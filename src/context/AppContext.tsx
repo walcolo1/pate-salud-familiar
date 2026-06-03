@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { 
   UserAccount, 
   FamilyGroup, 
@@ -52,6 +52,16 @@ import {
   writeAllOperationalTables,
   createIndividualMemberReport
 } from '../lib/googleSheetsOperational';
+import {
+  ensureOperationalToken,
+  ensureDriveToken,
+  ensureCalendarToken,
+  invalidateAllTokens,
+  getOperationalTokenIfValid,
+  isOperationalTokenValid,
+  hasAnyValidToken,
+  getTokenRemainingMinutes,
+} from '../lib/googleTokenManager';
 
 
 interface AppContextProps {
@@ -152,9 +162,17 @@ interface AppContextProps {
   syncNow: () => Promise<void>;
   exportBackupJSON: () => void;
 
-  // Estado de inicialización Google-native (carga automática al login)
-  syncInitStatus: 'idle' | 'checking' | 'loaded_from_google' | 'no_remote_data' | 'local_only' | 'error';
+  // Estado de inicialización automática Google-native
+  syncInitStatus: 'idle' | 'checking' | 'loaded_from_google' | 'no_remote_data' | 'local_only' | 'error' | 'needs_auth' | 'pending_sync';
   syncInitMessage: string | null;
+
+  // Auto-sync
+  pendingSyncCount: number;
+  autoSyncEnabled: boolean;
+  setAutoSyncEnabled: (v: boolean) => void;
+  needsGoogleAuth: boolean;
+  reconnectGoogle: () => Promise<void>;
+  flushPendingSync: () => Promise<void>;
 
   // Secure Google-Native Sharing Phase 3B
   sharedReports: SharedMemberReport[];
@@ -215,8 +233,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [sharedReports, setSharedReports] = useState<SharedMemberReport[]>([]);
 
   // Estado de inicialización automática desde Google al hacer login
-  const [syncInitStatus, setSyncInitStatus] = useState<'idle' | 'checking' | 'loaded_from_google' | 'no_remote_data' | 'local_only' | 'error'>('idle');
+  const [syncInitStatus, setSyncInitStatus] = useState<'idle' | 'checking' | 'loaded_from_google' | 'no_remote_data' | 'local_only' | 'error' | 'needs_auth' | 'pending_sync'>('idle');
   const [syncInitMessage, setSyncInitMessage] = useState<string | null>(null);
+
+  // Auto-sync
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(true);
+  const [needsGoogleAuth, setNeedsGoogleAuth] = useState<boolean>(false);
+  const autoSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSyncInProgress = useRef<boolean>(false);
 
 
   // 1. Carga inicial controlada del LocalStorage (únicamente del lado del cliente)
@@ -362,6 +387,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             }
           }
           setDeviceId(devId);
+
+          if (activeUser !== 'demo' && activeUser.provider === 'google') {
+            setTimeout(() => {
+              autoSyncOnLogin(activeUser);
+            }, 500);
+          }
         }
       } else {
         // No hay usuario activo (primer ingreso absoluto)
@@ -402,6 +433,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         }
         setDeviceId(devId);
+
       }
 
       // Registro del Service Worker para soporte PWA y Offline
@@ -594,10 +626,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Lanzar búsqueda automática en Google (no bloquea el login)
-      // Se ejecuta en background para detectar base remota existente
+      // Intento silencioso primero — sin popup si ya concedió permisos
       setIsLoading(false);
       setTimeout(() => {
-        initializeGoogleNativeState(realUser);
+        autoSyncOnLogin(realUser);
       }, 500);
       return;
     } else {
@@ -673,6 +705,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     setIsLoading(true);
     await new Promise((resolve) => setTimeout(resolve, 500));
+    // Cancelar timer de auto-sync pendiente
+    if (autoSyncTimerRef.current) {
+      clearTimeout(autoSyncTimerRef.current);
+      autoSyncTimerRef.current = null;
+    }
+    // Limpiar tokens en memoria (seguridad)
+    invalidateAllTokens();
     setActiveUser(null);
     setUser(null);
     setMembers([]);
@@ -699,8 +738,124 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLastPushAt(null);
     setAppDataFileId(null);
     setLastKnownRevision(0);
+    setPendingSyncCount(0);
+    setNeedsGoogleAuth(false);
+    setSyncInitStatus('idle');
+    setSyncInitMessage(null);
+    setOpSyncStatus('disconnected');
+    setOpSyncError(null);
+    setDriveAccessToken(null);
+    setCalendarAccessToken(null);
+    setSheetsAccessToken(null);
     setIsLoading(false);
   };
+
+  // ── FUNCIONES DE AUTO-SYNC ────────────────────────────────────────────────
+
+  /**
+   * scheduleAutoSync — Programa sincronización automática con debounce de 4s.
+   * Cancela el timer anterior si existía. No sincroniza si: no hay base de datos,
+   * el auto-sync está deshabilitado, o ya hay una sync en progreso.
+   * Si no hay token disponible, marca como pending_sync en lugar de fallar.
+   */
+  const scheduleAutoSync = (reason: string) => {
+    if (!autoSyncEnabled) return;
+    if (typeof window === 'undefined') return;
+
+    // Cancelar timer anterior
+    if (autoSyncTimerRef.current) {
+      clearTimeout(autoSyncTimerRef.current);
+    }
+
+    autoSyncTimerRef.current = setTimeout(async () => {
+      autoSyncTimerRef.current = null;
+
+      if (isSyncInProgress.current) return;
+
+      const token = getOperationalTokenIfValid();
+      if (!token) {
+        // Sin token disponible: marcar como pendiente
+        setPendingSyncCount(prev => prev + 1);
+        setSyncInitStatus('pending_sync');
+        setSyncInitMessage('Cambios pendientes de sincronizar. Conecta con Google para enviarlos.');
+        setNeedsGoogleAuth(true);
+        return;
+      }
+
+      // Con token: sincronizar automáticamente
+      isSyncInProgress.current = true;
+      try {
+        await syncNow();
+        setPendingSyncCount(0);
+        setNeedsGoogleAuth(false);
+      } catch (_) {
+        // Error silencioso en auto-sync — no interrumpir UX
+        setPendingSyncCount(prev => prev + 1);
+      } finally {
+        isSyncInProgress.current = false;
+      }
+    }, 4000);
+  };
+
+  /**
+   * flushPendingSync — Sincroniza inmediatamente si hay cambios pendientes y token válido.
+   */
+  const flushPendingSync = async (): Promise<void> => {
+    if (isSyncInProgress.current) return;
+    if (pendingSyncCount === 0) return;
+
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    try {
+      isSyncInProgress.current = true;
+      const token = await ensureOperationalToken(clientId, false);
+      if (token) {
+        await syncNow();
+        setPendingSyncCount(0);
+        setNeedsGoogleAuth(false);
+      }
+    } catch (_) {
+      // Si falla: mantener pending
+    } finally {
+      isSyncInProgress.current = false;
+    }
+  };
+
+  /**
+   * reconnectGoogle — Solicita token explícitamente con popup y luego flushea cambios pendientes.
+   * Solo se llama cuando el usuario hace clic en "Conectar Google" o "Reconectar".
+   */
+  const reconnectGoogle = async (): Promise<void> => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    setSyncInitStatus('checking');
+    setSyncInitMessage('Conectando con Google...');
+    setOpSyncError(null);
+
+    try {
+      // forcePrompt=false usa el popup normal de GIS (select_account)
+      await ensureOperationalToken(clientId, false);
+      setNeedsGoogleAuth(false);
+      setSyncInitStatus('checking');
+      setSyncInitMessage('Conectado. Sincronizando datos pendientes...');
+      await flushPendingSync();
+    } catch (err: any) {
+      const errMsg = err?.error || err?.message || 'Error desconocido';
+      const cancelled = errMsg === 'access_denied' || errMsg === 'popup_closed_by_user';
+      if (!cancelled) {
+        setSyncInitStatus('error');
+        setSyncInitMessage(`Error al conectar: ${errMsg}`);
+        setNeedsGoogleAuth(true);
+      } else {
+        setSyncInitStatus('pending_sync');
+        setSyncInitMessage('Autorización cancelada. Los cambios quedaron pendientes.');
+      }
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   const addMember = (member: Omit<FamilyMember, 'id' | 'familyGroupId'>) => {
     const newId = `member-${Date.now()}`;
@@ -722,6 +877,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       lastUpdated: new Date().toISOString()
     };
     setHealthProfiles((prev) => ({ ...prev, [newId]: newProfile }));
+    setTimeout(() => scheduleAutoSync('member_added'), 100);
 
     // Registrar hito en el historial clínico
     const newEvent: MedicalHistoryEvent = {
@@ -771,6 +927,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return m;
     }));
+    setTimeout(() => scheduleAutoSync('member_updated'), 100);
   };
 
   const deleteMember = (id: string): boolean => {
@@ -825,6 +982,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
       setHistory(prev => [newEvent, ...prev]);
     }
+    setTimeout(() => scheduleAutoSync('member_deleted'), 100);
     return true; 
   };
 
@@ -841,6 +999,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory(prev => [newEvent, ...prev]);
+    setTimeout(() => scheduleAutoSync('member_inactivated'), 100);
   };
 
   const reactivateMember = (memberId: string) => {
@@ -856,6 +1015,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory(prev => [newEvent, ...prev]);
+    setTimeout(() => scheduleAutoSync('member_reactivated'), 100);
   };
 
   const runAppointmentRetentionCleanup = () => {
@@ -915,6 +1075,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return appt;
     }));
+    if (updatedCount > 0) {
+      setTimeout(() => scheduleAutoSync('retention_cleanup'), 100);
+    }
   };
 
   const saveHealthProfile = (memberId: string, profileFields: Partial<HealthProfile>) => {
@@ -936,6 +1099,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       };
     });
+    setTimeout(() => scheduleAutoSync('health_profile_saved'), 100);
   };
 
   const addAppointment = (appt: Omit<MedicalAppointment, 'id' | 'documentIds'>) => {
@@ -973,12 +1137,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory((prev) => [newEvent, ...prev]);
+    setTimeout(() => scheduleAutoSync('appointment_added'), 100);
 
     // Sincronizar en segundo plano con Google Calendar si está habilitado
     if (calendarSyncEnabled) {
       setTimeout(() => {
         syncAppointmentToCalendar(newId, newAppt);
-      }, 100);
+      }, 200);
     }
   };
 
@@ -1008,6 +1173,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (status === 'COMPLETED') {
       setReminders((prev) => prev.map((r) => r.relatedEventId === id ? { ...r, status: 'DONE' } : r));
     }
+    setTimeout(() => scheduleAutoSync('appointment_status_updated'), 100);
   };
 
   const addCheckup = (chk: Omit<PeriodicCheckup, 'id'>) => {
@@ -1029,6 +1195,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory((prev) => [newEvent, ...prev]);
+    setTimeout(() => scheduleAutoSync('checkup_added'), 100);
   };
 
   const addVaccine = (vac: Omit<VaccineRecord, 'id'>) => {
@@ -1066,6 +1233,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory((prev) => [newEvent, ...prev]);
+    setTimeout(() => scheduleAutoSync('vaccine_added'), 100);
   };
 
   const addExam = (
@@ -1101,6 +1269,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory((prev) => [newEvent, ...prev]);
+    setTimeout(() => scheduleAutoSync('exam_added'), 100);
   };
 
   const connectDrive = async (): Promise<string | null> => {
@@ -1114,15 +1283,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setDriveStatus('authorizing');
     setDriveError(null);
     try {
-      const token = await requestDrivePermission(clientId);
+      // Usar TokenManager: primero intenta caché en memoria, luego popup
+      const token = await ensureDriveToken(clientId, false);
       setDriveAccessToken(token);
       setDriveStatus('connected');
       setLastDriveAuthTime(new Date().toISOString());
       return token;
     } catch (err: any) {
-      console.error('Error de autorización en Drive:', err.error || err.message || err);
+      const errCode = err?.error || err?.message || 'auth_error';
       setDriveStatus('error');
-      setDriveError(err.error || err.message || 'El usuario canceló o falló la autorización');
+      setDriveError(errCode === 'access_denied' ? 'Acceso denegado. Verifica que tu correo esté autorizado como tester.' : (errCode || 'El usuario canceló o falló la autorización'));
       return null;
     }
   };
@@ -1138,15 +1308,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCalendarStatus('authorizing');
     setCalendarError(null);
     try {
-      const token = await requestCalendarPermission(clientId);
+      // Usar TokenManager: intenta caché en memoria primero, luego popup
+      const token = await ensureCalendarToken(clientId, false);
       setCalendarAccessToken(token);
       setCalendarStatus('connected');
       setLastCalendarAuthTime(new Date().toISOString());
       return token;
     } catch (err: any) {
-      console.error('Error de autorización en Calendar:', err.error || err.message || err);
+      const errCode = err?.error || err?.message || 'auth_error';
       setCalendarStatus('error');
-      setCalendarError(err.error || err.message || 'El usuario canceló o falló la autorización');
+      setCalendarError(errCode === 'access_denied' ? 'Acceso denegado. Verifica que tu correo esté autorizado como tester.' : (errCode || 'El usuario canceló o falló la autorización'));
       return null;
     }
   };
@@ -1182,9 +1353,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )
     );
 
+    // Usar TokenManager: reusar token en memoria si está vigente
+    const clientId2 = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     let token = calendarAccessToken;
-    if (!token) {
-      token = await connectCalendar();
+    if (!token && clientId2) {
+      try {
+        token = await ensureCalendarToken(clientId2, false);
+        setCalendarAccessToken(token);
+        setLastCalendarAuthTime(new Date().toISOString());
+      } catch (_) {
+        token = null;
+      }
     }
 
     if (token) {
@@ -1263,10 +1442,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (driveSyncEnabled && clientId && file) {
       setDriveStatus('connecting');
       setDriveError(null);
+      // Usar TokenManager: reusar token en memoria si está vigente
       let token = driveAccessToken;
-      
       if (!token) {
-        token = await connectDrive();
+        try {
+          token = await ensureDriveToken(clientId, false);
+          setDriveAccessToken(token);
+          setLastDriveAuthTime(new Date().toISOString());
+          setDriveStatus('connected');
+        } catch (_) {
+          token = await connectDrive();
+        }
       }
 
       if (token) {
@@ -1305,6 +1491,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             createdAt: new Date().toISOString()
           };
           setHistory((prev) => [newEvent, ...prev]);
+          setTimeout(() => scheduleAutoSync('document_uploaded'), 100);
           return;
         } catch (uploadErr: any) {
           console.error('Error subiendo archivo a Google Drive:', uploadErr.message || uploadErr);
@@ -1346,14 +1533,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory((prev) => [newEvent, ...prev]);
+    setTimeout(() => scheduleAutoSync('document_uploaded_local'), 100);
   };
 
   const deleteDocument = (id: string) => {
     setDocuments((prev) => prev.filter((d) => d.id !== id));
+    setTimeout(() => scheduleAutoSync('document_deleted'), 100);
   };
 
   const completeTask = (id: string) => {
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: 'DONE' } : t)));
+    setTimeout(() => scheduleAutoSync('task_completed'), 100);
   };
 
   const toggleReminder = (id: string) => {
@@ -1362,6 +1552,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         r.id === id ? { ...r, status: r.status === 'DONE' ? 'PENDING' : 'DONE' } : r
       )
     );
+    setTimeout(() => scheduleAutoSync('reminder_toggled'), 100);
   };
 
   const setDriveSync = (enabled: boolean) => {
@@ -1395,15 +1586,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSheetsStatus('authorizing');
     setSheetsError(null);
     try {
-      const token = await requestSheetsPermission(clientId);
+      // Usar TokenManager: reusar token operacional si está vigente
+      const token = await ensureOperationalToken(clientId, false);
       setSheetsAccessToken(token);
       setSheetsStatus('connected');
       setLastSheetsAuthTime(new Date().toISOString());
       return token;
     } catch (err: any) {
-      console.error('Error de autorización en Sheets:', err.error || err.message || err);
+      const errCode = err?.error || err?.message || 'auth_error';
       setSheetsStatus('error');
-      setSheetsError(err.error || err.message || 'El usuario canceló o falló la autorización');
+      setSheetsError(errCode === 'access_denied' ? 'Acceso denegado. Verifica que tu correo esté autorizado como tester.' : (errCode || 'El usuario canceló o falló la autorización'));
       return null;
     }
   };
@@ -1412,8 +1604,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSheetsStatus('connecting');
     setSheetsError(null);
 
+    const clientId3 = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    // Intentar token desde caché del TokenManager primero
     let token = sheetsAccessToken;
-    if (!token) {
+    if (!token && clientId3) {
+      try {
+        token = await ensureOperationalToken(clientId3, false);
+        setSheetsAccessToken(token);
+        setLastSheetsAuthTime(new Date().toISOString());
+        setSheetsStatus('connected');
+      } catch (_) {
+        token = await connectSheets();
+      }
+    } else if (!token) {
       token = await connectSheets();
     }
 
@@ -1621,15 +1824,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
 
-  // ── INICIALIZACIÓN AUTOMÁTICA GOOGLE-NATIVE AL LOGIN ──────────────────────
+  // ── AUTO-SYNC AL LOGIN (intento silencioso) ───────────────────────────────
 
   /**
-   * initializeGoogleNativeState — Busca automáticamente en Google appDataFolder
-   * si existe una base operacional para este usuario. Si la encuentra, hace pull
-   * y actualiza el estado local. Se llama en background después del login.
-   * NO bloquea el UX — el usuario ya puede usar la app mientras esto corre.
+   * autoSyncOnLogin — Busca automáticamente en Google appDataFolder si existe
+   * una base operacional. Usa prompt:'' para intentar token SILENCIOSO sin popup.
+   * Si Google requiere consentimiento, setea needs_auth y muestra banner.
+   * NO bloquea el UX — el usuario puede usar la app mientras esto corre.
    */
-  const initializeGoogleNativeState = async (loggedUser: UserAccount): Promise<void> => {
+  const autoSyncOnLogin = async (loggedUser: UserAccount): Promise<void> => {
     if (!loggedUser || loggedUser.provider !== 'google') return;
 
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -1639,43 +1842,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSyncInitMessage('Buscando tu base de datos en Google...');
 
     try {
-      // Solicitar token con los 3 scopes necesarios
-      const token = await new Promise<string>((resolve, reject) => {
-        const google = (window as any).google;
-        if (!google?.accounts?.oauth2) {
-          reject(new Error('Google Identity Services no está cargado.'));
-          return;
-        }
-        const client = google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata',
-          prompt: '',  // No forzar popup si ya hay sesión activa
-          callback: (response: any) => {
-            if (response.error) {
-              // Si el usuario no autoriza automáticamente, no es un error fatal
-              // Solo significa que deberá hacer sync manual
-              reject(response);
-            } else if (response.access_token) {
-              resolve(response.access_token);
-            } else {
-              reject(new Error('No se obtuvo access_token.'));
-            }
-          },
-        });
-        client.requestAccessToken();
-      });
+      // ① Intento SILENCIOSO — no abre popup (prompt: '')
+      // Si GIS no puede renovar silenciosamente → lanza error 'interaction_required'
+      const token = await ensureOperationalToken(clientId, true /* silent */);
 
-      // Buscar pate-salud-config.json en el appDataFolder del usuario
+      // ② Con token: buscar config en appDataFolder
       const configFileId = await findConfigInAppData(token);
 
       if (!configFileId) {
-        // No hay base remota para este usuario
         setSyncInitStatus('no_remote_data');
-        setSyncInitMessage('Esta cuenta todavía no tiene datos en Google. Puedes crear tu base desde Configuración.');
+        setSyncInitMessage('Esta cuenta todavía no tiene datos en Google. Crea tu base desde Configuración.');
         return;
       }
 
-      // Leer la configuración
       const remoteConfig = await readConfigFromAppData(token, configFileId);
 
       if (!remoteConfig || !remoteConfig.databaseSpreadsheetId) {
@@ -1685,9 +1864,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       const remoteSheetId = remoteConfig.databaseSpreadsheetId as string;
-      const remoteSheetUrl = remoteConfig.databaseSpreadsheetUrl || `https://docs.google.com/spreadsheets/d/${remoteSheetId}`;
+      const remoteSheetUrl = remoteConfig.databaseSpreadsheetUrl ||
+        `https://docs.google.com/spreadsheets/d/${remoteSheetId}`;
 
-      // Actualizar IDs en el estado (el pull llenará los datos)
       setAppDataFileId(configFileId);
       setDatabaseSpreadsheetId(remoteSheetId);
       setDatabaseSpreadsheetUrl(remoteSheetUrl);
@@ -1696,32 +1875,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSharedReports(remoteConfig.permissionRefs.sharedReports);
       }
 
-      setSyncInitMessage('Base encontrada en Google. Cargando datos...');
-
-      // Leer y mergear datos desde la hoja operacional
+      setSyncInitMessage('Base encontrada. Cargando datos...');
       await pullFromGoogleInternal(token, remoteSheetId);
 
       setSyncInitStatus('loaded_from_google');
       setSyncInitMessage(`✅ Datos cargados desde Google (${new Date().toLocaleTimeString('es-CO')})`);
+      setNeedsGoogleAuth(false);
+      setPendingSyncCount(0);
 
     } catch (err: any) {
-      // Si el usuario no autoriza el popup o hay error de red, no es fatal
-      // Solo informamos que la carga automática no fue posible
-      const errMsg = err?.error || err?.message || 'Error desconocido';
-      const isUserCancelled = errMsg === 'access_denied' || errMsg === 'popup_closed_by_user' || errMsg === 'popup_failed_to_open';
+      const errCode = err?.error || err?.message || '';
+      const needsInteraction =
+        errCode === 'interaction_required' ||
+        errCode === 'consent_required' ||
+        errCode === 'login_required' ||
+        errCode === 'access_denied' ||
+        errCode === 'popup_closed_by_user' ||
+        errCode === 'popup_failed_to_open';
 
-      if (isUserCancelled) {
-        setSyncInitStatus('local_only');
-        setSyncInitMessage('Sincronización automática cancelada. Puedes sincronizar manualmente desde Configuración.');
+      if (needsInteraction) {
+        // No es un error — solo se requiere consentimiento del usuario
+        setSyncInitStatus('needs_auth');
+        setSyncInitMessage(
+          'Conecta con Google para cargar tus datos y habilitar la sincronización automática.'
+        );
+        setNeedsGoogleAuth(true);
       } else {
+        // Error de red u otro error técnico
         setSyncInitStatus('error');
-        setSyncInitMessage(`Error al conectar con Google: ${errMsg}. Sincroniza manualmente desde Configuración.`);
+        setSyncInitMessage(`Error al conectar: ${errCode || 'error desconocido'}. Intenta desde Configuración.`);
       }
     }
   };
 
   // ── CAPA OPERACIONAL GOOGLE-NATIVE FOUNDATION ACTIONS ──────────────────────
 
+  /**
+   * requestGoogleNativeToken — Obtiene token operacional via TokenManager.
+   * Intenta caché en memoria primero; si expiró, abre popup de GIS.
+   * NUNCA guarda el token en localStorage ni sessionStorage.
+   */
   const requestGoogleNativeToken = async (): Promise<string | null> => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) {
@@ -1733,31 +1926,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setOpSyncStatus('syncing');
     setOpSyncError(null);
     try {
-      return await new Promise<string>((resolve, reject) => {
-        const google = (window as any).google;
-        if (!google?.accounts?.oauth2) {
-          reject(new Error('Google Identity Services library is not loaded.'));
-          return;
-        }
-        const client = google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata',
-          callback: (response: any) => {
-            if (response.error) {
-              reject(response);
-            } else if (response.access_token) {
-              resolve(response.access_token);
-            } else {
-              reject(new Error('No access token returned.'));
-            }
-          },
-        });
-        client.requestAccessToken();
-      });
+      // Usar TokenManager: reusar token en memoria si es válido
+      return await ensureOperationalToken(clientId, false);
     } catch (err: any) {
-      console.error('Error de autorización para base de datos Google:', err);
+      const errCode = err?.error || err?.message || 'Error de autorización';
       setOpSyncStatus('error');
-      setOpSyncError(err.error || err.message || 'Error de autorización');
+      setOpSyncError(errCode);
       return null;
     }
   };
@@ -2534,7 +2708,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setHistory(prev => [shareEvent, ...prev]);
 
       // Sincronizar en lote a la base operacional Sheets en segundo plano
-      setTimeout(() => pushToGoogle(), 100);
+      setTimeout(() => scheduleAutoSync('document_shared'), 100);
 
       alert(`El documento "${doc.fileName}" se compartió con éxito.`);
     } catch (err: any) {
@@ -2607,7 +2781,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
       setHistory(prev => [revokeEvent, ...prev]);
 
-      setTimeout(() => pushToGoogle(), 100);
+      setTimeout(() => scheduleAutoSync('document_share_revoked'), 100);
 
       alert(`Se revocó con éxito el acceso de ${targetEmail} al documento.`);
     } catch (err: any) {
@@ -2932,6 +3106,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Estado de inicialización automática desde Google
       syncInitStatus,
       syncInitMessage,
+
+      // Auto-sync
+      pendingSyncCount,
+      autoSyncEnabled,
+      setAutoSyncEnabled,
+      needsGoogleAuth,
+      reconnectGoogle,
+      flushPendingSync,
 
       // Secure Google-Native Sharing Phase 3B Bindings
       sharedReports,
