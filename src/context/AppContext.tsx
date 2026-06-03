@@ -152,6 +152,10 @@ interface AppContextProps {
   syncNow: () => Promise<void>;
   exportBackupJSON: () => void;
 
+  // Estado de inicialización Google-native (carga automática al login)
+  syncInitStatus: 'idle' | 'checking' | 'loaded_from_google' | 'no_remote_data' | 'local_only' | 'error';
+  syncInitMessage: string | null;
+
   // Secure Google-Native Sharing Phase 3B
   sharedReports: SharedMemberReport[];
   shareDocumentWithMember: (documentId: string, email: string) => Promise<void>;
@@ -209,6 +213,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [lastKnownRevision, setLastKnownRevision] = useState<number>(0);
   const [appDataFileId, setAppDataFileId] = useState<string | null>(null);
   const [sharedReports, setSharedReports] = useState<SharedMemberReport[]>([]);
+
+  // Estado de inicialización automática desde Google al hacer login
+  const [syncInitStatus, setSyncInitStatus] = useState<'idle' | 'checking' | 'loaded_from_google' | 'no_remote_data' | 'local_only' | 'error'>('idle');
+  const [syncInitMessage, setSyncInitMessage] = useState<string | null>(null);
 
 
   // 1. Carga inicial controlada del LocalStorage (únicamente del lado del cliente)
@@ -538,6 +546,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSyncStrategy(savedState.syncStrategy || 'LAST_WRITE_WINS');
         setLastKnownRevision(savedState.lastKnownRevision || 0);
         setAppDataFileId(savedState.appDataFileId || null);
+        // Marcar como cargado desde caché local; el pull automático se lanza en background
+        setSyncInitStatus('local_only');
+        setSyncInitMessage('Datos cargados desde caché local. Puedes sincronizar desde Configuración.');
       } else {
         // Inicialización limpia por primera vez para usuario real nuevo
         setUser(realUser);
@@ -566,6 +577,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSyncStrategy('LAST_WRITE_WINS');
         setLastKnownRevision(0);
         setAppDataFileId(null);
+        setSyncInitStatus('idle');
+        setSyncInitMessage(null);
         
         // Registrar auditoría inicial
         const newEvent: MedicalHistoryEvent = {
@@ -579,6 +592,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
         setHistory([newEvent]);
       }
+
+      // Lanzar búsqueda automática en Google (no bloquea el login)
+      // Se ejecuta en background para detectar base remota existente
+      setIsLoading(false);
+      setTimeout(() => {
+        initializeGoogleNativeState(realUser);
+      }, 500);
+      return;
     } else {
       // Sesión Demo
       setActiveUser('demo');
@@ -1600,6 +1621,105 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
 
+  // ── INICIALIZACIÓN AUTOMÁTICA GOOGLE-NATIVE AL LOGIN ──────────────────────
+
+  /**
+   * initializeGoogleNativeState — Busca automáticamente en Google appDataFolder
+   * si existe una base operacional para este usuario. Si la encuentra, hace pull
+   * y actualiza el estado local. Se llama en background después del login.
+   * NO bloquea el UX — el usuario ya puede usar la app mientras esto corre.
+   */
+  const initializeGoogleNativeState = async (loggedUser: UserAccount): Promise<void> => {
+    if (!loggedUser || loggedUser.provider !== 'google') return;
+
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    setSyncInitStatus('checking');
+    setSyncInitMessage('Buscando tu base de datos en Google...');
+
+    try {
+      // Solicitar token con los 3 scopes necesarios
+      const token = await new Promise<string>((resolve, reject) => {
+        const google = (window as any).google;
+        if (!google?.accounts?.oauth2) {
+          reject(new Error('Google Identity Services no está cargado.'));
+          return;
+        }
+        const client = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata',
+          prompt: '',  // No forzar popup si ya hay sesión activa
+          callback: (response: any) => {
+            if (response.error) {
+              // Si el usuario no autoriza automáticamente, no es un error fatal
+              // Solo significa que deberá hacer sync manual
+              reject(response);
+            } else if (response.access_token) {
+              resolve(response.access_token);
+            } else {
+              reject(new Error('No se obtuvo access_token.'));
+            }
+          },
+        });
+        client.requestAccessToken();
+      });
+
+      // Buscar pate-salud-config.json en el appDataFolder del usuario
+      const configFileId = await findConfigInAppData(token);
+
+      if (!configFileId) {
+        // No hay base remota para este usuario
+        setSyncInitStatus('no_remote_data');
+        setSyncInitMessage('Esta cuenta todavía no tiene datos en Google. Puedes crear tu base desde Configuración.');
+        return;
+      }
+
+      // Leer la configuración
+      const remoteConfig = await readConfigFromAppData(token, configFileId);
+
+      if (!remoteConfig || !remoteConfig.databaseSpreadsheetId) {
+        setSyncInitStatus('no_remote_data');
+        setSyncInitMessage('La configuración remota existe pero no tiene base operacional asociada.');
+        return;
+      }
+
+      const remoteSheetId = remoteConfig.databaseSpreadsheetId as string;
+      const remoteSheetUrl = remoteConfig.databaseSpreadsheetUrl || `https://docs.google.com/spreadsheets/d/${remoteSheetId}`;
+
+      // Actualizar IDs en el estado (el pull llenará los datos)
+      setAppDataFileId(configFileId);
+      setDatabaseSpreadsheetId(remoteSheetId);
+      setDatabaseSpreadsheetUrl(remoteSheetUrl);
+
+      if (remoteConfig.permissionRefs?.sharedReports) {
+        setSharedReports(remoteConfig.permissionRefs.sharedReports);
+      }
+
+      setSyncInitMessage('Base encontrada en Google. Cargando datos...');
+
+      // Leer y mergear datos desde la hoja operacional
+      await pullFromGoogleInternal(token, remoteSheetId);
+
+      setSyncInitStatus('loaded_from_google');
+      setSyncInitMessage(`✅ Datos cargados desde Google (${new Date().toLocaleTimeString('es-CO')})`);
+
+    } catch (err: any) {
+      // Si el usuario no autoriza el popup o hay error de red, no es fatal
+      // Solo informamos que la carga automática no fue posible
+      const errMsg = err?.error || err?.message || 'Error desconocido';
+      const isUserCancelled = errMsg === 'access_denied' || errMsg === 'popup_closed_by_user' || errMsg === 'popup_failed_to_open';
+
+      if (isUserCancelled) {
+        setSyncInitStatus('local_only');
+        setSyncInitMessage('Sincronización automática cancelada. Puedes sincronizar manualmente desde Configuración.');
+      } else {
+        setSyncInitStatus('error');
+        setSyncInitMessage(`Error al conectar con Google: ${errMsg}. Sincroniza manualmente desde Configuración.`);
+      }
+    }
+  };
+
   // ── CAPA OPERACIONAL GOOGLE-NATIVE FOUNDATION ACTIONS ──────────────────────
 
   const requestGoogleNativeToken = async (): Promise<string | null> => {
@@ -2064,6 +2184,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setDatabaseSpreadsheetId(sheetId);
           setDatabaseSpreadsheetUrl(remoteConfig.databaseSpreadsheetUrl);
           setAppDataFileId(configId);
+          if (remoteConfig.permissionRefs?.sharedReports) {
+            setSharedReports(remoteConfig.permissionRefs.sharedReports);
+          }
         }
       }
     }
@@ -2078,14 +2201,215 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       setOpSyncStatus('syncing');
       
-      // Pull
-      await pullFromGoogleInternal(token, sheetId);
-      
-      // Push
-      await pushToGoogleInternal(token, sheetId);
+      // FASE 1: Pull — Leer el estado remoto y obtener el estado fusionado
+      // IMPORTANTE: No llamamos pullFromGoogleInternal porque ese método actualiza
+      // React state, y el push inmediato capturaría el closure viejo (race condition).
+      // En cambio, leemos directamente el estado remoto y construimos el merge aquí.
+      const remoteState = await readAllOperationalTables(token, sheetId);
 
+      // Función de merge LWW reutilizable
+      const mergeEntitiesSync = <T extends { id: string; updatedAt?: string; deletedAt?: string | null }>(localArray: T[], remoteArray: T[]): T[] => {
+        const merged: T[] = [...localArray];
+        remoteArray.forEach(remoteItem => {
+          const localIdx = merged.findIndex(l => l.id === remoteItem.id);
+          if (localIdx >= 0) {
+            const localUpdate = merged[localIdx].updatedAt ? new Date(merged[localIdx].updatedAt!).getTime() : 0;
+            const remoteUpdate = remoteItem.updatedAt ? new Date(remoteItem.updatedAt).getTime() : 0;
+            if (remoteUpdate > localUpdate) {
+              merged[localIdx] = { ...remoteItem, syncStatus: 'SYNCED' } as any;
+            }
+          } else if (!remoteItem.deletedAt) {
+            merged.push({ ...remoteItem, syncStatus: 'SYNCED' } as any);
+          }
+        });
+        return merged;
+      };
+
+      // Calcular el estado fusionado sin depender de React state post-set
+      // Capturamos el estado actual (pre-pull) de las colecciones locales
+      // y lo mergeamos con el remoto para obtener el estado final correcto.
+      const mergedMembers = remoteState.Miembros ? mergeEntitiesSync(members, remoteState.Miembros) : members;
+      const mergedAppointments = remoteState.Citas ? mergeEntitiesSync(appointments, remoteState.Citas) : appointments;
+      const mergedCheckups = remoteState.Controles ? mergeEntitiesSync(checkups, remoteState.Controles) : checkups;
+      const mergedVaccines = remoteState.Vacunas ? mergeEntitiesSync(vaccines, remoteState.Vacunas) : vaccines;
+      const mergedExams = remoteState.Examenes ? mergeEntitiesSync(exams, remoteState.Examenes) : exams;
+      const mergedDocuments = remoteState.Documentos ? mergeEntitiesSync(documents, remoteState.Documentos) : documents;
+      const mergedHistory = remoteState.HistorialClinico ? mergeEntitiesSync(history, remoteState.HistorialClinico) : history;
+
+      // Merge health profiles (Record<string, HealthProfile>)
+      const mergedProfiles = { ...healthProfiles };
+      if (remoteState.FichasMedicas) {
+        remoteState.FichasMedicas.forEach((remoteProf: any) => {
+          const localProf = mergedProfiles[remoteProf.memberId];
+          const localUpdate = localProf?.updatedAt ? new Date(localProf.updatedAt).getTime() : 0;
+          const remoteUpdate = remoteProf.updatedAt ? new Date(remoteProf.updatedAt).getTime() : 0;
+          if (!localProf || remoteUpdate > localUpdate) {
+            mergedProfiles[remoteProf.memberId] = { ...remoteProf, syncStatus: 'SYNCED' };
+          }
+        });
+      }
+
+      // Actualizar React state con el resultado fusionado
+      setMembers(mergedMembers);
+      setAppointments(mergedAppointments);
+      setCheckups(mergedCheckups);
+      setVaccines(mergedVaccines);
+      setExams(mergedExams);
+      setDocuments(mergedDocuments);
+      setHistory(mergedHistory);
+      setHealthProfiles(mergedProfiles);
+      setLastPullAt(new Date().toISOString());
+
+      // FASE 2: Push — Usar el estado fusionado calculado (no el closure viejo)
+      const email = user?.email || 'titular@correo.com';
+      const uid = user?.googleId || user?.id || 'unknown';
+
+      const operationalStateSnapshot = {
+        Config: [
+          { Key: 'ownerEmail', Value: email, Description: 'Dueño de la base', updatedAt: new Date().toISOString() },
+          { Key: 'ownerGoogleId', Value: uid, Description: 'Google ID del dueño', updatedAt: new Date().toISOString() },
+          { Key: 'familyGroupId', Value: 'family-001', Description: 'ID de familia', updatedAt: new Date().toISOString() }
+        ],
+        Usuarios: [
+          { id: user?.id || 'user-01', googleId: uid, displayName: user?.displayName || 'Titular', email: email, photoUrl: user?.photoUrl || '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+        ],
+        Familias: [
+          { id: 'family-001', ownerId: user?.id || 'user-01', name: 'Grupo Familiar', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+        ],
+        Miembros: mergedMembers.map(m => ({
+          ...m,
+          ownerEmail: m.ownerEmail || email,
+          ownerGoogleId: m.ownerGoogleId || uid,
+          sourceDeviceId: m.sourceDeviceId || deviceId,
+          createdAt: m.createdAt || new Date().toISOString(),
+          updatedAt: m.updatedAt || new Date().toISOString(),
+          deletedAt: m.deletedAt || null
+        })),
+        Permisos: mergedMembers.map(m => ({
+          memberId: m.id,
+          canManageOwnProfile: m.permissions?.canManageOwnProfile ?? true,
+          canManageOwnAppointments: m.permissions?.canManageOwnAppointments ?? true,
+          canManageOwnDocuments: m.permissions?.canManageOwnDocuments ?? true,
+          canViewOwnHistory: m.permissions?.canViewOwnHistory ?? true,
+          canUploadDocuments: m.permissions?.canUploadDocuments ?? true,
+          canExportOwnData: m.permissions?.canExportOwnData ?? false,
+          canViewFamilyData: m.permissions?.canViewFamilyData ?? false,
+          canManageFamilyData: m.permissions?.canManageFamilyData ?? false,
+          ownerEmail: m.ownerEmail || email,
+          ownerGoogleId: m.ownerGoogleId || uid,
+          sourceDeviceId: m.sourceDeviceId || deviceId,
+          createdAt: m.createdAt || new Date().toISOString(),
+          updatedAt: m.updatedAt || new Date().toISOString(),
+          deletedAt: m.deletedAt || null
+        })),
+        FichasMedicas: Object.values(mergedProfiles).map(hp => ({
+          ...hp,
+          ownerEmail: (hp as any).ownerEmail || email,
+          ownerGoogleId: (hp as any).ownerGoogleId || uid,
+          sourceDeviceId: (hp as any).sourceDeviceId || deviceId,
+          createdAt: (hp as any).createdAt || new Date().toISOString(),
+          updatedAt: (hp as any).updatedAt || new Date().toISOString(),
+          deletedAt: (hp as any).deletedAt || null
+        })),
+        Citas: mergedAppointments.map(a => ({
+          ...a,
+          ownerEmail: a.ownerEmail || email,
+          ownerGoogleId: a.ownerGoogleId || uid,
+          sourceDeviceId: a.sourceDeviceId || deviceId,
+          createdAt: a.createdAt || new Date().toISOString(),
+          updatedAt: a.updatedAt || new Date().toISOString(),
+          deletedAt: a.deletedAt || null
+        })),
+        Controles: mergedCheckups.map(c => ({
+          ...c,
+          ownerEmail: c.ownerEmail || email,
+          ownerGoogleId: c.ownerGoogleId || uid,
+          sourceDeviceId: c.sourceDeviceId || deviceId,
+          createdAt: c.createdAt || new Date().toISOString(),
+          updatedAt: c.updatedAt || new Date().toISOString(),
+          deletedAt: c.deletedAt || null
+        })),
+        Vacunas: mergedVaccines.map(v => ({
+          ...v,
+          ownerEmail: v.ownerEmail || email,
+          ownerGoogleId: v.ownerGoogleId || uid,
+          sourceDeviceId: v.sourceDeviceId || deviceId,
+          createdAt: v.createdAt || new Date().toISOString(),
+          updatedAt: v.updatedAt || new Date().toISOString(),
+          deletedAt: v.deletedAt || null
+        })),
+        Examenes: mergedExams.map(e => ({
+          ...e,
+          ownerEmail: e.ownerEmail || email,
+          ownerGoogleId: e.ownerGoogleId || uid,
+          sourceDeviceId: e.sourceDeviceId || deviceId,
+          createdAt: e.createdAt || new Date().toISOString(),
+          updatedAt: e.updatedAt || new Date().toISOString(),
+          deletedAt: e.deletedAt || null
+        })),
+        Documentos: mergedDocuments.map(d => ({
+          ...d,
+          ownerEmail: d.ownerEmail || email,
+          ownerGoogleId: d.ownerGoogleId || uid,
+          sourceDeviceId: d.sourceDeviceId || deviceId,
+          createdAt: d.createdAt || new Date().toISOString(),
+          updatedAt: d.updatedAt || new Date().toISOString(),
+          deletedAt: d.deletedAt || null
+        })),
+        HistorialClinico: mergedHistory.map(h => ({
+          ...h,
+          ownerEmail: h.ownerEmail || email,
+          ownerGoogleId: h.ownerGoogleId || uid,
+          sourceDeviceId: h.sourceDeviceId || deviceId,
+          createdAt: h.createdAt || new Date().toISOString(),
+          updatedAt: h.updatedAt || new Date().toISOString(),
+          deletedAt: h.deletedAt || null
+        })),
+        Auditoria: mergedHistory
+          .filter(h => h.title.includes('Miembro') || h.title.includes('Borrado') || h.title.includes('Permisos') || h.title.includes('Cita'))
+          .map(h => ({
+            id: h.id,
+            timestamp: h.createdAt || new Date().toISOString(),
+            userId: uid,
+            userEmail: email,
+            action: h.title,
+            details: h.description || '',
+            deviceId: deviceId || 'unknown',
+            createdAt: h.createdAt || new Date().toISOString()
+          })),
+        Retencion: [],
+        SyncLog: mergedHistory
+          .filter(h => h.title.includes('sincronización') || h.title.includes('Conflicto'))
+          .map(h => ({
+            id: h.id,
+            timestamp: h.createdAt || new Date().toISOString(),
+            deviceId: deviceId || 'unknown',
+            actorEmail: email,
+            tableName: 'history',
+            entityId: h.id,
+            actionType: 'SYNC',
+            fieldName: 'syncStatus',
+            localValue: h.title,
+            remoteValue: h.description,
+            resolution: 'LWW',
+            createdAt: h.createdAt || new Date().toISOString()
+          }))
+      };
+
+      await writeAllOperationalTables(token, sheetId, operationalStateSnapshot);
+
+      // Marcar todos como SYNCED
+      const now = new Date().toISOString();
+      setMembers(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
+      setAppointments(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
+      setCheckups(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
+      setVaccines(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
+      setExams(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
+      setDocuments(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
+
+      setLastPushAt(now);
+      setLastSyncAt(now);
       setOpSyncStatus('synced');
-      setLastSyncAt(new Date().toISOString());
     } catch (err: any) {
       console.error('Error durante la sincronización total:', err);
       setOpSyncStatus('error');
@@ -2604,6 +2928,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pushToGoogle,
       syncNow,
       exportBackupJSON,
+
+      // Estado de inicialización automática desde Google
+      syncInitStatus,
+      syncInitMessage,
 
       // Secure Google-Native Sharing Phase 3B Bindings
       sharedReports,

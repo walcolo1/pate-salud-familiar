@@ -57,6 +57,7 @@ export default function SettingsPage() {
     setSimulatedEmail,
     runAppointmentRetentionCleanup,
     appointments,
+    members,
     databaseSpreadsheetId,
     databaseSpreadsheetUrl,
     lastSyncAt,
@@ -73,7 +74,9 @@ export default function SettingsPage() {
     sharedReports,
     revokeMemberReportShare,
     documents,
-    revokeDocumentShare
+    revokeDocumentShare,
+    syncInitStatus,
+    syncInitMessage
   } = useApp();
 
   const [isExporting, setIsExporting] = useState(false);
@@ -484,6 +487,37 @@ export default function SettingsPage() {
         
         <hr className="border-slate-50" />
 
+        {/* Banner de Estado de Inicialización Automática */}
+        {user?.provider === 'google' && syncInitStatus !== 'idle' && (
+          <div className={`p-3 rounded-2xl border text-[10px] font-semibold leading-relaxed flex items-start gap-2.5 ${
+            syncInitStatus === 'checking'
+              ? 'bg-blue-50 border-blue-100 text-blue-700'
+              : syncInitStatus === 'loaded_from_google'
+              ? 'bg-emerald-50 border-emerald-100 text-emerald-800'
+              : syncInitStatus === 'no_remote_data'
+              ? 'bg-amber-50 border-amber-100 text-amber-700'
+              : syncInitStatus === 'local_only'
+              ? 'bg-slate-50 border-slate-200 text-slate-600'
+              : syncInitStatus === 'error'
+              ? 'bg-rose-50 border-rose-100 text-rose-700'
+              : 'bg-slate-50 border-slate-200 text-slate-600'
+          }`}>
+            {syncInitStatus === 'checking' && (
+              <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 mt-0.5" />
+            )}
+            <span className="font-extrabold">
+              {syncInitStatus === 'checking' && 'Buscando base de datos en Google...'}
+              {syncInitStatus === 'loaded_from_google' && '✅ Datos cargados desde Google'}
+              {syncInitStatus === 'no_remote_data' && '⚠️ Esta cuenta todavía no tiene datos en Google'}
+              {syncInitStatus === 'local_only' && '💾 Datos cargados desde caché local'}
+              {syncInitStatus === 'error' && '❌ Error al conectar con Google'}
+            </span>
+            {syncInitMessage && syncInitStatus !== 'checking' && (
+              <span className="block text-[9px] font-medium opacity-80 mt-0.5">{syncInitMessage}</span>
+            )}
+          </div>
+        )}
+
         <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[10px] text-slate-500 leading-relaxed">
           <div className="flex justify-between">
             <span>Dueño de la Base:</span>
@@ -506,6 +540,10 @@ export default function SettingsPage() {
             <span className="font-bold text-slate-700">{lastPushAt ? new Date(lastPushAt).toLocaleString('es-CO') : 'Nunca'}</span>
           </div>
           <div className="flex justify-between text-[9px]">
+            <span>Registros locales (miembros):</span>
+            <span className="font-bold text-slate-700">{members.length}</span>
+          </div>
+          <div className="flex justify-between text-[9px]">
             <span>Identificador Dispositivo:</span>
             <span className="font-bold text-slate-700 truncate max-w-[150px]">{deviceId || 'Desconocido'}</span>
           </div>
@@ -526,74 +564,101 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Botones de acción */}
+          {/* Botones de acción — SIEMPRE visibles para el flujo de dispositivo B */}
           <div className="flex flex-col gap-2 mt-2">
-            {!databaseSpreadsheetId ? (
+
+            {/* Fila 1: Sincronizar / Crear base */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => syncNow()}
+                disabled={opSyncStatus === 'syncing'}
+                className="py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
+              >
+                {opSyncStatus === 'syncing' ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <span>Sincronizar ahora</span>
+                )}
+              </button>
               <button
                 onClick={() => createGoogleNativeDatabase()}
                 disabled={opSyncStatus === 'syncing'}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold text-xs rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                className="py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
               >
                 {opSyncStatus === 'syncing' ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>Inicializando...</span>
-                  </>
+                  <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
-                  <span>Crear base Google-native</span>
+                  <span>{databaseSpreadsheetId ? 'Verificar base' : 'Crear base Google-native'}</span>
                 )}
               </button>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => syncNow()}
-                    disabled={opSyncStatus === 'syncing'}
-                    className="py-2 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    {opSyncStatus === 'syncing' ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <span>Sincronizar ahora</span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => exportBackupJSON()}
-                    className="py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <span>Respaldar JSON</span>
-                  </button>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => pullFromGoogle()}
-                    disabled={opSyncStatus === 'syncing'}
-                    className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-[10px] rounded-xl border border-slate-200 transition-colors"
-                  >
-                    <span>Cargar desde Google</span>
-                  </button>
-                  <button
-                    onClick={() => pushToGoogle()}
-                    disabled={opSyncStatus === 'syncing'}
-                    className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-[10px] rounded-xl border border-slate-200 transition-colors"
-                  >
-                    <span>Enviar cambios locales</span>
-                  </button>
-                </div>
+            </div>
 
-                {databaseSpreadsheetUrl && (
-                  <a
-                    href={databaseSpreadsheetUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full py-2 bg-slate-800 hover:bg-slate-900 active:bg-black text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5 text-center mt-1"
-                  >
-                    <Grid3X3 className="h-3.5 w-3.5" />
-                    <span>Ver hoja operacional</span>
-                  </a>
+            {/* Fila 2: Pull / Push individual */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => pullFromGoogle()}
+                disabled={opSyncStatus === 'syncing'}
+                className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-[10px] rounded-xl border border-slate-200 transition-colors flex items-center justify-center gap-1"
+              >
+                {opSyncStatus === 'syncing' ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <span>Cargar desde Google</span>
                 )}
-              </>
+              </button>
+              <button
+                onClick={() => pushToGoogle()}
+                disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
+                className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-[10px] rounded-xl border border-slate-200 transition-colors flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {opSyncStatus === 'syncing' ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <span>Enviar cambios locales</span>
+                )}
+              </button>
+            </div>
+
+            {/* Fila 3: Respaldo JSON + Ver hoja */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => exportBackupJSON()}
+                className="py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
+              >
+                <span>Respaldar JSON</span>
+              </button>
+              {databaseSpreadsheetUrl ? (
+                <a
+                  href={databaseSpreadsheetUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="py-2 bg-slate-800 hover:bg-slate-900 active:bg-black text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5 text-center"
+                >
+                  <Grid3X3 className="h-3.5 w-3.5" />
+                  <span>Ver hoja operacional</span>
+                </a>
+              ) : (
+                <div className="py-2 bg-slate-100 text-slate-400 font-extrabold text-[10px] rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-not-allowed">
+                  <span>Sin hoja aún</span>
+                </div>
+              )}
+            </div>
+
+            {/* Mensajes cláros de estado */}
+            {syncInitStatus === 'no_remote_data' && (
+              <p className="text-[9px] text-amber-700 font-semibold bg-amber-50 p-2 rounded-xl border border-amber-100">
+                ⚠️ Esta cuenta todavía no tiene datos en Google. Haz clic en “Crear base Google-native” para inicializar.
+              </p>
+            )}
+            {syncInitStatus === 'loaded_from_google' && (
+              <p className="text-[9px] text-emerald-700 font-semibold bg-emerald-50 p-2 rounded-xl border border-emerald-100">
+                ✅ Datos guardados en Google — cargados correctamente en este dispositivo.
+              </p>
+            )}
+            {syncInitStatus === 'local_only' && databaseSpreadsheetId && (
+              <p className="text-[9px] text-blue-700 font-semibold bg-blue-50 p-2 rounded-xl border border-blue-100">
+                Hay datos remotos disponibles. Presiona “Cargar desde Google” para recuperar cambios de otros dispositivos.
+              </p>
             )}
           </div>
         </div>
