@@ -34,6 +34,7 @@ export default function SettingsPage() {
     isLoading,
     clearAllData,
     restoreDemoData,
+    clearDemoData,
     exportState,
     driveStatus,
     driveError,
@@ -881,33 +882,67 @@ export default function SettingsPage() {
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-2.5 mt-1">
-            <button
-              onClick={() => {
-                if (window.confirm('¿Estás seguro de que deseas restaurar la base de datos de demostración? Esto sobrescribirá todos tus cambios actuales.')) {
-                  restoreDemoData();
-                  alert('Base de datos demo restaurada con éxito.');
-                }
-              }}
-              className="h-10 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-amber-100"
-            >
-              <RotateCcw className="h-4 w-4" />
-              <span>Restaurar Demo</span>
-            </button>
-            
-            <button
-              onClick={() => {
-                if (window.confirm('¿Estás seguro de que deseas eliminar TODOS los datos locales de salud familiar? Esta acción no se puede deshacer.')) {
-                  clearAllData();
-                  alert('Datos locales eliminados. Por favor inicia sesión de nuevo.');
-                  router.push('/login');
-                }
-              }}
-              className="h-10 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-rose-100 animate-pulse"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span>Limpiar Datos</span>
-            </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-1">
+            {user?.provider === 'mock' ? (
+              <>
+                <button
+                  onClick={() => {
+                    if (window.confirm('¿Estás seguro de que deseas restaurar la base de datos de demostración? Esto sobrescribirá todos tus cambios actuales.')) {
+                      restoreDemoData();
+                      alert('Base de datos demo restaurada con éxito.');
+                    }
+                  }}
+                  className="h-10 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-amber-100"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span>Restaurar Demo</span>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (window.confirm('¿Estás seguro de que deseas eliminar los datos de demostración de este navegador?')) {
+                      clearDemoData();
+                      clearAllData();
+                      alert('Datos demo eliminados de este navegador.');
+                      router.push('/login');
+                    }
+                  }}
+                  className="h-10 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-rose-100"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Limpiar Datos Demo</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    if (window.confirm('¿Estás seguro de que deseas reiniciar tu cuenta en este navegador? Esto eliminará tus datos locales de esta cuenta pero conservará intactos tus archivos en Google Drive y Sheets.')) {
+                      clearAllData();
+                      alert('Datos locales de la cuenta reiniciados con éxito.');
+                      router.push('/login');
+                    }
+                  }}
+                  className="h-10 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-rose-100"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Reiniciar Cuenta Actual</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (window.confirm('¿Estás seguro de que deseas eliminar los datos demo de este navegador? Esto no afectará a tus datos reales.')) {
+                      clearDemoData();
+                      alert('Datos demo eliminados de este navegador con éxito.');
+                    }
+                  }}
+                  className="h-10 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-100"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span>Limpiar Datos Demo</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </section>

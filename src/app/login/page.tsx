@@ -116,6 +116,13 @@ export default function LoginPage() {
             <p className="text-[9px] text-teal-200/50 leading-relaxed font-bold tracking-wide mt-1 text-center">
               Autenticación de sesión operada y provista directamente por Google OAuth.
             </p>
+            <button
+              onClick={handleSignIn}
+              disabled={isLoading || localLoading}
+              className="mt-3 text-xs font-bold text-teal-200/60 hover:text-teal-100 transition-colors duration-200 underline decoration-dashed decoration-teal-200/30 underline-offset-4"
+            >
+              ¿Quieres probar la app sin tu cuenta de Google? Iniciar en Modo Demostración
+            </button>
           </div>
         ) : (
           /* Fallback Mock de Desarrollo para pruebas sin variables de entorno */

@@ -37,7 +37,7 @@ import {
   mockReminders, 
   mockTasks 
 } from '../data/mockData';
-import { loadAppState, saveAppState, clearAppState, exportDataAsJSON } from '../data/persistence';
+import { loadAppState, saveAppState, clearAppState, exportDataAsJSON, getActiveUser, setActiveUser } from '../data/persistence';
 import { requestDrivePermission, resolveDrivePath, uploadFile, shareFileWithUser, revokeFileShare } from '../lib/googleDrive';
 import { requestCalendarPermission, createCalendarEvent } from '../lib/googleCalendar';
 import { requestSheetsPermission, exportFamilyHealthWorkbook } from '../lib/googleSheets';
@@ -134,6 +134,7 @@ interface AppContextProps {
   // Métodos de administración local y persistencia
   clearAllData: () => void;
   restoreDemoData: () => void;
+  clearDemoData: () => void;
   exportState: () => void;
 
   // Capa Operacional Google-Native Foundation
@@ -213,92 +214,169 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // 1. Carga inicial controlada del LocalStorage (únicamente del lado del cliente)
   useEffect(() => {
     try {
-      const savedState = loadAppState();
+      const activeUser = getActiveUser();
       
-      if (savedState) {
-        setUser(savedState.user);
+      if (activeUser) {
+        const userEmailOrId = activeUser === 'demo' ? 'demo' : (activeUser.googleId || activeUser.email);
+        const savedState = loadAppState(userEmailOrId);
         
-        // Backwards compatibility sanitization
-        const sanitizedMembers = (savedState.members || []).map(m => ({
-          ...m,
-          status: m.status || 'ACTIVE'
-        }));
-        setMembers(sanitizedMembers);
-        
-        setHealthProfiles(savedState.healthProfiles || {});
-        
-        const sanitizedAppointments = (savedState.appointments || []).map(a => ({
-          ...a,
-          retentionStatus: a.retentionStatus || 'ACTIVE',
-          completedAt: a.status === 'COMPLETED' && !a.completedAt ? a.scheduledAt : a.completedAt
-        }));
-        setAppointments(sanitizedAppointments);
-        
-        setCheckups(savedState.checkups || []);
-        setVaccines(savedState.vaccines || []);
-        setExams(savedState.exams || []);
-        setExamResults(savedState.examResults || {});
-        setDocuments(savedState.documents || []);
-        setHistory(savedState.history || []);
-        setReminders(savedState.reminders || []);
-        setTasks(savedState.tasks || []);
-        setSharedReports(savedState.sharedReports || []);
-        setDriveSyncEnabled(savedState.driveSyncEnabled);
-        setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
-        setLastExportMetadata(savedState.lastExportMetadata !== undefined ? savedState.lastExportMetadata : null);
-        setSimulatedRole(savedState.simulatedRole !== undefined ? savedState.simulatedRole : null);
-        setSimulatedEmail(savedState.simulatedEmail !== undefined ? savedState.simulatedEmail : null);
-
-        // Capa Operacional Google-Native Foundation Configs Load
-        setDatabaseSpreadsheetId(savedState.databaseSpreadsheetId || null);
-        setDatabaseSpreadsheetUrl(savedState.databaseSpreadsheetUrl || null);
-        setLastSyncAt(savedState.lastSyncAt || null);
-        setLastPullAt(savedState.lastPullAt || null);
-        setLastPushAt(savedState.lastPushAt || null);
-        setSyncStrategy(savedState.syncStrategy || 'LAST_WRITE_WINS');
-        setLastKnownRevision(savedState.lastKnownRevision || 0);
-        setAppDataFileId(savedState.appDataFileId || null);
-
-        let devId = savedState.deviceId;
-        if (!devId && typeof window !== 'undefined') {
-          devId = window.localStorage.getItem('pate_salud_device_id');
-        }
-        if (!devId) {
-          devId = `dev-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem('pate_salud_device_id', devId);
+        if (savedState) {
+          if (activeUser === 'demo') {
+            setUser({
+              ...mockUser,
+              provider: 'mock',
+              loggedAt: new Date().toISOString()
+            });
+          } else {
+            setUser(activeUser);
           }
-        }
-        setDeviceId(devId);
-      } else {
-        // Inicialización con MockData por primera vez
-        const sanitizedMockMembers = mockMembers.map(m => ({ ...m, status: 'ACTIVE' as const }));
-        const sanitizedMockAppointments = mockAppointments.map(a => ({ ...a, retentionStatus: 'ACTIVE' as const }));
-        
-        const devId = `dev-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem('pate_salud_device_id', devId);
-        }
+          
+          // Sanitización y carga de miembros
+          const sanitizedMembers = (savedState.members || []).map(m => ({
+            ...m,
+            status: m.status || 'ACTIVE'
+          }));
+          setMembers(sanitizedMembers);
+          setHealthProfiles(savedState.healthProfiles || {});
+          
+          const sanitizedAppointments = (savedState.appointments || []).map(a => ({
+            ...a,
+            retentionStatus: a.retentionStatus || 'ACTIVE',
+            completedAt: a.status === 'COMPLETED' && !a.completedAt ? a.scheduledAt : a.completedAt
+          }));
+          setAppointments(sanitizedAppointments);
+          
+          setCheckups(savedState.checkups || []);
+          setVaccines(savedState.vaccines || []);
+          setExams(savedState.exams || []);
+          setExamResults(savedState.examResults || {});
+          setDocuments(savedState.documents || []);
+          setHistory(savedState.history || []);
+          setReminders(savedState.reminders || []);
+          setTasks(savedState.tasks || []);
+          setSharedReports(savedState.sharedReports || []);
+          setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
+          setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
+          setLastExportMetadata(savedState.lastExportMetadata !== undefined ? savedState.lastExportMetadata : null);
+          setSimulatedRole(savedState.simulatedRole !== undefined ? savedState.simulatedRole : null);
+          setSimulatedEmail(savedState.simulatedEmail !== undefined ? savedState.simulatedEmail : null);
 
-        setUser(null); // Iniciar deslogueado
-        setMembers(sanitizedMockMembers);
-        setHealthProfiles(mockHealthProfiles);
-        setAppointments(sanitizedMockAppointments);
-        setCheckups(mockCheckups);
-        setVaccines(mockVaccines);
-        setExams(mockExams);
-        setExamResults(mockExamResults);
-        setDocuments(mockDocuments);
-        setHistory(mockHistory);
-        setReminders(mockReminders);
-        setTasks(mockTasks);
+          // Capa Operacional
+          setDatabaseSpreadsheetId(savedState.databaseSpreadsheetId || null);
+          setDatabaseSpreadsheetUrl(savedState.databaseSpreadsheetUrl || null);
+          setLastSyncAt(savedState.lastSyncAt || null);
+          setLastPullAt(savedState.lastPullAt || null);
+          setLastPushAt(savedState.lastPushAt || null);
+          setSyncStrategy(savedState.syncStrategy || 'LAST_WRITE_WINS');
+          setLastKnownRevision(savedState.lastKnownRevision || 0);
+          setAppDataFileId(savedState.appDataFileId || null);
+          
+          let devId = savedState.deviceId;
+          if (!devId && typeof window !== 'undefined') {
+            devId = window.localStorage.getItem('pate_salud_device_id');
+          }
+          if (!devId) {
+            devId = `dev-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem('pate_salud_device_id', devId);
+            }
+          }
+          setDeviceId(devId);
+        } else {
+          // Inicializar como vacío si el archivo no existe (o demo si es demo)
+          if (activeUser === 'demo') {
+            setUser({
+              ...mockUser,
+              provider: 'mock',
+              loggedAt: new Date().toISOString()
+            });
+            const sanitizedMockMembers = mockMembers.map(m => ({ ...m, status: 'ACTIVE' as const }));
+            const sanitizedMockAppointments = mockAppointments.map(a => ({ ...a, retentionStatus: 'ACTIVE' as const }));
+            setMembers(sanitizedMockMembers);
+            setHealthProfiles(mockHealthProfiles);
+            setAppointments(sanitizedMockAppointments);
+            setCheckups(mockCheckups);
+            setVaccines(mockVaccines);
+            setExams(mockExams);
+            setExamResults(mockExamResults);
+            setDocuments(mockDocuments);
+            setHistory(mockHistory);
+            setReminders(mockReminders);
+            setTasks(mockTasks);
+            setDriveSyncEnabled(true);
+            setCalendarSyncEnabled(true);
+            setLastExportMetadata(null);
+            setSimulatedRole(null);
+            setSimulatedEmail(null);
+            setSharedReports([]);
+            setDatabaseSpreadsheetId(null);
+            setDatabaseSpreadsheetUrl(null);
+            setLastSyncAt(null);
+            setLastPullAt(null);
+            setLastPushAt(null);
+            setSyncStrategy('LAST_WRITE_WINS');
+            setLastKnownRevision(0);
+            setAppDataFileId(null);
+          } else {
+            setUser(activeUser);
+            setMembers([]);
+            setHealthProfiles({});
+            setAppointments([]);
+            setCheckups([]);
+            setVaccines([]);
+            setExams([]);
+            setExamResults({});
+            setDocuments([]);
+            setHistory([]);
+            setReminders([]);
+            setTasks([]);
+            setSharedReports([]);
+            setDriveSyncEnabled(true);
+            setCalendarSyncEnabled(true);
+            setLastExportMetadata(null);
+            setSimulatedRole(null);
+            setSimulatedEmail(null);
+            setDatabaseSpreadsheetId(null);
+            setDatabaseSpreadsheetUrl(null);
+            setLastSyncAt(null);
+            setLastPullAt(null);
+            setLastPushAt(null);
+            setSyncStrategy('LAST_WRITE_WINS');
+            setLastKnownRevision(0);
+            setAppDataFileId(null);
+          }
+          
+          let devId = typeof window !== 'undefined' ? window.localStorage.getItem('pate_salud_device_id') : null;
+          if (!devId) {
+            devId = `dev-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem('pate_salud_device_id', devId);
+            }
+          }
+          setDeviceId(devId);
+        }
+      } else {
+        // No hay usuario activo (primer ingreso absoluto)
+        // Iniciar en limpio y deslogueado (sin cargar mockData!)
+        setUser(null);
+        setMembers([]);
+        setHealthProfiles({});
+        setAppointments([]);
+        setCheckups([]);
+        setVaccines([]);
+        setExams([]);
+        setExamResults({});
+        setDocuments([]);
+        setHistory([]);
+        setReminders([]);
+        setTasks([]);
+        setSharedReports([]);
         setDriveSyncEnabled(true);
         setCalendarSyncEnabled(true);
         setLastExportMetadata(null);
         setSimulatedRole(null);
         setSimulatedEmail(null);
-
-        // Capa Operacional Google-Native Defaults
+        
         setDatabaseSpreadsheetId(null);
         setDatabaseSpreadsheetUrl(null);
         setLastSyncAt(null);
@@ -307,38 +385,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSyncStrategy('LAST_WRITE_WINS');
         setLastKnownRevision(0);
         setAppDataFileId(null);
-        setDeviceId(devId);
         
-        saveAppState({
-          user: null,
-          members: sanitizedMockMembers,
-          healthProfiles: mockHealthProfiles,
-          appointments: sanitizedMockAppointments,
-          checkups: mockCheckups,
-          vaccines: mockVaccines,
-          exams: mockExams,
-          examResults: mockExamResults,
-          documents: mockDocuments,
-          history: mockHistory,
-          reminders: mockReminders,
-          tasks: mockTasks,
-          driveSyncEnabled: true,
-          calendarSyncEnabled: true,
-          lastExportMetadata: null,
-          simulatedRole: null,
-          simulatedEmail: null,
-          databaseSpreadsheetId: null,
-          databaseSpreadsheetUrl: null,
-          lastSyncAt: null,
-          lastPullAt: null,
-          lastPushAt: null,
-          syncStatus: 'disconnected',
-          syncError: null,
-          deviceId: devId,
-          syncStrategy: 'LAST_WRITE_WINS',
-          lastKnownRevision: 0,
-          appDataFileId: null
-        });
+        let devId = typeof window !== 'undefined' ? window.localStorage.getItem('pate_salud_device_id') : null;
+        if (!devId) {
+          devId = `dev-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem('pate_salud_device_id', devId);
+          }
+        }
+        setDeviceId(devId);
       }
 
       // Registro del Service Worker para soporte PWA y Offline
@@ -359,6 +414,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // 2. Reactividad de Autoguardado: Sincroniza cualquier cambio en caliente al LocalStorage
   useEffect(() => {
     if (isLoading) return; // Evita sobreescribir con estados vacíos durante la carga inicial
+    if (!user) return; // Evita guardar estados vacíos cuando no hay sesión activa (evita borrar demo en logout)
+    
+    const userEmailOrId = user.provider === 'google' ? (user.googleId || user.email) : 'demo';
     
     saveAppState({
       user,
@@ -390,7 +448,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       lastKnownRevision,
       appDataFileId,
       sharedReports
-    });
+    }, userEmailOrId);
   }, [
     user,
     members,
@@ -446,14 +504,146 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         provider: 'google',
         loggedAt: new Date().toISOString()
       };
-      setUser(realUser);
+      
+      // Establecer usuario activo en LocalStorage
+      setActiveUser(realUser);
+      
+      const userKey = realUser.googleId || realUser.email;
+      const savedState = loadAppState(userKey);
+      
+      if (savedState) {
+        setUser(realUser);
+        setMembers(savedState.members || []);
+        setHealthProfiles(savedState.healthProfiles || {});
+        setAppointments(savedState.appointments || []);
+        setCheckups(savedState.checkups || []);
+        setVaccines(savedState.vaccines || []);
+        setExams(savedState.exams || []);
+        setExamResults(savedState.examResults || {});
+        setDocuments(savedState.documents || []);
+        setHistory(savedState.history || []);
+        setReminders(savedState.reminders || []);
+        setTasks(savedState.tasks || []);
+        setSharedReports(savedState.sharedReports || []);
+        setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
+        setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
+        setLastExportMetadata(savedState.lastExportMetadata || null);
+        setSimulatedRole(savedState.simulatedRole || null);
+        setSimulatedEmail(savedState.simulatedEmail || null);
+        setDatabaseSpreadsheetId(savedState.databaseSpreadsheetId || null);
+        setDatabaseSpreadsheetUrl(savedState.databaseSpreadsheetUrl || null);
+        setLastSyncAt(savedState.lastSyncAt || null);
+        setLastPullAt(savedState.lastPullAt || null);
+        setLastPushAt(savedState.lastPushAt || null);
+        setSyncStrategy(savedState.syncStrategy || 'LAST_WRITE_WINS');
+        setLastKnownRevision(savedState.lastKnownRevision || 0);
+        setAppDataFileId(savedState.appDataFileId || null);
+      } else {
+        // Inicialización limpia por primera vez para usuario real nuevo
+        setUser(realUser);
+        setMembers([]);
+        setHealthProfiles({});
+        setAppointments([]);
+        setCheckups([]);
+        setVaccines([]);
+        setExams([]);
+        setExamResults({});
+        setDocuments([]);
+        setHistory([]);
+        setReminders([]);
+        setTasks([]);
+        setSharedReports([]);
+        setDriveSyncEnabled(true);
+        setCalendarSyncEnabled(true);
+        setLastExportMetadata(null);
+        setSimulatedRole(null);
+        setSimulatedEmail(null);
+        setDatabaseSpreadsheetId(null);
+        setDatabaseSpreadsheetUrl(null);
+        setLastSyncAt(null);
+        setLastPullAt(null);
+        setLastPushAt(null);
+        setSyncStrategy('LAST_WRITE_WINS');
+        setLastKnownRevision(0);
+        setAppDataFileId(null);
+        
+        // Registrar auditoría inicial
+        const newEvent: MedicalHistoryEvent = {
+          id: `hist-${Date.now()}`,
+          memberId: 'admin',
+          eventType: 'OTHER',
+          title: 'Expediente clínico inicializado',
+          description: `El usuario ${realUser.displayName} inició sesión e inicializó su expediente en limpio.`,
+          eventDate: new Date().toISOString().split('T')[0],
+          createdAt: new Date().toISOString()
+        };
+        setHistory([newEvent]);
+      }
     } else {
+      // Sesión Demo
+      setActiveUser('demo');
+      const savedState = loadAppState('demo');
+      
       const fallbackUser: UserAccount = {
         ...mockUser,
         provider: 'mock',
         loggedAt: new Date().toISOString()
       };
+      
       setUser(fallbackUser);
+      
+      if (savedState) {
+        setMembers(savedState.members || []);
+        setHealthProfiles(savedState.healthProfiles || {});
+        setAppointments(savedState.appointments || []);
+        setCheckups(savedState.checkups || []);
+        setVaccines(savedState.vaccines || []);
+        setExams(savedState.exams || []);
+        setExamResults(savedState.examResults || {});
+        setDocuments(savedState.documents || []);
+        setHistory(savedState.history || []);
+        setReminders(savedState.reminders || []);
+        setTasks(savedState.tasks || []);
+        setSharedReports(savedState.sharedReports || []);
+        setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
+        setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
+        setLastExportMetadata(savedState.lastExportMetadata !== undefined ? savedState.lastExportMetadata : null);
+        setSimulatedRole(savedState.simulatedRole !== undefined ? savedState.simulatedRole : null);
+        setSimulatedEmail(savedState.simulatedEmail !== undefined ? savedState.simulatedEmail : null);
+        setDatabaseSpreadsheetId(savedState.databaseSpreadsheetId || null);
+        setDatabaseSpreadsheetUrl(savedState.databaseSpreadsheetUrl || null);
+        setLastSyncAt(savedState.lastSyncAt || null);
+        setAppDataFileId(savedState.appDataFileId || null);
+      } else {
+        const sanitizedMockMembers = mockMembers.map(m => ({ ...m, status: 'ACTIVE' as const }));
+        const sanitizedMockAppointments = mockAppointments.map(a => ({ ...a, retentionStatus: 'ACTIVE' as const }));
+        
+        setMembers(sanitizedMockMembers);
+        setHealthProfiles(mockHealthProfiles);
+        setAppointments(sanitizedMockAppointments);
+        setCheckups(mockCheckups);
+        setVaccines(mockVaccines);
+        setExams(mockExams);
+        setExamResults(mockExamResults);
+        setDocuments(mockDocuments);
+        setHistory(mockHistory);
+        setReminders(mockReminders);
+        setTasks(mockTasks);
+        setSharedReports([]);
+        setDriveSyncEnabled(true);
+        setCalendarSyncEnabled(true);
+        setLastExportMetadata(null);
+        setSimulatedRole(null);
+        setSimulatedEmail(null);
+        setDatabaseSpreadsheetId(null);
+        setDatabaseSpreadsheetUrl(null);
+        setLastSyncAt(null);
+        setLastPullAt(null);
+        setLastPushAt(null);
+        setSyncStrategy('LAST_WRITE_WINS');
+        setLastKnownRevision(0);
+        setAppDataFileId(null);
+      }
     }
     
     setIsLoading(false);
@@ -462,7 +652,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     setIsLoading(true);
     await new Promise((resolve) => setTimeout(resolve, 500));
+    setActiveUser(null);
     setUser(null);
+    setMembers([]);
+    setHealthProfiles({});
+    setAppointments([]);
+    setCheckups([]);
+    setVaccines([]);
+    setExams([]);
+    setExamResults({});
+    setDocuments([]);
+    setHistory([]);
+    setReminders([]);
+    setTasks([]);
+    setSharedReports([]);
+    setDriveSyncEnabled(true);
+    setCalendarSyncEnabled(true);
+    setLastExportMetadata(null);
+    setSimulatedRole(null);
+    setSimulatedEmail(null);
+    setDatabaseSpreadsheetId(null);
+    setDatabaseSpreadsheetUrl(null);
+    setLastSyncAt(null);
+    setLastPullAt(null);
+    setLastPushAt(null);
+    setAppDataFileId(null);
+    setLastKnownRevision(0);
     setIsLoading(false);
   };
 
@@ -1251,8 +1466,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // 3. Métodos para la administración y restauración local
   const clearAllData = () => {
     setIsLoading(true);
-    clearAppState();
-    setUser(null);
+    const activeUser = getActiveUser();
+    const userEmailOrId = activeUser && activeUser !== 'demo' ? (activeUser.googleId || activeUser.email) : 'demo';
+    
+    clearAppState(userEmailOrId);
+    if (activeUser && activeUser !== 'demo') {
+      setActiveUser(null);
+      setUser(null);
+    }
+    
     setMembers([]);
     setHealthProfiles({});
     setAppointments([]);
@@ -1270,15 +1492,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSimulatedRole(null);
     setSimulatedEmail(null);
     setSharedReports([]);
+    
+    // Reset base links
+    setDatabaseSpreadsheetId(null);
+    setDatabaseSpreadsheetUrl(null);
+    setLastSyncAt(null);
+    setLastPullAt(null);
+    setLastPushAt(null);
+    setAppDataFileId(null);
+    setLastKnownRevision(0);
+    
     setIsLoading(false);
   };
 
   const restoreDemoData = () => {
     setIsLoading(true);
-    setUser(mockUser);
-    setMembers(mockMembers);
+    setActiveUser('demo');
+    
+    const fallbackUser: UserAccount = {
+      ...mockUser,
+      provider: 'mock',
+      loggedAt: new Date().toISOString()
+    };
+    
+    setUser(fallbackUser);
+    const sanitizedMockMembers = mockMembers.map(m => ({ ...m, status: 'ACTIVE' as const }));
+    const sanitizedMockAppointments = mockAppointments.map(a => ({ ...a, retentionStatus: 'ACTIVE' as const }));
+    
+    setMembers(sanitizedMockMembers);
     setHealthProfiles(mockHealthProfiles);
-    setAppointments(mockAppointments);
+    setAppointments(sanitizedMockAppointments);
     setCheckups(mockCheckups);
     setVaccines(mockVaccines);
     setExams(mockExams);
@@ -1295,10 +1538,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSharedReports([]);
     
     saveAppState({
-      user: mockUser,
-      members: mockMembers.map(m => ({ ...m, status: 'ACTIVE' as const })),
+      user: fallbackUser,
+      members: sanitizedMockMembers,
       healthProfiles: mockHealthProfiles,
-      appointments: mockAppointments.map(a => ({ ...a, retentionStatus: 'ACTIVE' as const })),
+      appointments: sanitizedMockAppointments,
       checkups: mockCheckups,
       vaccines: mockVaccines,
       exams: mockExams,
@@ -1312,9 +1555,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       lastExportMetadata: null,
       simulatedRole: null,
       simulatedEmail: null,
-      sharedReports: []
-    });
+      sharedReports: [],
+      databaseSpreadsheetId: null,
+      databaseSpreadsheetUrl: null,
+      lastSyncAt: null,
+      lastPullAt: null,
+      lastPushAt: null,
+      syncStatus: 'disconnected',
+      syncError: null,
+      deviceId,
+      syncStrategy: 'LAST_WRITE_WINS',
+      lastKnownRevision: 0,
+      appDataFileId: null
+    }, 'demo');
+    
     setIsLoading(false);
+  };
+
+  const clearDemoData = () => {
+    clearAppState('demo');
   };
 
   const exportState = () => {
@@ -2328,6 +2587,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       
       clearAllData,
       restoreDemoData,
+      clearDemoData,
       exportState,
 
       // Capa Operacional Google-Native Foundation Values Expose

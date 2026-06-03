@@ -48,14 +48,58 @@ export interface SavedAppState {
   sharedReports?: SharedMemberReport[];
 }
 
-const STORAGE_KEY = 'pate_salud_familiar_app_state';
+const ACTIVE_USER_KEY = 'pate_salud_active_user';
+const DEFAULT_STORAGE_KEY = 'pate_salud_familiar_app_state_demo';
 const CURRENT_SCHEMA_VERSION = 1;
+
+/**
+ * Obtiene el usuario activo actual en la sesión (real o "demo").
+ */
+export function getActiveUser(): UserAccount | 'demo' | null {
+  if (typeof window === 'undefined') return null;
+  const val = window.localStorage.getItem(ACTIVE_USER_KEY);
+  if (!val) return null;
+  if (val === 'demo') return 'demo';
+  try {
+    return JSON.parse(val) as UserAccount;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Establece el usuario activo actual en la sesión (real o "demo").
+ */
+export function setActiveUser(user: UserAccount | 'demo' | null): void {
+  if (typeof window === 'undefined') return;
+  if (!user) {
+    window.localStorage.removeItem(ACTIVE_USER_KEY);
+  } else if (user === 'demo') {
+    window.localStorage.setItem(ACTIVE_USER_KEY, 'demo');
+  } else {
+    window.localStorage.setItem(ACTIVE_USER_KEY, JSON.stringify(user));
+  }
+}
+
+/**
+ * Resuelve la clave de almacenamiento adecuada para el LocalStorage basándose en el usuario activo.
+ */
+export function getStorageKey(userEmailOrId?: string | null): string {
+  if (userEmailOrId) {
+    return `pate-salud-state:${userEmailOrId}`;
+  }
+  const activeUser = getActiveUser();
+  if (!activeUser || activeUser === 'demo') {
+    return DEFAULT_STORAGE_KEY;
+  }
+  return `pate-salud-state:${activeUser.googleId || activeUser.email}`;
+}
 
 /**
  * Guarda de forma segura el estado de la aplicación en el LocalStorage.
  * Maneja fallos si el almacenamiento está lleno o bloqueado.
  */
-export function saveAppState(state: Omit<SavedAppState, 'schemaVersion'>): boolean {
+export function saveAppState(state: Omit<SavedAppState, 'schemaVersion'>, userEmailOrId?: string | null): boolean {
   if (typeof window === 'undefined') return false;
   
   try {
@@ -64,8 +108,9 @@ export function saveAppState(state: Omit<SavedAppState, 'schemaVersion'>): boole
       schemaVersion: CURRENT_SCHEMA_VERSION
     };
     
+    const key = getStorageKey(userEmailOrId);
     const serialized = JSON.stringify(fullState);
-    window.localStorage.setItem(STORAGE_KEY, serialized);
+    window.localStorage.setItem(key, serialized);
     return true;
   } catch (error) {
     console.error('Error al escribir en LocalStorage:', error);
@@ -77,11 +122,12 @@ export function saveAppState(state: Omit<SavedAppState, 'schemaVersion'>): boole
  * Carga el estado de la aplicación desde el LocalStorage.
  * Valida la existencia, el versionamiento y maneja la corrupción de datos.
  */
-export function loadAppState(): SavedAppState | null {
+export function loadAppState(userEmailOrId?: string | null): SavedAppState | null {
   if (typeof window === 'undefined') return null;
   
+  const key = getStorageKey(userEmailOrId);
   try {
-    const serialized = window.localStorage.getItem(STORAGE_KEY);
+    const serialized = window.localStorage.getItem(key);
     if (!serialized) return null;
     
     const parsed = JSON.parse(serialized) as SavedAppState;
@@ -93,8 +139,7 @@ export function loadAppState(): SavedAppState | null {
     }
     
     if (parsed.schemaVersion !== CURRENT_SCHEMA_VERSION) {
-      console.warn(`Discrepancia de versión del esquema (Leído: ${parsed.schemaVersion}, Esperado: ${CURRENT_SCHEMA_VERSION}). Ejecutando migraciones...`);
-      // Aquí se podrían agregar migraciones si cambiara el esquema en el futuro.
+      console.warn(`Discrepancia de versión del esquema (Leído: ${parsed.schemaVersion}, Esperado: ${CURRENT_SCHEMA_VERSION}).`);
     }
     
     // Validamos que contenga las propiedades mínimas para evitar errores de ejecución
@@ -106,9 +151,8 @@ export function loadAppState(): SavedAppState | null {
     return parsed;
   } catch (error) {
     console.error('Error al leer de LocalStorage o datos corruptos:', error);
-    // Para mitigar datos corruptos, si falla la lectura se devuelve null y se limpia la clave
     try {
-      window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(key);
     } catch (_) {}
     return null;
   }
@@ -117,11 +161,12 @@ export function loadAppState(): SavedAppState | null {
 /**
  * Remueve el estado de la aplicación del LocalStorage (Limpiar datos).
  */
-export function clearAppState(): boolean {
+export function clearAppState(userEmailOrId?: string | null): boolean {
   if (typeof window === 'undefined') return false;
   
+  const key = getStorageKey(userEmailOrId);
   try {
-    window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(key);
     return true;
   } catch (error) {
     console.error('Error al limpiar LocalStorage:', error);

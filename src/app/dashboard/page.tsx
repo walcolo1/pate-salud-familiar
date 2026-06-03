@@ -83,33 +83,52 @@ export default function DashboardPage() {
         </div>
 
         {/* Members row */}
-        <div className="flex items-center gap-3.5 overflow-x-auto pb-2 scrollbar-none">
-          {members.map((member) => (
-            <Link
-              key={member.id}
-              href={`/members/${member.id}`}
-              className="flex flex-col items-center gap-2 bg-white p-4 rounded-2xl min-w-[100px] border border-slate-100 shadow-sm shadow-slate-100/40 hover:shadow-md transition-all duration-200 active:scale-95 shrink-0"
-            >
-              <div className="h-12 w-12 rounded-full bg-teal-600/10 text-teal-700 border border-teal-600/20 flex items-center justify-center font-black text-sm">
-                {member.fullName.substring(0, 2).toUpperCase()}
+        <div className="flex items-center gap-3.5 overflow-x-auto pb-2 scrollbar-none w-full">
+          {members.length === 0 ? (
+            <div className="flex-1 bg-white p-6 rounded-2xl border border-slate-100 text-center flex flex-col items-center justify-center gap-2 shadow-sm">
+              <div className="h-12 w-12 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center border border-slate-100">
+                <Users className="h-5 w-5" />
               </div>
-              <div className="text-center">
-                <p className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[80px]">{member.fullName.split(' ')[0]}</p>
-                <span className="text-[10px] text-slate-400 font-semibold">{member.relationship === 'SELF' ? 'Tú' : member.relationship === 'CHILD' ? 'Hijo/a' : 'Cónyuge'}</span>
-              </div>
-            </Link>
-          ))}
-
-          {/* Add member shortcut */}
-          <Link
-            href="/members/new"
-            className="flex flex-col items-center justify-center gap-2 bg-slate-100/50 hover:bg-slate-100 p-4 rounded-2xl min-w-[100px] min-h-[108px] border border-dashed border-slate-200 transition-all duration-200 active:scale-95 shrink-0"
-          >
-            <div className="h-10 w-10 rounded-full bg-white text-teal-600 flex items-center justify-center border border-slate-200">
-              <Plus className="h-5 w-5" />
+              <p className="text-xs font-bold text-slate-800">Aún no tienes miembros registrados</p>
+              <p className="text-[10px] text-slate-400">Comienza agregando a tu primer familiar para gestionar sus expedientes.</p>
+              <Link
+                href="/members/new"
+                className="mt-2 inline-flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs px-4.5 py-2 rounded-xl shadow-md shadow-teal-900/10 transition-colors duration-200"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Agregar primer familiar</span>
+              </Link>
             </div>
-            <span className="text-[10px] font-bold text-teal-600">Añadir</span>
-          </Link>
+          ) : (
+            <>
+              {members.map((member) => (
+                <Link
+                  key={member.id}
+                  href={`/members/${member.id}`}
+                  className="flex flex-col items-center gap-2 bg-white p-4 rounded-2xl min-w-[100px] border border-slate-100 shadow-sm shadow-slate-100/40 hover:shadow-md transition-all duration-200 active:scale-95 shrink-0"
+                >
+                  <div className="h-12 w-12 rounded-full bg-teal-600/10 text-teal-700 border border-teal-600/20 flex items-center justify-center font-black text-sm">
+                    {member.fullName.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[80px]">{member.fullName.split(' ')[0]}</p>
+                    <span className="text-[10px] text-slate-400 font-semibold">{member.relationship === 'SELF' ? 'Tú' : member.relationship === 'CHILD' ? 'Hijo/a' : 'Cónyuge'}</span>
+                  </div>
+                </Link>
+              ))}
+
+              {/* Add member shortcut */}
+              <Link
+                href="/members/new"
+                className="flex flex-col items-center justify-center gap-2 bg-slate-100/50 hover:bg-slate-100 p-4 rounded-2xl min-w-[100px] min-h-[108px] border border-dashed border-slate-200 transition-all duration-200 active:scale-95 shrink-0"
+              >
+                <div className="h-10 w-10 rounded-full bg-white text-teal-600 flex items-center justify-center border border-slate-200">
+                  <Plus className="h-5 w-5" />
+                </div>
+                <span className="text-[10px] font-bold text-teal-600">Añadir</span>
+              </Link>
+            </>
+          )}
         </div>
       </section>
 
