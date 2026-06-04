@@ -61,8 +61,32 @@ import {
   isOperationalTokenValid,
   hasAnyValidToken,
   getTokenRemainingMinutes,
+  ensureAllRequiredTokens,
 } from '../lib/googleTokenManager';
 
+
+const sanitizeRemoteAppointment = (appt: any): MedicalAppointment => {
+  const doctorName = appt.doctorName || appt.doctor || 'Médico';
+  const doctor = appt.doctor || doctorName;
+  
+  // Reconstruct scheduledAt if missing but date & time exist
+  let scheduledAt = appt.scheduledAt;
+  if (!scheduledAt && appt.date && appt.time) {
+    scheduledAt = `${appt.date}T${appt.time}`;
+  }
+  
+  return {
+    ...appt,
+    doctorName,
+    doctor,
+    scheduledAt,
+    documentIds: appt.documentIds || [],
+    syncStatus: appt.syncStatus || 'SYNCED',
+    calendarSyncStatus: appt.calendarSyncStatus || 'LOCAL_ONLY',
+    retentionStatus: appt.retentionStatus || 'ACTIVE',
+    deletedAt: appt.deletedAt || null
+  };
+};
 
 interface AppContextProps {
   user: UserAccount | null;
@@ -161,6 +185,10 @@ interface AppContextProps {
   pushToGoogle: () => Promise<void>;
   syncNow: () => Promise<void>;
   exportBackupJSON: () => void;
+  postLoginGoogleSetup: () => Promise<void>;
+  requestInitialGooglePermissions: () => Promise<string | null>;
+  ensureGoogleNativeReady: (silent?: boolean) => Promise<string>;
+  autoCreateOrLoadGoogleNativeBase: (token: string) => Promise<{ exists: boolean }>;
 
   // Estado de inicialización automática Google-native
   syncInitStatus: 'idle' | 'checking' | 'loaded_from_google' | 'no_remote_data' | 'local_only' | 'error' | 'needs_auth' | 'pending_sync';
@@ -199,6 +227,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [history, setHistory] = useState<MedicalHistoryEvent[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [tasks, setTasks] = useState<FollowUpTask[]>([]);
+
+  // Refs to prevent React state stale closures during async sync/pull operations
+  const membersRef = useRef<FamilyMember[]>(members);
+  const healthProfilesRef = useRef<Record<string, HealthProfile>>(healthProfiles);
+  const appointmentsRef = useRef<MedicalAppointment[]>(appointments);
+  const checkupsRef = useRef<PeriodicCheckup[]>(checkups);
+  const vaccinesRef = useRef<VaccineRecord[]>(vaccines);
+  const examsRef = useRef<MedicalExam[]>(exams);
+  const examResultsRef = useRef<Record<string, ExamResult[]>>(examResults);
+  const documentsRef = useRef<ClinicalDocument[]>(documents);
+  const historyRef = useRef<MedicalHistoryEvent[]>(history);
+  const remindersRef = useRef<Reminder[]>(reminders);
+  const tasksRef = useRef<FollowUpTask[]>(tasks);
+
+  useEffect(() => { membersRef.current = members; }, [members]);
+  useEffect(() => { healthProfilesRef.current = healthProfiles; }, [healthProfiles]);
+  useEffect(() => { appointmentsRef.current = appointments; }, [appointments]);
+  useEffect(() => { checkupsRef.current = checkups; }, [checkups]);
+  useEffect(() => { vaccinesRef.current = vaccines; }, [vaccines]);
+  useEffect(() => { examsRef.current = exams; }, [exams]);
+  useEffect(() => { examResultsRef.current = examResults; }, [examResults]);
+  useEffect(() => { documentsRef.current = documents; }, [documents]);
+  useEffect(() => { historyRef.current = history; }, [history]);
+  useEffect(() => { remindersRef.current = reminders; }, [reminders]);
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
   const [driveSyncEnabled, setDriveSyncEnabled] = useState<boolean>(true);
   const [driveAccessToken, setDriveAccessToken] = useState<string | null>(null);
   const [driveStatus, setDriveStatus] = useState<'disconnected' | 'connected' | 'connecting' | 'authorizing' | 'subiendo' | 'subido' | 'error'>('disconnected');
@@ -773,25 +826,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (isSyncInProgress.current) return;
 
-      const token = getOperationalTokenIfValid();
-      if (!token) {
-        // Sin token disponible: marcar como pendiente
-        setPendingSyncCount(prev => prev + 1);
-        setSyncInitStatus('pending_sync');
-        setSyncInitMessage('Cambios pendientes de sincronizar. Conecta con Google para enviarlos.');
-        setNeedsGoogleAuth(true);
-        return;
-      }
-
-      // Con token: sincronizar automáticamente
-      isSyncInProgress.current = true;
       try {
-        await syncNow();
-        setPendingSyncCount(0);
-        setNeedsGoogleAuth(false);
+        isSyncInProgress.current = true;
+        
+        // Intentar asegurar el token de forma silenciosa si no está disponible o expiró
+        let token = getOperationalTokenIfValid();
+        if (!token) {
+          try {
+            token = await ensureGoogleNativeReady(true);
+          } catch (_) {
+            token = null;
+          }
+        }
+
+        if (token) {
+          await syncNow();
+          setPendingSyncCount(0);
+          setNeedsGoogleAuth(false);
+        } else {
+          // Sin token disponible: marcar como pendiente
+          setPendingSyncCount(prev => prev + 1);
+          setSyncInitStatus('pending_sync');
+          setSyncInitMessage('Cambios pendientes de sincronizar. Conecta con Google para enviarlos.');
+          setNeedsGoogleAuth(true);
+        }
       } catch (_) {
         // Error silencioso en auto-sync — no interrumpir UX
         setPendingSyncCount(prev => prev + 1);
+        setSyncInitStatus('pending_sync');
+        setNeedsGoogleAuth(true);
       } finally {
         isSyncInProgress.current = false;
       }
@@ -1036,9 +1099,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (appt.retentionStatus === 'PURGED') return appt;
       
       const scheduledDate = new Date(appt.scheduledAt);
+      if (isNaN(scheduledDate.getTime())) return appt;
+      
+      // No depurar citas futuras
+      if (scheduledDate.getTime() > now.getTime()) return appt;
+      
+      // No depurar citas creadas recientemente (menos de 30 días)
+      const createdTime = appt.createdAt ? new Date(appt.createdAt).getTime() : 0;
+      if (!isNaN(createdTime) && (now.getTime() - createdTime) < 30 * 24 * 60 * 60 * 1000) {
+        return appt;
+      }
       
       if (appt.status === 'COMPLETED') {
         const completedDate = appt.completedAt ? new Date(appt.completedAt) : scheduledDate;
+        if (isNaN(completedDate.getTime())) return appt;
         const diffYears = (now.getTime() - completedDate.getTime()) / (1000 * 60 * 60 * 24 * 365);
         if (diffYears >= 2) {
           updatedCount++;
@@ -1114,11 +1188,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const addAppointment = (appt: Omit<MedicalAppointment, 'id' | 'documentIds'>) => {
     const newId = `appt-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+    
+    let date = '';
+    let time = '';
+    if (appt.scheduledAt && appt.scheduledAt.includes('T')) {
+      [date, time] = appt.scheduledAt.split('T');
+    } else if (appt.scheduledAt) {
+      date = appt.scheduledAt;
+    }
+
     const newAppt: MedicalAppointment = {
       ...appt,
       id: newId,
+      doctor: appt.doctorName,
+      date,
+      time,
       documentIds: [],
-      calendarSyncStatus: calendarSyncEnabled ? 'PENDING_SYNC' : 'LOCAL_ONLY'
+      calendarSyncStatus: calendarSyncEnabled ? 'PENDING_CALENDAR_SYNC' : 'LOCAL_ONLY',
+      syncStatus: 'PENDING_SYNC',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      deletedAt: null,
+      retentionStatus: 'ACTIVE'
     };
     setAppointments((prev) => [...prev, newAppt]);
 
@@ -2135,7 +2227,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (remoteState.Citas) {
-        setAppointments(prev => mergeEntities(prev, remoteState.Citas, 'Citas'));
+        const remoteCitasSanitized = remoteState.Citas.map(sanitizeRemoteAppointment);
+        setAppointments(prev => mergeEntities(prev, remoteCitasSanitized, 'Citas'));
       }
       if (remoteState.Controles) {
         setCheckups(prev => mergeEntities(prev, remoteState.Controles, 'Controles'));
@@ -2215,7 +2308,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         Familias: [
           { id: 'family-001', ownerId: user?.id || 'user-01', name: 'Grupo Familiar', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
         ],
-        Miembros: members.map(m => ({
+        Miembros: membersRef.current.map(m => ({
           ...m,
           ownerEmail: m.ownerEmail || email,
           ownerGoogleId: m.ownerGoogleId || uid,
@@ -2224,7 +2317,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           updatedAt: m.updatedAt || new Date().toISOString(),
           deletedAt: m.deletedAt || null
         })),
-        Permisos: members.map(m => ({
+        Permisos: membersRef.current.map(m => ({
           memberId: m.id,
           canManageOwnProfile: m.permissions?.canManageOwnProfile ?? true,
           canManageOwnAppointments: m.permissions?.canManageOwnAppointments ?? true,
@@ -2241,7 +2334,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           updatedAt: m.updatedAt || new Date().toISOString(),
           deletedAt: m.deletedAt || null
         })),
-        FichasMedicas: Object.values(healthProfiles).map(hp => ({
+        FichasMedicas: Object.values(healthProfilesRef.current).map(hp => ({
           ...hp,
           ownerEmail: hp.ownerEmail || email,
           ownerGoogleId: hp.ownerGoogleId || uid,
@@ -2250,16 +2343,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           updatedAt: hp.updatedAt || new Date().toISOString(),
           deletedAt: hp.deletedAt || null
         })),
-        Citas: appointments.map(a => ({
-          ...a,
-          ownerEmail: a.ownerEmail || email,
-          ownerGoogleId: a.ownerGoogleId || uid,
-          sourceDeviceId: a.sourceDeviceId || deviceId,
-          createdAt: a.createdAt || new Date().toISOString(),
-          updatedAt: a.updatedAt || new Date().toISOString(),
-          deletedAt: a.deletedAt || null
-        })),
-        Controles: checkups.map(c => ({
+        Citas: appointmentsRef.current.map(a => {
+          let date = '';
+          let time = '';
+          if (a.scheduledAt && a.scheduledAt.includes('T')) {
+            [date, time] = a.scheduledAt.split('T');
+          } else if (a.scheduledAt) {
+            date = a.scheduledAt;
+          }
+          return {
+            ...a,
+            doctor: a.doctor || a.doctorName,
+            date,
+            time,
+            ownerEmail: a.ownerEmail || email,
+            ownerGoogleId: a.ownerGoogleId || uid,
+            sourceDeviceId: a.sourceDeviceId || deviceId,
+            createdAt: a.createdAt || new Date().toISOString(),
+            updatedAt: a.updatedAt || new Date().toISOString(),
+            deletedAt: a.deletedAt || null
+          };
+        }),
+        Controles: checkupsRef.current.map(c => ({
           ...c,
           ownerEmail: c.ownerEmail || email,
           ownerGoogleId: c.ownerGoogleId || uid,
@@ -2268,7 +2373,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           updatedAt: c.updatedAt || new Date().toISOString(),
           deletedAt: c.deletedAt || null
         })),
-        Vacunas: vaccines.map(v => ({
+        Vacunas: vaccinesRef.current.map(v => ({
           ...v,
           ownerEmail: v.ownerEmail || email,
           ownerGoogleId: v.ownerGoogleId || uid,
@@ -2277,7 +2382,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           updatedAt: v.updatedAt || new Date().toISOString(),
           deletedAt: v.deletedAt || null
         })),
-        Examenes: exams.map(e => ({
+        Examenes: examsRef.current.map(e => ({
           ...e,
           ownerEmail: e.ownerEmail || email,
           ownerGoogleId: e.ownerGoogleId || uid,
@@ -2286,7 +2391,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           updatedAt: e.updatedAt || new Date().toISOString(),
           deletedAt: e.deletedAt || null
         })),
-        Documentos: documents.map(d => ({
+        Documentos: documentsRef.current.map(d => ({
           ...d,
           ownerEmail: d.ownerEmail || email,
           ownerGoogleId: d.ownerGoogleId || uid,
@@ -2295,7 +2400,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           updatedAt: d.updatedAt || new Date().toISOString(),
           deletedAt: d.deletedAt || null
         })),
-        HistorialClinico: history.map(h => ({
+        HistorialClinico: historyRef.current.map(h => ({
           ...h,
           ownerEmail: h.ownerEmail || email,
           ownerGoogleId: h.ownerGoogleId || uid,
@@ -2304,7 +2409,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           updatedAt: h.updatedAt || new Date().toISOString(),
           deletedAt: h.deletedAt || null
         })),
-        Auditoria: history.filter(h => h.title.includes('Miembro') || h.title.includes('Borrado') || h.title.includes('Permisos') || h.title.includes('Cita')).map(h => ({
+        Auditoria: historyRef.current.filter(h => h.title.includes('Miembro') || h.title.includes('Borrado') || h.title.includes('Permisos') || h.title.includes('Cita')).map(h => ({
           id: h.id,
           timestamp: h.createdAt || new Date().toISOString(),
           userId: uid,
@@ -2315,7 +2420,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           createdAt: h.createdAt || new Date().toISOString()
         })),
         Retencion: [],
-        SyncLog: history.filter(h => h.title.includes('sincronización') || h.title.includes('Conflicto')).map(h => ({
+        SyncLog: historyRef.current.filter(h => h.title.includes('sincronización') || h.title.includes('Conflicto')).map(h => ({
           id: h.id,
           timestamp: h.createdAt || new Date().toISOString(),
           deviceId: deviceId || 'unknown',
@@ -2416,42 +2521,70 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setOpSyncStatus('syncing');
       
       // FASE 1: Pull — Leer el estado remoto y obtener el estado fusionado
-      // IMPORTANTE: No llamamos pullFromGoogleInternal porque ese método actualiza
-      // React state, y el push inmediato capturaría el closure viejo (race condition).
-      // En cambio, leemos directamente el estado remoto y construimos el merge aquí.
       const remoteState = await readAllOperationalTables(token, sheetId);
 
+      // Sanitizar las citas remotas
+      const remoteCitasSanitized = remoteState.Citas ? remoteState.Citas.map(sanitizeRemoteAppointment) : [];
+
       // Función de merge LWW reutilizable
-      const mergeEntitiesSync = <T extends { id: string; updatedAt?: string; deletedAt?: string | null }>(localArray: T[], remoteArray: T[]): T[] => {
+      const mergeEntitiesSync = <T extends { id: string; updatedAt?: string; deletedAt?: string | null; syncStatus?: any }>(
+        localArray: T[],
+        remoteArray: T[],
+        tableName: string
+      ): T[] => {
         const merged: T[] = [...localArray];
         remoteArray.forEach(remoteItem => {
           const localIdx = merged.findIndex(l => l.id === remoteItem.id);
           if (localIdx >= 0) {
-            const localUpdate = merged[localIdx].updatedAt ? new Date(merged[localIdx].updatedAt!).getTime() : 0;
+            const localItem = merged[localIdx];
+            const localUpdate = localItem.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
             const remoteUpdate = remoteItem.updatedAt ? new Date(remoteItem.updatedAt).getTime() : 0;
             if (remoteUpdate > localUpdate) {
-              merged[localIdx] = { ...remoteItem, syncStatus: 'SYNCED' } as any;
+              // Conflicto: Sobrescribir local si el remoto es más reciente
+              if (localItem.syncStatus === 'PENDING_SYNC') {
+                const conflictLog: MedicalHistoryEvent = {
+                  id: `hist-conf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                  memberId: (remoteItem as any).memberId || (localItem as any).memberId || 'family-owner',
+                  eventType: 'OTHER',
+                  title: 'Conflicto de sincronización resuelto',
+                  description: `Conflicto en tabla ${tableName} para ID: ${remoteItem.id} resuelto aplicando versión remota más reciente (LWW).`,
+                  eventDate: new Date().toISOString().split('T')[0],
+                  createdAt: new Date().toISOString()
+                };
+                setTimeout(() => setHistory(h => [conflictLog, ...h]), 50);
+              }
+              merged[localIdx] = { ...remoteItem, syncStatus: 'SYNCED' };
+            } else {
+              // El local es igual o más reciente
+              merged[localIdx] = { ...localItem };
             }
           } else if (!remoteItem.deletedAt) {
-            merged.push({ ...remoteItem, syncStatus: 'SYNCED' } as any);
+            merged.push({ ...remoteItem, syncStatus: 'SYNCED' });
           }
         });
         return merged;
       };
 
-      // Calcular el estado fusionado sin depender de React state post-set
-      // Capturamos el estado actual (pre-pull) de las colecciones locales
-      // y lo mergeamos con el remoto para obtener el estado final correcto.
-      const mergedMembers = remoteState.Miembros ? mergeEntitiesSync(members, remoteState.Miembros) : members;
-      const mergedAppointments = remoteState.Citas ? mergeEntitiesSync(appointments, remoteState.Citas) : appointments;
-      const mergedCheckups = remoteState.Controles ? mergeEntitiesSync(checkups, remoteState.Controles) : checkups;
-      const mergedVaccines = remoteState.Vacunas ? mergeEntitiesSync(vaccines, remoteState.Vacunas) : vaccines;
-      const mergedExams = remoteState.Examenes ? mergeEntitiesSync(exams, remoteState.Examenes) : exams;
-      const mergedDocuments = remoteState.Documentos ? mergeEntitiesSync(documents, remoteState.Documentos) : documents;
-      const mergedHistory = remoteState.HistorialClinico ? mergeEntitiesSync(history, remoteState.HistorialClinico) : history;
+      // Obtener estados actuales de las referencias (Refs) para evitar stale closures
+      const currentMembers = membersRef.current;
+      const currentAppointments = appointmentsRef.current;
+      const currentCheckups = checkupsRef.current;
+      const currentVaccines = vaccinesRef.current;
+      const currentExams = examsRef.current;
+      const currentDocuments = documentsRef.current;
+      const currentHistory = historyRef.current;
+      const currentHealthProfiles = healthProfilesRef.current;
+
+      const mergedMembers = remoteState.Miembros ? mergeEntitiesSync(currentMembers, remoteState.Miembros, 'Miembros') : currentMembers;
+      const mergedAppointments = remoteState.Citas ? mergeEntitiesSync(currentAppointments, remoteCitasSanitized, 'Citas') : currentAppointments;
+      const mergedCheckups = remoteState.Controles ? mergeEntitiesSync(currentCheckups, remoteState.Controles, 'Controles') : currentCheckups;
+      const mergedVaccines = remoteState.Vacunas ? mergeEntitiesSync(currentVaccines, remoteState.Vacunas, 'Vacunas') : currentVaccines;
+      const mergedExams = remoteState.Examenes ? mergeEntitiesSync(currentExams, remoteState.Examenes, 'Exámenes') : currentExams;
+      const mergedDocuments = remoteState.Documentos ? mergeEntitiesSync(currentDocuments, remoteState.Documentos, 'Documentos') : currentDocuments;
+      const mergedHistory = remoteState.HistorialClinico ? mergeEntitiesSync(currentHistory, remoteState.HistorialClinico, 'Historial') : currentHistory;
 
       // Merge health profiles (Record<string, HealthProfile>)
-      const mergedProfiles = { ...healthProfiles };
+      const mergedProfiles = { ...currentHealthProfiles };
       if (remoteState.FichasMedicas) {
         remoteState.FichasMedicas.forEach((remoteProf: any) => {
           const localProf = mergedProfiles[remoteProf.memberId];
@@ -2474,7 +2607,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setHealthProfiles(mergedProfiles);
       setLastPullAt(new Date().toISOString());
 
-      // FASE 2: Push — Usar el estado fusionado calculado (no el closure viejo)
+      // FASE 2: Push — Usar el estado fusionado calculado
       const email = user?.email || 'titular@correo.com';
       const uid = user?.googleId || user?.id || 'unknown';
 
@@ -2525,15 +2658,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           updatedAt: (hp as any).updatedAt || new Date().toISOString(),
           deletedAt: (hp as any).deletedAt || null
         })),
-        Citas: mergedAppointments.map(a => ({
-          ...a,
-          ownerEmail: a.ownerEmail || email,
-          ownerGoogleId: a.ownerGoogleId || uid,
-          sourceDeviceId: a.sourceDeviceId || deviceId,
-          createdAt: a.createdAt || new Date().toISOString(),
-          updatedAt: a.updatedAt || new Date().toISOString(),
-          deletedAt: a.deletedAt || null
-        })),
+        Citas: mergedAppointments.map(a => {
+          let date = '';
+          let time = '';
+          if (a.scheduledAt && a.scheduledAt.includes('T')) {
+            [date, time] = a.scheduledAt.split('T');
+          } else if (a.scheduledAt) {
+            date = a.scheduledAt;
+          }
+          return {
+            ...a,
+            doctor: a.doctor || a.doctorName,
+            date,
+            time,
+            ownerEmail: a.ownerEmail || email,
+            ownerGoogleId: a.ownerGoogleId || uid,
+            sourceDeviceId: a.sourceDeviceId || deviceId,
+            createdAt: a.createdAt || new Date().toISOString(),
+            updatedAt: a.updatedAt || new Date().toISOString(),
+            deletedAt: a.deletedAt || null
+          };
+        }),
         Controles: mergedCheckups.map(c => ({
           ...c,
           ownerEmail: c.ownerEmail || email,
@@ -2633,6 +2778,144 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const exportBackupJSON = () => {
     exportState();
+  };
+
+  const requestInitialGooglePermissions = async (): Promise<string | null> => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      throw new Error('NEXT_PUBLIC_GOOGLE_CLIENT_ID no configurada.');
+    }
+    const token = await ensureAllRequiredTokens(clientId, false);
+    // Rellenar las variables de estado locales para que los badges se actualicen de inmediato
+    setDriveAccessToken(token);
+    setSheetsAccessToken(token);
+    setCalendarAccessToken(token);
+    setLastDriveAuthTime(new Date().toISOString());
+    setLastSheetsAuthTime(new Date().toISOString());
+    setLastCalendarAuthTime(new Date().toISOString());
+    setDriveStatus('connected');
+    setSheetsStatus('connected');
+    setCalendarStatus('connected');
+    return token;
+  };
+
+  const ensureGoogleNativeReady = async (silent = true): Promise<string> => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      throw new Error('NEXT_PUBLIC_GOOGLE_CLIENT_ID no configurada.');
+    }
+    const token = await ensureAllRequiredTokens(clientId, silent);
+    // Mantener sincronizados los tokens
+    setDriveAccessToken(token);
+    setSheetsAccessToken(token);
+    setCalendarAccessToken(token);
+    return token;
+  };
+
+  const autoCreateOrLoadGoogleNativeBase = async (token: string): Promise<{ exists: boolean }> => {
+    setOpSyncStatus('syncing');
+    setSyncInitStatus('checking');
+    setSyncInitMessage('Conectando con tu cuenta Google...');
+    try {
+      const email = user?.email || 'titular@correo.com';
+      const uid = user?.googleId || user?.id || 'unknown';
+
+      // 1. Buscar pate-salud-config.json en appDataFolder
+      const configFileId = await findConfigInAppData(token);
+      if (configFileId) {
+        const remoteConfig = await readConfigFromAppData(token, configFileId);
+        if (remoteConfig && remoteConfig.databaseSpreadsheetId) {
+          const remoteSheetId = remoteConfig.databaseSpreadsheetId;
+          const remoteSheetUrl = remoteConfig.databaseSpreadsheetUrl || `https://docs.google.com/spreadsheets/d/${remoteSheetId}`;
+          
+          setAppDataFileId(configFileId);
+          setDatabaseSpreadsheetId(remoteSheetId);
+          setDatabaseSpreadsheetUrl(remoteSheetUrl);
+          
+          if (remoteConfig.permissionRefs?.sharedReports) {
+            setSharedReports(remoteConfig.permissionRefs.sharedReports);
+          }
+          
+          setSyncInitStatus('checking');
+          setSyncInitMessage('Hemos encontrado tu base de datos de Paté Salud en Google Drive. Descargando...');
+          
+          // Pull de los datos remotos existentes
+          await pullFromGoogleInternal(token, remoteSheetId);
+          
+          setLastSyncAt(new Date().toISOString());
+          setOpSyncStatus('synced');
+          setSyncInitStatus('loaded_from_google');
+          setSyncInitMessage(`✅ Datos sincronizados con Google (${new Date().toLocaleTimeString('es-CO')})`);
+          return { exists: true };
+        }
+      }
+      
+      // 2. Si no existe la hoja en Drive, crear una nueva
+      setSyncInitMessage('Creando tu base de datos segura y privada en Google Drive...');
+      const result = await createOperationalSpreadsheet(token, email);
+      const sheetId = result.spreadsheetId;
+      const sheetUrl = result.spreadsheetUrl;
+      
+      setDatabaseSpreadsheetId(sheetId);
+      setDatabaseSpreadsheetUrl(sheetUrl);
+      
+      // Crear estructura inicial de config en appDataFolder
+      const newConfig = {
+        schemaVersion: 2,
+        ownerEmail: email,
+        ownerGoogleId: uid,
+        databaseSpreadsheetId: sheetId,
+        databaseSpreadsheetUrl: sheetUrl,
+        lastSyncAt: new Date().toISOString(),
+        lastPullAt: new Date().toISOString(),
+        lastPushAt: new Date().toISOString(),
+        deviceId: deviceId || 'unknown',
+        syncStrategy: 'LAST_WRITE_WINS',
+        lastKnownRevision: 1,
+        backupRefs: {},
+        permissionRefs: {
+          sharedReports: []
+        }
+      };
+      
+      const newConfigId = await writeConfigToAppData(token, newConfig);
+      setAppDataFileId(newConfigId);
+      
+      // Guardar el estado local (incluyendo el admin/titular) en Google Sheets
+      await pushToGoogleInternal(token, sheetId);
+      
+      setLastSyncAt(new Date().toISOString());
+      setOpSyncStatus('synced');
+      setSyncInitStatus('loaded_from_google');
+      setSyncInitMessage(`✅ Base de datos configurada y sincronizada`);
+      
+      // Registrar hito
+      const newAudit: MedicalHistoryEvent = {
+        id: `hist-${Date.now()}`,
+        memberId: 'admin',
+        eventType: 'OTHER',
+        title: 'Base operacional Google creada',
+        description: `Base Google-native inicializada automáticamente en Drive. Sheets ID: ${sheetId}`,
+        eventDate: new Date().toISOString().split('T')[0],
+        createdAt: new Date().toISOString()
+      };
+      setHistory(h => [newAudit, ...h]);
+      
+      return { exists: false };
+    } catch (err: any) {
+      console.error('Error en autoCreateOrLoadGoogleNativeBase:', err);
+      setOpSyncStatus('error');
+      setOpSyncError(err.message || 'Error al configurar base Google-native.');
+      setSyncInitStatus('error');
+      setSyncInitMessage(`Fallo en configuración: ${err.message}`);
+      throw err;
+    }
+  };
+
+  const postLoginGoogleSetup = async () => {
+    const token = await requestInitialGooglePermissions();
+    if (!token) throw new Error('No se concedieron permisos de Google.');
+    await autoCreateOrLoadGoogleNativeBase(token);
   };
 
 
@@ -3142,6 +3425,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pushToGoogle,
       syncNow,
       exportBackupJSON,
+      postLoginGoogleSetup,
+      requestInitialGooglePermissions,
+      ensureGoogleNativeReady,
+      autoCreateOrLoadGoogleNativeBase,
 
       // Estado de inicialización automática desde Google
       syncInitStatus,

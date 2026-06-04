@@ -114,8 +114,11 @@ export interface MedicalAppointment {
   id: string;
   memberId: string;
   doctorName: string;
+  doctor?: string | null;
   specialty: string;
   scheduledAt: string; // YYYY-MM-DDTHH:mm
+  date?: string | null;
+  time?: string | null;
   location?: string | null;
   reason: string;
   notes?: string | null;
@@ -123,7 +126,7 @@ export interface MedicalAppointment {
   documentIds: string[];
   googleCalendarEventId?: string | null;
   googleCalendarHtmlLink?: string | null;
-  calendarSyncStatus?: 'LOCAL_ONLY' | 'SYNCED' | 'PENDING_SYNC' | 'SYNC_ERROR' | null;
+  calendarSyncStatus?: 'LOCAL_ONLY' | 'SYNCED' | 'PENDING_SYNC' | 'SYNC_ERROR' | 'PENDING_CALENDAR_SYNC' | null;
   calendarSyncedAt?: string | null;
   calendarError?: string | null;
   reminderPolicy?: string | null;
@@ -137,6 +140,7 @@ export interface MedicalAppointment {
   createdAt?: string;
   updatedAt?: string;
   deletedAt?: string | null;
+  syncStatus?: 'LOCAL_ONLY' | 'SYNCED' | 'PENDING_SYNC' | 'SYNC_ERROR' | null;
   lastSyncedAt?: string | null;
 }
 

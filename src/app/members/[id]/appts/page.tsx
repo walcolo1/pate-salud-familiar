@@ -35,7 +35,9 @@ export default function AppointmentsPage() {
     calendarSyncEnabled,
     calendarStatus,
     calendarError,
-    syncAppointmentToCalendar
+    syncAppointmentToCalendar,
+    pushToGoogle,
+    syncNow
   } = useApp();
 
   const [filter, setFilter] = useState<HealthEventStatus | 'ALL'>('ALL');
@@ -119,6 +121,37 @@ export default function AppointmentsPage() {
     }
   };
 
+  const getSheetsSyncBadge = (appt: any) => {
+    const status = appt.syncStatus || 'PENDING_SYNC';
+    switch (status) {
+      case 'SYNCED':
+        return (
+          <span className="text-[9px] font-extrabold bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full border border-teal-600/10 uppercase">
+            ✓ Nube Sheets
+          </span>
+        );
+      case 'PENDING_SYNC':
+        return (
+          <span className="text-[9px] font-extrabold bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-600/10 uppercase animate-pulse">
+            Pendiente Sheets
+          </span>
+        );
+      case 'SYNC_ERROR':
+        return (
+          <span className="text-[9px] font-extrabold bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full border border-rose-600/10 uppercase">
+            Error Sheets
+          </span>
+        );
+      case 'LOCAL_ONLY':
+      default:
+        return (
+          <span className="text-[9px] font-extrabold bg-slate-50 text-slate-400 px-2 py-0.5 rounded-full border border-slate-200 uppercase">
+            Local Only
+          </span>
+        );
+    }
+  };
+
   const getCalendarSyncBadge = (appt: any) => {
     const status = appt.calendarSyncStatus || 'LOCAL_ONLY';
     switch (status) {
@@ -128,23 +161,24 @@ export default function AppointmentsPage() {
             ✓ Calendar
           </span>
         );
+      case 'PENDING_CALENDAR_SYNC':
       case 'PENDING_SYNC':
         return (
           <span className="text-[9px] font-extrabold bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-600/10 uppercase animate-pulse">
-            Pendiente Sync
+            Pendiente Calendar
           </span>
         );
       case 'SYNC_ERROR':
         return (
           <span className="text-[9px] font-extrabold bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full border border-rose-600/10 uppercase">
-            Error Sync
+            Error Calendar
           </span>
         );
       case 'LOCAL_ONLY':
       default:
         return (
           <span className="text-[9px] font-extrabold bg-slate-50 text-slate-400 px-2 py-0.5 rounded-full border border-slate-200 uppercase">
-            Local
+            Local Only
           </span>
         );
     }
@@ -218,14 +252,12 @@ export default function AppointmentsPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <h4 className="text-sm font-extrabold text-slate-800 leading-tight mb-0.5">{appt.doctorName}</h4>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                     <span className="text-[10px] text-slate-400 font-bold">{appt.specialty}</span>
-                    {appt.calendarSyncStatus && (
-                      <>
-                        <span className="text-slate-300 text-[10px]">·</span>
-                        {getCalendarSyncBadge(appt)}
-                      </>
-                    )}
+                    <span className="text-slate-300 text-[10px]">·</span>
+                    {getSheetsSyncBadge(appt)}
+                    <span className="text-slate-300 text-[10px]">·</span>
+                    {getCalendarSyncBadge(appt)}
                   </div>
                 </div>
                 {getStatusBadge(appt.status)}
@@ -297,29 +329,58 @@ export default function AppointmentsPage() {
                 </div>
               )}
 
-              {/* Google Calendar Actions / Status info */}
-              {(appt.googleCalendarHtmlLink || appt.calendarSyncStatus === 'SYNC_ERROR') && (
-                <div className="flex items-center justify-between mt-1 text-[11px] font-semibold bg-slate-50/50 p-2.5 rounded-xl border border-slate-100/50">
-                  <div className="flex items-center gap-1.5 text-slate-500">
-                    <span>📅 Calendar:</span>
-                    {appt.calendarSyncStatus === 'SYNC_ERROR' && (
-                      <span className="text-rose-600 font-bold max-w-[150px] sm:max-w-xs truncate" title={appt.calendarError || ''}>
-                        {appt.calendarError || 'Fallo de conexión'}
-                      </span>
-                    )}
-                    {appt.calendarSyncStatus === 'SYNCED' && (
-                      <span className="text-teal-600 font-bold">
-                        Sincronizado
-                      </span>
-                    )}
+              {/* Cloud Integration Panel */}
+              <div className="flex flex-col gap-2 mt-1 text-[11px] font-semibold bg-slate-50/50 p-3 rounded-xl border border-slate-100/50">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="flex flex-col gap-1">
+                    {/* Google Sheets Sync Info */}
+                    <div className="flex items-center gap-1.5 text-slate-500">
+                      <span className="font-extrabold text-[10px] uppercase text-slate-400">Base de Datos:</span>
+                      {appt.syncStatus === 'SYNCED' ? (
+                        <span className="text-teal-600">✓ Sincronizado en la Base Operacional</span>
+                      ) : appt.syncStatus === 'SYNC_ERROR' ? (
+                        <span className="text-rose-600 font-semibold">Error al sincronizar con Sheets</span>
+                      ) : (
+                        <span className="text-amber-600 animate-pulse">Pendiente de sincronizar</span>
+                      )}
+                    </div>
+                    {/* Google Calendar Sync Info */}
+                    <div className="flex items-center gap-1.5 text-slate-500">
+                      <span className="font-extrabold text-[10px] uppercase text-slate-400">Google Calendar:</span>
+                      {appt.calendarSyncStatus === 'SYNCED' ? (
+                        <span className="text-teal-600">✓ Evento creado</span>
+                      ) : appt.calendarSyncStatus === 'SYNC_ERROR' ? (
+                        <span className="text-rose-600 font-semibold truncate max-w-[200px]" title={appt.calendarError || ''}>
+                          {appt.calendarError || 'Error de sincronización'}
+                        </span>
+                      ) : (
+                        <span className="text-amber-600 animate-pulse">Pendiente de crear evento</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {appt.calendarSyncStatus === 'SYNC_ERROR' && (
+
+                  {/* Actions buttons */}
+                  <div className="flex flex-wrap gap-1.5 justify-end">
+                    {appt.syncStatus !== 'SYNCED' && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            await syncNow();
+                          } catch (err) {
+                            console.error(err);
+                          }
+                        }}
+                        className="text-[10px] font-black text-amber-700 hover:text-amber-800 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-100 transition-colors"
+                      >
+                        Reintentar subir a Google
+                      </button>
+                    )}
+                    {appt.calendarSyncStatus !== 'SYNCED' && (
                       <button
                         onClick={() => syncAppointmentToCalendar(appt.id)}
                         className="text-[10px] font-black text-rose-600 hover:text-rose-700 bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-100 transition-colors"
                       >
-                        Reintentar sincronización
+                        Reintentar Calendar
                       </button>
                     )}
                     {appt.googleCalendarHtmlLink && (
@@ -335,7 +396,7 @@ export default function AppointmentsPage() {
                     )}
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           ))
         )}
