@@ -137,3 +137,86 @@ export async function createCalendarEvent(
     htmlLink: data.htmlLink
   };
 }
+
+/**
+ * Creates an individual medication dose take event on the user's primary Google Calendar.
+ */
+export async function createMedicationDoseCalendarEvent(
+  accessToken: string,
+  medicationName: string,
+  dose: string,
+  scheduledAt: string,
+  memberName: string,
+  instructions?: string | null
+): Promise<CalendarEventResult> {
+  const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+
+  const startDate = new Date(scheduledAt);
+  if (isNaN(startDate.getTime())) {
+    throw new Error(`Invalid dose date: ${scheduledAt}`);
+  }
+
+  // Default duration is 10 minutes for taking medication
+  const endDate = new Date(startDate.getTime() + 10 * 60 * 1000);
+
+  // Detect browser timezone
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Bogota';
+
+  // Construct standard summary
+  const summary = `Tomar ${medicationName} (${dose}) - ${memberName}`;
+
+  // Construct description body
+  const descriptionLines = [
+    `Familiar: ${memberName}`,
+    `Medicamento: ${medicationName}`,
+    `Dosis: ${dose}`,
+    instructions ? `Instrucciones: ${instructions}` : null,
+    'Origen: Paté Salud Familiar - Recordatorio de dosis'
+  ].filter(Boolean);
+
+  const eventBody = {
+    summary,
+    description: descriptionLines.join('\n'),
+    start: {
+      dateTime: startDate.toISOString(),
+      timeZone
+    },
+    end: {
+      dateTime: endDate.toISOString(),
+      timeZone
+    },
+    reminders: {
+      useDefault: false,
+      overrides: [
+        { method: 'popup', minutes: 15 }, // 15 mins before
+        { method: 'popup', minutes: 0 }   // At the time
+      ]
+    }
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(eventBody),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const message = errorData.error?.message || res.statusText;
+    throw new Error(`Google Calendar API Error: ${message}`);
+  }
+
+  const data = await res.json();
+  if (!data.id || !data.htmlLink) {
+    throw new Error('Google Calendar API returned response missing id or htmlLink.');
+  }
+
+  return {
+    eventId: data.id,
+    htmlLink: data.htmlLink
+  };
+}
+

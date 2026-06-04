@@ -14,7 +14,7 @@ export type ReminderType = 'APPOINTMENT' | 'VACCINE' | 'EXAM' | 'MEDICATION' | '
 
 export type Priority = 'HIGH' | 'MEDIUM' | 'LOW';
 
-export type HistoryEventType = 'APPOINTMENT' | 'CHECKUP' | 'VACCINE' | 'EXAM' | 'DOCUMENT' | 'REMINDER' | 'OTHER';
+export type HistoryEventType = 'APPOINTMENT' | 'CHECKUP' | 'VACCINE' | 'EXAM' | 'DOCUMENT' | 'REMINDER' | 'MEDICAL_ORDER' | 'MEDICATION' | 'OTHER';
 
 export interface UserAccount {
   id: string;
@@ -150,6 +150,7 @@ export interface MedicalAppointment {
   sourceEmail?: string | null;
   sourceMessageId?: string | null;
   sourceSubject?: string | null;
+  medicalOrderId?: string | null;
 }
 
 export interface PeriodicCheckup {
@@ -332,4 +333,97 @@ export interface ImportedEmailAppointmentCandidate {
   syncStatus?: 'LOCAL_ONLY' | 'SYNCED' | 'PENDING_SYNC' | 'SYNC_ERROR' | null;
   lastSyncedAt?: string | null;
 }
+
+export type MedicalOrderType = 'SPECIALIST_APPOINTMENT' | 'LAB_EXAM' | 'IMAGING' | 'PROCEDURE' | 'MEDICATION' | 'THERAPY' | 'OTHER';
+export type MedicalOrderStatus = 'PENDING_AUTHORIZATION' | 'AUTHORIZED' | 'DENIED' | 'APPOINTMENT_PENDING' | 'APPOINTMENT_SCHEDULED' | 'COMPLETED' | 'CANCELLED';
+
+export interface MedicalOrder {
+  id: string;
+  memberId: string;
+  orderType: MedicalOrderType;
+  title: string;
+  description?: string | null;
+  doctorName?: string | null;
+  specialty?: string | null;
+  issuedAt: string; // YYYY-MM-DD
+  expiresAt?: string | null; // YYYY-MM-DD
+  requiresAuthorization: boolean;
+  authorizationStatus?: 'PENDING' | 'AUTHORIZED' | 'DENIED' | null;
+  authorizationNumber?: string | null;
+  authorizationDate?: string | null; // YYYY-MM-DD
+  authorizationExpiresAt?: string | null; // YYYY-MM-DD
+  epsOrProvider?: string | null;
+  ipsOrClinic?: string | null;
+  documentId?: string | null;
+  relatedAppointmentId?: string | null;
+  status: MedicalOrderStatus;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  syncStatus?: 'LOCAL_ONLY' | 'SYNCED' | 'PENDING_SYNC' | 'SYNC_ERROR' | null;
+  lastSyncedAt?: string | null;
+  ownerEmail?: string | null;
+  ownerGoogleId?: string | null;
+  sourceDeviceId?: string | null;
+}
+
+export type DoseUnit = 'mg' | 'ml' | 'tablet' | 'capsule' | 'drops' | 'inhalation' | 'other';
+export type QuantityUnit = 'tablets' | 'capsules' | 'ml' | 'units' | 'other';
+export type FrequencyType = 'EVERY_X_HOURS' | 'SPECIFIC_TIMES' | 'ONCE_DAILY' | 'TWICE_DAILY' | 'THREE_TIMES_DAILY' | 'OTHER';
+export type PrescriptionStatus = 'ACTIVE' | 'COMPLETED' | 'SUSPENDED' | 'CANCELLED';
+export type DoseReminderStatus = 'PENDING' | 'TAKEN' | 'MISSED' | 'SKIPPED';
+
+export interface MedicationPrescription {
+  id: string;
+  memberId: string;
+  name: string;
+  dose: string;
+  quantity: number;
+  quantityUnit: QuantityUnit;
+  durationDays: number;
+  frequencyType: FrequencyType;
+  frequencyIntervalHours?: number | null;
+  specificTimes?: string[] | null; // Array of specific times e.g. ["08:00", "20:00"]
+  instructions?: string | null;
+  prescribedBy?: string | null;
+  documentId?: string | null;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  status: PrescriptionStatus;
+  googleCalendarEventId?: string | null;
+  calendarSyncStatus?: 'LOCAL_ONLY' | 'SYNCED' | 'PENDING_SYNC' | 'SYNC_ERROR' | 'PENDING_CALENDAR_SYNC' | null;
+  calendarSyncedAt?: string | null;
+  calendarError?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  syncStatus?: 'LOCAL_ONLY' | 'SYNCED' | 'PENDING_SYNC' | 'SYNC_ERROR' | null;
+  lastSyncedAt?: string | null;
+  ownerEmail?: string | null;
+  ownerGoogleId?: string | null;
+  sourceDeviceId?: string | null;
+}
+
+export interface MedicationDoseReminder {
+  id: string;
+  prescriptionId: string;
+  memberId: string;
+  medicationName: string;
+  dose: string;
+  scheduledAt: string; // YYYY-MM-DDTHH:mm
+  status: DoseReminderStatus;
+  takenAt?: string | null; // YYYY-MM-DDTHH:mm
+  notes?: string | null;
+  googleCalendarEventId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  syncStatus?: 'LOCAL_ONLY' | 'SYNCED' | 'PENDING_SYNC' | 'SYNC_ERROR' | null;
+  lastSyncedAt?: string | null;
+  ownerEmail?: string | null;
+  ownerGoogleId?: string | null;
+  sourceDeviceId?: string | null;
+}
+
 

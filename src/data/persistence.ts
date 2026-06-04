@@ -14,7 +14,10 @@ import {
   LastExportMetadata,
   SharedMemberReport,
   AppointmentEmailSource,
-  ImportedEmailAppointmentCandidate
+  ImportedEmailAppointmentCandidate,
+  MedicalOrder,
+  MedicationPrescription,
+  MedicationDoseReminder
 } from '../domain/models';
 
 export interface SavedAppState {
@@ -57,6 +60,9 @@ export interface SavedAppState {
   nextGmailScanAt?: string | null;  // ISO timestamp of next scheduled scan
   gmailScanRangeDays?: number;      // how many days back to search
   gmailOnlyFutureAppointments?: boolean; // filter out past appointments
+  medicalOrders?: MedicalOrder[];
+  medicationPrescriptions?: MedicationPrescription[];
+  medicationDoseReminders?: MedicationDoseReminder[];
 }
 
 const ACTIVE_USER_KEY = 'pate_salud_active_user';

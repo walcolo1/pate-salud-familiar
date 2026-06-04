@@ -31,7 +31,7 @@ export const OPERATIONAL_HEADERS = {
     'googleCalendarEventId', 'googleCalendarHtmlLink', 'calendarSyncStatus', 'calendarSyncedAt', 'calendarError', 
     'completedAt', 'retentionStatus', 'retentionReason', 'purgedAt', 
     'ownerEmail', 'ownerGoogleId', 'sourceDeviceId', 'createdAt', 'updatedAt', 'deletedAt', 'syncStatus',
-    'source', 'sourceEmail', 'sourceMessageId', 'sourceSubject'
+    'source', 'sourceEmail', 'sourceMessageId', 'sourceSubject', 'medicalOrderId'
   ],
   Controles: [
     'id', 'memberId', 'checkupType', 'scheduledDate', 'completedDate', 'results', 'status', 
@@ -71,6 +71,15 @@ export const OPERATIONAL_HEADERS = {
     'id', 'sourceEmail', 'gmailMessageId', 'subject', 'receivedAt', 'rawSnippet', 
     'detectedPatientName', 'detectedDate', 'detectedTime', 'detectedDoctor', 'detectedSpecialty', 'detectedLocation', 
     'confidence', 'status', 'createdAppointmentId', 'createdAt', 'updatedAt'
+  ],
+  OrdenesMedicas: [
+    'id', 'memberId', 'orderType', 'title', 'description', 'doctorName', 'specialty', 'issuedAt', 'expiresAt', 'requiresAuthorization', 'authorizationStatus', 'authorizationNumber', 'authorizationDate', 'authorizationExpiresAt', 'epsOrProvider', 'ipsOrClinic', 'documentId', 'relatedAppointmentId', 'status', 'notes', 'createdAt', 'updatedAt', 'deletedAt', 'syncStatus', 'ownerEmail', 'ownerGoogleId', 'sourceDeviceId'
+  ],
+  Medicamentos: [
+    'id', 'memberId', 'name', 'dose', 'quantity', 'quantityUnit', 'durationDays', 'frequencyType', 'frequencyIntervalHours', 'specificTimes', 'instructions', 'prescribedBy', 'documentId', 'startDate', 'endDate', 'status', 'googleCalendarEventId', 'calendarSyncStatus', 'calendarSyncedAt', 'calendarError', 'createdAt', 'updatedAt', 'deletedAt', 'syncStatus', 'ownerEmail', 'ownerGoogleId', 'sourceDeviceId'
+  ],
+  TomasMedicamentos: [
+    'id', 'prescriptionId', 'memberId', 'medicationName', 'dose', 'scheduledAt', 'status', 'takenAt', 'notes', 'googleCalendarEventId', 'createdAt', 'updatedAt', 'deletedAt', 'syncStatus', 'ownerEmail', 'ownerGoogleId', 'sourceDeviceId'
   ]
 };
 
@@ -92,7 +101,10 @@ export const OPERATIONAL_TABS = {
   Retencion: 'Retención',
   SyncLog: 'SyncLog',
   FuentesCorreoCitas: 'Fuentes Correo Citas',
-  CandidatosCorreoCitas: 'Candidatos Correo Citas'
+  CandidatosCorreoCitas: 'Candidatos Correo Citas',
+  OrdenesMedicas: 'Órdenes Médicas',
+  Medicamentos: 'Medicamentos',
+  TomasMedicamentos: 'Tomas Medicamentos'
 };
 
 /**

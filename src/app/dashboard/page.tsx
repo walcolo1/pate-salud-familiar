@@ -12,7 +12,10 @@ import {
   ArrowRight, 
   Clock, 
   AlertCircle, 
-  ShieldAlert 
+  ShieldAlert,
+  ClipboardList,
+  Pill,
+  AlertTriangle 
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -24,6 +27,9 @@ export default function DashboardPage() {
     reminders, 
     tasks,
     documents,
+    medicalOrders,
+    medicationPrescriptions,
+    medicationDoseReminders,
     isLoading 
   } = useApp();
 
@@ -50,10 +56,167 @@ export default function DashboardPage() {
     .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
     .slice(0, 3);
 
-  // Get active warnings (overdue reminders or high priority tasks)
-  const activeReminders = reminders
-    .filter(r => r.status === 'OVERDUE' || r.status === 'PENDING')
-    .slice(0, 3);
+  // Calculate dynamic alerts for dashboard
+  const dashboardAlerts: {
+    id: string;
+    title: string;
+    description: string;
+    severity: 'error' | 'warning' | 'info';
+    memberName: string;
+    href: string;
+    iconType: 'order' | 'medication' | 'general';
+  }[] = [];
+
+  // 1. Pending Authorizations (EPS)
+  medicalOrders
+    .filter(o => !o.deletedAt && o.status === 'PENDING_AUTHORIZATION')
+    .forEach(o => {
+      const memberName = members.find(m => m.id === o.memberId)?.fullName.split(' ')[0] || 'Familiar';
+      dashboardAlerts.push({
+        id: `auth-${o.id}`,
+        title: 'Trámite EPS Pendiente',
+        description: `La orden "${o.title}" requiere autorización de tu EPS.`,
+        severity: 'warning',
+        memberName,
+        href: `/members/${o.memberId}/orders`,
+        iconType: 'order'
+      });
+    });
+
+  // 2. Expiring Authorizations
+  const sevenDays = 7 * 24 * 60 * 60 * 1000;
+  medicalOrders
+    .filter(o => {
+      if (o.deletedAt || o.status !== 'AUTHORIZED' || !o.requiresAuthorization || !o.authorizationExpiresAt) return false;
+      const diff = new Date(o.authorizationExpiresAt).getTime() - Date.now();
+      return diff >= 0 && diff <= sevenDays;
+    })
+    .forEach(o => {
+      const memberName = members.find(m => m.id === o.memberId)?.fullName.split(' ')[0] || 'Familiar';
+      dashboardAlerts.push({
+        id: `exp-auth-${o.id}`,
+        title: 'Autorización por Vencer',
+        description: `Vence el ${new Date(o.authorizationExpiresAt!).toLocaleDateString('es-CO')}: "${o.title}".`,
+        severity: 'error',
+        memberName,
+        href: `/members/${o.memberId}/orders`,
+        iconType: 'order'
+      });
+    });
+
+  // 3. Authorized orders without appointments
+  medicalOrders
+    .filter(o => !o.deletedAt && o.status === 'AUTHORIZED' && !o.relatedAppointmentId && o.orderType !== 'MEDICATION')
+    .forEach(o => {
+      const memberName = members.find(m => m.id === o.memberId)?.fullName.split(' ')[0] || 'Familiar';
+      dashboardAlerts.push({
+        id: `no-appt-${o.id}`,
+        title: 'Agendar Cita Pendiente',
+        description: `Orden autorizada lista para programar: "${o.title}".`,
+        severity: 'info',
+        memberName,
+        href: `/members/${o.memberId}/orders`,
+        iconType: 'order'
+      });
+    });
+
+  // 4. Missed or pending-past medication doses
+  const missedDoseCountByMember: Record<string, { memberId: string; count: number }> = {};
+  medicationDoseReminders
+    .filter(d => {
+      if (d.deletedAt) return false;
+      const isPast = new Date(d.scheduledAt).getTime() < Date.now();
+      return d.status === 'MISSED' || (d.status === 'PENDING' && isPast);
+    })
+    .forEach(d => {
+      if (!missedDoseCountByMember[d.memberId]) {
+        missedDoseCountByMember[d.memberId] = { memberId: d.memberId, count: 0 };
+      }
+      missedDoseCountByMember[d.memberId].count++;
+    });
+
+  Object.values(missedDoseCountByMember).forEach(item => {
+    const memberName = members.find(m => m.id === item.memberId)?.fullName.split(' ')[0] || 'Familiar';
+    dashboardAlerts.push({
+      id: `missed-med-${item.memberId}`,
+      title: 'Tomas Vencidad',
+      description: `Tienes ${item.count} toma(s) de medicamentos pendientes o no registradas hoy.`,
+      severity: 'error',
+      memberName,
+      href: `/members/${item.memberId}/medications`,
+      iconType: 'medication'
+    });
+  });
+
+  // 5. Today's upcoming medication doses
+  const upcomingDoseCountByMember: Record<string, { memberId: string; count: number }> = {};
+  const todayDateStr = new Date().toISOString().split('T')[0];
+  medicationDoseReminders
+    .filter(d => {
+      if (d.deletedAt || d.status !== 'PENDING') return false;
+      const isFuture = new Date(d.scheduledAt).getTime() >= Date.now();
+      return d.scheduledAt.startsWith(todayDateStr) && isFuture;
+    })
+    .forEach(d => {
+      if (!upcomingDoseCountByMember[d.memberId]) {
+        upcomingDoseCountByMember[d.memberId] = { memberId: d.memberId, count: 0 };
+      }
+      upcomingDoseCountByMember[d.memberId].count++;
+    });
+
+  Object.values(upcomingDoseCountByMember).forEach(item => {
+    const memberName = members.find(m => m.id === item.memberId)?.fullName.split(' ')[0] || 'Familiar';
+    dashboardAlerts.push({
+      id: `upcoming-med-${item.memberId}`,
+      title: 'Tomas Programadas',
+      description: `Quedan ${item.count} toma(s) de medicamento pendientes de registrar hoy.`,
+      severity: 'info',
+      memberName,
+      href: `/members/${item.memberId}/medications`,
+      iconType: 'medication'
+    });
+  });
+
+  // 6. Medications ending in ≤ 3 days
+  const threeDays = 3 * 24 * 60 * 60 * 1000;
+  medicationPrescriptions
+    .filter(p => {
+      if (p.deletedAt || p.status !== 'ACTIVE' || !p.endDate) return false;
+      const diff = new Date(p.endDate).getTime() - Date.now();
+      return diff >= 0 && diff <= threeDays;
+    })
+    .forEach(p => {
+      const memberName = members.find(m => m.id === p.memberId)?.fullName.split(' ')[0] || 'Familiar';
+      dashboardAlerts.push({
+        id: `ending-med-${p.id}`,
+        title: 'Medicamento por Terminar',
+        description: `El tratamiento de "${p.name}" finaliza en menos de 3 días.`,
+        severity: 'warning',
+        memberName,
+        href: `/members/${p.memberId}/medications`,
+        iconType: 'medication'
+      });
+    });
+
+  // 7. General reminders (overdue)
+  reminders
+    .filter(r => r.status === 'OVERDUE')
+    .forEach(r => {
+      const memberName = members.find(m => m.id === r.memberId)?.fullName.split(' ')[0] || 'Familiar';
+      dashboardAlerts.push({
+        id: `rem-${r.id}`,
+        title: r.title,
+        description: r.description || 'Recordatorio general pendiente.',
+        severity: 'warning',
+        memberName,
+        href: `/reminders`,
+        iconType: 'general'
+      });
+    });
+
+  // Sort alerts: error first, then warning, then info
+  const severityWeight = { error: 3, warning: 2, info: 1 };
+  dashboardAlerts.sort((a, b) => severityWeight[b.severity] - severityWeight[a.severity]);
 
   // Format date helper
   const formatDate = (isoString: string) => {
@@ -237,44 +400,68 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Alertas y Alamas */}
+        {/* Alertas y Alarmas */}
         <section className="flex flex-col gap-3">
           <h3 className="font-extrabold text-slate-800 text-sm tracking-wide uppercase px-1">Alertas Activas</h3>
           <div className="flex flex-col gap-3">
-            {activeReminders.length === 0 ? (
+            {dashboardAlerts.length === 0 ? (
               <div className="bg-white p-6 rounded-2xl border border-slate-100 text-center flex flex-col items-center justify-center gap-2">
                 <AlertCircle className="h-8 w-8 text-slate-300" />
                 <p className="text-xs font-bold text-slate-800">Sin alertas pendientes</p>
-                <p className="text-[10px] text-slate-400">No hay alarmas vencidas ni urgentes.</p>
+                <p className="text-[10px] text-slate-400">No hay alarmas vencidas, trámites ni tomas urgentes.</p>
               </div>
             ) : (
-              activeReminders.map((reminder) => {
-                const patient = members.find(m => m.id === reminder.memberId)?.fullName.split(' ')[0] || 'Familiar';
-                const isOverdue = reminder.status === 'OVERDUE';
+              dashboardAlerts.slice(0, 5).map((alert) => {
+                const getAlertIcon = (iconType: string, severity: string) => {
+                  const style = severity === 'error' ? 'bg-rose-50 text-rose-600' :
+                                severity === 'warning' ? 'bg-amber-50 text-amber-600' :
+                                'bg-teal-50 text-teal-600';
+                  
+                  switch (iconType) {
+                    case 'order':
+                      return (
+                        <div className={`p-2.5 rounded-xl ${style}`}>
+                          <ClipboardList className="h-5 w-5" />
+                        </div>
+                      );
+                    case 'medication':
+                      return (
+                        <div className={`p-2.5 rounded-xl ${style}`}>
+                          <Pill className="h-5 w-5" />
+                        </div>
+                      );
+                    default:
+                      return (
+                        <div className={`p-2.5 rounded-xl ${style}`}>
+                          <AlertCircle className="h-5 w-5" />
+                        </div>
+                      );
+                  }
+                };
+
+                const severityStyle = alert.severity === 'error' ? 'bg-rose-50/50 border-rose-100 hover:bg-rose-50' :
+                                      alert.severity === 'warning' ? 'bg-amber-50/40 border-amber-100 hover:bg-amber-50/70' :
+                                      'bg-white border-slate-100 hover:bg-slate-50';
+
                 return (
-                  <div 
-                    key={reminder.id}
-                    className={`flex items-center gap-3.5 p-4 rounded-2xl border ${
-                      isOverdue 
-                        ? 'bg-rose-50/50 border-rose-100' 
-                        : 'bg-white border-slate-100 shadow-sm'
-                    }`}
+                  <Link 
+                    key={alert.id}
+                    href={alert.href}
+                    className={`flex items-start gap-3.5 p-4 rounded-2xl border transition-all duration-200 shadow-sm ${severityStyle}`}
                   >
-                    <div className={`p-2.5 rounded-xl ${isOverdue ? 'bg-rose-100/50 text-rose-600' : 'bg-amber-50 text-amber-500'}`}>
-                      <AlertCircle className="h-5 w-5" />
-                    </div>
+                    {getAlertIcon(alert.iconType, alert.severity)}
                     <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-center mb-0.5">
-                        <h4 className="text-xs font-extrabold text-slate-800 leading-tight truncate">{reminder.title}</h4>
+                      <div className="flex justify-between items-start mb-0.5">
+                        <h4 className="text-xs font-extrabold text-slate-800 leading-tight truncate">{alert.title}</h4>
                         <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full ${
-                          isOverdue 
-                            ? 'bg-rose-100 text-rose-600' 
-                            : 'bg-slate-100 text-slate-500'
-                        }`}>{patient}</span>
+                          alert.severity === 'error' ? 'bg-rose-100 text-rose-600' :
+                          alert.severity === 'warning' ? 'bg-amber-100 text-amber-700' :
+                          'bg-teal-100 text-teal-700'
+                        }`}>{alert.memberName}</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 font-bold truncate">{reminder.description}</p>
+                      <p className="text-[10px] text-slate-400 font-bold leading-tight">{alert.description}</p>
                     </div>
-                  </div>
+                  </Link>
                 );
               })
             )}

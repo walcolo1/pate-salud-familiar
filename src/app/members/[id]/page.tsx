@@ -16,7 +16,9 @@ import {
   FileText, 
   Beaker, 
   Clock,
-  HeartPulse
+  HeartPulse,
+  ClipboardList,
+  Pill
 } from 'lucide-react';
 import { Relationship, BloodType } from '@/domain/models';
 
@@ -61,7 +63,9 @@ export default function MemberDetailPage() {
     revokeMemberReportShare,
     documents,
     shareDocumentWithMember,
-    revokeDocumentShare
+    revokeDocumentShare,
+    medicalOrders,
+    medicationPrescriptions
   } = useApp();
 
   useEffect(() => {
@@ -133,6 +137,12 @@ export default function MemberDetailPage() {
   const pendingVaccines = vaccines
     .filter(v => v.memberId === id && v.status === 'SCHEDULED').length;
 
+  const pendingOrders = medicalOrders
+    .filter(o => o.memberId === id && o.status === 'PENDING_AUTHORIZATION' && !o.deletedAt).length;
+
+  const activePrescriptions = medicationPrescriptions
+    .filter(p => p.memberId === id && p.status === 'ACTIVE' && !p.deletedAt).length;
+
   const categories = [
     {
       title: 'Ficha Médica',
@@ -187,6 +197,24 @@ export default function MemberDetailPage() {
       icon: FileText,
       color: 'bg-cyan-50 text-cyan-600 border-cyan-100/50',
       badge: null
+    },
+    {
+      title: 'Órdenes y Autorizaciones',
+      description: 'Trámites de EPS, órdenes médicas y autorizaciones',
+      href: `/members/${id}/orders`,
+      icon: ClipboardList,
+      color: 'bg-amber-50 text-amber-600 border-amber-100/50',
+      badge: pendingOrders > 0 ? `${pendingOrders} pendiente` : null,
+      badgeColor: 'bg-amber-100 text-amber-700 font-bold'
+    },
+    {
+      title: 'Medicamentos y Prescripciones',
+      description: 'Control de tratamientos, tomas diarias y recordatorios',
+      href: `/members/${id}/medications`,
+      icon: Pill,
+      color: 'bg-rose-50 text-rose-600 border-rose-100/50',
+      badge: activePrescriptions > 0 ? `${activePrescriptions} activo` : null,
+      badgeColor: 'bg-rose-100 text-rose-700 font-bold'
     },
     {
       title: 'Historial Completo',

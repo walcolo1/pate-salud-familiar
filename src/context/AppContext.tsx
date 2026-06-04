@@ -22,7 +22,11 @@ import {
   MemberPermissions,
   SharedMemberReport,
   AppointmentEmailSource,
-  ImportedEmailAppointmentCandidate
+  ImportedEmailAppointmentCandidate,
+  MedicalOrder,
+  MedicationPrescription,
+  MedicationDoseReminder,
+  DoseReminderStatus
 } from '../domain/models';
 import { 
   mockUser, 
@@ -41,7 +45,7 @@ import {
 } from '../data/mockData';
 import { loadAppState, saveAppState, clearAppState, exportDataAsJSON, getActiveUser, setActiveUser } from '../data/persistence';
 import { requestDrivePermission, resolveDrivePath, uploadFile, shareFileWithUser, revokeFileShare } from '../lib/googleDrive';
-import { requestCalendarPermission, createCalendarEvent } from '../lib/googleCalendar';
+import { requestCalendarPermission, createCalendarEvent, createMedicationDoseCalendarEvent } from '../lib/googleCalendar';
 import { requestSheetsPermission, exportFamilyHealthWorkbook } from '../lib/googleSheets';
 import { 
   findConfigInAppData, 
@@ -147,7 +151,7 @@ interface AppContextProps {
   addCheckup: (chk: Omit<PeriodicCheckup, 'id'>) => void;
   addVaccine: (vac: Omit<VaccineRecord, 'id'>) => void;
   addExam: (exam: Omit<MedicalExam, 'id' | 'documentIds'>, results: Omit<ExamResult, 'id' | 'examId' | 'recordedAt'>[]) => void;
-  uploadDocument: (memberId: string, doc: { fileName: string; fileType: string; description?: string }, file?: File) => Promise<void>;
+  uploadDocument: (memberId: string, doc: { fileName: string; fileType: string; description?: string }, file?: File) => Promise<string>;
   deleteDocument: (id: string) => void;
   completeTask: (id: string) => void;
   toggleReminder: (id: string) => void;
@@ -248,6 +252,20 @@ interface AppContextProps {
   setGmailScanRangeDays: (d: number) => void;
   setGmailOnlyFutureAppointments: (v: boolean) => void;
   triggerGmailAutoScan: () => Promise<void>;
+
+  // Medical Orders & Prescription Medications
+  medicalOrders: MedicalOrder[];
+  medicationPrescriptions: MedicationPrescription[];
+  medicationDoseReminders: MedicationDoseReminder[];
+  addMedicalOrder: (order: Omit<MedicalOrder, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => void;
+  updateMedicalOrder: (id: string, fields: Partial<MedicalOrder>) => void;
+  deleteMedicalOrder: (id: string) => void;
+  createAppointmentFromOrder: (orderId: string, apptData: Omit<MedicalAppointment, 'id' | 'documentIds' | 'medicalOrderId'>) => void;
+  addMedicationPrescription: (prescription: Omit<MedicationPrescription, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => void;
+  updateMedicationPrescription: (id: string, fields: Partial<MedicationPrescription>) => void;
+  deleteMedicationPrescription: (id: string) => void;
+  markDoseReminder: (reminderId: string, status: DoseReminderStatus, takenAt?: string | null) => void;
+  generateDoseReminders: (prescription: MedicationPrescription) => MedicationDoseReminder[];
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -266,6 +284,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [history, setHistory] = useState<MedicalHistoryEvent[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [tasks, setTasks] = useState<FollowUpTask[]>([]);
+  const [medicalOrders, setMedicalOrders] = useState<MedicalOrder[]>([]);
+  const [medicationPrescriptions, setMedicationPrescriptions] = useState<MedicationPrescription[]>([]);
+  const [medicationDoseReminders, setMedicationDoseReminders] = useState<MedicationDoseReminder[]>([]);
 
   // Refs to prevent React state stale closures during async sync/pull operations
   const membersRef = useRef<FamilyMember[]>(members);
@@ -279,6 +300,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const historyRef = useRef<MedicalHistoryEvent[]>(history);
   const remindersRef = useRef<Reminder[]>(reminders);
   const tasksRef = useRef<FollowUpTask[]>(tasks);
+  const medicalOrdersRef = useRef<MedicalOrder[]>(medicalOrders);
+  const medicationPrescriptionsRef = useRef<MedicationPrescription[]>(medicationPrescriptions);
+  const medicationDoseRemindersRef = useRef<MedicationDoseReminder[]>(medicationDoseReminders);
 
   useEffect(() => { membersRef.current = members; }, [members]);
   useEffect(() => { healthProfilesRef.current = healthProfiles; }, [healthProfiles]);
@@ -291,6 +315,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { historyRef.current = history; }, [history]);
   useEffect(() => { remindersRef.current = reminders; }, [reminders]);
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+  useEffect(() => { medicalOrdersRef.current = medicalOrders; }, [medicalOrders]);
+  useEffect(() => { medicationPrescriptionsRef.current = medicationPrescriptions; }, [medicationPrescriptions]);
+  useEffect(() => { medicationDoseRemindersRef.current = medicationDoseReminders; }, [medicationDoseReminders]);
 
   // Gmail Import States & Refs
   const [emailSources, setEmailSources] = useState<AppointmentEmailSource[]>([]);
@@ -413,6 +440,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setHistory(savedState.history || []);
           setReminders(savedState.reminders || []);
           setTasks(savedState.tasks || []);
+          setMedicalOrders(savedState.medicalOrders || []);
+          setMedicationPrescriptions(savedState.medicationPrescriptions || []);
+          setMedicationDoseReminders(savedState.medicationDoseReminders || []);
           setSharedReports(savedState.sharedReports || []);
           setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
           setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
@@ -675,7 +705,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       lastGmailScanAt,
       nextGmailScanAt,
       gmailScanRangeDays,
-      gmailOnlyFutureAppointments
+      gmailOnlyFutureAppointments,
+      medicalOrders,
+      medicationPrescriptions,
+      medicationDoseReminders
     }, userEmailOrId);
   }, [
     user,
@@ -715,6 +748,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     nextGmailScanAt,
     gmailScanRangeDays,
     gmailOnlyFutureAppointments,
+    medicalOrders,
+    medicationPrescriptions,
+    medicationDoseReminders,
     isLoading
   ]);
 
@@ -760,6 +796,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setHistory(savedState.history || []);
         setReminders(savedState.reminders || []);
         setTasks(savedState.tasks || []);
+        setMedicalOrders(savedState.medicalOrders || []);
+        setMedicationPrescriptions(savedState.medicationPrescriptions || []);
+        setMedicationDoseReminders(savedState.medicationDoseReminders || []);
         setSharedReports(savedState.sharedReports || []);
         setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
         setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
@@ -813,6 +852,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setHistory([]);
         setReminders([]);
         setTasks([]);
+        setMedicalOrders([]);
+        setMedicationPrescriptions([]);
+        setMedicationDoseReminders([]);
         setSharedReports([]);
         setDriveSyncEnabled(true);
         setCalendarSyncEnabled(true);
@@ -886,6 +928,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setHistory(savedState.history || []);
         setReminders(savedState.reminders || []);
         setTasks(savedState.tasks || []);
+        setMedicalOrders(savedState.medicalOrders || []);
+        setMedicationPrescriptions(savedState.medicationPrescriptions || []);
+        setMedicationDoseReminders(savedState.medicationDoseReminders || []);
         setSharedReports(savedState.sharedReports || []);
         setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
         setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
@@ -1805,7 +1850,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           };
           setHistory((prev) => [newEvent, ...prev]);
           setTimeout(() => scheduleAutoSync('document_uploaded'), 100);
-          return;
+          return docId;
         } catch (uploadErr: any) {
           console.error('Error subiendo archivo a Google Drive:', uploadErr.message || uploadErr);
           setDriveStatus('error');
@@ -1847,6 +1892,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setHistory((prev) => [newEvent, ...prev]);
     setTimeout(() => scheduleAutoSync('document_uploaded_local'), 100);
+    return docId;
   };
 
   const deleteDocument = (id: string) => {
@@ -1860,12 +1906,523 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleReminder = (id: string) => {
-    setReminders((prev) => 
-      prev.map((r) => 
-        r.id === id ? { ...r, status: r.status === 'DONE' ? 'PENDING' : 'DONE' } : r
-      )
-    );
+    setReminders((prev) => {
+      let isMedication = false;
+      let newStatus: ReminderStatus = 'PENDING';
+      
+      const updated = prev.map((r) => {
+        if (r.id === id) {
+          isMedication = r.reminderType === 'MEDICATION';
+          newStatus = r.status === 'DONE' ? 'PENDING' : 'DONE';
+          return { ...r, status: newStatus };
+        }
+        return r;
+      });
+
+      if (isMedication) {
+        const doseStatus: DoseReminderStatus = (newStatus as string) === 'DONE' ? 'TAKEN' : 'PENDING';
+        setMedicationDoseReminders(doses => doses.map(d => {
+          if (d.id === id) {
+            return {
+              ...d,
+              status: doseStatus,
+              takenAt: doseStatus === 'TAKEN' ? new Date().toISOString() : null,
+              updatedAt: new Date().toISOString(),
+              syncStatus: 'PENDING_SYNC' as const
+            };
+          }
+          return d;
+        }));
+      }
+
+      return updated;
+    });
     setTimeout(() => scheduleAutoSync('reminder_toggled'), 100);
+  };
+
+  const generateDoseReminders = (prescription: MedicationPrescription): MedicationDoseReminder[] => {
+    const list: MedicationDoseReminder[] = [];
+    const startDate = new Date(prescription.startDate + 'T08:00:00');
+    const endDate = new Date(prescription.endDate + 'T23:59:59');
+    
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return [];
+    }
+
+    const email = user?.email || 'titular@correo.com';
+    const uid = user?.googleId || user?.id || 'unknown';
+    const nowIso = new Date().toISOString();
+
+    const addDose = (time: Date) => {
+      const year = time.getFullYear();
+      const month = String(time.getMonth() + 1).padStart(2, '0');
+      const day = String(time.getDate()).padStart(2, '0');
+      const hours = String(time.getHours()).padStart(2, '0');
+      const minutes = String(time.getMinutes()).padStart(2, '0');
+      const scheduledAt = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+      list.push({
+        id: `dose-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+        prescriptionId: prescription.id,
+        memberId: prescription.memberId,
+        medicationName: prescription.name,
+        dose: prescription.dose,
+        scheduledAt,
+        status: 'PENDING',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        syncStatus: 'PENDING_SYNC',
+        ownerEmail: email,
+        ownerGoogleId: uid,
+        sourceDeviceId: deviceId || null
+      });
+    };
+
+    if (prescription.frequencyType === 'EVERY_X_HOURS' && prescription.frequencyIntervalHours) {
+      const intervalMs = prescription.frequencyIntervalHours * 60 * 60 * 1000;
+      let current = new Date(startDate.getTime());
+      while (current.getTime() <= endDate.getTime()) {
+        addDose(new Date(current.getTime()));
+        current = new Date(current.getTime() + intervalMs);
+      }
+    } else if (prescription.frequencyType === 'SPECIFIC_TIMES' && prescription.specificTimes) {
+      const currentDay = new Date(startDate.getTime());
+      while (currentDay.getTime() <= endDate.getTime()) {
+        prescription.specificTimes.forEach(tStr => {
+          const [hStr, mStr] = tStr.split(':');
+          const timeVal = new Date(currentDay.getTime());
+          timeVal.setHours(parseInt(hStr, 10), parseInt(mStr, 10), 0, 0);
+          if (timeVal.getTime() >= startDate.getTime() && timeVal.getTime() <= endDate.getTime()) {
+            addDose(timeVal);
+          }
+        });
+        currentDay.setDate(currentDay.getDate() + 1);
+      }
+    } else {
+      let times: string[] = ['08:00'];
+      if (prescription.frequencyType === 'TWICE_DAILY') {
+        times = ['08:00', '20:00'];
+      } else if (prescription.frequencyType === 'THREE_TIMES_DAILY') {
+        times = ['08:00', '14:00', '20:00'];
+      } else if (prescription.frequencyType === 'ONCE_DAILY') {
+        times = ['08:00'];
+      }
+      
+      const currentDay = new Date(startDate.getTime());
+      while (currentDay.getTime() <= endDate.getTime()) {
+        times.forEach(tStr => {
+          const [hStr, mStr] = tStr.split(':');
+          const timeVal = new Date(currentDay.getTime());
+          timeVal.setHours(parseInt(hStr, 10), parseInt(mStr, 10), 0, 0);
+          if (timeVal.getTime() >= startDate.getTime() && timeVal.getTime() <= endDate.getTime()) {
+            addDose(timeVal);
+          }
+        });
+        currentDay.setDate(currentDay.getDate() + 1);
+      }
+    }
+
+    return list;
+  };
+
+  const addMedicalOrder = (order: Omit<MedicalOrder, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => {
+    const newId = `ord-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+    const email = user?.email || 'titular@correo.com';
+    const uid = user?.googleId || user?.id || 'unknown';
+
+    const newOrder: MedicalOrder = {
+      ...order,
+      id: newId,
+      status: order.status || (order.requiresAuthorization ? 'PENDING_AUTHORIZATION' : 'AUTHORIZED'),
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      syncStatus: 'PENDING_SYNC',
+      ownerEmail: email,
+      ownerGoogleId: uid,
+      sourceDeviceId: deviceId || null
+    };
+
+    setMedicalOrders(prev => [...prev, newOrder]);
+
+    const newEvent: MedicalHistoryEvent = {
+      id: `hist-${Date.now()}`,
+      memberId: order.memberId,
+      eventType: 'MEDICAL_ORDER',
+      title: `Orden médica registrada: ${order.title}`,
+      description: `Orden del médico ${order.doctorName || 'No especificado'}. Especialidad: ${order.specialty || 'No especificado'}. Requiere autorización: ${order.requiresAuthorization ? 'Sí' : 'No'}.`,
+      eventDate: order.issuedAt,
+      relatedEntityId: newId,
+      createdAt: nowIso
+    };
+    setHistory(prev => [newEvent, ...prev]);
+
+    setTimeout(() => scheduleAutoSync('medical_order_added'), 100);
+  };
+
+  const updateMedicalOrder = (id: string, fields: Partial<MedicalOrder>) => {
+    const nowIso = new Date().toISOString();
+    setMedicalOrders(prev => prev.map(o => {
+      if (o.id === id) {
+        const updated = {
+          ...o,
+          ...fields,
+          updatedAt: nowIso,
+          syncStatus: 'PENDING_SYNC' as const
+        };
+        
+        if (fields.status && fields.status !== o.status) {
+          const newEvent: MedicalHistoryEvent = {
+            id: `hist-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+            memberId: o.memberId,
+            eventType: 'MEDICAL_ORDER',
+            title: `Orden médica actualizada`,
+            description: `Orden "${o.title}" cambió su estado de ${o.status} a ${fields.status}.`,
+            eventDate: new Date().toISOString().split('T')[0],
+            relatedEntityId: id,
+            createdAt: nowIso
+          };
+          setTimeout(() => setHistory(h => [newEvent, ...h]), 50);
+        }
+
+        return updated;
+      }
+      return o;
+    }));
+
+    setTimeout(() => scheduleAutoSync('medical_order_updated'), 100);
+  };
+
+  const deleteMedicalOrder = (id: string) => {
+    const nowIso = new Date().toISOString();
+    setMedicalOrders(prev => prev.map(o => {
+      if (o.id === id) {
+        return {
+          ...o,
+          deletedAt: nowIso,
+          syncStatus: 'PENDING_SYNC' as const,
+          updatedAt: nowIso
+        };
+      }
+      return o;
+    }));
+    setTimeout(() => scheduleAutoSync('medical_order_deleted'), 100);
+  };
+
+  const createAppointmentFromOrder = (orderId: string, apptData: Omit<MedicalAppointment, 'id' | 'documentIds' | 'medicalOrderId'>) => {
+    const newId = `appt-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+    let date = '';
+    let time = '';
+    if (apptData.scheduledAt && apptData.scheduledAt.includes('T')) {
+      [date, time] = apptData.scheduledAt.split('T');
+    } else if (apptData.scheduledAt) {
+      date = apptData.scheduledAt;
+    }
+
+    const email = user?.email || 'titular@correo.com';
+    const uid = user?.googleId || user?.id || 'unknown';
+
+    const newAppt: MedicalAppointment = {
+      ...apptData,
+      id: newId,
+      medicalOrderId: orderId,
+      doctor: apptData.doctorName,
+      date,
+      time,
+      documentIds: [],
+      calendarSyncStatus: calendarSyncEnabled ? 'PENDING_CALENDAR_SYNC' : 'LOCAL_ONLY',
+      syncStatus: 'PENDING_SYNC',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      deletedAt: null,
+      retentionStatus: 'ACTIVE',
+      ownerEmail: email,
+      ownerGoogleId: uid,
+      sourceDeviceId: deviceId || null
+    };
+    
+    setAppointments(prev => [...prev, newAppt]);
+
+    const newReminder: Reminder = {
+      id: `rem-${Date.now()}`,
+      memberId: apptData.memberId,
+      title: `Cita Médica: ${apptData.doctorName} (${apptData.specialty})`,
+      description: `Agendada desde orden médica. Ubicación: ${apptData.location || 'Consultorio'}.`,
+      dueDate: apptData.scheduledAt,
+      reminderType: 'APPOINTMENT',
+      status: 'PENDING',
+      relatedEventId: newId
+    };
+    setReminders(prev => [...prev, newReminder]);
+
+    const newEventAppt: MedicalHistoryEvent = {
+      id: `hist-${Date.now()}`,
+      memberId: apptData.memberId,
+      eventType: 'APPOINTMENT',
+      title: `Cita de ${apptData.specialty} agendada`,
+      description: `Agendada desde orden de autorización. Médico: ${apptData.doctorName}.`,
+      eventDate: apptData.scheduledAt.split('T')[0],
+      relatedEntityId: newId,
+      createdAt: nowIso
+    };
+    setHistory(prev => [newEventAppt, ...prev]);
+
+    setMedicalOrders(prev => prev.map(o => {
+      if (o.id === orderId) {
+        return {
+          ...o,
+          status: 'APPOINTMENT_SCHEDULED' as const,
+          relatedAppointmentId: newId,
+          updatedAt: nowIso,
+          syncStatus: 'PENDING_SYNC' as const
+        };
+      }
+      return o;
+    }));
+
+    setTimeout(() => scheduleAutoSync('appointment_created_from_order'), 100);
+
+    if (calendarSyncEnabled) {
+      setTimeout(() => {
+        syncAppointmentToCalendar(newId, newAppt);
+      }, 200);
+    }
+  };
+
+  const syncMedicationCalendarEvents = async (
+    prescriptionId: string,
+    doses: MedicationDoseReminder[],
+    prescription: MedicationPrescription
+  ) => {
+    const activeDoses = doses.filter(d => !d.deletedAt && d.status === 'PENDING');
+    if (activeDoses.length === 0) return;
+
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    const member = members.find(m => m.id === prescription.memberId);
+    const memberName = member ? member.fullName : 'Familiar';
+
+    let token = calendarAccessToken;
+    if (!token) {
+      try {
+        token = await ensureCalendarToken(clientId, false);
+        setCalendarAccessToken(token);
+        setLastCalendarAuthTime(new Date().toISOString());
+      } catch (_) {
+        token = null;
+      }
+    }
+
+    if (!token) return;
+
+    try {
+      setCalendarStatus('sincronizando');
+      const updatedDoses = [...medicationDoseRemindersRef.current];
+      let hasUpdates = false;
+
+      for (const dose of activeDoses) {
+        try {
+          const result = await createMedicationDoseCalendarEvent(
+            token,
+            prescription.name,
+            prescription.dose,
+            dose.scheduledAt,
+            memberName,
+            prescription.instructions
+          );
+
+          const doseIdx = updatedDoses.findIndex(d => d.id === dose.id);
+          if (doseIdx >= 0) {
+            updatedDoses[doseIdx] = {
+              ...updatedDoses[doseIdx],
+              googleCalendarEventId: result.eventId,
+              syncStatus: 'PENDING_SYNC'
+            };
+            hasUpdates = true;
+          }
+        } catch (err) {
+          console.error(`Error syncing dose reminder ${dose.id} to calendar:`, err);
+        }
+      }
+
+      if (hasUpdates) {
+        setMedicationDoseReminders(updatedDoses);
+      }
+      setCalendarStatus('sincronizado');
+    } catch (err) {
+      console.error('Error in syncMedicationCalendarEvents:', err);
+      setCalendarStatus('error');
+    }
+  };
+
+  const addMedicationPrescription = (prescription: Omit<MedicationPrescription, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => {
+    const newId = `med-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+    const email = user?.email || 'titular@correo.com';
+    const uid = user?.googleId || user?.id || 'unknown';
+
+    const newPrescription: MedicationPrescription = {
+      ...prescription,
+      id: newId,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      syncStatus: 'PENDING_SYNC',
+      ownerEmail: email,
+      ownerGoogleId: uid,
+      sourceDeviceId: deviceId || null
+    };
+
+    const generatedDoses = generateDoseReminders({ ...newPrescription });
+
+    setMedicationPrescriptions(prev => [...prev, newPrescription]);
+    setMedicationDoseReminders(prev => [...prev, ...generatedDoses]);
+
+    const globalRemindersToAdd: Reminder[] = generatedDoses.map(dose => ({
+      id: dose.id,
+      memberId: prescription.memberId,
+      title: `Tomar ${prescription.name} (${prescription.dose})`,
+      description: prescription.instructions || 'Tomar según indicación médica.',
+      dueDate: dose.scheduledAt,
+      reminderType: 'MEDICATION',
+      status: 'PENDING',
+      relatedEventId: newId
+    }));
+    
+    setReminders(prev => [...prev, ...globalRemindersToAdd]);
+
+    const newHistoryEvent: MedicalHistoryEvent = {
+      id: `hist-${Date.now()}`,
+      memberId: prescription.memberId,
+      eventType: 'MEDICATION',
+      title: `Prescripción de medicamento registrada: ${prescription.name}`,
+      description: `Dosis: ${prescription.dose}. Duración: ${prescription.durationDays} días. Frecuencia: ${prescription.frequencyType}.`,
+      eventDate: prescription.startDate,
+      relatedEntityId: newId,
+      createdAt: nowIso
+    };
+    setHistory(prev => [newHistoryEvent, ...prev]);
+
+    setTimeout(() => scheduleAutoSync('medication_prescription_added'), 100);
+
+    if (calendarSyncEnabled && generatedDoses.length > 0 && generatedDoses.length <= 20) {
+      setTimeout(() => {
+        syncMedicationCalendarEvents(newId, generatedDoses, newPrescription);
+      }, 200);
+    }
+  };
+
+  const updateMedicationPrescription = (id: string, fields: Partial<MedicationPrescription>) => {
+    const nowIso = new Date().toISOString();
+    setMedicationPrescriptions(prev => prev.map(m => {
+      if (m.id === id) {
+        const updated = {
+          ...m,
+          ...fields,
+          updatedAt: nowIso,
+          syncStatus: 'PENDING_SYNC' as const
+        };
+
+        if (fields.status && fields.status !== m.status) {
+          const historyMsg = `Medicamento "${m.name}" fue marcado como ${fields.status}.`;
+          const histEvent: MedicalHistoryEvent = {
+            id: `hist-${Date.now()}`,
+            memberId: m.memberId,
+            eventType: 'MEDICATION',
+            title: `Medicamento ${fields.status.toLowerCase()}`,
+            description: historyMsg,
+            eventDate: new Date().toISOString().split('T')[0],
+            relatedEntityId: id,
+            createdAt: nowIso
+          };
+          setTimeout(() => setHistory(h => [histEvent, ...h]), 50);
+
+          if (fields.status === 'SUSPENDED' || fields.status === 'CANCELLED') {
+            setMedicationDoseReminders(doses => doses.map(d => {
+              if (d.prescriptionId === id && d.status === 'PENDING') {
+                return { ...d, status: 'SKIPPED' as const, updatedAt: nowIso, syncStatus: 'PENDING_SYNC' as const };
+              }
+              return d;
+            }));
+            setReminders(rems => rems.map(r => {
+              if (r.relatedEventId === id && r.status === 'PENDING') {
+                return { ...r, status: 'DONE' as const };
+              }
+              return r;
+            }));
+          }
+        }
+
+        return updated;
+      }
+      return m;
+    }));
+    setTimeout(() => scheduleAutoSync('medication_prescription_updated'), 100);
+  };
+
+  const deleteMedicationPrescription = (id: string) => {
+    const nowIso = new Date().toISOString();
+    setMedicationPrescriptions(prev => prev.map(m => {
+      if (m.id === id) {
+        return {
+          ...m,
+          deletedAt: nowIso,
+          syncStatus: 'PENDING_SYNC' as const,
+          updatedAt: nowIso
+        };
+      }
+      return m;
+    }));
+
+    setMedicationDoseReminders(prev => prev.map(d => {
+      if (d.prescriptionId === id) {
+        return {
+          ...d,
+          deletedAt: nowIso,
+          syncStatus: 'PENDING_SYNC' as const,
+          updatedAt: nowIso
+        };
+      }
+      return d;
+    }));
+
+    setReminders(prev => prev.filter(r => r.relatedEventId !== id));
+    setTimeout(() => scheduleAutoSync('medication_prescription_deleted'), 100);
+  };
+
+  const markDoseReminder = (reminderId: string, status: DoseReminderStatus, takenAt?: string | null) => {
+    const nowIso = new Date().toISOString();
+    
+    setMedicationDoseReminders(prev => prev.map(d => {
+      if (d.id === reminderId) {
+        return {
+          ...d,
+          status,
+          takenAt: status === 'TAKEN' ? (takenAt || nowIso) : null,
+          updatedAt: nowIso,
+          syncStatus: 'PENDING_SYNC' as const
+        };
+      }
+      return d;
+    }));
+
+    let globalStatus: ReminderStatus = 'PENDING';
+    if (status === 'TAKEN') globalStatus = 'DONE';
+    else if (status === 'MISSED') globalStatus = 'OVERDUE';
+    else if (status === 'SKIPPED') globalStatus = 'DONE';
+
+    setReminders(prev => prev.map(r => {
+      if (r.id === reminderId) {
+        return {
+          ...r,
+          status: globalStatus
+        };
+      }
+      return r;
+    }));
+
+    setTimeout(() => scheduleAutoSync('medication_dose_marked'), 100);
   };
 
   const setDriveSync = (enabled: boolean) => {
@@ -2547,8 +3104,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setExamResults({});
     setDocuments([]);
     setHistory([]);
-    setReminders([]);
-    setTasks([]);
+    setReminders(prev => []);
+    setTasks(prev => []);
+    setMedicalOrders(prev => []);
+    setMedicationPrescriptions(prev => []);
+    setMedicationDoseReminders(prev => []);
     setEmailSources([
       {
         id: 'source-default',
@@ -2604,6 +3164,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setHistory(mockHistory);
     setReminders(mockReminders);
     setTasks(mockTasks);
+    setMedicalOrders([]);
+    setMedicationPrescriptions([]);
+    setMedicationDoseReminders([]);
     setDriveSyncEnabled(true);
     setCalendarSyncEnabled(true);
     setLastExportMetadata(null);
@@ -2640,7 +3203,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deviceId,
       syncStrategy: 'LAST_WRITE_WINS',
       lastKnownRevision: 0,
-      appDataFileId: null
+      appDataFileId: null,
+      medicalOrders: [],
+      medicationPrescriptions: [],
+      medicationDoseReminders: []
     }, 'demo');
     
     setIsLoading(false);
@@ -2669,7 +3235,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       lastExportMetadata,
       simulatedRole,
       simulatedEmail,
-      sharedReports
+      sharedReports,
+      medicalOrders,
+      medicationPrescriptions,
+      medicationDoseReminders
     });
   };
 
@@ -2999,6 +3568,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (remoteState.CandidatosCorreoCitas) {
         setAppointmentCandidates(prev => mergeEntities(prev, remoteState.CandidatosCorreoCitas, 'CandidatosCorreoCitas'));
       }
+      if (remoteState.OrdenesMedicas) {
+        setMedicalOrders(prev => mergeEntities(prev, remoteState.OrdenesMedicas, 'OrdenesMedicas'));
+      }
+      if (remoteState.Medicamentos) {
+        setMedicationPrescriptions(prev => mergeEntities(prev, remoteState.Medicamentos, 'Medicamentos'));
+      }
+      if (remoteState.TomasMedicamentos) {
+        setMedicationDoseReminders(prev => mergeEntities(prev, remoteState.TomasMedicamentos, 'TomasMedicamentos'));
+      }
 
       setLastPullAt(new Date().toISOString());
       setLastSyncAt(new Date().toISOString());
@@ -3197,6 +3775,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ...c,
           createdAt: c.createdAt || new Date().toISOString(),
           updatedAt: c.updatedAt || new Date().toISOString()
+        })),
+        OrdenesMedicas: medicalOrdersRef.current.map(o => ({
+          ...o,
+          ownerEmail: o.ownerEmail || email,
+          ownerGoogleId: o.ownerGoogleId || uid,
+          sourceDeviceId: o.sourceDeviceId || deviceId,
+          createdAt: o.createdAt || new Date().toISOString(),
+          updatedAt: o.updatedAt || new Date().toISOString(),
+          deletedAt: o.deletedAt || null
+        })),
+        Medicamentos: medicationPrescriptionsRef.current.map(m => ({
+          ...m,
+          ownerEmail: m.ownerEmail || email,
+          ownerGoogleId: m.ownerGoogleId || uid,
+          sourceDeviceId: m.sourceDeviceId || deviceId,
+          createdAt: m.createdAt || new Date().toISOString(),
+          updatedAt: m.updatedAt || new Date().toISOString(),
+          deletedAt: m.deletedAt || null
+        })),
+        TomasMedicamentos: medicationDoseRemindersRef.current.map(t => ({
+          ...t,
+          ownerEmail: t.ownerEmail || email,
+          ownerGoogleId: t.ownerGoogleId || uid,
+          sourceDeviceId: t.sourceDeviceId || deviceId,
+          createdAt: t.createdAt || new Date().toISOString(),
+          updatedAt: t.updatedAt || new Date().toISOString(),
+          deletedAt: t.deletedAt || null
         }))
       };
 
@@ -3233,6 +3838,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setVaccines(prev => updateSyncStatus(prev));
       setExams(prev => updateSyncStatus(prev));
       setDocuments(prev => updateSyncStatus(prev));
+      setMedicalOrders(prev => updateSyncStatus(prev));
+      setMedicationPrescriptions(prev => updateSyncStatus(prev));
+      setMedicationDoseReminders(prev => updateSyncStatus(prev));
 
       setLastPushAt(new Date().toISOString());
       setLastSyncAt(new Date().toISOString());
@@ -3356,6 +3964,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const currentHealthProfiles = healthProfilesRef.current;
       const currentSources = emailSourcesRef.current;
       const currentCandidates = appointmentCandidatesRef.current;
+      const currentOrders = medicalOrdersRef.current;
+      const currentPrescriptions = medicationPrescriptionsRef.current;
+      const currentDoseReminders = medicationDoseRemindersRef.current;
 
       const mergedMembers = remoteState.Miembros ? mergeEntitiesSync(currentMembers, remoteState.Miembros, 'Miembros') : currentMembers;
       const mergedAppointments = remoteState.Citas ? mergeEntitiesSync(currentAppointments, remoteCitasSanitized, 'Citas') : currentAppointments;
@@ -3366,6 +3977,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const mergedHistory = remoteState.HistorialClinico ? mergeEntitiesSync(currentHistory, remoteState.HistorialClinico, 'Historial') : currentHistory;
       const mergedSources = remoteState.FuentesCorreoCitas ? mergeEntitiesSync(currentSources, remoteState.FuentesCorreoCitas, 'FuentesCorreoCitas') : currentSources;
       const mergedCandidates = remoteState.CandidatosCorreoCitas ? mergeEntitiesSync(currentCandidates, remoteState.CandidatosCorreoCitas, 'CandidatosCorreoCitas') : currentCandidates;
+      const mergedOrders = remoteState.OrdenesMedicas ? mergeEntitiesSync(currentOrders, remoteState.OrdenesMedicas, 'OrdenesMedicas') : currentOrders;
+      const mergedPrescriptions = remoteState.Medicamentos ? mergeEntitiesSync(currentPrescriptions, remoteState.Medicamentos, 'Medicamentos') : currentPrescriptions;
+      const mergedDoseReminders = remoteState.TomasMedicamentos ? mergeEntitiesSync(currentDoseReminders, remoteState.TomasMedicamentos, 'TomasMedicamentos') : currentDoseReminders;
 
       // Merge health profiles (Record<string, HealthProfile>)
       const mergedProfiles = { ...currentHealthProfiles };
@@ -3391,6 +4005,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setHealthProfiles(mergedProfiles);
       setEmailSources(mergedSources);
       setAppointmentCandidates(mergedCandidates);
+      setMedicalOrders(mergedOrders);
+      setMedicationPrescriptions(mergedPrescriptions);
+      setMedicationDoseReminders(mergedDoseReminders);
       setLastPullAt(new Date().toISOString());
 
       // FASE 2: Push — Usar el estado fusionado calculado
@@ -3548,6 +4165,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ...c,
           createdAt: c.createdAt || new Date().toISOString(),
           updatedAt: c.updatedAt || new Date().toISOString()
+        })),
+        OrdenesMedicas: mergedOrders.map(o => ({
+          ...o,
+          ownerEmail: o.ownerEmail || email,
+          ownerGoogleId: o.ownerGoogleId || uid,
+          sourceDeviceId: o.sourceDeviceId || deviceId,
+          createdAt: o.createdAt || new Date().toISOString(),
+          updatedAt: o.updatedAt || new Date().toISOString(),
+          deletedAt: o.deletedAt || null
+        })),
+        Medicamentos: mergedPrescriptions.map(m => ({
+          ...m,
+          ownerEmail: m.ownerEmail || email,
+          ownerGoogleId: m.ownerGoogleId || uid,
+          sourceDeviceId: m.sourceDeviceId || deviceId,
+          createdAt: m.createdAt || new Date().toISOString(),
+          updatedAt: m.updatedAt || new Date().toISOString(),
+          deletedAt: m.deletedAt || null
+        })),
+        TomasMedicamentos: mergedDoseReminders.map(t => ({
+          ...t,
+          ownerEmail: t.ownerEmail || email,
+          ownerGoogleId: t.ownerGoogleId || uid,
+          sourceDeviceId: t.sourceDeviceId || deviceId,
+          createdAt: t.createdAt || new Date().toISOString(),
+          updatedAt: t.updatedAt || new Date().toISOString(),
+          deletedAt: t.deletedAt || null
         }))
       };
 
@@ -3579,6 +4223,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setDocuments(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
       setEmailSources(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
       setAppointmentCandidates(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
+      setMedicalOrders(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
+      setMedicationPrescriptions(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
+      setMedicationDoseReminders(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
 
       setLastPushAt(now);
       setLastSyncAt(now);
@@ -4225,6 +4872,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const exposedHistory = filterByRole(history);
   const exposedReminders = filterByRole(reminders);
   const exposedTasks = filterByRole(tasks);
+  const exposedMedicalOrders = filterByRole(medicalOrders);
+  const exposedMedicationPrescriptions = filterByRole(medicationPrescriptions);
+  const exposedMedicationDoseReminders = filterByRole(medicationDoseReminders);
 
   return (
     <AppContext.Provider value={{
@@ -4308,6 +4958,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       restoreDemoData,
       clearDemoData,
       exportState,
+
+      // Medical Orders & Prescription Medications Bindings
+      medicalOrders: exposedMedicalOrders,
+      medicationPrescriptions: exposedMedicationPrescriptions,
+      medicationDoseReminders: exposedMedicationDoseReminders,
+      addMedicalOrder,
+      updateMedicalOrder,
+      deleteMedicalOrder,
+      createAppointmentFromOrder,
+      addMedicationPrescription,
+      updateMedicationPrescription,
+      deleteMedicationPrescription,
+      markDoseReminder,
+      generateDoseReminders,
 
       // Capa Operacional Google-Native Foundation Values Expose
       databaseSpreadsheetId,
