@@ -173,6 +173,7 @@ interface AppContextProps {
   needsGoogleAuth: boolean;
   reconnectGoogle: () => Promise<void>;
   flushPendingSync: () => Promise<void>;
+  checkForExistingDatabase: (explicitToken?: string, silent?: boolean) => Promise<boolean>;
 
   // Secure Google-Native Sharing Phase 3B
   sharedReports: SharedMemberReport[];
@@ -836,11 +837,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // forcePrompt=false usa el popup normal de GIS (select_account)
-      await ensureOperationalToken(clientId, false);
+      const token = await ensureOperationalToken(clientId, false);
       setNeedsGoogleAuth(false);
-      setSyncInitStatus('checking');
-      setSyncInitMessage('Conectado. Sincronizando datos pendientes...');
-      await flushPendingSync();
+      
+      // Buscar base remota con el token recién otorgado
+      const found = await checkForExistingDatabase(token, true);
+      
+      if (!found) {
+        // Si no se encontró base remota, pero ya tiene token,
+        // y tiene cambios locales pendientes, sincronizamos.
+        if (pendingSyncCount > 0) {
+          setSyncInitMessage('Sincronizando cambios locales...');
+          await flushPendingSync();
+        }
+      }
     } catch (err: any) {
       const errMsg = err?.error || err?.message || 'Error desconocido';
       const cancelled = errMsg === 'access_denied' || errMsg === 'popup_closed_by_user';
@@ -1832,35 +1842,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * Si Google requiere consentimiento, setea needs_auth y muestra banner.
    * NO bloquea el UX — el usuario puede usar la app mientras esto corre.
    */
-  const autoSyncOnLogin = async (loggedUser: UserAccount): Promise<void> => {
-    if (!loggedUser || loggedUser.provider !== 'google') return;
+  // ── BÚSQUEDA DE BASE EXISTENTE E INICIALIZACIÓN ──────────────────────────
 
+  /**
+   * checkForExistingDatabase — Busca en Google Drive si ya existe una base operacional
+   * vinculada (pate-salud-config.json).
+   * - Si silent=true, intenta obtener el token sin popup (prompt: '').
+   * - Si silent=false, abre el popup de consentimiento si no hay token.
+   * - Si encuentra la base, carga el historial remoto en el cliente.
+   * - Retorna true si encontró base, false si no.
+   */
+  const checkForExistingDatabase = async (explicitToken?: string, silent = true): Promise<boolean> => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!clientId) return;
+    if (!clientId) return false;
 
     setSyncInitStatus('checking');
     setSyncInitMessage('Buscando tu base de datos en Google...');
 
     try {
-      // ① Intento SILENCIOSO — no abre popup (prompt: '')
-      // Si GIS no puede renovar silenciosamente → lanza error 'interaction_required'
-      const token = await ensureOperationalToken(clientId, true /* silent */);
+      let token = explicitToken || getOperationalTokenIfValid();
+      if (!token) {
+        token = await ensureOperationalToken(clientId, silent);
+      }
 
-      // ② Con token: buscar config en appDataFolder
       const configFileId = await findConfigInAppData(token);
-
       if (!configFileId) {
+        setAppDataFileId(null);
         setSyncInitStatus('no_remote_data');
-        setSyncInitMessage('Esta cuenta todavía no tiene datos en Google. Crea tu base desde Configuración.');
-        return;
+        setSyncInitMessage('No existe base Google-native para esta cuenta.');
+        return false;
       }
 
       const remoteConfig = await readConfigFromAppData(token, configFileId);
-
       if (!remoteConfig || !remoteConfig.databaseSpreadsheetId) {
+        setAppDataFileId(configFileId);
         setSyncInitStatus('no_remote_data');
-        setSyncInitMessage('La configuración remota existe pero no tiene base operacional asociada.');
-        return;
+        setSyncInitMessage('No existe base Google-native para esta cuenta.');
+        return false;
       }
 
       const remoteSheetId = remoteConfig.databaseSpreadsheetId as string;
@@ -1875,16 +1893,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSharedReports(remoteConfig.permissionRefs.sharedReports);
       }
 
-      setSyncInitMessage('Base encontrada. Cargando datos...');
+      setSyncInitMessage('Base encontrada. Cargando datos desde Google...');
       await pullFromGoogleInternal(token, remoteSheetId);
 
       setSyncInitStatus('loaded_from_google');
       setSyncInitMessage(`✅ Datos cargados desde Google (${new Date().toLocaleTimeString('es-CO')})`);
       setNeedsGoogleAuth(false);
       setPendingSyncCount(0);
-
+      return true;
     } catch (err: any) {
       const errCode = err?.error || err?.message || '';
+      const errMessage = err?.message || '';
+      const isNotFound = errMessage.includes('Not Found') || errMessage.includes('404') || errMessage.includes('403') || errMessage.includes('not found') || errMessage.includes('deleted');
+
       const needsInteraction =
         errCode === 'interaction_required' ||
         errCode === 'consent_required' ||
@@ -1894,18 +1915,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         errCode === 'popup_failed_to_open';
 
       if (needsInteraction) {
-        // No es un error — solo se requiere consentimiento del usuario
         setSyncInitStatus('needs_auth');
-        setSyncInitMessage(
-          'Conecta con Google para cargar tus datos y habilitar la sincronización automática.'
-        );
+        setSyncInitMessage('Conecta Google para buscar tu base existente.');
         setNeedsGoogleAuth(true);
+      } else if (isNotFound) {
+        setDatabaseSpreadsheetId(null);
+        setDatabaseSpreadsheetUrl(null);
+        setSyncInitStatus('no_remote_data');
+        setSyncInitMessage('No existe base Google-native para esta cuenta.');
       } else {
-        // Error de red u otro error técnico
         setSyncInitStatus('error');
-        setSyncInitMessage(`Error al conectar: ${errCode || 'error desconocido'}. Intenta desde Configuración.`);
+        setSyncInitMessage(`Error al conectar: ${errCode || 'error desconocido'}.`);
       }
+      return false;
     }
+  };
+
+  /**
+   * autoSyncOnLogin — Intenta buscar silenciosamente al iniciar la app/sesión.
+   */
+  const autoSyncOnLogin = async (loggedUser: UserAccount): Promise<void> => {
+    if (!loggedUser || loggedUser.provider !== 'google') return;
+    await checkForExistingDatabase(undefined, true /* silent */);
   };
 
   // ── CAPA OPERACIONAL GOOGLE-NATIVE FOUNDATION ACTIONS ──────────────────────
@@ -2337,6 +2368,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setOpSyncStatus('error');
       setOpSyncError('No existe una base operacional configurada.');
       alert('No se encontró base operacional para subir cambios.');
+      return;
+    }
+
+    // Regla: No hacer push si local está vacío y no se ha hecho pull en esta sesión (o nunca)
+    if (!lastPullAt && members.length === 0) {
+      if (window.confirm('No se han cargado datos desde Google en este dispositivo. Para evitar sobrescribir datos remotos, se realizará una sincronización completa primero. ¿Proceder?')) {
+        await syncNow();
+        return;
+      }
       return;
     }
 
@@ -3114,6 +3154,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       needsGoogleAuth,
       reconnectGoogle,
       flushPendingSync,
+      checkForExistingDatabase,
 
       // Secure Google-Native Sharing Phase 3B Bindings
       sharedReports,
