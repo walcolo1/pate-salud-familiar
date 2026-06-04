@@ -20,6 +20,15 @@ export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 export const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 
+export const ALL_REQUIRED_SCOPES = [
+  'profile',
+  'email',
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/drive.appdata',
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/calendar.events'
+].join(' ');
+
 // ── Cache en memoria (módulo-scope, NO exportado) ──────────────────────────
 interface TokenCache {
   accessToken: string;    // Token de acceso (NUNCA se serializa a storage)
@@ -201,6 +210,33 @@ export async function ensureCalendarToken(
     expiresAt: Date.now() + TOKEN_LIFETIME_MS,
     scopes: CALENDAR_SCOPE,
   };
+  return token;
+}
+
+/**
+ * Obtiene un token con todos los scopes requeridos (Drive file, AppData, Sheets, Calendar).
+ * Rellena las cachés correspondientes para evitar solicitudes adicionales a Google.
+ */
+export async function ensureAllRequiredTokens(
+  clientId: string,
+  silent = false,
+): Promise<string> {
+  // Retornar caché operacional si incluye calendar y es válida
+  if (isCacheValid(_operationalCache) && _operationalCache!.scopes.includes('calendar.events')) {
+    return _operationalCache!.accessToken;
+  }
+
+  const token = await requestGISToken(clientId, ALL_REQUIRED_SCOPES, silent);
+  const cacheEntry = {
+    accessToken: token,
+    expiresAt: Date.now() + TOKEN_LIFETIME_MS,
+    scopes: ALL_REQUIRED_SCOPES,
+  };
+
+  _operationalCache = cacheEntry;
+  _driveCache = cacheEntry;
+  _calendarCache = cacheEntry;
+
   return token;
 }
 
