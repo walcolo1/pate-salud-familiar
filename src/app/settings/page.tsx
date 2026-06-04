@@ -575,14 +575,14 @@ export default function SettingsPage() {
             {databaseSpreadsheetUrl && (
               <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2.5 font-semibold text-[11px] text-slate-500">
                 <a
-                  id="lnk-view-spreadsheet"
+                  id="btn-open-spreadsheet"
                   href={databaseSpreadsheetUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="py-2.5 bg-slate-800 hover:bg-slate-900 active:bg-black text-white font-extrabold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 text-center w-full"
                 >
                   <Grid3X3 className="h-4.5 w-4.5" />
-                  <span>Abrir base operacional (Google Sheets)</span>
+                  <span>Abrir hoja operacional actual</span>
                   <ExternalLink className="h-3 w-3" />
                 </a>
                 

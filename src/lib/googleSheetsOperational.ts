@@ -26,10 +26,10 @@ export const OPERATIONAL_HEADERS = {
     'ownerEmail', 'ownerGoogleId', 'sourceDeviceId', 'createdAt', 'updatedAt', 'deletedAt'
   ],
   Citas: [
-    'id', 'memberId', 'doctorName', 'specialty', 'scheduledAt', 'location', 'reason', 'notes', 'status', 
+    'id', 'memberId', 'doctor', 'doctorName', 'specialty', 'scheduledAt', 'date', 'time', 'location', 'reason', 'notes', 'status', 
     'googleCalendarEventId', 'googleCalendarHtmlLink', 'calendarSyncStatus', 'calendarSyncedAt', 'calendarError', 
     'completedAt', 'retentionStatus', 'retentionReason', 'purgedAt', 
-    'ownerEmail', 'ownerGoogleId', 'sourceDeviceId', 'createdAt', 'updatedAt', 'deletedAt'
+    'ownerEmail', 'ownerGoogleId', 'sourceDeviceId', 'createdAt', 'updatedAt', 'deletedAt', 'syncStatus'
   ],
   Controles: [
     'id', 'memberId', 'checkupType', 'scheduledDate', 'completedDate', 'results', 'status', 
@@ -210,7 +210,7 @@ export async function createOperationalSpreadsheet(
           sheetId,
           dimension: 'COLUMNS',
           startIndex: 0,
-          endIndex: 25
+          endIndex: 35
         }
       }
     });
@@ -242,7 +242,7 @@ export async function readAllOperationalTables(
   accessToken: string,
   spreadsheetId: string
 ): Promise<any> {
-  const ranges = Object.values(OPERATIONAL_TABS).map(tabName => `'${tabName}'!A1:Z5000`);
+  const ranges = Object.values(OPERATIONAL_TABS).map(tabName => `'${tabName}'!A1:AZ5000`);
   const queryStr = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?${queryStr}`;
 
@@ -334,7 +334,7 @@ export async function writeAllOperationalTables(
     ];
 
     return {
-      range: `'${tabName}'!A1:Z${rows.length + 1}`,
+      range: `'${tabName}'!A1:AZ${rows.length + 1}`,
       values: rows
     };
   });

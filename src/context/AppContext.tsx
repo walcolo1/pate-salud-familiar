@@ -2439,6 +2439,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       await writeAllOperationalTables(token, sheetId, operationalStateSnapshot);
 
+      // Validación post-push de citas
+      try {
+        const verifyState = await readAllOperationalTables(token, sheetId);
+        const verifyCitas: MedicalAppointment[] = verifyState.Citas ? verifyState.Citas.map(sanitizeRemoteAppointment) : [];
+        const localActiveAppts = appointmentsRef.current.filter(a => !a.deletedAt);
+        for (const localAppt of localActiveAppts) {
+          const found = verifyCitas.some(r => r.id === localAppt.id);
+          if (!found) {
+            throw new Error(`La cita con ID ${localAppt.id} (${localAppt.doctorName}) no fue escrita en Google Sheets.`);
+          }
+        }
+      } catch (verifyErr: any) {
+        console.error('Fallo en la validación post-push de citas:', verifyErr);
+        throw new Error(`Validación post-push fallida: ${verifyErr.message || 'La cita no fue escrita en Google Sheets.'}`);
+      }
+
       // Actualizar estados locales a synced
       const updateSyncStatus = <T extends { syncStatus?: any; lastSyncedAt?: string | null }>(arr: T[]): T[] => {
         return arr.map(item => ({
@@ -2757,6 +2773,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
 
       await writeAllOperationalTables(token, sheetId, operationalStateSnapshot);
+
+      // Validación post-push de citas
+      try {
+        const verifyState = await readAllOperationalTables(token, sheetId);
+        const verifyCitas: MedicalAppointment[] = verifyState.Citas ? verifyState.Citas.map(sanitizeRemoteAppointment) : [];
+        const localActiveAppts = mergedAppointments.filter(a => !a.deletedAt);
+        for (const localAppt of localActiveAppts) {
+          const found = verifyCitas.some(r => r.id === localAppt.id);
+          if (!found) {
+            throw new Error(`La cita con ID ${localAppt.id} (${localAppt.doctorName}) no fue escrita en Google Sheets.`);
+          }
+        }
+      } catch (verifyErr: any) {
+        console.error('Fallo en la validación post-push de citas:', verifyErr);
+        throw new Error(`Validación post-push fallida: ${verifyErr.message || 'La cita no fue escrita en Google Sheets.'}`);
+      }
 
       // Marcar todos como SYNCED
       const now = new Date().toISOString();
