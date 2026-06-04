@@ -91,10 +91,12 @@ export default function SettingsPage() {
     needsGoogleAuth,
     reconnectGoogle,
     flushPendingSync,
-    checkForExistingDatabase
+    checkForExistingDatabase,
+    repairGoogleNativeDatabase
   } = useApp();
 
   const [isExporting, setIsExporting] = useState(false);
+  const [isRepairing, setIsRepairing] = useState(false);
   const [showLegal, setShowLegal] = useState(false);
 
   const activeApptsCount = appointments.filter(a => (a.retentionStatus || 'ACTIVE') !== 'PURGED').length;
@@ -183,619 +185,419 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
-      </section>
-
-      {/* ── PANEL DE CONFIGURACIÓN INICIAL GOOGLE-NATIVE (Si no hay base vinculada) ── */}
-      {!databaseSpreadsheetId && (
-        <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-          <div className="flex items-center gap-2">
-            <RefreshCw className="h-5 w-5 text-slate-500" />
-            <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase">Configurar Sincronización Google-native</h4>
-          </div>
-          <hr className="border-slate-50" />
-
-          <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
-            Vincula tu cuenta de Google para respaldar tus datos clínicos en tu Drive personal y mantenerlos sincronizados en tiempo real en todos tus dispositivos.
-          </p>
-
-          {/* Estado: Requiere autorización */}
-          {(needsGoogleAuth || syncInitStatus === 'needs_auth') ? (
-            <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-3 font-semibold text-[10px] text-amber-800 leading-relaxed shadow-sm">
-              <div className="flex items-start gap-2.5">
-                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+      </section>      {/* ── PANEL DE DIAGNÓSTICO Y RESPALDO DE GOOGLE-NATIVE ── */}
+      {user.provider === 'google' && (
+        <div className="flex flex-col gap-6">
+          
+          {/* Ficha 1: Diagnóstico General y Estado de Sincronización */}
+          <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-teal-50 text-teal-600 rounded-xl">
+                  <Settings className="h-5 w-5" />
+                </div>
                 <div>
-                  <span className="font-bold text-amber-950 block text-[11px] mb-0.5">Conecta Google para buscar tu base existente</span>
-                  <p>Inicia sesión y otorga los permisos necesarios. La aplicación buscará automáticamente si ya tienes un expediente de Paté Salud Familiar guardado para evitar duplicados.</p>
+                  <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Diagnóstico de Sincronización</h4>
+                  <p className="text-[10px] text-slate-400 font-semibold">Estado en tiempo real de tu base Google-native.</p>
                 </div>
               </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
+              <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full border uppercase leading-none ${
+                needsGoogleAuth ? 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse' :
+                opSyncStatus === 'synced' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                opSyncStatus === 'syncing' ? 'bg-blue-50 text-blue-600 border-blue-100 animate-pulse' :
+                opSyncStatus === 'error' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                'bg-slate-50 text-slate-400 border-slate-200'
+              }`}>
+                {needsGoogleAuth ? 'Autenticación Requerida' :
+                 opSyncStatus === 'synced' ? 'Sincronizado' :
+                 opSyncStatus === 'syncing' ? 'Sincronizando' :
+                 opSyncStatus === 'error' ? 'Error de Sincronización' : 'Desconectado'}
+              </span>
+            </div>
+
+            <hr className="border-slate-50" />
+
+            {/* Banner de alerta de consentimiento */}
+            {needsGoogleAuth && (
+              <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-3 font-semibold text-[10px] text-amber-800 leading-relaxed shadow-sm">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="h-4.5 w-4.5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-amber-950 block text-[11px] mb-0.5">Necesitamos permiso para sincronizar tus datos</span>
+                    <p>Por políticas de Google, requerimos tu consentimiento explícito para guardar tus datos en Sheets y Drive. Si no autorizas, tus cambios se guardarán localmente como pendientes.</p>
+                  </div>
+                </div>
                 <button
+                  id="btn-reconnect-consent-banner"
                   onClick={() => reconnectGoogle()}
-                  className="py-2.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                  className="w-full py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
                 >
-                  <Wifi className="h-4 w-4" />
-                  <span>Conectar Google para buscar</span>
+                  <Wifi className="h-3.5 w-3.5" />
+                  <span>Autorizar sincronización</span>
                 </button>
-                <button
-                  onClick={() => checkForExistingDatabase(undefined, false)}
-                  className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-[10px] rounded-xl border border-slate-300 transition-colors flex items-center justify-center gap-1.5"
+              </div>
+            )}
+
+            {/* Grid de Diagnóstico */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-4 font-semibold text-[11px] text-slate-500 leading-relaxed">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3.5 gap-x-6">
+                
+                <div className="flex flex-col">
+                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Estado de Conexión</span>
+                  <div className="flex items-center gap-1.5 font-extrabold text-slate-700">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span>Conectado con Google ({user.email})</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col">
+                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Base Google-Native</span>
+                  <div className="flex items-center gap-1.5 font-extrabold text-slate-700">
+                    {databaseSpreadsheetId ? (
+                      <>
+                        <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                        <span>Encontrada (Activa)</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+                        <span>No encontrada (Falta crear)</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
+                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Última Sincronización</span>
+                  <span className="font-extrabold text-slate-700">{lastSyncAt ? new Date(lastSyncAt).toLocaleString('es-CO') : 'Nunca'}</span>
+                </div>
+
+                <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
+                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Cambios locales pendientes</span>
+                  <span className={`font-black ${pendingSyncCount > 0 ? 'text-amber-600' : 'text-slate-700'}`}>
+                    {pendingSyncCount} {pendingSyncCount === 1 ? 'cambio' : 'cambios'}
+                  </span>
+                </div>
+
+                <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
+                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Último Pull (Descarga)</span>
+                  <span className="font-extrabold text-slate-700">{lastPullAt ? new Date(lastPullAt).toLocaleString('es-CO') : 'Nunca'}</span>
+                </div>
+
+                <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
+                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Último Push (Subida)</span>
+                  <span className="font-extrabold text-slate-700">{lastPushAt ? new Date(lastPushAt).toLocaleString('es-CO') : 'Nunca'}</span>
+                </div>
+              </div>
+
+              {opSyncError && (
+                <div className="bg-rose-50 p-3 rounded-xl border border-rose-100/60 text-rose-600 text-[10px] flex flex-col gap-1 font-semibold leading-relaxed">
+                  <strong className="text-rose-700">Último error registrado:</strong>
+                  <p>{opSyncError}</p>
+                </div>
+              )}
+
+              {/* Toggle de Auto-Sync */}
+              <div className="flex items-center justify-between border-t border-slate-100/70 pt-3.5 mt-1.5">
+                <div>
+                  <span className="font-extrabold text-slate-700 block text-xs mb-0.5">Sincronización Automática en Fondo</span>
+                  <p className="text-[10px] text-slate-400 font-semibold">Sube cambios de forma silenciosa tras 4 segundos de inactividad.</p>
+                </div>
+                <button 
+                  id="btn-toggle-auto-sync"
+                  type="button"
+                  onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
+                  className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
+                    autoSyncEnabled ? 'bg-teal-600 justify-end' : 'bg-slate-200 justify-start'
+                  }`}
                 >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  <span>Buscar base existente</span>
+                  <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
                 </button>
+              </div>
+            </div>
+          </section>
+
+          {/* Ficha 2: Permisos Específicos por Servicio */}
+          <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Permisos de Servicios</h4>
+                <p className="text-[10px] text-slate-400 font-semibold">Verifica el estado individual de consentimiento de las APIs de Google.</p>
+              </div>
+            </div>
+
+            <hr className="border-slate-50" />
+
+            <div className="grid grid-cols-1 gap-4">
+              
+              {/* Servicio: Google Drive */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Cloud className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <span className="font-extrabold text-slate-800 block text-xs mb-0.5">Google Drive (Carpeta de la App)</span>
+                      <span className="text-[9px] text-slate-400 block leading-none">Guardado seguro de PDFs y documentos clínicos</span>
+                    </div>
+                  </div>
+                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
+                    driveStatus === 'connected' || driveStatus === 'subido' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                    driveStatus === 'error' ? 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse' :
+                    'bg-slate-200 text-slate-500'
+                  }`}>
+                    {driveStatus === 'connected' || driveStatus === 'subido' ? 'Autorizado' :
+                     driveStatus === 'connecting' || driveStatus === 'authorizing' || driveStatus === 'subiendo' ? 'Conectando...' :
+                     driveStatus === 'error' ? 'Error' : 'Sin permiso'}
+                  </span>
+                </div>
+                
+                {driveError && (
+                  <p className="text-[9px] text-rose-500 bg-rose-50 p-2 rounded-lg border border-rose-100/50">{driveError}</p>
+                )}
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-100/60 pt-2.5 mt-1">
+                  <span className="text-[9px] text-slate-400 font-bold">Último token: {lastDriveAuthTime ? new Date(lastDriveAuthTime).toLocaleTimeString() : 'N/A'}</span>
+                  <button
+                    id="btn-reconnect-drive"
+                    onClick={() => connectDrive()}
+                    className="py-1.5 px-3 bg-white border border-slate-200 hover:border-teal-500 text-slate-700 font-extrabold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    <span>Reconectar Drive</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Servicio: Google Calendar */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-teal-600" />
+                    <div>
+                      <span className="font-extrabold text-slate-800 block text-xs mb-0.5">Google Calendar</span>
+                      <span className="text-[9px] text-slate-400 block leading-none">Agendamiento y sincronización de citas médicas</span>
+                    </div>
+                  </div>
+                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
+                    calendarStatus === 'connected' || calendarStatus === 'sincronizado' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                    calendarStatus === 'error' ? 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse' :
+                    'bg-slate-200 text-slate-500'
+                  }`}>
+                    {calendarStatus === 'connected' || calendarStatus === 'sincronizado' ? 'Autorizado' :
+                     calendarStatus === 'connecting' || calendarStatus === 'authorizing' || calendarStatus === 'sincronizando' ? 'Conectando...' :
+                     calendarStatus === 'error' ? 'Error' : 'Sin permiso'}
+                  </span>
+                </div>
+
+                {calendarError && (
+                  <p className="text-[9px] text-rose-500 bg-rose-50 p-2 rounded-lg border border-rose-100/50">{calendarError}</p>
+                )}
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-100/60 pt-2.5 mt-1">
+                  <span className="text-[9px] text-slate-400 font-bold">Último token: {lastCalendarAuthTime ? new Date(lastCalendarAuthTime).toLocaleTimeString() : 'N/A'}</span>
+                  <button
+                    id="btn-reconnect-calendar"
+                    onClick={() => connectCalendar()}
+                    className="py-1.5 px-3 bg-white border border-slate-200 hover:border-teal-500 text-slate-700 font-extrabold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    <span>Reconectar Calendar</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Servicio: Google Sheets */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+                    <div>
+                      <span className="font-extrabold text-slate-800 block text-xs mb-0.5">Google Sheets (Base y Exportación)</span>
+                      <span className="text-[9px] text-slate-400 block leading-none">Guardado de tablas operacionales y reportes familiares</span>
+                    </div>
+                  </div>
+                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
+                    sheetsStatus === 'connected' || sheetsStatus === 'exportado' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                    sheetsStatus === 'error' ? 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse' :
+                    'bg-slate-200 text-slate-500'
+                  }`}>
+                    {sheetsStatus === 'connected' || sheetsStatus === 'exportado' ? 'Autorizado' :
+                     sheetsStatus === 'connecting' || sheetsStatus === 'authorizing' || sheetsStatus === 'exportando' ? 'Conectando...' :
+                     sheetsStatus === 'error' ? 'Error' : 'Sin permiso'}
+                  </span>
+                </div>
+
+                {sheetsError && (
+                  <p className="text-[9px] text-rose-500 bg-rose-50 p-2 rounded-lg border border-rose-100/50">{sheetsError}</p>
+                )}
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-100/60 pt-2.5 mt-1">
+                  <span className="text-[9px] text-slate-400 font-bold">Último token: {lastSheetsAuthTime ? new Date(lastSheetsAuthTime).toLocaleTimeString() : 'N/A'}</span>
+                  <button
+                    id="btn-reconnect-sheets"
+                    onClick={() => connectSheets()}
+                    className="py-1.5 px-3 bg-white border border-slate-200 hover:border-teal-500 text-slate-700 font-extrabold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    <span>Reconectar Sheets</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+          {/* Ficha 3: Acciones Manuales de Respaldo y Diagnóstico */}
+          <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                <Database className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Acciones Manuales de Respaldo</h4>
+                <p className="text-[10px] text-slate-400 font-semibold">Ejecuta operaciones de respaldo secundarias para resolver conflictos.</p>
+              </div>
+            </div>
+
+            <hr className="border-slate-50" />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
+              
+              {/* Botón 1: Sincronizar Ahora */}
+              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                <div>
+                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Sincronizar ahora</span>
+                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Descarga cambios de la nube y sube tus cambios pendientes.</p>
+                </div>
                 <button
+                  id="btn-sync-now"
+                  onClick={() => syncNow()}
+                  disabled={opSyncStatus === 'syncing' || needsGoogleAuth}
+                  className="py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 w-full text-[10px]"
+                >
+                  {opSyncStatus === 'syncing' ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3" />
+                  )}
+                  <span>Sincronizar ahora</span>
+                </button>
+              </div>
+
+              {/* Botón 2: Reconectar Google */}
+              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                <div>
+                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reconectar Google</span>
+                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Solicita y renueva el token global abriendo la ventana de Google.</p>
+                </div>
+                <button
+                  id="btn-reconnect-google"
+                  onClick={() => reconnectGoogle()}
+                  className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 flex items-center justify-center gap-1.5 w-full text-[10px]"
+                >
+                  <Wifi className="h-3 w-3" />
+                  <span>Reconectar Google</span>
+                </button>
+              </div>
+
+              {/* Botón 3: Reparar base Google-native */}
+              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                <div>
+                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reparar base Google-native</span>
+                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Reconstruye pestañas dañadas en Sheets y fuerza la subida local.</p>
+                </div>
+                <button
+                  id="btn-repair-database"
+                  onClick={() => repairGoogleNativeDatabase()}
+                  disabled={opSyncStatus === 'syncing' || isRepairing}
+                  className="py-2.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold rounded-xl transition-all border border-rose-100 flex items-center justify-center gap-1.5 w-full disabled:opacity-50 text-[10px]"
+                >
+                  {isRepairing ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-3 w-3" />
+                  )}
+                  <span>Reparar base</span>
+                </button>
+              </div>
+
+              {/* Botón 4: Crear base si no existe */}
+              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                <div>
+                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Crear base si no existe</span>
+                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Crea una base en blanco en tu Drive si no tienes ninguna.</p>
+                </div>
+                <button
+                  id="btn-create-database"
+                  onClick={() => createGoogleNativeDatabase()}
+                  disabled={opSyncStatus === 'syncing' || !!databaseSpreadsheetId}
+                  className="py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
+                >
+                  <span>Crear base</span>
+                </button>
+              </div>
+
+              {/* Botón 5: Descargar datos (Pull) */}
+              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                <div>
+                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Cargar desde Google</span>
+                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Sobrescribe el estado local con la versión de Google Sheets.</p>
+                </div>
+                <button
+                  id="btn-pull-google"
                   onClick={() => pullFromGoogle()}
-                  className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-[10px] rounded-xl border border-slate-300 transition-colors flex items-center justify-center gap-1.5"
+                  disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
+                  className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
                 >
-                  <Download className="h-3.5 w-3.5" />
                   <span>Cargar desde Google</span>
                 </button>
               </div>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {/* Si estamos buscando */}
-              {syncInitStatus === 'checking' && (
-                <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-center gap-3 font-semibold text-[10px] text-blue-700">
-                  <Loader2 className="h-4 w-4 animate-spin shrink-0 text-blue-600" />
-                  <div>
-                    <span className="font-bold block text-[11px] text-blue-900">Buscando expediente en la nube...</span>
-                    <p className="text-[9px] opacity-80">Buscando archivos de configuración en tu cuenta Google Drive.</p>
-                  </div>
-                </div>
-              )}
 
-              {/* Si buscamos y no se encontró base remota */}
-              {syncInitStatus === 'no_remote_data' && (
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col gap-3 font-semibold text-[10px] text-slate-600 leading-relaxed shadow-sm">
-                  <div className="flex items-start gap-2.5">
-                    <Info className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold text-slate-900 block text-[11px] mb-0.5">No existe base Google-native para esta cuenta</span>
-                      <p>Hemos verificado tu Google Drive y no encontramos ningún expediente previo de Paté Salud Familiar vinculado a este correo. Si deseas empezar de cero, puedes crear una nueva base de datos vacía.</p>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
-                    <button
-                      onClick={() => createGoogleNativeDatabase()}
-                      className="py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      <span>Crear nueva base Google-native</span>
-                    </button>
-                    <button
-                      onClick={() => checkForExistingDatabase(undefined, false)}
-                      className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-[10px] rounded-xl border border-slate-300 transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      <span>Buscar otra vez</span>
-                    </button>
-                    <button
-                      onClick={() => pullFromGoogle()}
-                      className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-[10px] rounded-xl border border-slate-300 transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      <span>Cargar desde Google</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Si estamos conectados pero no hemos corrido la búsqueda manual */}
-              {syncInitStatus !== 'checking' && syncInitStatus !== 'no_remote_data' && (
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col gap-3 font-semibold text-[10px] text-slate-600 leading-relaxed shadow-sm">
-                  <div className="flex items-start gap-2.5">
-                    <Info className="h-4 w-4 text-teal-600 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold text-slate-900 block text-[11px] mb-0.5">Cuenta vinculada correctamente</span>
-                      <p>Tu sesión de Google está activa. Presiona el botón de abajo para buscar si tienes un expediente guardado en Drive de Paté Salud Familiar.</p>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
-                    <button
-                      onClick={() => checkForExistingDatabase(undefined, false)}
-                      className="py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      <span>Buscar base existente</span>
-                    </button>
-                    <button
-                      onClick={() => pullFromGoogle()}
-                      className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-[10px] rounded-xl border border-slate-300 transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      <span>Cargar desde Google</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* ── SECCIÓN 1: ESTADO DE SINCRONIZACIÓN GOOGLE-NATIVE ───────────────── */}
-      {databaseSpreadsheetId && (
-        <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <RefreshCw className={`h-5 w-5 ${opSyncStatus === 'syncing' ? 'animate-spin text-teal-600' : 'text-slate-500'}`} />
-              <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase">Estado de Sincronización</h4>
-            </div>
-            <span className={`text-[9px] font-extrabold px-2.5 py-0.5 rounded-full border uppercase leading-none ${
-              needsGoogleAuth ? 'bg-amber-50 text-amber-600 border-amber-100' :
-              opSyncStatus === 'synced' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-              opSyncStatus === 'syncing' ? 'bg-blue-50 text-blue-600 border-blue-100 animate-pulse' :
-              opSyncStatus === 'error' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-              'bg-slate-50 text-slate-400 border-slate-200'
-            }`}>
-              {needsGoogleAuth ? 'Autenticación Requerida' :
-               opSyncStatus === 'synced' ? 'Sincronizado' :
-               opSyncStatus === 'syncing' ? 'Sincronizando' :
-               opSyncStatus === 'error' ? 'Error' : 'No Conectada'}
-            </span>
-          </div>
-          <hr className="border-slate-50" />
-
-          {/* Banner de Estado de Inicialización Automática o requerimiento de consentimiento */}
-          {user?.provider === 'google' && (needsGoogleAuth || syncInitStatus === 'needs_auth') && (
-            <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-3 font-semibold text-[10px] text-amber-800 leading-relaxed shadow-sm">
-              <div className="flex items-start gap-2.5">
-                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              {/* Botón 6: Enviar datos locales (Push) */}
+              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                 <div>
-                  <span className="font-bold text-amber-950 block text-[11px] mb-0.5">Conectar Google para sincronizar</span>
-                  <p>Por políticas de seguridad de Google, necesitamos tu consentimiento para iniciar la base de datos operacional en memoria. Si no autorizas ahora, tus cambios se guardarán localmente como pendientes.</p>
+                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Subir cambios locales</span>
+                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Sube todos tus datos locales actuales a Google Sheets.</p>
                 </div>
-              </div>
-              <button
-                onClick={() => reconnectGoogle()}
-                className="w-full py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
-              >
-                <Wifi className="h-3.5 w-3.5" />
-                <span>Conectar Google</span>
-              </button>
-            </div>
-          )}
-
-          {/* Otro banner de inicialización técnica */}
-          {user?.provider === 'google' && syncInitStatus !== 'idle' && syncInitStatus !== 'needs_auth' && !needsGoogleAuth && (
-            <div className={`p-3 rounded-2xl border text-[10px] font-semibold leading-relaxed flex items-start gap-2.5 ${
-              syncInitStatus === 'checking'
-                ? 'bg-blue-50 border-blue-100 text-blue-700'
-                : syncInitStatus === 'loaded_from_google'
-                ? 'bg-emerald-50 border-emerald-100 text-emerald-800'
-                : syncInitStatus === 'no_remote_data'
-                ? 'bg-amber-50 border-amber-100 text-amber-700'
-                : syncInitStatus === 'local_only'
-                ? 'bg-slate-50 border-slate-200 text-slate-600'
-                : syncInitStatus === 'error'
-                ? 'bg-rose-50 border-rose-100 text-rose-700'
-                : 'bg-slate-50 border-slate-200 text-slate-600'
-            }`}>
-              {syncInitStatus === 'checking' && (
-                <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 mt-0.5" />
-              )}
-              <div className="flex-1">
-                <span className="font-extrabold block">
-                  {syncInitStatus === 'checking' && 'Buscando base de datos en Google...'}
-                  {syncInitStatus === 'loaded_from_google' && '✅ Datos cargados desde Google'}
-                  {syncInitStatus === 'no_remote_data' && '⚠️ Esta cuenta todavía no tiene datos en Google'}
-                  {syncInitStatus === 'local_only' && '💾 Datos cargados desde caché local'}
-                  {syncInitStatus === 'error' && '❌ Error al conectar con Google'}
-                </span>
-                {syncInitMessage && syncInitStatus !== 'checking' && (
-                  <span className="block text-[9px] font-medium opacity-80 mt-0.5">{syncInitMessage}</span>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[10px] text-slate-500 leading-relaxed">
-            <div className="grid grid-cols-2 gap-y-2.5 gap-x-4">
-              <div className="flex flex-col">
-                <span className="text-slate-400 font-bold uppercase text-[8px] leading-none mb-1">Estado General</span>
-                <div className="flex items-center gap-1.5 font-bold text-slate-700">
-                  {user?.provider === 'google' && !needsGoogleAuth ? (
-                    <>
-                      <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-                      <span>Conectado con Google</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
-                      <span>Desconectado / Pendiente</span>
-                    </>
-                  )}
-                </div>
+                <button
+                  id="btn-push-google"
+                  onClick={() => pushToGoogle()}
+                  disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
+                  className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
+                >
+                  <span>Subir cambios locales</span>
+                </button>
               </div>
 
-              <div className="flex flex-col">
-                <span className="text-slate-400 font-bold uppercase text-[8px] leading-none mb-1">Base Google-Native</span>
-                <span className="font-bold text-slate-700">
-                  {databaseSpreadsheetId ? 'Encontrada (Habilitada ✅)' : 'No encontrada (Falta crear ⚠️)'}
-                </span>
-              </div>
-
-              <div className="flex flex-col border-t border-slate-100/70 pt-2">
-                <span className="text-slate-400 font-bold uppercase text-[8px] leading-none mb-1">Última Sincronización</span>
-                <span className="font-bold text-slate-700">{lastSyncAt ? new Date(lastSyncAt).toLocaleString('es-CO') : 'Nunca'}</span>
-              </div>
-
-              <div className="flex flex-col border-t border-slate-100/70 pt-2">
-                <span className="text-slate-400 font-bold uppercase text-[8px] leading-none mb-1">Cambios Pendientes</span>
-                <span className={`font-bold ${pendingSyncCount > 0 ? 'text-amber-600 font-black' : 'text-slate-700'}`}>
-                  {pendingSyncCount} {pendingSyncCount === 1 ? 'cambio' : 'cambios'}
-                </span>
-              </div>
-
-              <div className="flex flex-col border-t border-slate-100/70 pt-2">
-                <span className="text-slate-400 font-bold uppercase text-[8px] leading-none mb-1">Último Pull (Bajar)</span>
-                <span className="font-bold text-slate-700">{lastPullAt ? new Date(lastPullAt).toLocaleString('es-CO') : 'Nunca'}</span>
-              </div>
-
-              <div className="flex flex-col border-t border-slate-100/70 pt-2">
-                <span className="text-slate-400 font-bold uppercase text-[8px] leading-none mb-1">Último Push (Subir)</span>
-                <span className="font-bold text-slate-700">{lastPushAt ? new Date(lastPushAt).toLocaleString('es-CO') : 'Nunca'}</span>
-              </div>
             </div>
 
-            {opSyncError && (
-              <div className="bg-rose-50 p-2.5 rounded-xl border border-rose-100/60 text-rose-600 text-[9px] flex flex-col gap-1 mt-1 font-semibold leading-relaxed">
-                <strong className="text-rose-700">Último error de sincronización:</strong>
-                <p>{opSyncError}</p>
-              </div>
-            )}
-
-            {/* Toggle de Sincronización Automática */}
-            <div className="flex items-center justify-between border-t border-slate-100/70 pt-3 mt-1">
-              <div>
-                <span className="font-extrabold text-slate-700 block text-xs mb-0.5">Sincronización Automática</span>
-                <p className="text-[9px] text-slate-400">Guarda los cambios de forma automática en la nube (Debounce 4s)</p>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
-                className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
-                  autoSyncEnabled ? 'bg-teal-600 justify-end' : 'bg-slate-200 justify-start'
-                }`}
-              >
-                <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
-              </button>
-            </div>
-
-            {/* Botón Principal de Sincronización Ahora */}
-            <button
-              onClick={() => syncNow()}
-              disabled={opSyncStatus === 'syncing' || needsGoogleAuth}
-              className="w-full mt-2 py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold text-xs rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
-            >
-              {opSyncStatus === 'syncing' ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>Sincronizando...</span>
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  <span>Sincronizar ahora</span>
-                </>
-              )}
-            </button>
-          </div>
-        </section>
-      )}
-
-      {/* ── SECCIÓN 2: PERMISOS DE SERVICIOS GOOGLE ─────────────────────────── */}
-      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-slate-500" />
-          <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase">Permisos de Servicios</h4>
-        </div>
-        <hr className="border-slate-50" />
-
-        <p className="text-[10px] text-slate-400 font-semibold leading-relaxed px-1">
-          Configura y reconecta los permisos específicos otorgados por Google en tu sesión. Los tokens viven estrictamente en memoria por seguridad.
-        </p>
-
-        {/* Servicio 1: Google Drive */}
-        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[10px] text-slate-500">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Cloud className="h-4.5 w-4.5 text-blue-600" />
-              <div>
-                <span className="font-extrabold text-slate-800 block text-xs leading-none mb-1">Google Drive</span>
-                <span className="text-[9px] text-slate-400">Respaldo privado de PDFs y recetas</span>
-              </div>
-            </div>
-            
-            <button 
-              type="button"
-              onClick={() => setDriveSync(!driveSyncEnabled)}
-              className={`w-10 h-5.5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none flex ${
-                driveSyncEnabled ? 'bg-teal-600 justify-end' : 'bg-slate-200 justify-start'
-              }`}
-            >
-              <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
-            </button>
-          </div>
-
-          {driveSyncEnabled && (
-            <div className="flex flex-col gap-2.5 border-t border-slate-100/70 pt-2.5">
-              <div className="flex items-center justify-between text-[9px]">
-                <span>Estado de Autorización:</span>
-                <span className={`font-bold uppercase ${
-                  driveStatus === 'connected' || driveStatus === 'subido' ? 'text-emerald-600' :
-                  driveStatus === 'error' ? 'text-rose-500 animate-pulse' :
-                  'text-slate-400'
-                }`}>
-                  {driveStatus === 'connected' || driveStatus === 'subido' ? 'Conectado ✅' :
-                   driveStatus === 'authorizing' || driveStatus === 'connecting' || driveStatus === 'subiendo' ? 'Conectando...' :
-                   driveStatus === 'error' ? 'Error ❌' : 'Sin permiso ⚠️'}
-                </span>
-              </div>
-
-              <div className="flex justify-between text-[9px]">
-                <span>Último permiso en sesión:</span>
-                <span className="font-bold text-slate-700">
-                  {lastDriveAuthTime ? new Date(lastDriveAuthTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Ninguno'}
-                </span>
-              </div>
-
-              <button
-                onClick={() => connectDrive()}
-                disabled={driveStatus === 'connecting' || driveStatus === 'authorizing' || driveStatus === 'subiendo'}
-                className="w-full py-2 bg-slate-200 hover:bg-slate-300 active:bg-slate-400 text-slate-700 font-extrabold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1"
-              >
-                {driveStatus === 'connecting' || driveStatus === 'authorizing' || driveStatus === 'subiendo' ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <span>Reconectar Drive</span>
-                )}
-              </button>
-
-              {driveError && (
-                <p className="text-[9px] text-rose-500 font-semibold bg-rose-50 p-2 rounded-lg border border-rose-100">
-                  {driveError}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Servicio 2: Google Calendar */}
-        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[10px] text-slate-500">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4.5 w-4.5 text-teal-600" />
-              <div>
-                <span className="font-extrabold text-slate-800 block text-xs leading-none mb-1">Google Calendar</span>
-                <span className="text-[9px] text-slate-400">Alertas y citas médicas automáticas</span>
-              </div>
-            </div>
-            
-            <button 
-              type="button"
-              onClick={() => setCalendarSync(!calendarSyncEnabled)}
-              className={`w-10 h-5.5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none flex ${
-                calendarSyncEnabled ? 'bg-teal-600 justify-end' : 'bg-slate-200 justify-start'
-              }`}
-            >
-              <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
-            </button>
-          </div>
-
-          {calendarSyncEnabled && (
-            <div className="flex flex-col gap-2.5 border-t border-slate-100/70 pt-2.5">
-              <div className="flex items-center justify-between text-[9px]">
-                <span>Estado de Autorización:</span>
-                <span className={`font-bold uppercase ${
-                  calendarStatus === 'connected' || calendarStatus === 'sincronizado' ? 'text-emerald-600' :
-                  calendarStatus === 'error' ? 'text-rose-500 animate-pulse' :
-                  'text-slate-400'
-                }`}>
-                  {calendarStatus === 'connected' || calendarStatus === 'sincronizado' ? 'Conectado ✅' :
-                   calendarStatus === 'authorizing' || calendarStatus === 'connecting' || calendarStatus === 'sincronizando' ? 'Conectando...' :
-                   calendarStatus === 'error' ? 'Error ❌' : 'Sin permiso ⚠️'}
-                </span>
-              </div>
-
-              <div className="flex justify-between text-[9px]">
-                <span>Último permiso en sesión:</span>
-                <span className="font-bold text-slate-700">
-                  {lastCalendarAuthTime ? new Date(lastCalendarAuthTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Ninguno'}
-                </span>
-              </div>
-
-              <button
-                onClick={() => connectCalendar()}
-                disabled={calendarStatus === 'connecting' || calendarStatus === 'authorizing' || calendarStatus === 'sincronizando'}
-                className="w-full py-2 bg-slate-200 hover:bg-slate-300 active:bg-slate-400 text-slate-700 font-extrabold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1"
-              >
-                {calendarStatus === 'connecting' || calendarStatus === 'authorizing' || calendarStatus === 'sincronizando' ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <span>Reconectar Calendar</span>
-                )}
-              </button>
-
-              {calendarError && (
-                <p className="text-[9px] text-rose-500 font-semibold bg-rose-50 p-2 rounded-lg border border-rose-100">
-                  {calendarError}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Servicio 3: Google Sheets */}
-        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[10px] text-slate-500">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileSpreadsheet className="h-4.5 w-4.5 text-emerald-600" />
-              <div>
-                <span className="font-extrabold text-slate-800 block text-xs leading-none mb-1">Google Sheets</span>
-                <span className="text-[9px] text-slate-400">Exportación de reporte completo estructurado</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2.5 border-t border-slate-100/70 pt-2.5">
-            <div className="flex items-center justify-between text-[9px]">
-              <span>Estado de Autorización:</span>
-              <span className={`font-bold uppercase ${
-                sheetsStatus === 'connected' || sheetsStatus === 'exportado' ? 'text-emerald-600' :
-                sheetsStatus === 'error' ? 'text-rose-500 animate-pulse' :
-                'text-slate-400'
-              }`}>
-                {sheetsStatus === 'connected' || sheetsStatus === 'exportado' ? 'Conectado ✅' :
-                 sheetsStatus === 'authorizing' || sheetsStatus === 'connecting' || sheetsStatus === 'exportando' ? 'Conectando...' :
-                 sheetsStatus === 'error' ? 'Error ❌' : 'Sin permiso ⚠️'}
-              </span>
-            </div>
-
-            <div className="flex justify-between text-[9px]">
-              <span>Última autorización:</span>
-              <span className="font-bold text-slate-700">
-                {lastSheetsAuthTime ? new Date(lastSheetsAuthTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Ninguna'}
-              </span>
-            </div>
-
-            <button
-              onClick={() => connectSheets()}
-              disabled={sheetsStatus === 'connecting' || sheetsStatus === 'authorizing' || sheetsStatus === 'exportando'}
-              className="w-full py-2 bg-slate-200 hover:bg-slate-300 active:bg-slate-400 text-slate-700 font-extrabold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1"
-            >
-              {sheetsStatus === 'connecting' || sheetsStatus === 'authorizing' ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <span>Reconectar Sheets</span>
-              )}
-            </button>
-
-            {sheetsError && (
-              <p className="text-[9px] text-rose-500 font-semibold bg-rose-50 p-2 rounded-lg border border-rose-100">
-                {sheetsError}
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* ── SECCIÓN 3: ACCIONES MANUALES DE RESPALDO Y CONFIGURACIÓN ───────── */}
-      {databaseSpreadsheetId && (
-        <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-          <div className="flex items-center gap-2">
-            <Database className="h-5 w-5 text-slate-500" />
-            <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase">Acciones Manuales de Respaldo</h4>
-          </div>
-          <hr className="border-slate-50" />
-
-          <p className="text-[10px] text-slate-400 font-semibold leading-relaxed px-1">
-            Ejecuta operaciones manuales para forzar la sincronización, inicializar la estructura u obtener copias de seguridad de tus registros médicos.
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-            {/* Inicializar base de datos */}
-            <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px]">
-              <div>
-                <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Estructura Google Sheets</span>
-                <p className="text-[9px] text-slate-400 leading-normal">Crea o busca la hoja de cálculo operacional en la nube.</p>
-              </div>
-              <button
-                onClick={() => createGoogleNativeDatabase()}
-                disabled={opSyncStatus === 'syncing'}
-                className="mt-auto py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold rounded-xl transition-colors flex items-center justify-center gap-1.5"
-              >
-                <span>{databaseSpreadsheetId ? 'Verificar base' : 'Crear base Google-native'}</span>
-              </button>
-            </div>
-
-            {/* Exportar Expediente */}
-            <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px]">
-              <div>
-                <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Exportar Expediente</span>
-                <p className="text-[9px] text-slate-400 leading-normal">Genera un libro premium Sheets formateado con todas las tablas.</p>
-              </div>
-              <button
-                onClick={handleExport}
-                disabled={isExporting || sheetsStatus === 'exportando'}
-                className="mt-auto py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold rounded-xl transition-colors flex items-center justify-center gap-1.5"
-              >
-                {isExporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>Exportar Expediente</span>}
-              </button>
-            </div>
-
-            {/* Cargar datos desde Google */}
-            <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px]">
-              <div>
-                <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Descargar datos (Pull)</span>
-                <p className="text-[9px] text-slate-400 leading-normal">Recupera la última versión en caliente guardada por otros dispositivos.</p>
-              </div>
-              <button
-                onClick={() => pullFromGoogle()}
-                disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
-                className="mt-auto py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-colors border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span>Cargar desde Google</span>
-              </button>
-            </div>
-
-            {/* Enviar datos locales */}
-            <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px]">
-              <div>
-                <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Subir datos (Push)</span>
-                <p className="text-[9px] text-slate-400 leading-normal">Fuerza la subida del estado local actual a la hoja de cálculo remota.</p>
-              </div>
-              <button
-                onClick={() => pushToGoogle()}
-                disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
-                className="mt-auto py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-colors border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span>Enviar cambios locales</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Enlaces de interés y meta */}
-          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2.5 font-semibold text-[10px] text-slate-500 mt-1">
+            {/* Enlaces Rápidos a Google Drive / Sheets */}
             {databaseSpreadsheetUrl && (
-              <a
-                href={databaseSpreadsheetUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="py-2.5 bg-slate-800 hover:bg-slate-900 active:bg-black text-white font-extrabold rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5 text-center text-[10px] w-full"
-              >
-                <Grid3X3 className="h-4 w-4" />
-                <span>Ver hoja operacional (Sheets)</span>
-                <ExternalLink className="h-3 w-3" />
-              </a>
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2.5 font-semibold text-[11px] text-slate-500">
+                <a
+                  id="lnk-view-spreadsheet"
+                  href={databaseSpreadsheetUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="py-2.5 bg-slate-800 hover:bg-slate-900 active:bg-black text-white font-extrabold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 text-center w-full"
+                >
+                  <Grid3X3 className="h-4.5 w-4.5" />
+                  <span>Abrir base operacional (Google Sheets)</span>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+                
+                <div className="flex justify-between text-[9px] border-t border-slate-200/50 pt-2.5">
+                  <span>ID Hoja de Cálculo:</span>
+                  <span className="font-bold text-slate-700 truncate max-w-[220px]">{databaseSpreadsheetId || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between text-[9px]">
+                  <span>Dispositivo ID:</span>
+                  <span className="font-bold text-slate-700 truncate max-w-[220px]">{deviceId || 'N/A'}</span>
+                </div>
+              </div>
             )}
-
-            {lastExportMetadata && lastExportMetadata.spreadsheetUrl && (
-              <a
-                href={lastExportMetadata.spreadsheetUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-colors flex items-center justify-center gap-1.5 text-center text-[9px] w-full"
-              >
-                <span>Abrir último expediente exportado</span>
-                <ExternalLink className="h-3 w-3 animate-none" />
-              </a>
-            )}
-
-            <div className="flex justify-between text-[9px] border-t border-slate-200/50 pt-2.5">
-              <span>ID Hoja de Cálculo:</span>
-              <span className="font-bold text-slate-700 truncate max-w-[200px]">{databaseSpreadsheetId || 'Ninguna'}</span>
-            </div>
-
-            <div className="flex justify-between text-[9px]">
-              <span>Identificador del dispositivo:</span>
-              <span className="font-bold text-slate-700 truncate max-w-[200px]">{deviceId || 'N/A'}</span>
-            </div>
-          </div>
-        </section>
+          </section>
+        </div>
       )}
 
 

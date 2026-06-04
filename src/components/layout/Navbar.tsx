@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
   Home, 
@@ -16,10 +16,17 @@ import {
 
 export default function Navbar({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, driveSyncEnabled, signOut } = useApp();
+  const router = useRouter();
+  const { user, driveSyncEnabled, signOut, databaseSpreadsheetId, isLoading } = useApp();
+
+  React.useEffect(() => {
+    if (!isLoading && user && user.provider === 'google' && !databaseSpreadsheetId) {
+      router.replace('/onboarding/setup');
+    }
+  }, [user, isLoading, databaseSpreadsheetId, router]);
 
   // If user is not authenticated, we do not render the navigation chrome
-  if (!user || pathname === '/login' || pathname === '/onboarding' || pathname === '/') {
+  if (!user || pathname === '/login' || pathname === '/onboarding' || pathname === '/' || pathname.startsWith('/onboarding/setup')) {
     return <>{children}</>;
   }
 

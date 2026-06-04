@@ -184,6 +184,7 @@ interface AppContextProps {
   pullFromGoogle: () => Promise<void>;
   pushToGoogle: () => Promise<void>;
   syncNow: () => Promise<void>;
+  repairGoogleNativeDatabase: () => Promise<void>;
   exportBackupJSON: () => void;
   postLoginGoogleSetup: () => Promise<void>;
   requestInitialGooglePermissions: () => Promise<string | null>;
@@ -2776,6 +2777,90 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const repairGoogleNativeDatabase = async () => {
+    const token = await requestGoogleNativeToken();
+    if (!token) return;
+
+    try {
+      setOpSyncStatus('syncing');
+      setOpSyncError(null);
+
+      let configId = await findConfigInAppData(token);
+      let sheetId = databaseSpreadsheetId;
+      let sheetUrl = databaseSpreadsheetUrl;
+
+      // 1. Intentar validar si la hoja existe y es accesible
+      let sheetExists = false;
+      if (sheetId) {
+        try {
+          await readAllOperationalTables(token, sheetId);
+          sheetExists = true;
+        } catch (e) {
+          console.warn('La hoja de cálculo no existe o no es accesible. Se creará una nueva.', e);
+        }
+      }
+
+      // 2. Si no existe o no es accesible, crearla
+      if (!sheetExists) {
+        const result = await createOperationalSpreadsheet(token, user?.email || '');
+        sheetId = result.spreadsheetId;
+        sheetUrl = result.spreadsheetUrl;
+        setDatabaseSpreadsheetId(sheetId);
+        setDatabaseSpreadsheetUrl(sheetUrl);
+      }
+
+      if (!sheetId) {
+        throw new Error('No se pudo encontrar ni crear una hoja de cálculo.');
+      }
+
+      // 3. Crear o actualizar configuración en appDataFolder
+      const newConfig = {
+        schemaVersion: 2,
+        ownerEmail: user?.email || '',
+        ownerGoogleId: user?.googleId || '',
+        databaseSpreadsheetId: sheetId,
+        databaseSpreadsheetUrl: sheetUrl,
+        lastSyncAt: new Date().toISOString(),
+        lastPullAt: new Date().toISOString(),
+        lastPushAt: new Date().toISOString(),
+        deviceId: deviceId || 'unknown',
+        syncStrategy: 'LAST_WRITE_WINS',
+        lastKnownRevision: 1,
+        backupRefs: {},
+        permissionRefs: {
+          sharedReports: sharedReports
+        }
+      };
+
+      const newConfigId = await writeConfigToAppData(token, newConfig, configId || undefined);
+      setAppDataFileId(newConfigId);
+
+      // 4. Forzar la escritura del estado local para reparar cualquier dato
+      await pushToGoogleInternal(token, sheetId);
+      
+      setOpSyncStatus('synced');
+      setLastSyncAt(new Date().toISOString());
+
+      // Registrar auditoría
+      const newAudit: MedicalHistoryEvent = {
+        id: `hist-${Date.now()}`,
+        memberId: members[0]?.id || 'family-owner',
+        eventType: 'OTHER',
+        title: 'Base Google reparada',
+        description: `Base Google-native reparada y resincronizada con éxito. Sheets ID: ${sheetId}`,
+        eventDate: new Date().toISOString().split('T')[0],
+        createdAt: new Date().toISOString()
+      };
+      setHistory(h => [newAudit, ...h]);
+      alert('¡Base operacional reparada exitosamente! Se reconstruyó la estructura de Sheets y se subieron los datos locales.');
+    } catch (err: any) {
+      console.error('Error al reparar base de datos:', err);
+      setOpSyncStatus('error');
+      setOpSyncError(err.message || 'Error al reparar la base.');
+      alert(`Error al reparar la base Google-native: ${err.message}`);
+    }
+  };
+
   const exportBackupJSON = () => {
     exportState();
   };
@@ -3424,6 +3509,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pullFromGoogle,
       pushToGoogle,
       syncNow,
+      repairGoogleNativeDatabase,
       exportBackupJSON,
       postLoginGoogleSetup,
       requestInitialGooglePermissions,
