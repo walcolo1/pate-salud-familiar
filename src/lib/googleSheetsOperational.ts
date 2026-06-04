@@ -337,6 +337,76 @@ export async function ensureSpreadsheetSheetsExist(
 }
 
 /**
+ * Migrates existing sheet headers to add any missing columns defined in OPERATIONAL_HEADERS.
+ * Appends new columns at the end of the existing header row without touching existing data.
+ * Safe to call multiple times — idempotent.
+ */
+export async function migrateOperationalSheetHeaders(
+  accessToken: string,
+  spreadsheetId: string
+): Promise<void> {
+  // Batch-read the header row (row 1) from every operational tab
+  const ranges = Object.values(OPERATIONAL_TABS).map(tabName => `'${tabName}'!A1:AZ1`);
+  const queryStr = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?${queryStr}`;
+
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok) {
+    console.warn('migrateOperationalSheetHeaders: could not read header rows', await res.text());
+    return;
+  }
+
+  const data = await res.json();
+  const valueRanges: any[] = data.valueRanges || [];
+
+  const updateData: { range: string; values: string[][] }[] = [];
+
+  Object.entries(OPERATIONAL_TABS).forEach(([key, tabName]) => {
+    const expectedHeaders: string[] = (OPERATIONAL_HEADERS as any)[key] || [];
+    const vr = valueRanges.find((v: any) =>
+      v.range?.startsWith(`'${tabName}'!`) || v.range?.startsWith(`${tabName}!`)
+    );
+    const existingHeaders: string[] = vr?.values?.[0] ?? [];
+
+    const missing = expectedHeaders.filter(h => !existingHeaders.includes(h));
+    if (missing.length === 0) return;
+
+    // Append missing headers after the last existing column
+    const startColIdx = existingHeaders.length; // 0-based
+    const colToLetter = (idx: number): string => {
+      let s = '';
+      let n = idx + 1;
+      while (n > 0) {
+        const rem = (n - 1) % 26;
+        s = String.fromCharCode(65 + rem) + s;
+        n = Math.floor((n - 1) / 26);
+      }
+      return s;
+    };
+    const startCol = colToLetter(startColIdx);
+    const endCol = colToLetter(startColIdx + missing.length - 1);
+
+    updateData.push({
+      range: `'${tabName}'!${startCol}1:${endCol}1`,
+      values: [missing]
+    });
+  });
+
+  if (updateData.length === 0) return;
+
+  const writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`;
+  const writeRes = await fetch(writeUrl, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ valueInputOption: 'USER_ENTERED', data: updateData })
+  });
+
+  if (!writeRes.ok) {
+    console.warn('migrateOperationalSheetHeaders: failed to write missing headers', await writeRes.text());
+  }
+}
+
+/**
  * Reads all rows from all tabs in the operational spreadsheet and maps them to JSON objects.
  */
 export async function readAllOperationalTables(
@@ -346,6 +416,11 @@ export async function readAllOperationalTables(
   // Ensure all tabs exist before reading
   await ensureSpreadsheetSheetsExist(accessToken, spreadsheetId).catch(err => {
     console.warn('Failed to ensure spreadsheet sheets exist:', err);
+  });
+
+  // Migrate headers for any new columns (e.g. documentType, documentNumber)
+  await migrateOperationalSheetHeaders(accessToken, spreadsheetId).catch(err => {
+    console.warn('Failed to migrate operational sheet headers:', err);
   });
   const ranges = Object.values(OPERATIONAL_TABS).map(tabName => `'${tabName}'!A1:AZ5000`);
   const queryStr = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');

@@ -56,7 +56,8 @@ import {
   createOperationalSpreadsheet, 
   readAllOperationalTables, 
   writeAllOperationalTables,
-  createIndividualMemberReport
+  createIndividualMemberReport,
+  migrateOperationalSheetHeaders
 } from '../lib/googleSheetsOperational';
 import {
   ensureOperationalToken,
@@ -266,6 +267,24 @@ interface AppContextProps {
   deleteMedicationPrescription: (id: string) => void;
   markDoseReminder: (reminderId: string, status: DoseReminderStatus, takenAt?: string | null) => void;
   generateDoseReminders: (prescription: MedicationPrescription) => MedicationDoseReminder[];
+
+  // Member document repair
+  repairMemberDocuments: () => Promise<void>;
+
+  // Session lock / inactivity
+  sessionLocked: boolean;
+  sessionLockedAt: string | null;
+  autoLockEnabled: boolean;
+  autoLockMinutes: number;
+  nightLockEnabled: boolean;
+  nightLockStart: string;
+  nightLockEnd: string;
+  unlockSession: () => void;
+  setAutoLockEnabled: (v: boolean) => void;
+  setAutoLockMinutes: (m: number) => void;
+  setNightLockEnabled: (v: boolean) => void;
+  setNightLockStart: (t: string) => void;
+  setNightLockEnd: (t: string) => void;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -395,6 +414,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [needsGoogleAuth, setNeedsGoogleAuth] = useState<boolean>(false);
   const autoSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSyncInProgress = useRef<boolean>(false);
+
+  // Session lock / inactivity states
+  const [sessionLocked, setSessionLocked] = useState<boolean>(false);
+  const [sessionLockedAt, setSessionLockedAt] = useState<string | null>(null);
+  const [autoLockEnabled, setAutoLockEnabled] = useState<boolean>(false);
+  const [autoLockMinutes, setAutoLockMinutes] = useState<number>(15);
+  const [nightLockEnabled, setNightLockEnabled] = useState<boolean>(false);
+  const [nightLockStart, setNightLockStart] = useState<string>('22:00');
+  const [nightLockEnd, setNightLockEnd] = useState<string>('06:00');
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nightLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoLockEnabledRef = useRef<boolean>(false);
+  const autoLockMinutesRef = useRef<number>(15);
+  const nightLockEnabledRef = useRef<boolean>(false);
+  const nightLockStartRef = useRef<string>('22:00');
+  const nightLockEndRef = useRef<string>('06:00');
+  const sessionLockedRef = useRef<boolean>(false);
+
+  useEffect(() => { autoLockEnabledRef.current = autoLockEnabled; }, [autoLockEnabled]);
+  useEffect(() => { autoLockMinutesRef.current = autoLockMinutes; }, [autoLockMinutes]);
+  useEffect(() => { nightLockEnabledRef.current = nightLockEnabled; }, [nightLockEnabled]);
+  useEffect(() => { nightLockStartRef.current = nightLockStart; }, [nightLockStart]);
+  useEffect(() => { nightLockEndRef.current = nightLockEnd; }, [nightLockEnd]);
+  useEffect(() => { sessionLockedRef.current = sessionLocked; }, [sessionLocked]);
 
 
   // 1. Carga inicial controlada del LocalStorage (únicamente del lado del cliente)
@@ -3503,7 +3546,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 };
                 setTimeout(() => setHistory(h => [conflictLog, ...h]), 50);
               }
-              merged[localIdx] = { ...remoteItem, syncStatus: 'SYNCED' };
+              // Merge seguro: si el remoto trae campos de identidad vacíos pero el local los tiene, conservar locales
+              let merged_item = { ...remoteItem, syncStatus: 'SYNCED' } as T;
+              if (tableName === 'Miembros') {
+                const localDoc = (localItem as any).documentNumber;
+                const remoteDoc = (remoteItem as any).documentNumber;
+                const localDocType = (localItem as any).documentType;
+                const remoteDocType = (remoteItem as any).documentType;
+                if (localDoc && !remoteDoc) (merged_item as any).documentNumber = localDoc;
+                if (localDocType && !remoteDocType) (merged_item as any).documentType = localDocType;
+              }
+              merged[localIdx] = merged_item;
             } else {
               // El local es más reciente o igual, mantener local
               merged[localIdx] = { ...localItem };
@@ -3941,7 +3994,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 };
                 setTimeout(() => setHistory(h => [conflictLog, ...h]), 50);
               }
-              merged[localIdx] = { ...remoteItem, syncStatus: 'SYNCED' };
+              // Merge seguro: conservar documentos de identidad locales si remoto los trae vacíos
+              let merged_item = { ...remoteItem, syncStatus: 'SYNCED' } as T;
+              if (tableName === 'Miembros') {
+                const localDoc = (localItem as any).documentNumber;
+                const remoteDoc = (remoteItem as any).documentNumber;
+                const localDocType = (localItem as any).documentType;
+                const remoteDocType = (remoteItem as any).documentType;
+                if (localDoc && !remoteDoc) (merged_item as any).documentNumber = localDoc;
+                if (localDocType && !remoteDocType) (merged_item as any).documentType = localDocType;
+              }
+              merged[localIdx] = merged_item;
             } else {
               // El local es igual o más reciente
               merged[localIdx] = { ...localItem };
@@ -4864,6 +4927,137 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // ─── repairMemberDocuments ────────────────────────────────────────────────────
+  const repairMemberDocuments = async (): Promise<void> => {
+    const token = await requestGoogleNativeToken();
+    if (!token) throw new Error('No se pudo obtener autorización de Google.');
+
+    let sheetId = databaseSpreadsheetId;
+    if (!sheetId) {
+      sheetId = await findConfigInAppData(token);
+    }
+    if (!sheetId) throw new Error('No hay base de datos operacional configurada.');
+
+    setOpSyncStatus('syncing');
+    setOpSyncError(null);
+
+    try {
+      // Paso 1: Asegurar que las columnas documentType/documentNumber existan en Sheets
+      await migrateOperationalSheetHeaders(token, sheetId);
+
+      // Paso 2: Leer estado remoto actual
+      const remoteState = await readAllOperationalTables(token, sheetId);
+      const remoteMembers: any[] = remoteState.Miembros || [];
+
+      // Paso 3: Cruzar local con remoto — si local tiene documento y remoto lo trae vacío, marcar PENDING_SYNC
+      const currentMembers = membersRef.current;
+      let repairedCount = 0;
+      const repairedMembers = currentMembers.map(localMember => {
+        const remoteMember = remoteMembers.find(r => r.id === localMember.id);
+        let updated = { ...localMember };
+        let needsUpdate = false;
+
+        if (localMember.documentNumber && (!remoteMember || !remoteMember.documentNumber)) {
+          needsUpdate = true;
+        }
+        if (localMember.documentType && (!remoteMember || !remoteMember.documentType)) {
+          needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+          updated = {
+            ...updated,
+            syncStatus: 'PENDING_SYNC' as any,
+            updatedAt: new Date().toISOString()
+          };
+          repairedCount++;
+        }
+        return updated;
+      });
+
+      setMembers(repairedMembers);
+
+      // Paso 4: Forzar sincronización completa para que los datos reparados suban a Sheets
+      await syncNow();
+
+      setOpSyncStatus('synced');
+      alert(`✅ Reparación completada. ${repairedCount} miembro(s) reparado(s) y sincronizado(s) con Google Sheets.`);
+    } catch (err: any) {
+      console.error('repairMemberDocuments error:', err);
+      setOpSyncStatus('error');
+      setOpSyncError(err.message || 'Error en reparación de documentos de miembros.');
+      throw err;
+    }
+  };
+
+  // ─── Session lock / inactivity ────────────────────────────────────────────────
+  const unlockSession = () => {
+    setSessionLocked(false);
+    setSessionLockedAt(null);
+    // Reiniciar temporizador de inactividad al desbloquear
+    resetIdleTimer();
+  };
+
+  const lockSession = () => {
+    if (sessionLockedRef.current) return;
+    setSessionLocked(true);
+    setSessionLockedAt(new Date().toISOString());
+  };
+
+  const resetIdleTimer = () => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    if (!autoLockEnabledRef.current) return;
+    const ms = autoLockMinutesRef.current * 60 * 1000;
+    idleTimerRef.current = setTimeout(() => {
+      lockSession();
+    }, ms);
+  };
+
+  // Watcher de inactividad — reinicia el timer en cualquier interacción del usuario
+  useEffect(() => {
+    if (!autoLockEnabled) {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      return;
+    }
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+    const handler = () => resetIdleTimer();
+    events.forEach(e => window.addEventListener(e, handler, { passive: true }));
+    resetIdleTimer();
+    return () => {
+      events.forEach(e => window.removeEventListener(e, handler));
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, [autoLockEnabled, autoLockMinutes]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cierre nocturno — comprueba cada minuto si estamos dentro de la ventana
+  useEffect(() => {
+    if (!nightLockEnabled) {
+      if (nightLockTimerRef.current) clearInterval(nightLockTimerRef.current);
+      return;
+    }
+    const checkNightLock = () => {
+      if (!nightLockEnabledRef.current) return;
+      const now = new Date();
+      const [startH, startM] = nightLockStartRef.current.split(':').map(Number);
+      const [endH, endM] = nightLockEndRef.current.split(':').map(Number);
+      const startMins = startH * 60 + startM;
+      const endMins = endH * 60 + endM;
+      const nowMins = now.getHours() * 60 + now.getMinutes();
+      // Determinar si estamos en la ventana nocturna (puede cruzar medianoche)
+      const inWindow = startMins > endMins
+        ? (nowMins >= startMins || nowMins < endMins)   // cruza medianoche
+        : (nowMins >= startMins && nowMins < endMins);  // misma noche
+      if (inWindow && !sessionLockedRef.current) {
+        lockSession();
+      }
+    };
+    checkNightLock();
+    nightLockTimerRef.current = setInterval(checkNightLock, 60_000) as any;
+    return () => {
+      if (nightLockTimerRef.current) clearInterval(nightLockTimerRef.current);
+    };
+  }, [nightLockEnabled, nightLockStart, nightLockEnd]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const exposedAppointments = filterByRole(appointments);
   const exposedVaccines = filterByRole(vaccines);
   const exposedCheckups = filterByRole(checkups);
@@ -5038,7 +5232,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setGmailScanTime,
       setGmailScanRangeDays,
       setGmailOnlyFutureAppointments,
-      triggerGmailAutoScan
+      triggerGmailAutoScan,
+
+      // Member document repair
+      repairMemberDocuments,
+
+      // Session lock / inactivity
+      sessionLocked,
+      sessionLockedAt,
+      autoLockEnabled,
+      autoLockMinutes,
+      nightLockEnabled,
+      nightLockStart,
+      nightLockEnd,
+      unlockSession,
+      setAutoLockEnabled,
+      setAutoLockMinutes,
+      setNightLockEnabled,
+      setNightLockStart,
+      setNightLockEnd,
     }}>
       {children}
     </AppContext.Provider>

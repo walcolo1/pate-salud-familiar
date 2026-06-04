@@ -11,13 +11,15 @@ import {
   Settings, 
   Activity, 
   CloudCheck, 
-  LogOut 
+  LogOut,
+  Lock,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function Navbar({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, driveSyncEnabled, signOut, databaseSpreadsheetId, isLoading } = useApp();
+  const { user, driveSyncEnabled, signOut, databaseSpreadsheetId, isLoading, sessionLocked, unlockSession } = useApp();
 
   React.useEffect(() => {
     if (!isLoading && user && user.provider === 'google' && !databaseSpreadsheetId) {
@@ -38,7 +40,8 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
+    <>
+      <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
       {/* ── Desktop Sidebar ────────────────────────────────────────────────── */}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-100 p-6 shrink-0 justify-between select-none">
         <div className="flex flex-col gap-8">
@@ -148,5 +151,47 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
         })}
       </nav>
     </div>
+
+    {/* ─── Session Lock Overlay ───────────────────────────────────────────── */}
+    {sessionLocked && (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Sesión bloqueada"
+        className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6 p-6"
+      >
+        <div className="bg-white rounded-3xl p-8 max-w-sm w-full flex flex-col items-center gap-5 shadow-2xl text-center">
+          <div className="h-16 w-16 rounded-full bg-teal-50 flex items-center justify-center border-2 border-teal-100">
+            <Lock className="h-8 w-8 text-teal-600" />
+          </div>
+          <div>
+            <h2 className="text-lg font-extrabold text-slate-900 mb-1">Sesión bloqueada</h2>
+            <p className="text-sm text-slate-500 font-semibold">
+              Paté Salud Familiar ha bloqueado tu sesión por inactividad o por el horario nocturno configurado.
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 bg-teal-50 text-teal-700 text-xs font-bold px-3 py-1.5 rounded-full border border-teal-100">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            <span>Tus datos están protegidos</span>
+          </div>
+          <button
+            id="btn-session-unlock"
+            onClick={() => unlockSession()}
+            className="w-full h-12 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold rounded-2xl transition-all shadow-md shadow-teal-600/20"
+          >
+            Continuar usando la app
+          </button>
+          <button
+            id="btn-session-signout"
+            onClick={() => signOut()}
+            className="text-xs text-slate-400 hover:text-slate-600 font-semibold underline"
+          >
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    )}
+  </>
   );
 }
+

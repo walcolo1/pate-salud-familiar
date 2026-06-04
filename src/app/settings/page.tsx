@@ -29,7 +29,10 @@ import {
   Info,
   Mail,
   Plus,
-  Edit
+  Edit,
+  Lock,
+  ShieldAlert,
+  Timer
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -113,11 +116,26 @@ export default function SettingsPage() {
     setGmailOnlyFutureAppointments,
     triggerGmailAutoScan,
     gmailStatus,
-    appointmentCandidates
+    appointmentCandidates,
+    repairMemberDocuments,
+    sessionLocked,
+    sessionLockedAt,
+    autoLockEnabled,
+    autoLockMinutes,
+    nightLockEnabled,
+    nightLockStart,
+    nightLockEnd,
+    unlockSession,
+    setAutoLockEnabled,
+    setAutoLockMinutes,
+    setNightLockEnabled,
+    setNightLockStart,
+    setNightLockEnd
   } = useApp();
 
   const [isExporting, setIsExporting] = useState(false);
   const [isRepairing, setIsRepairing] = useState(false);
+  const [isRepairingDocs, setIsRepairingDocs] = useState(false);
   const [showLegal, setShowLegal] = useState(false);
 
   // States for Gmail source forms
@@ -934,6 +952,31 @@ export default function SettingsPage() {
                 </button>
               </div>
 
+              {/* Botón 3b: Reparar documentos de miembros */}
+              <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                <div>
+                  <span className="font-extrabold text-amber-800 block text-[11px] mb-0.5">Reparar documentos de miembros</span>
+                  <p className="text-[9px] text-amber-600 leading-normal mb-2">Detecta y restaura números de documento que hayan desaparecido al sincronizar con Google Sheets.</p>
+                </div>
+                <button
+                  id="btn-repair-member-docs"
+                  onClick={async () => {
+                    setIsRepairingDocs(true);
+                    try { await repairMemberDocuments(); } catch (_) {}
+                    finally { setIsRepairingDocs(false); }
+                  }}
+                  disabled={opSyncStatus === 'syncing' || isRepairingDocs || !databaseSpreadsheetId}
+                  className="py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
+                >
+                  {isRepairingDocs ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <ShieldAlert className="h-3 w-3" />
+                  )}
+                  <span>Reparar documentos</span>
+                </button>
+              </div>
+
               {/* Botón 4: Crear base si no existe */}
               <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                 <div>
@@ -1395,6 +1438,121 @@ export default function SettingsPage() {
         )}
       </section>
 
+
+      {/* ─── Seguridad de Sesión ─────────────────────────────────────────── */}
+      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <Lock className="h-5 w-5 text-slate-500" />
+          <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase">Seguridad de Sesión</h4>
+        </div>
+        <hr className="border-slate-50" />
+
+        {/* Estado actual de bloqueo */}
+        {sessionLocked && (
+          <div className="bg-rose-50 border border-rose-100 rounded-2xl p-3 flex items-start gap-2">
+            <Lock className="h-4 w-4 text-rose-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-[10px] font-extrabold text-rose-700">Sesión bloqueada</p>
+              <p className="text-[9px] text-rose-500">
+                Bloqueada a las {sessionLockedAt ? new Date(sessionLockedAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '-'}
+              </p>
+            </div>
+            <button
+              id="btn-unlock-session"
+              onClick={() => unlockSession()}
+              className="py-1.5 px-3 bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-[9px] rounded-xl transition-all"
+            >
+              Desbloquear
+            </button>
+          </div>
+        )}
+
+        {/* Bloqueo por inactividad */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-extrabold text-slate-800">Bloqueo por inactividad</p>
+              <p className="text-[9px] text-slate-400 leading-normal">Bloquea la sesión automáticamente si el usuario no interactúa.</p>
+            </div>
+            <button
+              id="btn-toggle-autolock"
+              onClick={() => setAutoLockEnabled(!autoLockEnabled)}
+              className={`relative w-10 h-5.5 rounded-full transition-colors duration-200 flex-shrink-0 ${autoLockEnabled ? 'bg-teal-500' : 'bg-slate-200'}`}
+              role="switch"
+              aria-checked={autoLockEnabled}
+            >
+              <span className={`absolute top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow transition-transform duration-200 ${autoLockEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+          {autoLockEnabled && (
+            <div className="flex items-center gap-2 pl-1">
+              <Timer className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+              <label htmlFor="autolock-minutes" className="text-[10px] font-semibold text-slate-500 flex-shrink-0">Minutos de inactividad:</label>
+              <input
+                id="autolock-minutes"
+                type="number"
+                min={1}
+                max={120}
+                value={autoLockMinutes}
+                onChange={e => setAutoLockMinutes(Math.max(1, parseInt(e.target.value) || 15))}
+                className="w-16 px-2 py-1 text-[10px] font-bold border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-400"
+              />
+              <span className="text-[9px] text-slate-400 font-semibold">min</span>
+            </div>
+          )}
+        </div>
+
+        <hr className="border-slate-50" />
+
+        {/* Cierre lógico nocturno */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-extrabold text-slate-800">Cierre lógico nocturno</p>
+              <p className="text-[9px] text-slate-400 leading-normal">Bloquea automáticamente la sesión durante una ventana horaria configurada.</p>
+            </div>
+            <button
+              id="btn-toggle-nightlock"
+              onClick={() => setNightLockEnabled(!nightLockEnabled)}
+              className={`relative w-10 h-5.5 rounded-full transition-colors duration-200 flex-shrink-0 ${nightLockEnabled ? 'bg-indigo-500' : 'bg-slate-200'}`}
+              role="switch"
+              aria-checked={nightLockEnabled}
+            >
+              <span className={`absolute top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow transition-transform duration-200 ${nightLockEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+          {nightLockEnabled && (
+            <div className="flex flex-col gap-2 pl-1">
+              <div className="flex items-center gap-2">
+                <Clock className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                <label htmlFor="nightlock-start" className="text-[10px] font-semibold text-slate-500 w-20 flex-shrink-0">Inicio bloqueo:</label>
+                <input
+                  id="nightlock-start"
+                  type="time"
+                  value={nightLockStart}
+                  onChange={e => setNightLockStart(e.target.value)}
+                  className="px-2 py-1 text-[10px] font-bold border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                <label htmlFor="nightlock-end" className="text-[10px] font-semibold text-slate-500 w-20 flex-shrink-0">Fin bloqueo:</label>
+                <input
+                  id="nightlock-end"
+                  type="time"
+                  value={nightLockEnd}
+                  onChange={e => setNightLockEnd(e.target.value)}
+                  className="px-2 py-1 text-[10px] font-bold border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                />
+              </div>
+              <p className="text-[9px] text-indigo-500 font-semibold pl-6">
+                La sesión se bloqueará automáticamente entre las {nightLockStart} y las {nightLockEnd}.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Logout button */}
       <button
         onClick={() => signOut()}
@@ -1403,6 +1561,7 @@ export default function SettingsPage() {
         <LogOut className="h-5 w-5" />
         <span>Cerrar Sesión</span>
       </button>
+
 
       {/* Loading Backdrop Overlay for Exporting */}
       {(isExporting || sheetsStatus === 'exportando') && (
