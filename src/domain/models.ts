@@ -146,6 +146,10 @@ export interface MedicalAppointment {
   deletedAt?: string | null;
   syncStatus?: 'LOCAL_ONLY' | 'SYNCED' | 'PENDING_SYNC' | 'SYNC_ERROR' | null;
   lastSyncedAt?: string | null;
+  source?: 'GMAIL_IMPORT' | 'MANUAL' | null;
+  sourceEmail?: string | null;
+  sourceMessageId?: string | null;
+  sourceSubject?: string | null;
 }
 
 export interface PeriodicCheckup {
@@ -291,5 +295,41 @@ export interface SharedMemberReport {
   permissionId?: string | null;
   shareStatus: 'SHARED' | 'REVOKED' | 'ERROR';
   shareError?: string | null;
+}
+
+export interface AppointmentEmailSource {
+  id: string;
+  email: string;
+  label: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastScannedAt?: string | null;
+  lastScanResult?: string | null;
+  lastError?: string | null;
+  syncStatus?: 'LOCAL_ONLY' | 'SYNCED' | 'PENDING_SYNC' | 'SYNC_ERROR' | null;
+  lastSyncedAt?: string | null;
+}
+
+export interface ImportedEmailAppointmentCandidate {
+  id: string;
+  sourceEmail: string;
+  gmailMessageId: string;
+  subject: string;
+  receivedAt: string;
+  rawSnippet: string;
+  detectedPatientName?: string | null;
+  detectedDate?: string | null;
+  detectedTime?: string | null;
+  detectedDoctor?: string | null;
+  detectedSpecialty?: string | null;
+  detectedLocation?: string | null;
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  status: 'PENDING_REVIEW' | 'IMPORTED' | 'IGNORED' | 'DUPLICATE' | 'ERROR';
+  createdAppointmentId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  syncStatus?: 'LOCAL_ONLY' | 'SYNCED' | 'PENDING_SYNC' | 'SYNC_ERROR' | null;
+  lastSyncedAt?: string | null;
 }
 

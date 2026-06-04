@@ -26,7 +26,10 @@ import {
   ExternalLink,
   Check,
   Settings,
-  Info
+  Info,
+  Mail,
+  Plus,
+  Edit
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -92,12 +95,25 @@ export default function SettingsPage() {
     reconnectGoogle,
     flushPendingSync,
     checkForExistingDatabase,
-    repairGoogleNativeDatabase
+    repairGoogleNativeDatabase,
+    emailSources,
+    addEmailSource,
+    updateEmailSource,
+    deleteEmailSource
   } = useApp();
 
   const [isExporting, setIsExporting] = useState(false);
   const [isRepairing, setIsRepairing] = useState(false);
   const [showLegal, setShowLegal] = useState(false);
+
+  // States for Gmail source forms
+  const [isAddingSource, setIsAddingSource] = useState(false);
+  const [newSourceEmail, setNewSourceEmail] = useState('');
+  const [newSourceLabel, setNewSourceLabel] = useState('');
+  
+  const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
+  const [editingSourceEmail, setEditingSourceEmail] = useState('');
+  const [editingSourceLabel, setEditingSourceLabel] = useState('');
 
   const activeApptsCount = appointments.filter(a => (a.retentionStatus || 'ACTIVE') !== 'PURGED').length;
   const purgedApptsCount = appointments.filter(a => (a.retentionStatus || 'ACTIVE') === 'PURGED').length;
@@ -444,6 +460,254 @@ export default function SettingsPage() {
                 </div>
               </div>
 
+            </div>
+          </section>
+
+          {/* Ficha: Correos para programación de citas */}
+          <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <Mail className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Correos para programación de citas</h4>
+                  <p className="text-[10px] text-slate-400 font-semibold">Configura las direcciones desde donde recibes programaciones de citas para importarlas automáticamente.</p>
+                </div>
+              </div>
+              
+              {!isAddingSource && !editingSourceId && (
+                <button
+                  id="btn-add-email-source"
+                  onClick={() => {
+                    setNewSourceEmail('');
+                    setNewSourceLabel('');
+                    setIsAddingSource(true);
+                  }}
+                  className="py-1.5 px-3 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-[10px] rounded-lg shadow-sm flex items-center gap-1 transition-all"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Agregar fuente</span>
+                </button>
+              )}
+            </div>
+
+            <hr className="border-slate-50" />
+
+            {/* Banner explicativo */}
+            <div className="p-3 bg-blue-50 border border-blue-100 rounded-2xl text-blue-700 text-[10px] font-semibold leading-relaxed">
+              <p>“La app solo leerá correos de los remitentes que configures para detectar programaciones de citas médicas.”</p>
+            </div>
+
+            {/* Formulario Agregar Fuente */}
+            {isAddingSource && (
+              <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
+                <span className="font-bold text-slate-800 text-[11px]">Nueva fuente de correo</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-slate-400">Etiqueta (ej: Clinica, EPS)</label>
+                    <input
+                      type="text"
+                      value={newSourceLabel}
+                      onChange={(e) => setNewSourceLabel(e.target.value)}
+                      placeholder="Ej. Clínica del Norte"
+                      className="h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-teal-500 text-slate-900"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-slate-400">Dirección de correo remitente</label>
+                    <input
+                      type="email"
+                      value={newSourceEmail}
+                      onChange={(e) => setNewSourceEmail(e.target.value)}
+                      placeholder="correo@ejemplo.com"
+                      className="h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-teal-500 text-slate-900"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-1">
+                  <button
+                    onClick={() => setIsAddingSource(false)}
+                    className="py-1.5 px-3 bg-white border border-slate-200 text-slate-700 font-bold text-[10px] rounded-lg"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!newSourceLabel.trim() || !newSourceEmail.trim()) {
+                        alert('Por favor completa todos los campos.');
+                        return;
+                      }
+                      if (!newSourceEmail.includes('@')) {
+                        alert('Ingresa una dirección de correo válida.');
+                        return;
+                      }
+                      const exists = emailSources.some(s => s.email.toLowerCase() === newSourceEmail.trim().toLowerCase());
+                      if (exists) {
+                        alert('Esta dirección de correo ya está configurada.');
+                        return;
+                      }
+                      addEmailSource({
+                        email: newSourceEmail.trim().toLowerCase(),
+                        label: newSourceLabel.trim(),
+                        enabled: true
+                      });
+                      setIsAddingSource(false);
+                    }}
+                    className="py-1.5 px-3 bg-teal-600 hover:bg-teal-700 text-white font-bold text-[10px] rounded-lg"
+                  >
+                    Guardar Fuente
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Formulario Editar Fuente */}
+            {editingSourceId && (
+              <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
+                <span className="font-bold text-slate-800 text-[11px]">Editar fuente de correo</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-slate-400">Etiqueta</label>
+                    <input
+                      type="text"
+                      value={editingSourceLabel}
+                      onChange={(e) => setEditingSourceLabel(e.target.value)}
+                      placeholder="Ej. Clínica del Norte"
+                      className="h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-teal-500 text-slate-900"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] text-slate-400">Dirección de correo remitente</label>
+                    <input
+                      type="email"
+                      value={editingSourceEmail}
+                      onChange={(e) => setEditingSourceEmail(e.target.value)}
+                      placeholder="correo@ejemplo.com"
+                      className="h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-teal-500 text-slate-900"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-1">
+                  <button
+                    onClick={() => setEditingSourceId(null)}
+                    className="py-1.5 px-3 bg-white border border-slate-200 text-slate-700 font-bold text-[10px] rounded-lg"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!editingSourceLabel.trim() || !editingSourceEmail.trim()) {
+                        alert('Por favor completa todos los campos.');
+                        return;
+                      }
+                      if (!editingSourceEmail.includes('@')) {
+                        alert('Ingresa una dirección de correo válida.');
+                        return;
+                      }
+                      const exists = emailSources.some(s => s.id !== editingSourceId && s.email.toLowerCase() === editingSourceEmail.trim().toLowerCase());
+                      if (exists) {
+                        alert('Esta dirección de correo ya está configurada para otra fuente.');
+                        return;
+                      }
+                      updateEmailSource(editingSourceId, {
+                        email: editingSourceEmail.trim().toLowerCase(),
+                        label: editingSourceLabel.trim()
+                      });
+                      setEditingSourceId(null);
+                    }}
+                    className="py-1.5 px-3 bg-teal-600 hover:bg-teal-700 text-white font-bold text-[10px] rounded-lg"
+                  >
+                    Actualizar Fuente
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Listado de Fuentes */}
+            <div className="flex flex-col gap-3">
+              {emailSources.length === 0 ? (
+                <div className="text-center py-6 text-slate-400 text-xs font-semibold">
+                  No hay remitentes configurados. Agrega uno arriba.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3.5">
+                  {emailSources.map((source) => (
+                    <div
+                      key={source.id}
+                      className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-semibold text-[11px]"
+                    >
+                      <div className="flex-1 min-w-0 flex items-start gap-3">
+                        <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${source.enabled ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-200 text-slate-400'}`}>
+                          <Mail className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-slate-800 text-xs">{source.label}</span>
+                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase leading-none ${
+                              source.enabled ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'
+                            }`}>
+                              {source.enabled ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">{source.email}</p>
+                          
+                          {/* Scan status */}
+                          {(source.lastScannedAt || source.lastError) && (
+                            <div className="mt-2 pt-2 border-t border-slate-200/40 text-[9px] text-slate-400 font-semibold space-y-1">
+                              {source.lastScannedAt && (
+                                <p>Último escaneo: {new Date(source.lastScannedAt).toLocaleString('es-CO')}</p>
+                              )}
+                              {source.lastScanResult && (
+                                <p className="text-slate-500 font-bold">Resultado: {source.lastScanResult}</p>
+                              )}
+                              {source.lastError && (
+                                <p className="text-rose-500 font-extrabold">Error: {source.lastError}</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
+                        <button
+                          onClick={() => {
+                            updateEmailSource(source.id, { enabled: !source.enabled });
+                          }}
+                          className={`py-1 px-2.5 rounded-lg border text-[9px] font-black transition-colors ${
+                            source.enabled ? 'bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100'
+                          }`}
+                        >
+                          {source.enabled ? 'Desactivar' : 'Activar'}
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setEditingSourceId(source.id);
+                            setEditingSourceEmail(source.email);
+                            setEditingSourceLabel(source.label);
+                            setIsAddingSource(false);
+                          }}
+                          className="p-1.5 bg-white border border-slate-200 hover:border-teal-500 text-slate-600 rounded-lg shadow-sm transition-colors"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            if (confirm(`¿Estás seguro de eliminar el remitente "${source.label}"?`)) {
+                              deleteEmailSource(source.id);
+                            }
+                          }}
+                          className="p-1.5 bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
 

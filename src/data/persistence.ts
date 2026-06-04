@@ -12,7 +12,9 @@ import {
   Reminder, 
   FollowUpTask,
   LastExportMetadata,
-  SharedMemberReport
+  SharedMemberReport,
+  AppointmentEmailSource,
+  ImportedEmailAppointmentCandidate
 } from '../domain/models';
 
 export interface SavedAppState {
@@ -46,6 +48,8 @@ export interface SavedAppState {
   lastKnownRevision?: number | null;
   appDataFileId?: string | null;
   sharedReports?: SharedMemberReport[];
+  emailSources?: AppointmentEmailSource[];
+  appointmentCandidates?: ImportedEmailAppointmentCandidate[];
 }
 
 const ACTIVE_USER_KEY = 'pate_salud_active_user';

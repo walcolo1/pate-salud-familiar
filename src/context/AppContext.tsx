@@ -20,7 +20,9 @@ import {
   HealthEventStatus,
   LastExportMetadata,
   MemberPermissions,
-  SharedMemberReport
+  SharedMemberReport,
+  AppointmentEmailSource,
+  ImportedEmailAppointmentCandidate
 } from '../domain/models';
 import { 
   mockUser, 
@@ -62,7 +64,16 @@ import {
   hasAnyValidToken,
   getTokenRemainingMinutes,
   ensureAllRequiredTokens,
+  ensureGmailReadToken,
+  getGmailTokenIfValid,
 } from '../lib/googleTokenManager';
+import {
+  searchAppointmentEmails,
+  getGmailMessage,
+} from '../lib/googleGmail';
+import {
+  parseAppointmentEmail,
+} from '../lib/gmailAppointmentParser';
 
 
 const sanitizeRemoteAppointment = (appt: any): MedicalAppointment => {
@@ -210,6 +221,21 @@ interface AppContextProps {
   revokeDocumentShare: (documentId: string) => Promise<void>;
   generateAndShareMemberReport: (memberId: string, email: string) => Promise<void>;
   revokeMemberReportShare: (reportId: string) => Promise<void>;
+
+  // Gmail Import Module properties and actions
+  emailSources: AppointmentEmailSource[];
+  appointmentCandidates: ImportedEmailAppointmentCandidate[];
+  addEmailSource: (source: Omit<AppointmentEmailSource, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateEmailSource: (id: string, fields: Partial<AppointmentEmailSource>) => void;
+  deleteEmailSource: (id: string) => void;
+  addAppointmentCandidate: (candidate: ImportedEmailAppointmentCandidate) => void;
+  updateAppointmentCandidate: (id: string, fields: Partial<ImportedEmailAppointmentCandidate>) => void;
+  importAppointmentFromCandidate: (candidateId: string, memberId: string, customDetails: Partial<MedicalAppointment>) => Promise<void>;
+  scanGmailForAppointmentsAction: (rangeDays: number) => Promise<number>;
+  gmailAccessToken: string | null;
+  gmailStatus: 'disconnected' | 'connected' | 'connecting' | 'authorizing' | 'scanning' | 'scanned' | 'error';
+  gmailError: string | null;
+  connectGmail: () => Promise<string | null>;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -253,6 +279,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { historyRef.current = history; }, [history]);
   useEffect(() => { remindersRef.current = reminders; }, [reminders]);
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+
+  // Gmail Import States & Refs
+  const [emailSources, setEmailSources] = useState<AppointmentEmailSource[]>([]);
+  const [appointmentCandidates, setAppointmentCandidates] = useState<ImportedEmailAppointmentCandidate[]>([]);
+  const [gmailAccessToken, setGmailAccessToken] = useState<string | null>(null);
+  const [gmailStatus, setGmailStatus] = useState<'disconnected' | 'connected' | 'connecting' | 'authorizing' | 'scanning' | 'scanned' | 'error'>('disconnected');
+  const [gmailError, setGmailError] = useState<string | null>(null);
+
+  const emailSourcesRef = useRef<AppointmentEmailSource[]>(emailSources);
+  const appointmentCandidatesRef = useRef<ImportedEmailAppointmentCandidate[]>(appointmentCandidates);
+
+  useEffect(() => { emailSourcesRef.current = emailSources; }, [emailSources]);
+  useEffect(() => { appointmentCandidatesRef.current = appointmentCandidates; }, [appointmentCandidates]);
+
   const [driveSyncEnabled, setDriveSyncEnabled] = useState<boolean>(true);
   const [driveAccessToken, setDriveAccessToken] = useState<string | null>(null);
   const [driveStatus, setDriveStatus] = useState<'disconnected' | 'connected' | 'connecting' | 'authorizing' | 'subiendo' | 'subido' | 'error'>('disconnected');
@@ -349,6 +389,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setSimulatedRole(savedState.simulatedRole !== undefined ? savedState.simulatedRole : null);
           setSimulatedEmail(savedState.simulatedEmail !== undefined ? savedState.simulatedEmail : null);
 
+          // Gmail Import Loading
+          const defaultSources: AppointmentEmailSource[] = [
+            {
+              id: 'source-default',
+              email: 'noreply@informacion.saludsis.mil.co',
+              label: 'Salud SIS (Defecto)',
+              enabled: true,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }
+          ];
+          setEmailSources(savedState.emailSources && savedState.emailSources.length > 0 ? savedState.emailSources : defaultSources);
+          setAppointmentCandidates(savedState.appointmentCandidates || []);
+
           // Capa Operacional
           setDatabaseSpreadsheetId(savedState.databaseSpreadsheetId || null);
           setDatabaseSpreadsheetUrl(savedState.databaseSpreadsheetUrl || null);
@@ -405,6 +459,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setSyncStrategy('LAST_WRITE_WINS');
             setLastKnownRevision(0);
             setAppDataFileId(null);
+            setEmailSources([
+              {
+                id: 'source-default',
+                email: 'noreply@informacion.saludsis.mil.co',
+                label: 'Salud SIS (Defecto)',
+                enabled: true,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              }
+            ]);
+            setAppointmentCandidates([]);
           } else {
             setUser(activeUser);
             setMembers([]);
@@ -432,6 +497,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setSyncStrategy('LAST_WRITE_WINS');
             setLastKnownRevision(0);
             setAppDataFileId(null);
+            setEmailSources([
+              {
+                id: 'source-default',
+                email: 'noreply@informacion.saludsis.mil.co',
+                label: 'Salud SIS (Defecto)',
+                enabled: true,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              }
+            ]);
+            setAppointmentCandidates([]);
           }
           
           let devId = typeof window !== 'undefined' ? window.localStorage.getItem('pate_salud_device_id') : null;
@@ -479,6 +555,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSyncStrategy('LAST_WRITE_WINS');
         setLastKnownRevision(0);
         setAppDataFileId(null);
+        setEmailSources([
+          {
+            id: 'source-default',
+            email: 'noreply@informacion.saludsis.mil.co',
+            label: 'Salud SIS (Defecto)',
+            enabled: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        ]);
+        setAppointmentCandidates([]);
         
         let devId = typeof window !== 'undefined' ? window.localStorage.getItem('pate_salud_device_id') : null;
         if (!devId) {
@@ -542,7 +629,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       syncStrategy,
       lastKnownRevision,
       appDataFileId,
-      sharedReports
+      sharedReports,
+      emailSources,
+      appointmentCandidates
     }, userEmailOrId);
   }, [
     user,
@@ -574,6 +663,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     lastKnownRevision,
     appDataFileId,
     sharedReports,
+    emailSources,
+    appointmentCandidates,
     isLoading
   ]);
 
@@ -625,6 +716,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setLastExportMetadata(savedState.lastExportMetadata || null);
         setSimulatedRole(savedState.simulatedRole || null);
         setSimulatedEmail(savedState.simulatedEmail || null);
+        
+        // Gmail Import Loading
+        const defaultSources: AppointmentEmailSource[] = [
+          {
+            id: 'source-default',
+            email: 'noreply@informacion.saludsis.mil.co',
+            label: 'Salud SIS (Defecto)',
+            enabled: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        ];
+        setEmailSources(savedState.emailSources && savedState.emailSources.length > 0 ? savedState.emailSources : defaultSources);
+        setAppointmentCandidates(savedState.appointmentCandidates || []);
+
         setDatabaseSpreadsheetId(savedState.databaseSpreadsheetId || null);
         setDatabaseSpreadsheetUrl(savedState.databaseSpreadsheetUrl || null);
         setLastSyncAt(savedState.lastSyncAt || null);
@@ -664,6 +770,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSyncStrategy('LAST_WRITE_WINS');
         setLastKnownRevision(0);
         setAppDataFileId(null);
+        setEmailSources([
+          {
+            id: 'source-default',
+            email: 'noreply@informacion.saludsis.mil.co',
+            label: 'Salud SIS (Defecto)',
+            enabled: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        ]);
+        setAppointmentCandidates([]);
         setSyncInitStatus('idle');
         setSyncInitMessage(null);
         
@@ -715,9 +832,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSharedReports(savedState.sharedReports || []);
         setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
         setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
-        setLastExportMetadata(savedState.lastExportMetadata !== undefined ? savedState.lastExportMetadata : null);
         setSimulatedRole(savedState.simulatedRole !== undefined ? savedState.simulatedRole : null);
         setSimulatedEmail(savedState.simulatedEmail !== undefined ? savedState.simulatedEmail : null);
+
+        // Gmail Import Loading
+        const defaultSources: AppointmentEmailSource[] = [
+          {
+            id: 'source-default',
+            email: 'noreply@informacion.saludsis.mil.co',
+            label: 'Salud SIS (Defecto)',
+            enabled: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        ];
+        setEmailSources(savedState.emailSources && savedState.emailSources.length > 0 ? savedState.emailSources : defaultSources);
+        setAppointmentCandidates(savedState.appointmentCandidates || []);
+
         setDatabaseSpreadsheetId(savedState.databaseSpreadsheetId || null);
         setDatabaseSpreadsheetUrl(savedState.databaseSpreadsheetUrl || null);
         setLastSyncAt(savedState.lastSyncAt || null);
@@ -751,6 +882,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSyncStrategy('LAST_WRITE_WINS');
         setLastKnownRevision(0);
         setAppDataFileId(null);
+        setEmailSources([
+          {
+            id: 'source-default',
+            email: 'noreply@informacion.saludsis.mil.co',
+            label: 'Salud SIS (Defecto)',
+            enabled: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        ]);
+        setAppointmentCandidates([]);
       }
     }
     
@@ -781,6 +923,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setReminders([]);
     setTasks([]);
     setSharedReports([]);
+    setEmailSources([
+      {
+        id: 'source-default',
+        email: 'noreply@informacion.saludsis.mil.co',
+        label: 'Salud SIS (Defecto)',
+        enabled: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ]);
+    setAppointmentCandidates([]);
     setDriveSyncEnabled(true);
     setCalendarSyncEnabled(true);
     setLastExportMetadata(null);
@@ -1790,6 +1943,376 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // ── GMAIL IMPORT MODULE ACTIONS ───────────────────────────────────────────
+
+  const connectGmail = async (): Promise<string | null> => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      setGmailStatus('error');
+      setGmailError('ID de Cliente de Google no configurada en variables de entorno.');
+      return null;
+    }
+
+    setGmailStatus('authorizing');
+    setGmailError(null);
+    try {
+      const token = await ensureGmailReadToken(clientId, false);
+      setGmailAccessToken(token);
+      setGmailStatus('connected');
+      return token;
+    } catch (err: any) {
+      console.error('Error autorizando Gmail:', err);
+      const errCode = err?.error || err?.message || 'auth_error';
+      setGmailStatus('error');
+      setGmailError(errCode === 'access_denied' ? 'Acceso denegado. Verifica que tu correo esté autorizado como tester.' : (errCode || 'El usuario canceló o falló la autorización.'));
+      return null;
+    }
+  };
+
+  const addEmailSource = (source: Omit<AppointmentEmailSource, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newSource: AppointmentEmailSource = {
+      ...source,
+      id: `source-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      syncStatus: 'PENDING_SYNC' as const
+    };
+    setEmailSources(prev => [...prev, newSource]);
+  };
+
+  const updateEmailSource = (id: string, fields: Partial<AppointmentEmailSource>) => {
+    setEmailSources(prev => prev.map(s => s.id === id ? {
+      ...s,
+      ...fields,
+      updatedAt: new Date().toISOString(),
+      syncStatus: 'PENDING_SYNC' as const
+    } : s));
+  };
+
+  const deleteEmailSource = (id: string) => {
+    setEmailSources(prev => prev.filter(s => s.id !== id));
+  };
+
+  const addAppointmentCandidate = (candidate: ImportedEmailAppointmentCandidate) => {
+    setAppointmentCandidates(prev => {
+      const idx = prev.findIndex(c => c.gmailMessageId === candidate.gmailMessageId);
+      if (idx >= 0) {
+        const updated = [...prev];
+        updated[idx] = { ...candidate, updatedAt: new Date().toISOString(), syncStatus: 'PENDING_SYNC' as const };
+        return updated;
+      }
+      return [...prev, { ...candidate, syncStatus: 'PENDING_SYNC' as const }];
+    });
+  };
+
+  const updateAppointmentCandidate = (id: string, fields: Partial<ImportedEmailAppointmentCandidate>) => {
+    setAppointmentCandidates(prev => prev.map(c => c.id === id ? {
+      ...c,
+      ...fields,
+      updatedAt: new Date().toISOString(),
+      syncStatus: 'PENDING_SYNC' as const
+    } : c));
+  };
+
+  const importAppointmentFromCandidate = async (
+    candidateId: string,
+    memberId: string,
+    customDetails: Partial<MedicalAppointment>
+  ) => {
+    const candidate = appointmentCandidatesRef.current.find(c => c.id === candidateId);
+    if (!candidate) throw new Error('Candidato no encontrado.');
+
+    // 1. Validaciones de Duplicados obligatorias
+    const dupByMsgId = appointmentsRef.current.some(a => a.sourceMessageId === candidate.gmailMessageId && !a.deletedAt);
+    if (dupByMsgId) {
+      throw new Error('Esta cita ya ha sido importada (coincidencia de gmailMessageId).');
+    }
+
+    const targetDate = customDetails.date || candidate.detectedDate;
+    const targetTime = customDetails.time || candidate.detectedTime;
+    const targetDoctor = customDetails.doctorName || candidate.detectedDoctor || 'Médico';
+    const targetSpecialty = customDetails.specialty || candidate.detectedSpecialty || 'Medicina General';
+    const targetSubject = candidate.subject;
+    const targetSender = candidate.sourceEmail;
+    const targetReceivedAt = candidate.receivedAt;
+
+    if (!targetDate || !targetTime) {
+      throw new Error('La fecha y la hora son obligatorias para importar la cita.');
+    }
+
+    // Duplicado por miembro + fecha + hora + médico/especialidad
+    const dupByDateTimeDoctor = appointmentsRef.current.some(a => 
+      a.memberId === memberId &&
+      a.scheduledAt === `${targetDate}T${targetTime}` &&
+      (a.doctorName?.toLowerCase() === targetDoctor.toLowerCase() || a.specialty?.toLowerCase() === targetSpecialty.toLowerCase()) &&
+      !a.deletedAt
+    );
+    if (dupByDateTimeDoctor) {
+      throw new Error('Ya existe una cita para este familiar en la misma fecha y hora con este médico/especialidad.');
+    }
+
+    // Duplicado por asunto + remitente + fecha del correo
+    const dupBySubjectSenderDate = appointmentsRef.current.some(a => 
+      a.sourceSubject === targetSubject &&
+      a.sourceEmail === targetSender &&
+      a.createdAt?.split('T')[0] === targetReceivedAt?.split('T')[0] &&
+      !a.deletedAt
+    );
+    if (dupBySubjectSenderDate) {
+      throw new Error('Ya se importó una cita con el mismo asunto, remitente y fecha de correo.');
+    }
+
+    // 2. Crear Cita Médica Local inmediatamente
+    const apptId = `appt-${Date.now()}`;
+    const newAppointment: MedicalAppointment = {
+      id: apptId,
+      memberId,
+      doctorName: targetDoctor,
+      doctor: targetDoctor,
+      specialty: targetSpecialty,
+      scheduledAt: `${targetDate}T${targetTime}`,
+      date: targetDate,
+      time: targetTime,
+      location: customDetails.location || candidate.detectedLocation || 'Consultorio',
+      reason: customDetails.reason || `Importada desde correo: ${candidate.subject}`,
+      notes: customDetails.notes || `Snippet: ${candidate.rawSnippet}`,
+      status: 'SCHEDULED' as HealthEventStatus,
+      documentIds: [],
+      source: 'GMAIL_IMPORT' as const,
+      sourceEmail: candidate.sourceEmail,
+      sourceMessageId: candidate.gmailMessageId,
+      sourceSubject: candidate.subject,
+      syncStatus: 'PENDING_SYNC' as const,
+      calendarSyncStatus: 'PENDING_CALENDAR_SYNC' as const,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setAppointments(prev => [...prev, newAppointment]);
+    
+    // Marcar candidato como IMPORTADO
+    setAppointmentCandidates(prev => prev.map(c => c.id === candidateId ? {
+      ...c,
+      status: 'IMPORTED' as const,
+      createdAppointmentId: apptId,
+      updatedAt: new Date().toISOString(),
+      syncStatus: 'PENDING_SYNC' as const
+    } : c));
+
+    // Registrar evento de historial
+    const importHistoryEvent: MedicalHistoryEvent = {
+      id: `hist-${Date.now()}`,
+      memberId,
+      eventType: 'APPOINTMENT',
+      title: 'Cita importada desde Gmail',
+      description: `Se importó la cita con ${targetDoctor} (${targetSpecialty}) programada para el ${targetDate} a las ${targetTime}.`,
+      eventDate: targetDate,
+      createdAt: new Date().toISOString()
+    };
+    setHistory(prev => [importHistoryEvent, ...prev]);
+
+    // 3. Sincronizar en segundo plano sin bloquear
+    setTimeout(async () => {
+      try {
+        await syncAppointmentToCalendar(apptId, newAppointment);
+      } catch (calErr) {
+        console.error('Error sincronizando cita de Gmail a Google Calendar:', calErr);
+      }
+    }, 100);
+
+    setTimeout(async () => {
+      try {
+        await flushPendingSync();
+      } catch (sheetErr) {
+        console.error('Error haciendo push de la cita de Gmail a Google Sheets:', sheetErr);
+      }
+    }, 1500);
+  };
+
+  const scanGmailForAppointmentsAction = async (rangeDays: number): Promise<number> => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      setGmailStatus('error');
+      setGmailError('ID de Cliente de Google no configurada.');
+      return 0;
+    }
+
+    setGmailStatus('connecting');
+    setGmailError(null);
+
+    let token = getGmailTokenIfValid() || gmailAccessToken;
+    if (!token) {
+      try {
+        token = await ensureGmailReadToken(clientId, true);
+        setGmailAccessToken(token);
+        setGmailStatus('connected');
+      } catch (_) {
+        setGmailStatus('authorizing');
+        try {
+          token = await ensureGmailReadToken(clientId, false);
+          setGmailAccessToken(token);
+          setGmailStatus('connected');
+        } catch (err: any) {
+          console.error('Failed to get Gmail token:', err);
+          setGmailStatus('error');
+          setGmailError('Se requiere autorización para buscar citas en tu Gmail.');
+          return 0;
+        }
+      }
+    }
+
+    if (!token) {
+      setGmailStatus('error');
+      setGmailError('No se pudo obtener el token de acceso de Gmail.');
+      return 0;
+    }
+
+    setGmailStatus('scanning');
+    try {
+      const activeSources = emailSourcesRef.current.filter(s => s.enabled);
+      if (activeSources.length === 0) {
+        setGmailStatus('scanned');
+        return 0;
+      }
+
+      const foundMessages = await searchAppointmentEmails(token, emailSourcesRef.current, { rangeDays });
+      let newCandidatesCount = 0;
+
+      const currentCandidates = appointmentCandidatesRef.current;
+      const currentAppointments = appointmentsRef.current;
+      const currentMembers = membersRef.current;
+
+      const processedCandidates: ImportedEmailAppointmentCandidate[] = [];
+
+      for (const msg of foundMessages) {
+        const existingCandidate = currentCandidates.find(c => c.gmailMessageId === msg.id);
+        const alreadyImported = currentAppointments.some(a => a.sourceMessageId === msg.id && !a.deletedAt);
+
+        if (alreadyImported) {
+          if (existingCandidate && existingCandidate.status !== 'IMPORTED') {
+            processedCandidates.push({
+              ...existingCandidate,
+              status: 'IMPORTED',
+              updatedAt: new Date().toISOString()
+            });
+          }
+          continue;
+        }
+
+        if (existingCandidate) {
+          processedCandidates.push(existingCandidate);
+          continue;
+        }
+
+        try {
+          const detail = await getGmailMessage(token, msg.id);
+          const parsed = parseAppointmentEmail(detail.subject, detail.bodyText, currentMembers);
+
+          let finalStatus: 'PENDING_REVIEW' | 'DUPLICATE' = 'PENDING_REVIEW';
+          
+          if (parsed.detectedDate && parsed.detectedTime) {
+            const matchedMember = currentMembers.find(m => m.fullName === parsed.detectedPatientName && m.status !== 'DELETED');
+            if (matchedMember) {
+              const dupByDateTimeDoctor = currentAppointments.some(a => 
+                a.memberId === matchedMember.id &&
+                a.scheduledAt === `${parsed.detectedDate}T${parsed.detectedTime}` &&
+                (a.doctorName?.toLowerCase() === parsed.detectedDoctor?.toLowerCase() || a.specialty?.toLowerCase() === parsed.detectedSpecialty?.toLowerCase()) &&
+                !a.deletedAt
+              );
+              if (dupByDateTimeDoctor) {
+                finalStatus = 'DUPLICATE';
+              }
+            }
+          }
+
+          const newCand: ImportedEmailAppointmentCandidate = {
+            id: `cand-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            sourceEmail: msg.sourceEmail,
+            gmailMessageId: msg.id,
+            subject: detail.subject,
+            receivedAt: detail.date,
+            rawSnippet: detail.snippet,
+            detectedPatientName: parsed.detectedPatientName,
+            detectedDate: parsed.detectedDate,
+            detectedTime: parsed.detectedTime,
+            detectedDoctor: parsed.detectedDoctor,
+            detectedSpecialty: parsed.detectedSpecialty,
+            detectedLocation: parsed.detectedLocation,
+            confidence: parsed.confidence,
+            status: finalStatus,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            syncStatus: 'PENDING_SYNC' as const
+          };
+
+          processedCandidates.push(newCand);
+          if (finalStatus === 'PENDING_REVIEW') {
+            newCandidatesCount++;
+          }
+        } catch (detailErr) {
+          console.error(`Error fetching/parsing message ${msg.id}:`, detailErr);
+        }
+      }
+
+      setAppointmentCandidates(prev => {
+        const updated = [...prev];
+        processedCandidates.forEach(pc => {
+          const idx = updated.findIndex(u => u.gmailMessageId === pc.gmailMessageId);
+          if (idx >= 0) {
+            updated[idx] = pc;
+          } else {
+            updated.push(pc);
+          }
+        });
+        return updated;
+      });
+
+      const nowStr = new Date().toISOString();
+      setEmailSources(prev => prev.map(s => {
+        const wasScanned = activeSources.some(as => as.id === s.id);
+        if (wasScanned) {
+          return {
+            ...s,
+            lastScannedAt: nowStr,
+            lastScanResult: `Éxito. Encontrados ${foundMessages.filter(f => f.sourceEmail.toLowerCase() === s.email.toLowerCase()).length} correos.`,
+            lastError: null,
+            updatedAt: nowStr,
+            syncStatus: 'PENDING_SYNC' as const
+          };
+        }
+        return s;
+      }));
+
+      setGmailStatus('scanned');
+
+      // Auto-trigger sync to operational sheets in background
+      setTimeout(async () => {
+        try {
+          await flushPendingSync();
+        } catch (err) {
+          console.error('Error syncing candidates to sheets:', err);
+        }
+      }, 1000);
+
+      return newCandidatesCount;
+    } catch (err: any) {
+      console.error('Error running scanGmail:', err);
+      setGmailStatus('error');
+      setGmailError(err.message || 'Error durante el escaneo de correos.');
+      
+      const nowStr = new Date().toISOString();
+      setEmailSources(prev => prev.map(s => s.enabled ? {
+        ...s,
+        lastScannedAt: nowStr,
+        lastError: err.message || 'Error de escaneo.',
+        updatedAt: nowStr,
+        syncStatus: 'PENDING_SYNC' as const
+      } : s));
+
+      return 0;
+    }
+  };
+
   // 3. Métodos para la administración y restauración local
   const clearAllData = () => {
     setIsLoading(true);
@@ -1813,6 +2336,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setHistory([]);
     setReminders([]);
     setTasks([]);
+    setEmailSources([
+      {
+        id: 'source-default',
+        email: 'noreply@informacion.saludsis.mil.co',
+        label: 'Salud SIS (Defecto)',
+        enabled: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ]);
+    setAppointmentCandidates([]);
     setDriveSyncEnabled(false);
     setCalendarSyncEnabled(false);
     setLastExportMetadata(null);
@@ -2246,6 +2780,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (remoteState.HistorialClinico) {
         setHistory(prev => mergeEntities(prev, remoteState.HistorialClinico, 'Historial'));
       }
+      if (remoteState.FuentesCorreoCitas) {
+        setEmailSources(prev => mergeEntities(prev, remoteState.FuentesCorreoCitas, 'FuentesCorreoCitas'));
+      }
+      if (remoteState.CandidatosCorreoCitas) {
+        setAppointmentCandidates(prev => mergeEntities(prev, remoteState.CandidatosCorreoCitas, 'CandidatosCorreoCitas'));
+      }
 
       setLastPullAt(new Date().toISOString());
       setLastSyncAt(new Date().toISOString());
@@ -2434,6 +2974,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           remoteValue: h.description,
           resolution: 'LWW',
           createdAt: h.createdAt || new Date().toISOString()
+        })),
+        FuentesCorreoCitas: emailSourcesRef.current.map(s => ({
+          ...s,
+          createdAt: s.createdAt || new Date().toISOString(),
+          updatedAt: s.updatedAt || new Date().toISOString()
+        })),
+        CandidatosCorreoCitas: appointmentCandidatesRef.current.map(c => ({
+          ...c,
+          createdAt: c.createdAt || new Date().toISOString(),
+          updatedAt: c.updatedAt || new Date().toISOString()
         }))
       };
 
@@ -2591,6 +3141,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const currentDocuments = documentsRef.current;
       const currentHistory = historyRef.current;
       const currentHealthProfiles = healthProfilesRef.current;
+      const currentSources = emailSourcesRef.current;
+      const currentCandidates = appointmentCandidatesRef.current;
 
       const mergedMembers = remoteState.Miembros ? mergeEntitiesSync(currentMembers, remoteState.Miembros, 'Miembros') : currentMembers;
       const mergedAppointments = remoteState.Citas ? mergeEntitiesSync(currentAppointments, remoteCitasSanitized, 'Citas') : currentAppointments;
@@ -2599,6 +3151,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const mergedExams = remoteState.Examenes ? mergeEntitiesSync(currentExams, remoteState.Examenes, 'Exámenes') : currentExams;
       const mergedDocuments = remoteState.Documentos ? mergeEntitiesSync(currentDocuments, remoteState.Documentos, 'Documentos') : currentDocuments;
       const mergedHistory = remoteState.HistorialClinico ? mergeEntitiesSync(currentHistory, remoteState.HistorialClinico, 'Historial') : currentHistory;
+      const mergedSources = remoteState.FuentesCorreoCitas ? mergeEntitiesSync(currentSources, remoteState.FuentesCorreoCitas, 'FuentesCorreoCitas') : currentSources;
+      const mergedCandidates = remoteState.CandidatosCorreoCitas ? mergeEntitiesSync(currentCandidates, remoteState.CandidatosCorreoCitas, 'CandidatosCorreoCitas') : currentCandidates;
 
       // Merge health profiles (Record<string, HealthProfile>)
       const mergedProfiles = { ...currentHealthProfiles };
@@ -2622,6 +3176,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setDocuments(mergedDocuments);
       setHistory(mergedHistory);
       setHealthProfiles(mergedProfiles);
+      setEmailSources(mergedSources);
+      setAppointmentCandidates(mergedCandidates);
       setLastPullAt(new Date().toISOString());
 
       // FASE 2: Push — Usar el estado fusionado calculado
@@ -2769,7 +3325,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             remoteValue: h.description,
             resolution: 'LWW',
             createdAt: h.createdAt || new Date().toISOString()
-          }))
+          })),
+        FuentesCorreoCitas: mergedSources.map(s => ({
+          ...s,
+          createdAt: s.createdAt || new Date().toISOString(),
+          updatedAt: s.updatedAt || new Date().toISOString()
+        })),
+        CandidatosCorreoCitas: mergedCandidates.map(c => ({
+          ...c,
+          createdAt: c.createdAt || new Date().toISOString(),
+          updatedAt: c.updatedAt || new Date().toISOString()
+        }))
       };
 
       await writeAllOperationalTables(token, sheetId, operationalStateSnapshot);
@@ -2798,6 +3364,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setVaccines(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
       setExams(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
       setDocuments(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
+      setEmailSources(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
+      setAppointmentCandidates(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
 
       setLastPushAt(now);
       setLastSyncAt(now);
@@ -3566,7 +4134,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       shareDocumentWithMember,
       revokeDocumentShare,
       generateAndShareMemberReport,
-      revokeMemberReportShare
+      revokeMemberReportShare,
+
+      // Gmail Import Module Bindings
+      emailSources,
+      appointmentCandidates,
+      addEmailSource,
+      updateEmailSource,
+      deleteEmailSource,
+      addAppointmentCandidate,
+      updateAppointmentCandidate,
+      importAppointmentFromCandidate,
+      scanGmailForAppointmentsAction,
+      gmailAccessToken,
+      gmailStatus,
+      gmailError,
+      connectGmail
     }}>
       {children}
     </AppContext.Provider>

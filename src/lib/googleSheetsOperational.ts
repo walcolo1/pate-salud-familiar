@@ -30,7 +30,8 @@ export const OPERATIONAL_HEADERS = {
     'id', 'memberId', 'doctor', 'doctorName', 'specialty', 'scheduledAt', 'date', 'time', 'location', 'reason', 'notes', 'status', 
     'googleCalendarEventId', 'googleCalendarHtmlLink', 'calendarSyncStatus', 'calendarSyncedAt', 'calendarError', 
     'completedAt', 'retentionStatus', 'retentionReason', 'purgedAt', 
-    'ownerEmail', 'ownerGoogleId', 'sourceDeviceId', 'createdAt', 'updatedAt', 'deletedAt', 'syncStatus'
+    'ownerEmail', 'ownerGoogleId', 'sourceDeviceId', 'createdAt', 'updatedAt', 'deletedAt', 'syncStatus',
+    'source', 'sourceEmail', 'sourceMessageId', 'sourceSubject'
   ],
   Controles: [
     'id', 'memberId', 'checkupType', 'scheduledDate', 'completedDate', 'results', 'status', 
@@ -62,6 +63,14 @@ export const OPERATIONAL_HEADERS = {
   SyncLog: [
     'id', 'timestamp', 'deviceId', 'actorEmail', 'tableName', 'entityId', 
     'actionType', 'fieldName', 'localValue', 'remoteValue', 'resolution', 'createdAt'
+  ],
+  FuentesCorreoCitas: [
+    'id', 'email', 'label', 'enabled', 'createdAt', 'updatedAt', 'lastScannedAt', 'lastScanResult', 'lastError'
+  ],
+  CandidatosCorreoCitas: [
+    'id', 'sourceEmail', 'gmailMessageId', 'subject', 'receivedAt', 'rawSnippet', 
+    'detectedPatientName', 'detectedDate', 'detectedTime', 'detectedDoctor', 'detectedSpecialty', 'detectedLocation', 
+    'confidence', 'status', 'createdAppointmentId', 'createdAt', 'updatedAt'
   ]
 };
 
@@ -81,7 +90,9 @@ export const OPERATIONAL_TABS = {
   HistorialClinico: 'Historial Clínico',
   Auditoria: 'Auditoría',
   Retencion: 'Retención',
-  SyncLog: 'SyncLog'
+  SyncLog: 'SyncLog',
+  FuentesCorreoCitas: 'Fuentes Correo Citas',
+  CandidatosCorreoCitas: 'Candidatos Correo Citas'
 };
 
 /**
@@ -237,12 +248,93 @@ export async function createOperationalSpreadsheet(
 }
 
 /**
+ * Ensures all required operational tabs exist in the spreadsheet.
+ * If any are missing, they are created and their headers are written.
+ */
+export async function ensureSpreadsheetSheetsExist(
+  accessToken: string,
+  spreadsheetId: string
+): Promise<void> {
+  const getUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`;
+  const getRes = await fetch(getUrl, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  if (!getRes.ok) {
+    throw new Error(`Failed to check spreadsheet sheets: ${getRes.statusText}`);
+  }
+  const spreadsheet = await getRes.json();
+  const existingTitles = (spreadsheet.sheets || []).map((s: any) => s.properties.title);
+  
+  const missingTabs: [string, string][] = [];
+  Object.entries(OPERATIONAL_TABS).forEach(([key, tabName]) => {
+    if (!existingTitles.includes(tabName)) {
+      missingTabs.push([key, tabName]);
+    }
+  });
+
+  if (missingTabs.length === 0) return;
+
+  // 1. Add missing sheets
+  const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`;
+  const requests = missingTabs.map(([, tabName]) => ({
+    addSheet: {
+      properties: { title: tabName }
+    }
+  }));
+
+  const updateRes = await fetch(updateUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ requests })
+  });
+
+  if (!updateRes.ok) {
+    const err = await updateRes.json().catch(() => ({}));
+    throw new Error(`Failed to add missing sheets: ${err.error?.message || updateRes.statusText}`);
+  }
+
+  // 2. Write headers for the new sheets
+  const writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`;
+  const dataPayload = missingTabs.map(([key, tabName]) => {
+    const headers = (OPERATIONAL_HEADERS as any)[key];
+    return {
+      range: `'${tabName}'!A1`,
+      values: [headers]
+    };
+  });
+
+  const writeRes = await fetch(writeUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      valueInputOption: 'USER_ENTERED',
+      data: dataPayload
+    })
+  });
+
+  if (!writeRes.ok) {
+    const err = await writeRes.json().catch(() => ({}));
+    throw new Error(`Failed to write headers for new sheets: ${err.error?.message || writeRes.statusText}`);
+  }
+}
+
+/**
  * Reads all rows from all tabs in the operational spreadsheet and maps them to JSON objects.
  */
 export async function readAllOperationalTables(
   accessToken: string,
   spreadsheetId: string
 ): Promise<any> {
+  // Ensure all tabs exist before reading
+  await ensureSpreadsheetSheetsExist(accessToken, spreadsheetId).catch(err => {
+    console.warn('Failed to ensure spreadsheet sheets exist:', err);
+  });
   const ranges = Object.values(OPERATIONAL_TABS).map(tabName => `'${tabName}'!A1:AZ5000`);
   const queryStr = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?${queryStr}`;
@@ -327,6 +419,11 @@ export async function writeAllOperationalTables(
   spreadsheetId: string,
   state: any
 ): Promise<void> {
+  // Ensure all tabs exist before writing
+  await ensureSpreadsheetSheetsExist(accessToken, spreadsheetId).catch(err => {
+    console.warn('Failed to ensure spreadsheet sheets exist:', err);
+  });
+
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`;
   
   const dataPayload = Object.entries(OPERATIONAL_TABS).map(([key, tabName]) => {
