@@ -45,6 +45,8 @@ export interface MemberPermissions {
   canManageFamilyData: boolean;
 }
 
+export type MemberDocumentType = 'TI' | 'CC' | 'CE' | 'PASSPORT' | 'OTHER';
+
 export interface FamilyMember {
   id: string;
   familyGroupId: string;
@@ -67,6 +69,8 @@ export interface FamilyMember {
   deletedAt?: string | null;
   syncStatus?: 'LOCAL_ONLY' | 'SYNCED' | 'PENDING_SYNC' | 'SYNC_ERROR' | null;
   lastSyncedAt?: string | null;
+  documentType?: MemberDocumentType | null;
+  documentNumber?: string | null;
 }
 
 export interface HealthProfile {

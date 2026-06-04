@@ -31,9 +31,30 @@ const bloodTypeMap: Record<BloodType, string> = {
 
 export default function MembersPage() {
   const router = useRouter();
-  const { user, members, isLoading } = useApp();
+  const { user, members, documents, isLoading } = useApp();
   const [search, setSearch] = useState('');
   const [memberFilter, setMemberFilter] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
+
+  // Helper to format document type and number visually
+  const formatDocument = (type: string, number: string) => {
+    if (!type || !number) return '';
+    const digitsOnly = /^\d+$/.test(number);
+    const formatted = digitsOnly 
+      ? new Intl.NumberFormat('es-CO').format(parseInt(number, 10))
+      : number;
+    return `${type} ${formatted}`;
+  };
+
+  // Helper to count documents for a member
+  const getMemberDocCount = (memberId: string) => {
+    return documents.filter(d => d.memberId === memberId && !d.deletedAt).length;
+  };
+
+  // Helper to format document counts visually
+  const formatDocumentCount = (count: number) => {
+    if (count === 1) return '1 documento';
+    return `${count} documentos`;
+  };
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -161,11 +182,21 @@ export default function MembersPage() {
                   <p className="text-xs text-slate-400 font-bold mb-1.5">
                     {relationshipMap[member.relationship]} · {age} {age === 1 ? 'año' : 'años'}
                   </p>
-                  {member.bloodType && member.bloodType !== 'UNKNOWN' && (
-                    <span className="text-[9px] font-extrabold bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full border border-teal-600/10 uppercase">
-                      RH {bloodTypeMap[member.bloodType]}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {member.bloodType && member.bloodType !== 'UNKNOWN' && (
+                      <span className="text-[9px] font-extrabold bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-600/10 uppercase leading-none">
+                        RH {bloodTypeMap[member.bloodType]}
+                      </span>
+                    )}
+                    {member.documentType && member.documentNumber && (
+                      <span className="text-[9px] font-extrabold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-600/10 uppercase leading-none">
+                        {formatDocument(member.documentType, member.documentNumber)}
+                      </span>
+                    )}
+                    <span className="text-[9px] font-extrabold bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full border border-slate-200 uppercase leading-none">
+                      {formatDocumentCount(getMemberDocCount(member.id))}
                     </span>
-                  )}
+                  </div>
                 </div>
 
                 {/* Arrow */}

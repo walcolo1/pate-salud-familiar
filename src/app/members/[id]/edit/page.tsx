@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { ArrowLeft, Save, ShieldAlert } from 'lucide-react';
-import { Relationship, BloodType } from '@/domain/models';
+import { Relationship, BloodType, MemberDocumentType } from '@/domain/models';
 
 export default function EditMemberPage() {
   const router = useRouter();
@@ -21,6 +21,9 @@ export default function EditMemberPage() {
   const [email, setEmail] = useState('');
   const [canAccessPortal, setCanAccessPortal] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<'NONE' | 'INVITED' | 'ACTIVE' | 'REVOKED'>('NONE');
+  const [documentType, setDocumentType] = useState<MemberDocumentType>('CC');
+  const [documentNumber, setDocumentNumber] = useState('');
+  const [isInitialized, setIsInitialized] = useState(false);
   
   // Granular permissions states
   const [canManageOwnProfile, setCanManageOwnProfile] = useState(true);
@@ -43,7 +46,7 @@ export default function EditMemberPage() {
   const member = members.find(m => m.id === id);
 
   useEffect(() => {
-    if (member) {
+    if (member && !isInitialized) {
       setFullName(member.fullName);
       setBirthDate(member.birthDate);
       setRelationship(member.relationship);
@@ -52,6 +55,12 @@ export default function EditMemberPage() {
       setEmail(member.email || '');
       setCanAccessPortal(member.canAccessPortal || false);
       setPermissionStatus(member.permissionStatus || 'NONE');
+      if (member.documentType) {
+        setDocumentType(member.documentType);
+      }
+      if (member.documentNumber) {
+        setDocumentNumber(member.documentNumber);
+      }
       
       const perms = member.permissions || {
         canManageOwnProfile: true,
@@ -72,8 +81,27 @@ export default function EditMemberPage() {
       setCanExportOwnData(perms.canExportOwnData);
       setCanViewFamilyData(perms.canViewFamilyData);
       setCanManageFamilyData(perms.canManageFamilyData);
+      setIsInitialized(true);
     }
-  }, [member]);
+  }, [member, isInitialized]);
+
+  // Sugerir tipo de documento según la fecha de nacimiento (solo si se altera activamente tras inicializar)
+  useEffect(() => {
+    if (!isInitialized || !birthDate) return;
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    
+    if (age < 18) {
+      setDocumentType('TI');
+    } else {
+      setDocumentType('CC');
+    }
+  }, [birthDate, isInitialized]);
 
   if (isLoading || !user) {
     return (
@@ -109,6 +137,25 @@ export default function EditMemberPage() {
       return;
     }
 
+    if (!documentNumber.trim()) {
+      setError('El número de documento es obligatorio');
+      return;
+    }
+
+    // Validar duplicados de documento en miembros activos/inactivos, excluyendo el actual
+    const normalizedDocNumber = documentNumber.trim();
+    const duplicateExists = members.some(
+      (m) =>
+        m.id !== id &&
+        m.status !== 'DELETED' &&
+        m.documentNumber?.trim().toLowerCase() === normalizedDocNumber.toLowerCase()
+    );
+
+    if (duplicateExists) {
+      setError('El número de documento ya está registrado para otro miembro familiar');
+      return;
+    }
+
     const permissions = {
       canManageOwnProfile,
       canManageOwnAppointments,
@@ -129,7 +176,9 @@ export default function EditMemberPage() {
       email: email.trim() || null,
       canAccessPortal,
       permissionStatus: canAccessPortal ? permissionStatus : 'NONE',
-      permissions: canAccessPortal ? permissions : null
+      permissions: canAccessPortal ? permissions : null,
+      documentType,
+      documentNumber: normalizedDocNumber
     });
 
     router.replace(`/members/${id}`);
@@ -182,6 +231,35 @@ export default function EditMemberPage() {
             onChange={(e) => setBirthDate(e.target.value)}
             className="h-12 px-4.5 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-900 outline-none transition-all duration-200"
           />
+        </div>
+
+        {/* Document Type and Document Number */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-extrabold text-slate-700">Tipo de Documento</label>
+            <select
+              value={documentType}
+              onChange={(e) => setDocumentType(e.target.value as any)}
+              className="h-12 px-4.5 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-900 outline-none transition-all duration-200"
+            >
+              <option value="CC">Cédula de Ciudadanía (CC)</option>
+              <option value="TI">Tarjeta de Identidad (TI)</option>
+              <option value="CE">Cédula de Extranjería (CE)</option>
+              <option value="PASSPORT">Pasaporte (PASSPORT)</option>
+              <option value="OTHER">Otro (OTHER)</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-extrabold text-slate-700">Número de Documento</label>
+            <input
+              type="text"
+              value={documentNumber}
+              onChange={(e) => setDocumentNumber(e.target.value)}
+              placeholder="Ej. 1020304050"
+              className="h-12 px-4.5 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-200"
+            />
+          </div>
         </div>
 
         {/* Grid for selectors */}

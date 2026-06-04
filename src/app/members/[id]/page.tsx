@@ -104,6 +104,25 @@ export default function MemberDetailPage() {
     return age;
   };
 
+  // Helper to format document type and number visually
+  const formatDocument = (type: string, number: string) => {
+    if (!type || !number) return '';
+    const digitsOnly = /^\d+$/.test(number);
+    const formatted = digitsOnly 
+      ? new Intl.NumberFormat('es-CO').format(parseInt(number, 10))
+      : number;
+    return `${type} ${formatted}`;
+  };
+
+  const getMemberDocCount = (memberId: string) => {
+    return documents.filter(d => d.memberId === memberId && !d.deletedAt).length;
+  };
+
+  const formatDocumentCount = (count: number) => {
+    if (count === 1) return '1 documento';
+    return `${count} documentos`;
+  };
+
   const age = calculateAge(member.birthDate);
 
   // Stats for badges
@@ -231,6 +250,18 @@ export default function MemberDetailPage() {
                 <span className="text-teal-600 font-extrabold uppercase">RH {bloodTypeMap[member.bloodType]}</span>
               </>
             )}
+            {member.documentType && member.documentNumber && (
+              <>
+                <span>·</span>
+                <span className="text-blue-600 font-extrabold uppercase">
+                  {formatDocument(member.documentType, member.documentNumber)}
+                </span>
+              </>
+            )}
+            <span>·</span>
+            <span className="text-slate-500 font-extrabold">
+              {formatDocumentCount(getMemberDocCount(member.id))}
+            </span>
           </div>
         </div>
       </section>

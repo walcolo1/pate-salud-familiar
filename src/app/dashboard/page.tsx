@@ -23,6 +23,7 @@ export default function DashboardPage() {
     appointments, 
     reminders, 
     tasks,
+    documents,
     isLoading 
   } = useApp();
 
@@ -60,6 +61,31 @@ export default function DashboardPage() {
     return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
+
+  // Helper to format document type and number visually
+  const formatDocument = (type: string, number: string) => {
+    if (!type || !number) return '';
+    const digitsOnly = /^\d+$/.test(number);
+    const formatted = digitsOnly 
+      ? new Intl.NumberFormat('es-CO').format(parseInt(number, 10))
+      : number;
+    return `${type} ${formatted}`;
+  };
+
+  // Helper to count documents for a member
+  const getMemberDocCount = (memberId: string) => {
+    return documents.filter(d => d.memberId === memberId && !d.deletedAt).length;
+  };
+
+  // Helper to format document counts visually
+  const formatDocumentCount = (count: number) => {
+    if (count === 1) return '1 documento';
+    return `${count} documentos`;
+  };
+
+  // Filter only active members for dashboard
+  const activeMembers = members.filter(m => (m.status || 'ACTIVE') === 'ACTIVE');
+
   return (
     <div className="flex flex-col gap-8 pb-10">
       
@@ -71,20 +97,20 @@ export default function DashboardPage() {
           Tienes el control de la salud de tu hogar en tus manos. Aquí está el resumen de hoy.
         </p>
       </section>
-
+ 
       {/* ── Family Members Section ───────────────────────────────────────── */}
       <section className="flex flex-col gap-3">
         <div className="flex justify-between items-center px-1">
-          <h3 className="font-extrabold text-slate-800 text-sm tracking-wide uppercase">Mi Familia ({members.length})</h3>
+          <h3 className="font-extrabold text-slate-800 text-sm tracking-wide uppercase">Mi Familia ({activeMembers.length})</h3>
           <Link href="/members" className="text-xs font-bold text-teal-600 hover:text-teal-700 flex items-center gap-1">
             <span>Ver todos</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-
+ 
         {/* Members row */}
         <div className="flex items-center gap-3.5 overflow-x-auto pb-2 scrollbar-none w-full">
-          {members.length === 0 ? (
+          {activeMembers.length === 0 ? (
             <div className="flex-1 bg-white p-6 rounded-2xl border border-slate-100 text-center flex flex-col items-center justify-center gap-2 shadow-sm">
               <div className="h-12 w-12 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center border border-slate-100">
                 <Users className="h-5 w-5" />
@@ -101,26 +127,34 @@ export default function DashboardPage() {
             </div>
           ) : (
             <>
-              {members.map((member) => (
+              {activeMembers.map((member) => (
                 <Link
                   key={member.id}
                   href={`/members/${member.id}`}
-                  className="flex flex-col items-center gap-2 bg-white p-4 rounded-2xl min-w-[100px] border border-slate-100 shadow-sm shadow-slate-100/40 hover:shadow-md transition-all duration-200 active:scale-95 shrink-0"
+                  className="flex flex-col items-center gap-2 bg-white p-4 rounded-2xl min-w-[110px] border border-slate-100 shadow-sm shadow-slate-100/40 hover:shadow-md transition-all duration-200 active:scale-95 shrink-0"
                 >
-                  <div className="h-12 w-12 rounded-full bg-teal-600/10 text-teal-700 border border-teal-600/20 flex items-center justify-center font-black text-sm">
+                  <div className="h-12 w-12 rounded-full bg-teal-600/10 text-teal-700 border border-teal-600/20 flex items-center justify-center font-black text-sm shrink-0">
                     {member.fullName.substring(0, 2).toUpperCase()}
                   </div>
-                  <div className="text-center">
-                    <p className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[80px]">{member.fullName.split(' ')[0]}</p>
-                    <span className="text-[10px] text-slate-400 font-semibold">{member.relationship === 'SELF' ? 'Tú' : member.relationship === 'CHILD' ? 'Hijo/a' : 'Cónyuge'}</span>
+                  <div className="text-center w-full min-w-0">
+                    <p className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[90px] mx-auto">{member.fullName.split(' ')[0]}</p>
+                    <span className="text-[9px] text-slate-400 font-semibold">{member.relationship === 'SELF' ? 'Tú' : member.relationship === 'CHILD' ? 'Hijo/a' : 'Cónyuge'}</span>
+                    {member.documentType && member.documentNumber && (
+                      <p className="text-[9px] text-teal-600 font-extrabold mt-0.5 truncate max-w-[95px] mx-auto leading-none">
+                        {formatDocument(member.documentType, member.documentNumber)}
+                      </p>
+                    )}
+                    <p className="text-[8px] text-slate-400 font-bold mt-0.5 truncate max-w-[95px] mx-auto leading-none">
+                      {formatDocumentCount(getMemberDocCount(member.id))}
+                    </p>
                   </div>
                 </Link>
               ))}
-
+ 
               {/* Add member shortcut */}
               <Link
                 href="/members/new"
-                className="flex flex-col items-center justify-center gap-2 bg-slate-100/50 hover:bg-slate-100 p-4 rounded-2xl min-w-[100px] min-h-[108px] border border-dashed border-slate-200 transition-all duration-200 active:scale-95 shrink-0"
+                className="flex flex-col items-center justify-center gap-2 bg-slate-100/50 hover:bg-slate-100 p-4 rounded-2xl min-w-[110px] min-h-[118px] border border-dashed border-slate-200 transition-all duration-200 active:scale-95 shrink-0"
               >
                 <div className="h-10 w-10 rounded-full bg-white text-teal-600 flex items-center justify-center border border-slate-200">
                   <Plus className="h-5 w-5" />

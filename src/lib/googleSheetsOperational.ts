@@ -13,7 +13,8 @@ export const OPERATIONAL_HEADERS = {
   Miembros: [
     'id', 'familyGroupId', 'fullName', 'birthDate', 'relationship', 'bloodType', 'photoUrl', 
     'notes', 'status', 'email', 'canAccessPortal', 'permissionStatus', 
-    'ownerEmail', 'ownerGoogleId', 'sourceDeviceId', 'createdAt', 'updatedAt', 'deletedAt'
+    'ownerEmail', 'ownerGoogleId', 'sourceDeviceId', 'createdAt', 'updatedAt', 'deletedAt',
+    'documentType', 'documentNumber'
   ],
   Permisos: [
     'memberId', 'canManageOwnProfile', 'canManageOwnAppointments', 'canManageOwnDocuments', 
@@ -276,6 +277,13 @@ export async function readAllOperationalTables(
     
     state[key] = dataRows.map((row: any[]) => {
       const obj: any = {};
+      
+      // Initialize all expected headers with null for schema migration compatibility
+      const expectedHeaders = (OPERATIONAL_HEADERS as any)[key] || [];
+      expectedHeaders.forEach((h: string) => {
+        obj[h] = null;
+      });
+
       headers.forEach((header: string, colIdx: number) => {
         let val = row[colIdx];
         if (val === undefined || val === '') {
@@ -286,7 +294,7 @@ export async function readAllOperationalTables(
         if (val !== null) {
           if (val === 'TRUE') val = true;
           else if (val === 'FALSE') val = false;
-          else if (val.startsWith('[') && val.endsWith(']')) {
+          else if (typeof val === 'string' && val.startsWith('[') && val.endsWith(']')) {
             try {
               val = JSON.parse(val);
             } catch (_) {}
