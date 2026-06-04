@@ -99,7 +99,21 @@ export default function SettingsPage() {
     emailSources,
     addEmailSource,
     updateEmailSource,
-    deleteEmailSource
+    deleteEmailSource,
+    // Gmail auto-scan
+    gmailAutoScanEnabled,
+    gmailScanTime,
+    lastGmailScanAt,
+    nextGmailScanAt,
+    gmailScanRangeDays,
+    gmailOnlyFutureAppointments,
+    setGmailAutoScanEnabled,
+    setGmailScanTime,
+    setGmailScanRangeDays,
+    setGmailOnlyFutureAppointments,
+    triggerGmailAutoScan,
+    gmailStatus,
+    appointmentCandidates
   } = useApp();
 
   const [isExporting, setIsExporting] = useState(false);
@@ -711,7 +725,142 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* Ficha 3: Acciones Manuales de Respaldo y Diagnóstico */}
+          {/* Ficha: Escaneo automático diario de Gmail */}
+          <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-violet-50 text-violet-600 rounded-xl">
+                  <Clock className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Escaneo automático diario de Gmail</h4>
+                  <p className="text-[10px] text-slate-400 font-semibold">Configura la hora diaria para buscar nuevas citas desde tus correos configurados.</p>
+                </div>
+              </div>
+              {/* Toggle maestro */}
+              <button
+                id="btn-toggle-gmail-autoscan"
+                type="button"
+                onClick={() => setGmailAutoScanEnabled(!gmailAutoScanEnabled)}
+                className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
+                  gmailAutoScanEnabled ? 'bg-violet-600 justify-end' : 'bg-slate-200 justify-start'
+                }`}
+              >
+                <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
+              </button>
+            </div>
+
+            <hr className="border-slate-50" />
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-4 font-semibold text-[11px] text-slate-500">
+              {/* Hora de escaneo */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <span className="font-extrabold text-slate-700 block text-xs mb-0.5">Hora de escaneo diario</span>
+                  <p className="text-[10px] text-slate-400">La app buscará citas en Gmail a esta hora cada día.</p>
+                </div>
+                <input
+                  type="time"
+                  value={gmailScanTime}
+                  onChange={(e) => setGmailScanTime(e.target.value)}
+                  disabled={!gmailAutoScanEnabled}
+                  className="h-9 px-3 bg-white border border-slate-200 focus:border-violet-500 rounded-xl text-xs font-bold text-slate-800 outline-none disabled:opacity-50"
+                />
+              </div>
+
+              {/* Rango de días */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-slate-100/70 pt-3.5">
+                <div>
+                  <span className="font-extrabold text-slate-700 block text-xs mb-0.5">Rango de búsqueda</span>
+                  <p className="text-[10px] text-slate-400">Cuántos días atrás buscar correos de citas.</p>
+                </div>
+                <select
+                  value={gmailScanRangeDays}
+                  onChange={(e) => setGmailScanRangeDays(Number(e.target.value))}
+                  disabled={!gmailAutoScanEnabled}
+                  className="h-9 px-3 bg-white border border-slate-200 focus:border-violet-500 rounded-xl text-xs font-bold text-slate-800 outline-none disabled:opacity-50"
+                >
+                  <option value={30}>30 días</option>
+                  <option value={60}>60 días</option>
+                  <option value={90}>90 días</option>
+                  <option value={180}>180 días</option>
+                </select>
+              </div>
+
+              {/* Filtro de citas futuras */}
+              <div className="flex items-center justify-between border-t border-slate-100/70 pt-3.5">
+                <div>
+                  <span className="font-extrabold text-slate-700 block text-xs mb-0.5">Solo importar citas futuras</span>
+                  <p className="text-[10px] text-slate-400">Descarta automáticamente citas cuya fecha ya haya pasado.</p>
+                </div>
+                <button
+                  id="btn-toggle-future-only"
+                  type="button"
+                  onClick={() => setGmailOnlyFutureAppointments(!gmailOnlyFutureAppointments)}
+                  className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
+                    gmailOnlyFutureAppointments ? 'bg-teal-600 justify-end' : 'bg-slate-200 justify-start'
+                  }`}
+                >
+                  <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
+                </button>
+              </div>
+
+              {/* Estado del escaneo */}
+              <div className="border-t border-slate-100/70 pt-3.5 grid grid-cols-1 sm:grid-cols-2 gap-y-2.5 gap-x-4">
+                <div className="flex flex-col">
+                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Candidatos pendientes de revisión</span>
+                  <span className={`font-extrabold ${
+                    appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length > 0 ? 'text-amber-600' : 'text-emerald-600'
+                  }`}>
+                    {appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length} citas pendientes
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Citas pasadas ignoradas</span>
+                  <span className="font-extrabold text-slate-600">
+                    {appointmentCandidates.filter(c => c.status === 'IGNORED').length} ignoradas
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Último escaneo automático</span>
+                  <span className="font-extrabold text-slate-700">{lastGmailScanAt ? new Date(lastGmailScanAt).toLocaleString('es-CO') : 'Nunca'}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Próximo escaneo programado</span>
+                  <span className="font-extrabold text-slate-700">{nextGmailScanAt ? new Date(nextGmailScanAt).toLocaleString('es-CO') : 'No configurado'}</span>
+                </div>
+              </div>
+
+              {/* Botón escaneo manual */}
+              <div className="border-t border-slate-100/70 pt-3.5 flex justify-end">
+                <button
+                  id="btn-trigger-gmail-autoscan"
+                  onClick={async () => {
+                    try {
+                      await triggerGmailAutoScan();
+                    } catch (err: any) {
+                      alert(`Error al escanear: ${err.message}`);
+                    }
+                  }}
+                  disabled={gmailStatus === 'scanning' || emailSources.filter(s => s.enabled).length === 0}
+                  className="py-2 px-4 bg-violet-600 hover:bg-violet-700 active:bg-violet-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5"
+                >
+                  {gmailStatus === 'scanning' ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>Escaneando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-3 w-3" />
+                      <span>Escanear Gmail ahora</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </section>
+
           <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">

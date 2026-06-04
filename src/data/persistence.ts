@@ -50,6 +50,13 @@ export interface SavedAppState {
   sharedReports?: SharedMemberReport[];
   emailSources?: AppointmentEmailSource[];
   appointmentCandidates?: ImportedEmailAppointmentCandidate[];
+  // Gmail auto-scan configuration
+  gmailAutoScanEnabled?: boolean;
+  gmailScanTime?: string;           // HH:mm, default '00:00'
+  lastGmailScanAt?: string | null;  // ISO timestamp of last auto-scan
+  nextGmailScanAt?: string | null;  // ISO timestamp of next scheduled scan
+  gmailScanRangeDays?: number;      // how many days back to search
+  gmailOnlyFutureAppointments?: boolean; // filter out past appointments
 }
 
 const ACTIVE_USER_KEY = 'pate_salud_active_user';

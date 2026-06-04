@@ -333,7 +333,23 @@ export default function AppointmentsImportPage() {
 
         {/* Listado de sugerencias */}
         <div className="flex flex-col gap-4">
-          {filteredCandidates.length === 0 ? (
+          {/* Info banner for IGNORED tab */}
+          {filterStatus === 'IGNORED' && filteredCandidates.length === 0 && (
+            <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-800 text-[10px] font-semibold leading-relaxed flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block text-xs mb-0.5">Sin citas ignoradas aún</span>
+                <p>Cuando el filtro <strong>&quot;Solo citas futuras&quot;</strong> está activo, las citas detectadas cuya fecha ya pasó se ignoran automáticamente y aparecerán aquí. Puedes activar este filtro en <strong>Configuración → Escaneo automático</strong>.</p>
+              </div>
+            </div>
+          )}
+          {filterStatus === 'IGNORED' && filteredCandidates.length > 0 && (
+            <div className="p-3.5 bg-amber-50 border border-amber-100 rounded-2xl text-amber-700 text-[10px] font-semibold leading-relaxed flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <p>Estas citas fueron descartadas automáticamente porque su fecha detectada ya pasó. Si una fue descartada por error, puedes editarla manualmente en la pestaña <strong>Pendientes</strong> después de cambiar la fecha.</p>
+            </div>
+          )}
+          {filteredCandidates.length === 0 && filterStatus !== 'IGNORED' ? (
             <div className="text-center py-10 text-slate-400 text-xs font-semibold">
               No hay citas médicas registradas en esta pestaña. Presiona &quot;Buscar citas en Gmail&quot; arriba para escanear.
             </div>

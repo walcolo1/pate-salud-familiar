@@ -236,6 +236,18 @@ interface AppContextProps {
   gmailStatus: 'disconnected' | 'connected' | 'connecting' | 'authorizing' | 'scanning' | 'scanned' | 'error';
   gmailError: string | null;
   connectGmail: () => Promise<string | null>;
+  // Gmail auto-scan configuration
+  gmailAutoScanEnabled: boolean;
+  gmailScanTime: string;
+  lastGmailScanAt: string | null;
+  nextGmailScanAt: string | null;
+  gmailScanRangeDays: number;
+  gmailOnlyFutureAppointments: boolean;
+  setGmailAutoScanEnabled: (v: boolean) => void;
+  setGmailScanTime: (t: string) => void;
+  setGmailScanRangeDays: (d: number) => void;
+  setGmailOnlyFutureAppointments: (v: boolean) => void;
+  triggerGmailAutoScan: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -286,12 +298,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [gmailAccessToken, setGmailAccessToken] = useState<string | null>(null);
   const [gmailStatus, setGmailStatus] = useState<'disconnected' | 'connected' | 'connecting' | 'authorizing' | 'scanning' | 'scanned' | 'error'>('disconnected');
   const [gmailError, setGmailError] = useState<string | null>(null);
+  // Gmail auto-scan configuration state
+  const [gmailAutoScanEnabled, setGmailAutoScanEnabled] = useState<boolean>(false);
+  const [gmailScanTime, setGmailScanTime] = useState<string>('00:00');
+  const [lastGmailScanAt, setLastGmailScanAt] = useState<string | null>(null);
+  const [nextGmailScanAt, setNextGmailScanAt] = useState<string | null>(null);
+  const [gmailScanRangeDays, setGmailScanRangeDays] = useState<number>(90);
+  const [gmailOnlyFutureAppointments, setGmailOnlyFutureAppointments] = useState<boolean>(true);
+  const gmailAutoScanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isGmailScanInProgress = useRef<boolean>(false);
 
   const emailSourcesRef = useRef<AppointmentEmailSource[]>(emailSources);
   const appointmentCandidatesRef = useRef<ImportedEmailAppointmentCandidate[]>(appointmentCandidates);
+  const gmailAutoScanEnabledRef = useRef<boolean>(gmailAutoScanEnabled);
+  const gmailScanTimeRef = useRef<string>(gmailScanTime);
+  const lastGmailScanAtRef = useRef<string | null>(lastGmailScanAt);
+  const gmailScanRangeDaysRef = useRef<number>(gmailScanRangeDays);
+  const gmailOnlyFutureRef = useRef<boolean>(gmailOnlyFutureAppointments);
 
   useEffect(() => { emailSourcesRef.current = emailSources; }, [emailSources]);
   useEffect(() => { appointmentCandidatesRef.current = appointmentCandidates; }, [appointmentCandidates]);
+  useEffect(() => { gmailAutoScanEnabledRef.current = gmailAutoScanEnabled; }, [gmailAutoScanEnabled]);
+  useEffect(() => { gmailScanTimeRef.current = gmailScanTime; }, [gmailScanTime]);
+  useEffect(() => { lastGmailScanAtRef.current = lastGmailScanAt; }, [lastGmailScanAt]);
+  useEffect(() => { gmailScanRangeDaysRef.current = gmailScanRangeDays; }, [gmailScanRangeDays]);
+  useEffect(() => { gmailOnlyFutureRef.current = gmailOnlyFutureAppointments; }, [gmailOnlyFutureAppointments]);
 
   const [driveSyncEnabled, setDriveSyncEnabled] = useState<boolean>(true);
   const [driveAccessToken, setDriveAccessToken] = useState<string | null>(null);
@@ -402,6 +433,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ];
           setEmailSources(savedState.emailSources && savedState.emailSources.length > 0 ? savedState.emailSources : defaultSources);
           setAppointmentCandidates(savedState.appointmentCandidates || []);
+          // Gmail auto-scan config
+          setGmailAutoScanEnabled(savedState.gmailAutoScanEnabled ?? false);
+          setGmailScanTime(savedState.gmailScanTime ?? '00:00');
+          setLastGmailScanAt(savedState.lastGmailScanAt ?? null);
+          setNextGmailScanAt(savedState.nextGmailScanAt ?? null);
+          setGmailScanRangeDays(savedState.gmailScanRangeDays ?? 90);
+          setGmailOnlyFutureAppointments(savedState.gmailOnlyFutureAppointments ?? true);
 
           // Capa Operacional
           setDatabaseSpreadsheetId(savedState.databaseSpreadsheetId || null);
@@ -631,7 +669,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       appDataFileId,
       sharedReports,
       emailSources,
-      appointmentCandidates
+      appointmentCandidates,
+      gmailAutoScanEnabled,
+      gmailScanTime,
+      lastGmailScanAt,
+      nextGmailScanAt,
+      gmailScanRangeDays,
+      gmailOnlyFutureAppointments
     }, userEmailOrId);
   }, [
     user,
@@ -665,6 +709,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     sharedReports,
     emailSources,
     appointmentCandidates,
+    gmailAutoScanEnabled,
+    gmailScanTime,
+    lastGmailScanAt,
+    nextGmailScanAt,
+    gmailScanRangeDays,
+    gmailOnlyFutureAppointments,
     isLoading
   ]);
 
@@ -730,6 +780,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ];
         setEmailSources(savedState.emailSources && savedState.emailSources.length > 0 ? savedState.emailSources : defaultSources);
         setAppointmentCandidates(savedState.appointmentCandidates || []);
+        // Gmail auto-scan config
+        setGmailAutoScanEnabled(savedState.gmailAutoScanEnabled ?? false);
+        setGmailScanTime(savedState.gmailScanTime ?? '00:00');
+        setLastGmailScanAt(savedState.lastGmailScanAt ?? null);
+        setNextGmailScanAt(savedState.nextGmailScanAt ?? null);
+        setGmailScanRangeDays(savedState.gmailScanRangeDays ?? 90);
+        setGmailOnlyFutureAppointments(savedState.gmailOnlyFutureAppointments ?? true);
 
         setDatabaseSpreadsheetId(savedState.databaseSpreadsheetId || null);
         setDatabaseSpreadsheetUrl(savedState.databaseSpreadsheetUrl || null);
@@ -1945,6 +2002,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ── GMAIL IMPORT MODULE ACTIONS ───────────────────────────────────────────
 
+  /**
+   * isPastAppointment — Returns true if the detected date+time of a candidate
+   * is strictly before the current moment. Candidates without a detectable date
+   * are NOT considered past (we keep them for manual review).
+   */
+  const isPastAppointment = (detectedDate?: string | null, detectedTime?: string | null): boolean => {
+    if (!detectedDate) return false; // no date → not considered past
+    const timeStr = detectedTime || '00:00';
+    const candidateDt = new Date(`${detectedDate}T${timeStr}`);
+    if (isNaN(candidateDt.getTime())) return false;
+    return candidateDt.getTime() < Date.now();
+  };
+
+  /**
+   * computeNextGmailScanAt — Calculates the next scan ISO timestamp based on
+   * the configured scan time (HH:mm) and the reference date (defaults to now).
+   * If today's scheduled time is still in the future, use it; otherwise push to tomorrow.
+   */
+  const computeNextGmailScanAt = (scanTime: string, referenceDate?: Date): string => {
+    const [hStr, mStr] = (scanTime || '00:00').split(':');
+    const h = parseInt(hStr, 10) || 0;
+    const m = parseInt(mStr, 10) || 0;
+    const base = referenceDate ? new Date(referenceDate) : new Date();
+    const candidate = new Date(base);
+    candidate.setHours(h, m, 0, 0);
+    if (candidate.getTime() <= base.getTime()) {
+      candidate.setDate(candidate.getDate() + 1);
+    }
+    return candidate.toISOString();
+  };
+
   const connectGmail = async (): Promise<string | null> => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) {
@@ -2208,6 +2296,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const detail = await getGmailMessage(token, msg.id);
           const parsed = parseAppointmentEmail(detail.subject, detail.bodyText, currentMembers);
 
+          // ── FILTRO DE CITAS FUTURAS ─────────────────────────────────────
+          // Si gmailOnlyFutureAppointments está activo y la cita detectada es del pasado,
+          // la marcamos como IGNORED de inmediato (sin contar como nueva).
+          const onlyFuture = gmailOnlyFutureRef.current;
+          if (onlyFuture && parsed.detectedDate && isPastAppointment(parsed.detectedDate, parsed.detectedTime)) {
+            const ignoredCand: ImportedEmailAppointmentCandidate = {
+              id: `cand-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+              sourceEmail: msg.sourceEmail,
+              gmailMessageId: msg.id,
+              subject: detail.subject,
+              receivedAt: detail.date,
+              rawSnippet: detail.snippet,
+              detectedPatientName: parsed.detectedPatientName,
+              detectedDate: parsed.detectedDate,
+              detectedTime: parsed.detectedTime,
+              detectedDoctor: parsed.detectedDoctor,
+              detectedSpecialty: parsed.detectedSpecialty,
+              detectedLocation: parsed.detectedLocation,
+              confidence: parsed.confidence,
+              status: 'IGNORED' as const,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              syncStatus: 'PENDING_SYNC' as const
+            };
+            processedCandidates.push(ignoredCand);
+            // Cita pasada: no incrementar newCandidatesCount
+            continue;
+          }
+
           let finalStatus: 'PENDING_REVIEW' | 'DUPLICATE' = 'PENDING_REVIEW';
           
           if (parsed.detectedDate && parsed.detectedTime) {
@@ -2285,6 +2402,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setGmailStatus('scanned');
 
+      // Actualizar timestamps del escaneo automático
+      const scanNowStr = new Date().toISOString();
+      const nextScan = computeNextGmailScanAt(gmailScanTimeRef.current);
+      setLastGmailScanAt(scanNowStr);
+      setNextGmailScanAt(nextScan);
+
       // Auto-trigger sync to operational sheets in background
       setTimeout(async () => {
         try {
@@ -2312,6 +2435,96 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return 0;
     }
   };
+
+  /**
+   * triggerGmailAutoScan — Ejecuta el escaneo de Gmail en nombre del planificador automático.
+   * Usa el rangeDays configurado en gmailScanRangeDaysRef. Sólo corre si no hay un escaneo en progreso.
+   */
+  const triggerGmailAutoScan = async (): Promise<void> => {
+    if (isGmailScanInProgress.current) return;
+    if (!gmailAutoScanEnabledRef.current) return;
+    if (emailSourcesRef.current.filter(s => s.enabled).length === 0) return;
+
+    isGmailScanInProgress.current = true;
+    try {
+      await scanGmailForAppointmentsAction(gmailScanRangeDaysRef.current);
+    } catch (err) {
+      console.error('[GmailAutoScan] Error en escaneo automático:', err);
+    } finally {
+      isGmailScanInProgress.current = false;
+    }
+  };
+
+  /**
+   * checkAndRunGmailAutoScan — Comprueba si corresponde ejecutar el escaneo diario.
+   * Lógica de catch-up: si la app no estaba abierta a la hora programada, ejecuta si ya pasó.
+   */
+  const checkAndRunGmailAutoScan = () => {
+    if (!gmailAutoScanEnabledRef.current) return;
+    if (isGmailScanInProgress.current) return;
+
+    const now = Date.now();
+    const nextScanStr = nextGmailScanAt;
+    const lastScanStr = lastGmailScanAtRef.current;
+
+    // ¿Ya pasó la hora programada y no hemos escaneado hoy?
+    let shouldScan = false;
+
+    if (nextScanStr) {
+      const nextTs = new Date(nextScanStr).getTime();
+      if (now >= nextTs) {
+        shouldScan = true;
+      }
+    } else if (lastScanStr) {
+      // Si no hay nextGmailScanAt calculado, usar lastScanAt + 24h como referencia
+      const lastTs = new Date(lastScanStr).getTime();
+      if (now - lastTs >= 24 * 60 * 60 * 1000) {
+        shouldScan = true;
+      }
+    } else {
+      // Primer escaneo automático del día
+      const [hStr, mStr] = (gmailScanTimeRef.current || '00:00').split(':');
+      const scheduled = new Date();
+      scheduled.setHours(parseInt(hStr, 10) || 0, parseInt(mStr, 10) || 0, 0, 0);
+      if (now >= scheduled.getTime()) {
+        shouldScan = true;
+      }
+    }
+
+    if (shouldScan) {
+      triggerGmailAutoScan();
+    }
+  };
+
+  // Planificador automático de Gmail: verifica al montar, al recuperar visibilidad y cada minuto
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Verificar al montar (catch-up por si la app estuvo cerrada)
+    checkAndRunGmailAutoScan();
+
+    // Intervalo de 60 segundos: permite detectar cuando cruza la hora programada
+    const interval = setInterval(() => {
+      checkAndRunGmailAutoScan();
+    }, 60 * 1000);
+
+    // Verificar al recuperar visibilidad (usuario vuelve a la pestaña)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkAndRunGmailAutoScan();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (gmailAutoScanTimerRef.current) {
+        clearTimeout(gmailAutoScanTimerRef.current);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gmailAutoScanEnabled, gmailScanTime, nextGmailScanAt]);
 
   // 3. Métodos para la administración y restauración local
   const clearAllData = () => {
@@ -4149,7 +4362,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       gmailAccessToken,
       gmailStatus,
       gmailError,
-      connectGmail
+      connectGmail,
+      // Gmail auto-scan configuration bindings
+      gmailAutoScanEnabled,
+      gmailScanTime,
+      lastGmailScanAt,
+      nextGmailScanAt,
+      gmailScanRangeDays,
+      gmailOnlyFutureAppointments,
+      setGmailAutoScanEnabled,
+      setGmailScanTime,
+      setGmailScanRangeDays,
+      setGmailOnlyFutureAppointments,
+      triggerGmailAutoScan
     }}>
       {children}
     </AppContext.Provider>
