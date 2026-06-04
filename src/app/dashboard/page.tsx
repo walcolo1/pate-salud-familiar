@@ -30,6 +30,8 @@ export default function DashboardPage() {
     medicalOrders,
     medicationPrescriptions,
     medicationDoseReminders,
+    appointmentCandidates,
+    pendingSyncCount,
     isLoading 
   } = useApp();
 
@@ -213,6 +215,33 @@ export default function DashboardPage() {
         iconType: 'general'
       });
     });
+
+  // 8. Gmail candidates pending review
+  const pendingCandidatesCount = appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length;
+  if (pendingCandidatesCount > 0) {
+    dashboardAlerts.push({
+      id: 'gmail-candidates-pending',
+      title: 'Citas de Gmail por Revisar',
+      description: `Tienes ${pendingCandidatesCount} cita(s) importada(s) de Gmail pendientes de confirmación.`,
+      severity: 'warning',
+      memberName: 'Gmail',
+      href: '/appointments/import',
+      iconType: 'general'
+    });
+  }
+
+  // 9. Sync pending changes
+  if (pendingSyncCount > 0) {
+    dashboardAlerts.push({
+      id: 'sync-pending-changes',
+      title: 'Sincronización Pendiente',
+      description: `Tienes ${pendingSyncCount} cambio(s) guardado(s) localmente pendiente(s) de sincronizar con Google.`,
+      severity: 'info',
+      memberName: 'Nube',
+      href: '/settings',
+      iconType: 'general'
+    });
+  }
 
   // Sort alerts: error first, then warning, then info
   const severityWeight = { error: 3, warning: 2, info: 1 };

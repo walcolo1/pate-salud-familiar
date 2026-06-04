@@ -426,4 +426,12 @@ export interface MedicationDoseReminder {
   sourceDeviceId?: string | null;
 }
 
+export interface DataIntegrityReport {
+  status: 'ok' | 'warnings' | 'errors';
+  errors: string[];
+  warnings: string[];
+  checkedAt: string;
+}
+
+
 

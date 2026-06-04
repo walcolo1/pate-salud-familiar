@@ -26,7 +26,8 @@ import {
   MedicalOrder,
   MedicationPrescription,
   MedicationDoseReminder,
-  DoseReminderStatus
+  DoseReminderStatus,
+  DataIntegrityReport
 } from '../domain/models';
 import { 
   mockUser, 
@@ -43,7 +44,7 @@ import {
   mockReminders, 
   mockTasks 
 } from '../data/mockData';
-import { loadAppState, saveAppState, clearAppState, exportDataAsJSON, getActiveUser, setActiveUser } from '../data/persistence';
+import { loadAppState, saveAppState, clearAppState, exportDataAsJSON, getActiveUser, setActiveUser, SavedAppState } from '../data/persistence';
 import { requestDrivePermission, resolveDrivePath, uploadFile, shareFileWithUser, revokeFileShare } from '../lib/googleDrive';
 import { requestCalendarPermission, createCalendarEvent, createMedicationDoseCalendarEvent } from '../lib/googleCalendar';
 import { requestSheetsPermission, exportFamilyHealthWorkbook } from '../lib/googleSheets';
@@ -285,6 +286,8 @@ interface AppContextProps {
   setNightLockEnabled: (v: boolean) => void;
   setNightLockStart: (t: string) => void;
   setNightLockEnd: (t: string) => void;
+  validateDataIntegrity: () => DataIntegrityReport;
+  importBackupJSON: (data: SavedAppState) => void;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -3285,6 +3288,68 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const importBackupJSON = (data: SavedAppState) => {
+    if (!data) return;
+    setIsLoading(true);
+    try {
+      if (Array.isArray(data.members)) setMembers(data.members);
+      if (data.healthProfiles) setHealthProfiles(data.healthProfiles);
+      if (Array.isArray(data.appointments)) setAppointments(data.appointments);
+      if (Array.isArray(data.checkups)) setCheckups(data.checkups);
+      if (Array.isArray(data.vaccines)) setVaccines(data.vaccines);
+      if (Array.isArray(data.exams)) setExams(data.exams);
+      if (data.examResults) setExamResults(data.examResults);
+      if (Array.isArray(data.documents)) setDocuments(data.documents);
+      if (Array.isArray(data.history)) setHistory(data.history);
+      if (Array.isArray(data.reminders)) setReminders(data.reminders);
+      if (Array.isArray(data.tasks)) setTasks(data.tasks);
+      if (Array.isArray(data.medicalOrders)) setMedicalOrders(data.medicalOrders);
+      if (Array.isArray(data.medicationPrescriptions)) setMedicationPrescriptions(data.medicationPrescriptions);
+      if (Array.isArray(data.medicationDoseReminders)) setMedicationDoseReminders(data.medicationDoseReminders);
+      if (Array.isArray(data.sharedReports)) setSharedReports(data.sharedReports);
+      if (Array.isArray(data.emailSources)) setEmailSources(data.emailSources);
+      if (Array.isArray(data.appointmentCandidates)) setAppointmentCandidates(data.appointmentCandidates);
+
+      if (data.databaseSpreadsheetId) setDatabaseSpreadsheetId(data.databaseSpreadsheetId);
+      if (data.databaseSpreadsheetUrl) setDatabaseSpreadsheetUrl(data.databaseSpreadsheetUrl);
+      if (data.appDataFileId) setAppDataFileId(data.appDataFileId);
+
+      const nowStr = new Date().toISOString();
+      const markPendingSync = <T extends { syncStatus?: any; updatedAt?: string }>(arr: T[]): T[] => {
+        return arr.map(item => ({
+          ...item,
+          syncStatus: 'PENDING_SYNC' as any,
+          updatedAt: item.updatedAt || nowStr
+        }));
+      };
+
+      if (user?.provider === 'google') {
+        if (Array.isArray(data.members)) setMembers(markPendingSync(data.members));
+        if (Array.isArray(data.appointments)) setAppointments(markPendingSync(data.appointments));
+        if (Array.isArray(data.checkups)) setCheckups(markPendingSync(data.checkups));
+        if (Array.isArray(data.vaccines)) setVaccines(markPendingSync(data.vaccines));
+        if (Array.isArray(data.exams)) setExams(markPendingSync(data.exams));
+        if (Array.isArray(data.documents)) setDocuments(markPendingSync(data.documents));
+        if (Array.isArray(data.medicalOrders)) setMedicalOrders(markPendingSync(data.medicalOrders));
+        if (Array.isArray(data.medicationPrescriptions)) setMedicationPrescriptions(markPendingSync(data.medicationPrescriptions));
+        if (Array.isArray(data.medicationDoseReminders)) setMedicationDoseReminders(markPendingSync(data.medicationDoseReminders));
+        
+        setTimeout(async () => {
+          try {
+            await syncNow();
+          } catch (syncErr) {
+            console.error('Error auto-syncing imported backup:', syncErr);
+          }
+        }, 1000);
+      }
+    } catch (e) {
+      console.error('Error importing backup JSON:', e);
+      throw e;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   // ── AUTO-SYNC AL LOGIN (intento silencioso) ───────────────────────────────
 
@@ -5058,6 +5123,110 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [nightLockEnabled, nightLockStart, nightLockEnd]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const validateDataIntegrity = (): DataIntegrityReport => {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    // 1. Miembros sin id
+    const membersWithoutId = membersRef.current.filter(m => !m.id);
+    if (membersWithoutId.length > 0) {
+      errors.push(`Hay ${membersWithoutId.length} miembro(s) sin ID.`);
+    }
+
+    // 2. Miembros con documento duplicado
+    const docMap = new Map<string, string[]>();
+    membersRef.current.forEach(m => {
+      if (m.documentNumber && m.status !== 'DELETED') {
+        const key = `${m.documentType || 'OTHER'}:${m.documentNumber.trim()}`;
+        const list = docMap.get(key) || [];
+        list.push(m.fullName || m.id);
+        docMap.set(key, list);
+      }
+    });
+    for (const [key, names] of docMap.entries()) {
+      if (names.length > 1) {
+        errors.push(`Documento de identidad duplicado (${key}) en los miembros: ${names.join(', ')}.`);
+      }
+    }
+
+    // 3. Miembros sin documento
+    const membersWithoutDoc = membersRef.current.filter(m => m.status !== 'DELETED' && (!m.documentNumber || !m.documentType));
+    if (membersWithoutDoc.length > 0) {
+      warnings.push(`Hay ${membersWithoutDoc.length} miembro(s) activo(s) sin tipo o número de documento de identidad registrado: ${membersWithoutDoc.map(m => m.fullName).join(', ')}.`);
+    }
+
+    // 4. Citas sin memberId
+    const apptsWithoutMember = appointmentsRef.current.filter(a => !a.memberId && a.retentionStatus !== 'PURGED');
+    if (apptsWithoutMember.length > 0) {
+      errors.push(`Hay ${apptsWithoutMember.length} cita(s) sin ID de miembro (memberId vacío).`);
+    }
+
+    // 5. Documentos sin memberId
+    const docsWithoutMember = documentsRef.current.filter(d => !d.memberId);
+    if (docsWithoutMember.length > 0) {
+      errors.push(`Hay ${docsWithoutMember.length} documento(s) clínico(s) sin ID de miembro (memberId vacío).`);
+    }
+
+    // 6. Medicamentos sin memberId
+    const medsWithoutMember = medicationPrescriptionsRef.current.filter(p => !p.memberId);
+    if (medsWithoutMember.length > 0) {
+      errors.push(`Hay ${medsWithoutMember.length} prescripción(es) de medicamento sin ID de miembro (memberId vacío).`);
+    }
+
+    // 7. Tomas sin prescriptionId
+    const dosesWithoutPrescription = medicationDoseRemindersRef.current.filter(r => !r.prescriptionId);
+    if (dosesWithoutPrescription.length > 0) {
+      errors.push(`Hay ${dosesWithoutPrescription.length} toma(s) de medicamentos sin prescripción vinculada (prescriptionId vacío).`);
+    }
+
+    // 8. Órdenes sin memberId
+    const ordersWithoutMember = medicalOrdersRef.current.filter(o => !o.memberId);
+    if (ordersWithoutMember.length > 0) {
+      errors.push(`Hay ${ordersWithoutMember.length} orden(es) médica(s) sin ID de miembro (memberId vacío).`);
+    }
+
+    // 9. Citas vinculadas a órdenes inexistentes
+    const orderIds = new Set(medicalOrdersRef.current.map(o => o.id));
+    const apptsWithInvalidOrder = appointmentsRef.current.filter(a => a.medicalOrderId && !orderIds.has(a.medicalOrderId));
+    if (apptsWithInvalidOrder.length > 0) {
+      warnings.push(`Hay ${apptsWithInvalidOrder.length} cita(s) vinculada(s) a ID de orden médica inexistente.`);
+    }
+
+    // 10. Citas importadas duplicadas desde Gmail
+    const gmailMsgMap = new Map<string, string[]>();
+    appointmentsRef.current.forEach(a => {
+      if (a.source === 'GMAIL_IMPORT' && a.sourceMessageId && a.status !== 'CANCELLED') {
+        const list = gmailMsgMap.get(a.sourceMessageId) || [];
+        list.push(a.id);
+        gmailMsgMap.set(a.sourceMessageId, list);
+      }
+    });
+    let duplicateGmailAppts = 0;
+    for (const [msgId, ids] of gmailMsgMap.entries()) {
+      if (ids.length > 1) {
+        duplicateGmailAppts += (ids.length - 1);
+      }
+    }
+    if (duplicateGmailAppts > 0) {
+      warnings.push(`Hay ${duplicateGmailAppts} cita(s) importada(s) desde Gmail que están duplicadas (comparten el mismo mensaje de origen).`);
+    }
+
+    // 11. Documentos clínicos huérfanos
+    const memberIds = new Set(membersRef.current.map(m => m.id));
+    const orphanedDocs = documentsRef.current.filter(d => d.memberId && !memberIds.has(d.memberId));
+    if (orphanedDocs.length > 0) {
+      warnings.push(`Hay ${orphanedDocs.length} documento(s) clínico(s) huérfano(s) (el ID de miembro no coincide con ningún familiar registrado).`);
+    }
+
+    const status = errors.length > 0 ? 'errors' : warnings.length > 0 ? 'warnings' : 'ok';
+    return {
+      status,
+      errors,
+      warnings,
+      checkedAt: new Date().toISOString()
+    };
+  };
+
   const exposedAppointments = filterByRole(appointments);
   const exposedVaccines = filterByRole(vaccines);
   const exposedCheckups = filterByRole(checkups);
@@ -5251,6 +5420,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setNightLockEnabled,
       setNightLockStart,
       setNightLockEnd,
+      validateDataIntegrity,
+      importBackupJSON,
     }}>
       {children}
     </AppContext.Provider>

@@ -85,11 +85,20 @@ export default function SettingsPage() {
     pushToGoogle,
     syncNow,
     exportBackupJSON,
+    importBackupJSON,
     sharedReports,
     revokeMemberReportShare,
     documents,
     revokeDocumentShare,
     syncInitStatus,
+    validateDataIntegrity,
+    medicalOrders,
+    medicationPrescriptions,
+    medicationDoseReminders,
+    checkups,
+    vaccines,
+    exams,
+    history,
     syncInitMessage,
     pendingSyncCount,
     autoSyncEnabled,
@@ -137,6 +146,8 @@ export default function SettingsPage() {
   const [isRepairing, setIsRepairing] = useState(false);
   const [isRepairingDocs, setIsRepairingDocs] = useState(false);
   const [showLegal, setShowLegal] = useState(false);
+  const [integrityReport, setIntegrityReport] = useState<any | null>(null);
+  const [isCheckingIntegrity, setIsCheckingIntegrity] = useState(false);
 
   // States for Gmail source forms
   const [isAddingSource, setIsAddingSource] = useState(false);
@@ -150,6 +161,15 @@ export default function SettingsPage() {
   const activeApptsCount = appointments.filter(a => (a.retentionStatus || 'ACTIVE') !== 'PURGED').length;
   const purgedApptsCount = appointments.filter(a => (a.retentionStatus || 'ACTIVE') === 'PURGED').length;
   
+  const totalMembers = members.filter(m => m.status !== 'DELETED').length;
+  const activeMembers = members.filter(m => m.status === 'ACTIVE' || !m.status).length;
+  const inactiveMembers = members.filter(m => m.status === 'INACTIVE').length;
+  const totalDocs = documents.filter(d => !d.deletedAt).length;
+  const totalAppointments = appointments.filter(a => (a.retentionStatus || 'ACTIVE') !== 'PURGED' && !a.deletedAt).length;
+  const totalOrders = medicalOrders.filter(o => !o.deletedAt).length;
+  const totalMeds = medicationPrescriptions.filter(p => !p.deletedAt).length;
+  const pendingDoses = medicationDoseReminders.filter(d => d.status === 'PENDING' && !d.deletedAt).length;
+
   const now = new Date();
   const eligibleCount = appointments.filter(a => {
     if ((a.retentionStatus || 'ACTIVE') === 'PURGED') return false;
@@ -178,6 +198,51 @@ export default function SettingsPage() {
       </div>
     );
   }
+
+  const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (!parsed || typeof parsed !== 'object') {
+          alert('El archivo no tiene un formato JSON válido.');
+          return;
+        }
+
+        // Validación básica de campos requeridos
+        if (!Array.isArray(parsed.members) || !Array.isArray(parsed.appointments)) {
+          alert('El archivo no corresponde a una copia de seguridad válida de Paté Salud Familiar (faltan miembros o citas).');
+          return;
+        }
+
+        const mCount = parsed.members.filter((m: any) => m.status !== 'DELETED').length;
+        const aCount = parsed.appointments.filter((a: any) => (a.retentionStatus || 'ACTIVE') !== 'PURGED' && !a.deletedAt).length;
+        const dCount = Array.isArray(parsed.documents) ? parsed.documents.filter((d: any) => !d.deletedAt).length : 0;
+        const oCount = Array.isArray(parsed.medicalOrders) ? parsed.medicalOrders.filter((o: any) => !o.deletedAt).length : 0;
+        const pCount = Array.isArray(parsed.medicationPrescriptions) ? parsed.medicationPrescriptions.filter((p: any) => !p.deletedAt).length : 0;
+
+        const summary = `Se ha verificado la copia de seguridad. Resumen de datos a restaurar:\n\n` +
+          `• Miembros de la familia: ${mCount}\n` +
+          `• Citas médicas: ${aCount}\n` +
+          `• Documentos clínicos: ${dCount}\n` +
+          `• Órdenes médicas: ${oCount}\n` +
+          `• Medicamentos: ${pCount}\n\n` +
+          `¿Estás seguro de que deseas restaurar esta copia de seguridad? Esta acción reemplazará todos tus datos locales actuales en este dispositivo y los sincronizará si estás conectado a Google.`;
+
+        if (window.confirm(summary)) {
+          importBackupJSON(parsed);
+          alert('Copia de seguridad importada y restaurada exitosamente.');
+        }
+      } catch (err: any) {
+        alert(`Error al procesar el archivo JSON: ${err.message}`);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -362,6 +427,193 @@ export default function SettingsPage() {
                   <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
                 </button>
               </div>
+            </div>
+          </section>
+
+          {/* Ficha Nueva: Diagnóstico de Datos e Integridad */}
+          <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-teal-50 text-teal-600 rounded-xl">
+                  <Database className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Diagnóstico y Salud de Datos</h4>
+                  <p className="text-[10px] text-slate-400 font-semibold">Resumen de registros locales e integridad de la información.</p>
+                </div>
+              </div>
+              
+              {integrityReport ? (
+                <span className={`text-[10px] font-black px-3 py-1 rounded-full border uppercase leading-none ${
+                  integrityReport.status === 'ok' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                  integrityReport.status === 'warnings' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                  'bg-rose-50 text-rose-600 border-rose-100'
+                }`}>
+                  Integridad: {integrityReport.status === 'ok' ? 'Correcto' :
+                               integrityReport.status === 'warnings' ? 'Advertencias' : 'Errores'}
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-slate-50 text-slate-400 border border-slate-200 uppercase leading-none">
+                  Sin verificar
+                </span>
+              )}
+            </div>
+
+            <hr className="border-slate-50" />
+
+            {/* Grid de Cantidades */}
+            <div>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide block mb-3">Registros en memoria local</span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Miembros</span>
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="text-lg font-black text-slate-800 leading-none">{totalMembers}</span>
+                    <span className="text-[8px] font-semibold text-slate-400 leading-none">({activeMembers} act / {inactiveMembers} inact)</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Citas médicas</span>
+                  <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalAppointments}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Documentos clínicos</span>
+                  <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalDocs}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Órdenes Médicas</span>
+                  <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalOrders}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Medicamentos</span>
+                  <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalMeds}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Tomas pendientes hoy</span>
+                  <span className={`text-lg font-black leading-none mt-1 ${pendingDoses > 0 ? 'text-teal-600' : 'text-slate-850'}`}>{pendingDoses}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Sincronización y Hoja Operacional */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between border-b border-slate-200/40 pb-2">
+                  <span>Último pull (descarga):</span>
+                  <span className="font-extrabold text-slate-700">{lastPullAt ? new Date(lastPullAt).toLocaleString('es-CO') : 'Nunca'}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-200/40 pb-2">
+                  <span>Último push (subida):</span>
+                  <span className="font-extrabold text-slate-700">{lastPushAt ? new Date(lastPushAt).toLocaleString('es-CO') : 'Nunca'}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-200/40 pb-2">
+                  <span>Última sincronización:</span>
+                  <span className="font-extrabold text-slate-700">{lastSyncAt ? new Date(lastSyncAt).toLocaleString('es-CO') : 'Nunca'}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-200/40 pb-2">
+                  <span>Cambios pendientes locales:</span>
+                  <span className={`font-black ${pendingSyncCount > 0 ? 'text-amber-600' : 'text-slate-700'}`}>{pendingSyncCount}</span>
+                </div>
+                <div className="flex justify-between pb-1">
+                  <span>ID de Hoja Operacional:</span>
+                  <span className="font-mono text-[10px] text-slate-700 truncate max-w-[200px]">{databaseSpreadsheetId || 'Sin vincular'}</span>
+                </div>
+              </div>
+
+              {databaseSpreadsheetUrl && (
+                <a
+                  href={databaseSpreadsheetUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 py-2 px-3 bg-white border border-slate-200 hover:border-teal-500 hover:text-teal-600 text-slate-700 font-extrabold text-[10px] rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  <span>Abrir hoja operacional actual</span>
+                  <ExternalLink className="h-2.5 w-2.5" />
+                </a>
+              )}
+            </div>
+
+            {/* Ejecución de Validación de Integridad */}
+            <div className="flex flex-col gap-3 pt-1">
+              <button
+                id="btn-validate-integrity"
+                onClick={() => {
+                  setIsCheckingIntegrity(true);
+                  setTimeout(() => {
+                    const result = validateDataIntegrity();
+                    setIntegrityReport(result);
+                    setIsCheckingIntegrity(false);
+                  }, 600);
+                }}
+                disabled={isCheckingIntegrity}
+                className="w-full h-10 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-75"
+              >
+                {isCheckingIntegrity ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Validando consistencia de datos...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    <span>Validar Integridad de Datos</span>
+                  </>
+                )}
+              </button>
+
+              {/* Resultados de la validación */}
+              {integrityReport && (
+                <div className={`p-4 rounded-2xl border flex flex-col gap-2 font-semibold text-[10px] ${
+                  integrityReport.status === 'ok' ? 'bg-emerald-50/50 border-emerald-100/60 text-emerald-800' :
+                  integrityReport.status === 'warnings' ? 'bg-amber-50/50 border-amber-100/60 text-amber-800' :
+                  'bg-rose-50/50 border-rose-100/60 text-rose-800'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    {integrityReport.status === 'ok' ? (
+                      <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 flex-shrink-0" />
+                    ) : (
+                      <AlertCircle className="h-4.5 w-4.5 text-amber-600 flex-shrink-0" />
+                    )}
+                    <span className="font-bold text-[11px] block">
+                      {integrityReport.status === 'ok' && '¡Excelente! No se encontraron problemas de consistencia en tus datos.'}
+                      {integrityReport.status === 'warnings' && 'Sugerencias de integridad encontradas (Advertencias)'}
+                      {integrityReport.status === 'errors' && 'Conflictos críticos detectados (Errores)'}
+                    </span>
+                  </div>
+                  
+                  {integrityReport.errors.length > 0 && (
+                    <div className="mt-1 flex flex-col gap-1">
+                      <span className="font-bold text-[9px] uppercase text-rose-700">Errores:</span>
+                      <ul className="list-disc pl-4 space-y-1 text-rose-600 text-[9.5px]">
+                        {integrityReport.errors.map((err: string, idx: number) => (
+                          <li key={idx}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {integrityReport.warnings.length > 0 && (
+                    <div className="mt-1 flex flex-col gap-1">
+                      <span className="font-bold text-[9px] uppercase text-amber-700">Advertencias:</span>
+                      <ul className="list-disc pl-4 space-y-1 text-amber-600 text-[9.5px]">
+                        {integrityReport.warnings.map((warn: string, idx: number) => (
+                          <li key={idx}>{warn}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  <div className="text-[8px] text-slate-400 font-bold border-t border-slate-200/30 pt-2 mt-1">
+                    Verificado el: {new Date(integrityReport.checkedAt).toLocaleString('es-CO')}
+                  </div>
+                </div>
+              )}
             </div>
           </section>
 
@@ -1306,23 +1558,44 @@ export default function SettingsPage() {
         <hr className="border-slate-50" />
         
         {/* Backup JSON */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
               <Download className="h-4.5 w-4.5" />
             </div>
             <div>
               <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Copia de Seguridad</h5>
-              <p className="text-[10px] text-slate-400 font-semibold leading-none mt-1">Descarga todo tu expediente familiar en formato JSON</p>
+              <p className="text-[10px] text-slate-400 font-semibold leading-none mt-1">Exporta o importa el expediente clínico familiar en JSON</p>
             </div>
           </div>
-          <button
-            onClick={exportState}
-            className="w-full h-10 mt-1 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors border border-indigo-100"
-          >
-            <Download className="h-4 w-4" />
-            <span>Exportar Copia de Seguridad (.json)</span>
-          </button>
+          
+          <input
+            type="file"
+            id="import-backup-file-input"
+            accept=".json"
+            onChange={handleImportFileChange}
+            className="hidden"
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+            <button
+              onClick={exportState}
+              className="h-10 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors border border-indigo-100 shadow-sm"
+            >
+              <Download className="h-4 w-4" />
+              <span>Exportar Copia (.json)</span>
+            </button>
+
+            <button
+              onClick={() => {
+                document.getElementById('import-backup-file-input')?.click();
+              }}
+              className="h-10 bg-white hover:bg-slate-50 text-indigo-750 font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors border border-indigo-100 shadow-sm"
+            >
+              <Download className="h-4 w-4 rotate-180" />
+              <span>Importar Copia (.json)</span>
+            </button>
+          </div>
         </div>
 
         <hr className="border-slate-50 my-1" />
@@ -1418,21 +1691,35 @@ export default function SettingsPage() {
         </button>
 
         {showLegal && (
-          <div className="flex flex-col gap-2 mt-2 text-[11px] text-slate-500 leading-relaxed font-semibold animate-in fade-in duration-200">
+          <div className="flex flex-col gap-3 mt-2 text-[11px] text-slate-500 leading-relaxed font-semibold animate-in fade-in duration-200">
             <p>
-              Esta aplicación está diseñada exclusivamente para la autogestión y control organizado de la salud del núcleo familiar.
+              Esta aplicación está diseñada bajo una **arquitectura 100% Google-native**. Esto significa que todos tus datos e historial clínico se almacenan directamente en tu cuenta personal de Google, garantizando soberanía absoluta sobre tu información de salud.
             </p>
+            
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 flex flex-col gap-2 text-[10px] text-slate-600">
+              <p>
+                <strong>• Google Drive:</strong> Se utiliza exclusivamente para almacenar los archivos físicos (fotos o PDFs) de tus documentos clínicos y órdenes médicas. La aplicación crea una carpeta privada en tu Drive para que mantengas el control absoluto de tus archivos digitalizados.
+              </p>
+              <p>
+                <strong>• Google Sheets:</strong> Funciona como base de datos operacional. Todas tus tablas de datos (miembros, citas, medicamentos, tomas, órdenes) se registran en una hoja de cálculo (`SaludFamiliar_OperationalDB`) dentro de tu Google Drive. Los datos nunca se transmiten a servidores de terceros.
+              </p>
+              <p>
+                <strong>• Google Calendar:</strong> Sincroniza tus citas médicas y recordatorios de medicamentos. Para los tratamientos farmacológicos, la app incluye una alerta preventiva si programas más de 20 tomas/eventos individuales, evitando saturar tu calendario personal.
+              </p>
+              <p>
+                <strong>• Gmail (Solo Lectura):</strong> Habilita el escaneo automático para la detección de citas médicas. El escaneo lee únicamente los remitentes que configures explícitamente en la sección de filtros. **La aplicación tiene prohibido borrar correos, moverlos, archivarlos o marcarlos como leídos.**
+              </p>
+              <p>
+                <strong>• Seguridad de Tokens:</strong> Para proteger tu seguridad, los tokens de acceso y credenciales de Google OAuth **nunca se guardan en el LocalStorage ni SessionStorage** del navegador. Se administran mediante una sesión efímera en memoria y expiran automáticamente tras 60 minutos de inactividad.
+              </p>
+            </div>
+
             <p>
-              <strong>Seguridad de los datos:</strong> Los datos se almacenan localmente en el navegador del dispositivo. No se sincronizan en la nube todavía y pueden eliminarse si el usuario borra datos del sitio.
+              <strong>Copia de seguridad adicional:</strong> Aunque tus datos están respaldados en tu cuenta de Google, te aconsejamos descargar copias manuales en formato JSON con la herramienta a continuación para mayor seguridad.
             </p>
-            <p>
-              No se guardan claves, credenciales ni tokens reales en esta etapa de desarrollo del MVP. El almacenamiento local (LocalStorage) no se encuentra cifrado; para mayor seguridad futura se recomienda la implementación de autenticación real, cifrado de datos o un backend centralizado seguro.
-            </p>
-            <p>
-              Se aconseja encarecidamente descargar copias de respaldo de forma periódica con la herramienta de <strong>Copia de Seguridad (.json)</strong> a continuación para evitar pérdidas accidentales.
-            </p>
+
             <p className="italic text-rose-500/90 border-t border-slate-50 pt-2 mt-1">
-              Advertencia: La información contenida en esta aplicación es de carácter organizativo y no reemplaza el diagnóstico médico profesional, tratamiento ni prescripciones de un médico calificado.
+              Advertencia Médica: La información de salud y recordatorios de medicamentos provistos por esta aplicación son de carácter netamente informativo y organizativo. No reemplazan el diagnóstico médico profesional, tratamiento ni prescripciones de un médico calificado.
             </p>
           </div>
         )}
