@@ -27,8 +27,7 @@ import {
   MedicationPrescription,
   MedicationDoseReminder,
   DoseReminderStatus,
-  DataIntegrityReport,
-  FamilyInvitation
+  DataIntegrityReport
 } from '../domain/models';
 import { 
   mockUser, 
@@ -46,18 +45,7 @@ import {
   mockTasks 
 } from '../data/mockData';
 import { loadAppState, saveAppState, clearAppState, exportDataAsJSON, getActiveUser, setActiveUser, SavedAppState } from '../data/persistence';
-import { 
-  requestDrivePermission, 
-  resolveDrivePath, 
-  uploadFile, 
-  shareFileWithUser, 
-  revokeFileShare,
-  shareFileOrFolderWithUser,
-  revokeFileOrFolderPermission,
-  listFilePermissions,
-  searchSharedDatabases,
-  getOrCreateFolder
-} from '../lib/googleDrive';
+import { requestDrivePermission, resolveDrivePath, uploadFile, shareFileWithUser, revokeFileShare } from '../lib/googleDrive';
 import { requestCalendarPermission, createCalendarEvent, createMedicationDoseCalendarEvent } from '../lib/googleCalendar';
 import { requestSheetsPermission, exportFamilyHealthWorkbook } from '../lib/googleSheets';
 import { 
@@ -325,22 +313,6 @@ interface AppContextProps {
   generateAndShareMemberReport: (memberId: string, email: string) => Promise<void>;
   revokeMemberReportShare: (reportId: string) => Promise<void>;
 
-  // Shared database configuration states for invited members
-  sharedDatabaseSpreadsheetId: string | null;
-  sharedDriveFolderId: string | null;
-  familyOwnerEmail: string | null;
-  memberId: string | null;
-  role: 'OWNER' | 'MEMBER' | 'CAREGIVER' | 'VIEWER' | null;
-  invitations: FamilyInvitation[];
-  pendingInvitation: FamilyInvitation | null;
-
-  // Actions
-  createInvitation: (memberId: string, email: string, role: 'OWNER' | 'MEMBER' | 'CAREGIVER' | 'VIEWER') => Promise<void>;
-  resendInvitation: (invitationId: string) => Promise<void>;
-  revokeInvitation: (invitationId: string) => Promise<void>;
-  acceptInvitation: (invitation: FamilyInvitation) => Promise<void>;
-  rejectInvitation: (invitation: FamilyInvitation) => Promise<void>;
-
   // Gmail Import Module properties and actions
   emailSources: AppointmentEmailSource[];
   appointmentCandidates: ImportedEmailAppointmentCandidate[];
@@ -506,18 +478,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [simulatedRole, setSimulatedRole] = useState<'FAMILY_ADMIN' | 'MEMBER_SELF' | 'VIEWER' | null>(null);
   const [simulatedEmail, setSimulatedEmail] = useState<string | null>(null);
 
-  // Shared portal parameters for invited members
-  const [sharedDatabaseSpreadsheetId, setSharedDatabaseSpreadsheetId] = useState<string | null>(null);
-  const [sharedDriveFolderId, setSharedDriveFolderId] = useState<string | null>(null);
-  const [familyOwnerEmail, setFamilyOwnerEmail] = useState<string | null>(null);
-  const [memberId, setMemberId] = useState<string | null>(null);
-  const [role, setRole] = useState<'OWNER' | 'MEMBER' | 'CAREGIVER' | 'VIEWER' | null>(null);
-  const [invitations, setInvitations] = useState<FamilyInvitation[]>([]);
-  const [pendingInvitation, setPendingInvitation] = useState<FamilyInvitation | null>(null);
-
-  const invitationsRef = useRef<FamilyInvitation[]>(invitations);
-  useEffect(() => { invitationsRef.current = invitations; }, [invitations]);
-
   // Capa Operacional Google-Native Foundation States
   const [databaseSpreadsheetId, setDatabaseSpreadsheetId] = useState<string | null>(null);
   const [databaseSpreadsheetUrl, setDatabaseSpreadsheetUrl] = useState<string | null>(null);
@@ -651,14 +611,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setSyncStrategy(savedState.syncStrategy || 'LAST_WRITE_WINS');
           setLastKnownRevision(savedState.lastKnownRevision || 0);
           setAppDataFileId(savedState.appDataFileId || null);
-
-          // Cargar estados del portal compartido de miembros
-          setSharedDatabaseSpreadsheetId(savedState.sharedDatabaseSpreadsheetId || null);
-          setSharedDriveFolderId(savedState.sharedDriveFolderId || null);
-          setFamilyOwnerEmail(savedState.familyOwnerEmail || null);
-          setMemberId(savedState.memberId || null);
-          setRole(savedState.role || null);
-          setInvitations(savedState.invitations || []);
           
           let devId = savedState.deviceId;
           if (!devId && typeof window !== 'undefined') {
@@ -846,6 +798,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!user) return; // Evita guardar estados vacíos cuando no hay sesión activa (evita borrar demo en logout)
     
     const userEmailOrId = user.provider === 'google' ? (user.googleId || user.email) : 'demo';
+    
     saveAppState({
       user,
       members,
@@ -866,12 +819,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       simulatedEmail,
       databaseSpreadsheetId,
       databaseSpreadsheetUrl,
-      sharedDatabaseSpreadsheetId,
-      sharedDriveFolderId,
-      familyOwnerEmail,
-      memberId,
-      role,
-      invitations,
       lastSyncAt,
       lastPullAt,
       lastPushAt,
@@ -914,12 +861,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     simulatedEmail,
     databaseSpreadsheetId,
     databaseSpreadsheetUrl,
-    sharedDatabaseSpreadsheetId,
-    sharedDriveFolderId,
-    familyOwnerEmail,
-    memberId,
-    role,
-    invitations,
     lastSyncAt,
     lastPullAt,
     lastPushAt,
@@ -1377,10 +1318,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ─────────────────────────────────────────────────────────────────────────
 
   const addMember = (member: Omit<FamilyMember, 'id' | 'familyGroupId'>) => {
-    if (activeRole !== 'OWNER') {
-      alert('Operación restringida: Solo el titular de la familia puede agregar miembros.');
-      return;
-    }
     const newId = `member-${Date.now()}`;
     const newMember: FamilyMember = {
       ...member,
@@ -1419,9 +1356,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateMember = (id: string, updatedFields: Partial<FamilyMember>) => {
-    if (!checkWritePermission(id, true)) {
-      return;
-    }
     setMembers((prev) => prev.map((m) => {
       if (m.id === id) {
         const permissionsChanged = JSON.stringify(m.permissions) !== JSON.stringify(updatedFields.permissions) || 
@@ -1465,10 +1399,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteMember = (id: string): boolean => {
-    if (activeRole !== 'OWNER') {
-      alert('Operación restringida: Solo el titular de la familia puede eliminar miembros.');
-      return false;
-    }
     const memberAppointments = appointments.filter(a => a.memberId === id && a.retentionStatus !== 'PURGED');
     const memberCheckups = checkups.filter(c => c.memberId === id);
     const memberVaccines = vaccines.filter(v => v.memberId === id);
@@ -1536,10 +1466,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const inactivateMember = (memberId: string) => {
-    if (activeRole !== 'OWNER') {
-      alert('Operación restringida: Solo el titular de la familia puede inactivar miembros.');
-      return;
-    }
     setMembers(prev => prev.map(m => m.id === memberId ? { 
       ...m, 
       status: 'INACTIVE',
@@ -1561,10 +1487,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const reactivateMember = (memberId: string) => {
-    if (activeRole !== 'OWNER') {
-      alert('Operación restringida: Solo el titular de la familia puede reactivar miembros.');
-      return;
-    }
     setMembers(prev => prev.map(m => m.id === memberId ? { 
       ...m, 
       status: 'ACTIVE',
@@ -1659,7 +1581,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const saveHealthProfile = (memberId: string, profileFields: Partial<HealthProfile>) => {
-    if (!checkWritePermission(memberId)) return;
     setHealthProfiles((prev) => {
       const current = prev[memberId] || {
         id: `hp-${Date.now()}`,
@@ -1682,7 +1603,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addAppointment = (appt: Omit<MedicalAppointment, 'id' | 'documentIds'>) => {
-    if (!checkWritePermission(appt.memberId)) return;
     const newId = `appt-${Date.now()}`;
     const nowIso = new Date().toISOString();
     
@@ -1746,8 +1666,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateAppointmentStatus = (id: string, status: HealthEventStatus) => {
-    const appt = appointments.find(a => a.id === id);
-    if (!appt || !checkWritePermission(appt.memberId)) return;
     setAppointments((prev) => prev.map((a) => {
       if (a.id === id) {
         const completedAt = status === 'COMPLETED' ? new Date().toISOString() : a.completedAt;
@@ -1777,7 +1695,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addCheckup = (chk: Omit<PeriodicCheckup, 'id'>) => {
-    if (!checkWritePermission(chk.memberId)) return;
     const newId = `chk-${Date.now()}`;
     const newCheckup: PeriodicCheckup = {
       ...chk,
@@ -1800,7 +1717,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addVaccine = (vac: Omit<VaccineRecord, 'id'>) => {
-    if (!checkWritePermission(vac.memberId)) return;
     const newId = `vac-${Date.now()}`;
     const newVac: VaccineRecord = {
       ...vac,
@@ -1842,7 +1758,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     exam: Omit<MedicalExam, 'id' | 'documentIds'>, 
     results: Omit<ExamResult, 'id' | 'examId' | 'recordedAt'>[]
   ) => {
-    if (!checkWritePermission(exam.memberId)) return;
     const examId = `exam-${Date.now()}`;
     const newExam: MedicalExam = {
       ...exam,
@@ -2028,9 +1943,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     doc: { fileName: string; fileType: string; description?: string },
     file?: File
   ) => {
-    if (!checkWritePermission(memberId)) {
-      throw new Error('Permiso de escritura denegado');
-    }
     const member = members.find((m) => m.id === memberId);
     const memberName = member ? member.fullName : 'Miembro';
     const categoryName = ({
@@ -2144,22 +2056,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteDocument = (id: string) => {
-    const doc = documents.find((d) => d.id === id);
-    if (!doc || !checkWritePermission(doc.memberId)) return;
     setDocuments((prev) => prev.filter((d) => d.id !== id));
     setTimeout(() => scheduleAutoSync('document_deleted'), 100);
   };
 
   const completeTask = (id: string) => {
-    const t = tasks.find((x) => x.id === id);
-    if (!t || !checkWritePermission(t.memberId)) return;
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: 'DONE' } : t)));
     setTimeout(() => scheduleAutoSync('task_completed'), 100);
   };
 
   const toggleReminder = (id: string) => {
-    const r = reminders.find((x) => x.id === id);
-    if (!r || !checkWritePermission(r.memberId)) return;
     setReminders((prev) => {
       let isMedication = false;
       let newStatus: ReminderStatus = 'PENDING';
@@ -2280,7 +2186,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addMedicalOrder = (order: Omit<MedicalOrder, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => {
-    if (!checkWritePermission(order.memberId)) return;
     const newId = `ord-${Date.now()}`;
     const nowIso = new Date().toISOString();
     const email = user?.email || 'titular@correo.com';
@@ -2316,8 +2221,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateMedicalOrder = (id: string, fields: Partial<MedicalOrder>) => {
-    const order = medicalOrders.find(o => o.id === id);
-    if (!order || !checkWritePermission(order.memberId)) return;
     const nowIso = new Date().toISOString();
     setMedicalOrders(prev => prev.map(o => {
       if (o.id === id) {
@@ -2351,8 +2254,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteMedicalOrder = (id: string) => {
-    const order = medicalOrders.find(o => o.id === id);
-    if (!order || !checkWritePermission(order.memberId)) return;
     const nowIso = new Date().toISOString();
     setMedicalOrders(prev => prev.map(o => {
       if (o.id === id) {
@@ -2369,8 +2270,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const createAppointmentFromOrder = (orderId: string, apptData: Omit<MedicalAppointment, 'id' | 'documentIds' | 'medicalOrderId'>) => {
-    const order = medicalOrders.find(o => o.id === orderId);
-    if (!order || !checkWritePermission(order.memberId)) return;
     const newId = `appt-${Date.now()}`;
     const nowIso = new Date().toISOString();
     let date = '';
@@ -2519,7 +2418,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addMedicationPrescription = (prescription: Omit<MedicationPrescription, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => {
-    if (!checkWritePermission(prescription.memberId)) return;
     const newId = `med-${Date.now()}`;
     const nowIso = new Date().toISOString();
     const email = user?.email || 'titular@correo.com';
@@ -2576,8 +2474,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateMedicationPrescription = (id: string, fields: Partial<MedicationPrescription>) => {
-    const pres = medicationPrescriptions.find(p => p.id === id);
-    if (!pres || !checkWritePermission(pres.memberId)) return;
     const nowIso = new Date().toISOString();
     setMedicationPrescriptions(prev => prev.map(m => {
       if (m.id === id) {
@@ -2626,8 +2522,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteMedicationPrescription = (id: string) => {
-    const pres = medicationPrescriptions.find(p => p.id === id);
-    if (!pres || !checkWritePermission(pres.memberId)) return;
     const nowIso = new Date().toISOString();
     setMedicationPrescriptions(prev => prev.map(m => {
       if (m.id === id) {
@@ -2658,10 +2552,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const markDoseReminder = (reminderId: string, status: DoseReminderStatus, takenAt?: string | null) => {
-    const dose = medicationDoseReminders.find(d => d.id === reminderId);
-    if (!dose) return;
-    const pres = medicationPrescriptions.find(p => p.id === dose.prescriptionId);
-    if (!pres || !checkWritePermission(pres.memberId)) return;
     const nowIso = new Date().toISOString();
     
     setMedicationDoseReminders(prev => prev.map(d => {
@@ -2741,10 +2631,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const exportToSheets = async (memberId: string): Promise<string> => {
-    if (activeRole !== 'OWNER' && memberId !== currentMemberSelfId) {
-      alert('Operación restringida: Solo puedes exportar tu propio reporte o debes ser el titular de la familia.');
-      throw new Error('Permiso denegado.');
-    }
     setSheetsStatus('connecting');
     setSheetsError(null);
 
@@ -3359,10 +3245,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // 3. Métodos para la administración y restauración local
   const clearAllData = () => {
-    if (activeRole !== 'OWNER') {
-      alert('Operación restringida: Solo el titular de la familia puede eliminar todos los datos locales.');
-      return;
-    }
     setIsLoading(true);
     const activeUser = getActiveUser();
     const userEmailOrId = activeUser && activeUser !== 'demo' ? (activeUser.googleId || activeUser.email) : 'demo';
@@ -3418,10 +3300,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const restoreDemoData = () => {
-    if (activeRole !== 'OWNER') {
-      alert('Operación restringida: Solo el titular de la familia puede restaurar los datos de demostración.');
-      return;
-    }
     setIsLoading(true);
     setActiveUser('demo');
     
@@ -3495,10 +3373,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clearDemoData = () => {
-    if (activeRole !== 'OWNER') {
-      alert('Operación restringida: Solo el titular de la familia puede eliminar los datos de demostración.');
-      return;
-    }
     clearAppState('demo');
   };
 
@@ -3529,10 +3403,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const importBackupJSON = (data: SavedAppState) => {
-    if (activeRole !== 'OWNER') {
-      alert('Operación restringida: Solo el titular de la familia puede importar un backup JSON.');
-      return;
-    }
     if (!data) return;
     setIsLoading(true);
     try {
@@ -3628,12 +3498,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const configFileId = await findConfigInAppData(token);
       if (!configFileId) {
-        const hasInvitation = await checkForSharedInvitations(token);
-        if (hasInvitation) {
-          setNeedsGoogleAuth(false);
-          return true;
-        }
-
         setAppDataFileId(null);
         setSyncInitStatus('no_remote_data');
         setSyncInitMessage('No existe base Google-native para esta cuenta.');
@@ -3900,10 +3764,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setMembers(prev => mergeEntities(prev, remoteState.Miembros, 'Miembros'));
       }
 
-      if (remoteState.InvitacionesFamiliares) {
-        setInvitations(prev => mergeEntities(prev, remoteState.InvitacionesFamiliares, 'InvitacionesFamiliares'));
-      }
-
       if (remoteState.FichasMedicas) {
         const remoteProfiles = remoteState.FichasMedicas.reduce((acc: any, hp: any) => {
           acc[hp.memberId] = hp;
@@ -4028,12 +3888,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           createdAt: m.createdAt || new Date().toISOString(),
           updatedAt: m.updatedAt || new Date().toISOString(),
           deletedAt: m.deletedAt || null
-        })),
-        InvitacionesFamiliares: invitationsRef.current.map(i => ({
-          ...i,
-          createdAt: i.createdAt || new Date().toISOString(),
-          updatedAt: i.updatedAt || new Date().toISOString(),
-          deletedAt: i.deletedAt || null
         })),
         Permisos: membersRef.current.map(m => ({
           memberId: m.id,
@@ -4219,7 +4073,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
 
       setMembers(prev => updateSyncStatus(prev));
-      setInvitations(prev => updateSyncStatus(prev));
       setAppointments(prev => updateSyncStatus(prev));
       setCheckups(prev => updateSyncStatus(prev));
       setVaccines(prev => updateSyncStatus(prev));
@@ -4387,10 +4240,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const currentOrders = medicalOrdersRef.current;
       const currentPrescriptions = medicationPrescriptionsRef.current;
       const currentDoseReminders = medicationDoseRemindersRef.current;
-      const currentInvitations = invitationsRef.current;
 
       const mergedMembers = remoteState.Miembros ? mergeEntitiesSync(currentMembers, remoteState.Miembros, 'Miembros') : currentMembers;
-      const mergedInvitations = remoteState.InvitacionesFamiliares ? mergeEntitiesSync(currentInvitations, remoteState.InvitacionesFamiliares, 'InvitacionesFamiliares') : currentInvitations;
       const mergedAppointments = remoteState.Citas ? mergeEntitiesSync(currentAppointments, remoteCitasSanitized, 'Citas') : currentAppointments;
       const mergedCheckups = remoteState.Controles ? mergeEntitiesSync(currentCheckups, remoteState.Controles, 'Controles') : currentCheckups;
       const mergedVaccines = remoteState.Vacunas ? mergeEntitiesSync(currentVaccines, remoteState.Vacunas, 'Vacunas') : currentVaccines;
@@ -4418,7 +4269,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       // Actualizar React state con el resultado fusionado
       setMembers(mergedMembers);
-      setInvitations(mergedInvitations);
       setAppointments(mergedAppointments);
       setCheckups(mergedCheckups);
       setVaccines(mergedVaccines);
@@ -4457,12 +4307,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           createdAt: m.createdAt || new Date().toISOString(),
           updatedAt: m.updatedAt || new Date().toISOString(),
           deletedAt: m.deletedAt || null
-        })),
-        InvitacionesFamiliares: mergedInvitations.map(i => ({
-          ...i,
-          createdAt: i.createdAt || new Date().toISOString(),
-          updatedAt: i.updatedAt || new Date().toISOString(),
-          deletedAt: i.deletedAt || null
         })),
         Permisos: mergedMembers.map(m => ({
           memberId: m.id,
@@ -4645,7 +4489,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Marcar todos como SYNCED
       const now = new Date().toISOString();
       setMembers(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
-      setInvitations(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
       setAppointments(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
       setCheckups(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
       setVaccines(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
@@ -4668,10 +4511,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const repairGoogleNativeDatabase = async () => {
-    if (activeRole !== 'OWNER') {
-      alert('Operación restringida: Solo el titular de la familia puede reparar la base operacional de Google Sheets.');
-      return;
-    }
     const token = await requestGoogleNativeToken();
     if (!token) return;
 
@@ -4756,10 +4595,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const exportBackupJSON = () => {
-    if (activeRole !== 'OWNER') {
-      alert('Operación restringida: Solo el titular de la familia puede exportar un backup JSON completo.');
-      return;
-    }
     exportState();
   };
 
@@ -4833,12 +4668,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       }
       
-      // 2. Si no existe la hoja en Drive, primero buscar invitaciones compartidas
-      const hasInvitation = await checkForSharedInvitations(token);
-      if (hasInvitation) {
-        return { exists: true };
-      }
-
+      // 2. Si no existe la hoja en Drive, crear una nueva
       setSyncInitMessage('Creando tu base de datos segura y privada en Google Drive...');
       const result = await createOperationalSpreadsheet(token, email);
       const sheetId = result.spreadsheetId;
@@ -4913,35 +4743,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const activeEmail = simulatedEmail || user?.email || null;
 
   // Determine role and matched member
-  let activeRole: 'OWNER' | 'MEMBER' | 'CAREGIVER' | 'VIEWER' = 'OWNER';
+  let currentUserRole: 'FAMILY_ADMIN' | 'MEMBER_SELF' | 'VIEWER' = 'FAMILY_ADMIN';
   let currentMemberSelfId: string | null = null;
 
-  if (role) {
-    activeRole = role;
-    currentMemberSelfId = memberId;
-  } else if (simulatedRole) {
-    if (simulatedRole === 'FAMILY_ADMIN') activeRole = 'OWNER';
-    else if (simulatedRole === 'MEMBER_SELF') activeRole = 'MEMBER';
-    else if (simulatedRole === 'VIEWER') activeRole = 'VIEWER';
-
-    if (activeRole === 'MEMBER' || (activeRole as string) === 'CAREGIVER' || activeRole === 'VIEWER') {
-      const matched = members.find(m => m.linkedEmail && m.linkedEmail.toLowerCase() === activeEmail?.toLowerCase());
+  if (simulatedRole) {
+    currentUserRole = simulatedRole;
+    if (currentUserRole === 'MEMBER_SELF') {
+      const matched = members.find(m => m.email && m.email.toLowerCase() === activeEmail?.toLowerCase() && m.canAccessPortal === true && m.permissionStatus === 'ACTIVE');
       currentMemberSelfId = matched ? matched.id : (members.find(m => m.relationship === 'SELF')?.id || null);
     }
   } else if (activeEmail) {
-    // Escaneo en miembros para detectar si el usuario logueado es miembro invitado
-    const matched = members.find(m => m.linkedEmail && m.linkedEmail.toLowerCase() === activeEmail.toLowerCase() && m.invitationStatus === 'ACCEPTED');
+    const matched = members.find(m => m.email && m.email.toLowerCase() === activeEmail.toLowerCase() && m.canAccessPortal === true && m.permissionStatus === 'ACTIVE');
     if (matched) {
-      activeRole = matched.accessRole || 'MEMBER';
+      currentUserRole = 'MEMBER_SELF';
       currentMemberSelfId = matched.id;
     }
   }
-
-  // Convert to legacy role for compatibility with internal code/UI
-  let currentUserRole: 'FAMILY_ADMIN' | 'MEMBER_SELF' | 'VIEWER' = 'FAMILY_ADMIN';
-  if (activeRole === 'OWNER') currentUserRole = 'FAMILY_ADMIN';
-  else if (activeRole === 'VIEWER') currentUserRole = 'VIEWER';
-  else currentUserRole = 'MEMBER_SELF';
 
   // Member permissions default configuration
   const matchedMember = currentMemberSelfId ? members.find(m => m.id === currentMemberSelfId) : null;
@@ -4952,54 +4769,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     canViewOwnHistory: true,
     canUploadDocuments: true,
     canExportOwnData: false,
-    canViewFamilyData: activeRole === 'OWNER', 
-    canManageFamilyData: activeRole === 'OWNER'
+    canViewFamilyData: true, // Default to true for Admin titular
+    canManageFamilyData: true  // Default to true for Admin titular
   };
 
   // If role is MEMBER_SELF, override family data access if granular permissions don't allow it
   const canViewFamily = currentUserRole === 'FAMILY_ADMIN' || memberPerms.canViewFamilyData;
 
-  // Filtro por fila basado en el rol activo
   const filterByRole = <T extends { memberId?: string; id?: string }>(array: T[], memberIdField: keyof T = 'memberId'): T[] => {
-    if (activeRole === 'OWNER') {
-      return array;
-    }
-    // MEMBER y CAREGIVER ven únicamente los registros asociados a su memberId
-    if (activeRole === 'MEMBER' || activeRole === 'CAREGIVER') {
+    if (currentUserRole === 'MEMBER_SELF' && !canViewFamily) {
       return array.filter(item => {
         const itemMemberId = memberIdField === 'id' ? item.id : item[memberIdField];
         return itemMemberId === currentMemberSelfId;
       });
     }
-    // VIEWER ve únicamente los registros asociados a su memberId (si está asignado), o todo si es visor general
-    if (activeRole === 'VIEWER') {
-      if (currentMemberSelfId) {
-        return array.filter(item => {
-          const itemMemberId = memberIdField === 'id' ? item.id : item[memberIdField];
-          return itemMemberId === currentMemberSelfId;
-        });
-      }
-      return array;
-    }
     return array;
-  };
-
-  // Helper de control de escritura para seguridad por rol
-  const checkWritePermission = (targetMemberId?: string, isSelfUpdate = false): boolean => {
-    if (activeRole === 'VIEWER') {
-      alert('Operación restringida: El rol de VISOR es de solo lectura.');
-      return false;
-    }
-    if (activeRole === 'OWNER') return true;
-    
-    // Para MEMBER y CAREGIVER
-    if (activeRole === 'MEMBER' || activeRole === 'CAREGIVER') {
-      if (isSelfUpdate) {
-        return targetMemberId === currentMemberSelfId;
-      }
-      return !!targetMemberId && targetMemberId === currentMemberSelfId;
-    }
-    return false;
   };
 
   // Exposed arrays to UI components
@@ -5008,11 +4792,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     status: m.status || 'ACTIVE'
   })).filter(m => {
     if (m.status === 'DELETED') return false;
-    if (activeRole === 'OWNER') return true;
-    if ((activeRole === 'MEMBER' || activeRole === 'CAREGIVER') && currentMemberSelfId) {
-      return m.id === currentMemberSelfId;
-    }
-    if (activeRole === 'VIEWER' && currentMemberSelfId) {
+    if (currentUserRole === 'MEMBER_SELF' && !canViewFamily) {
       return m.id === currentMemberSelfId;
     }
     return true;
@@ -5357,336 +5137,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const checkForSharedInvitations = async (token: string): Promise<boolean> => {
-    const activeUser = user || getActiveUser();
-    const userEmail = activeUser && activeUser !== 'demo' ? activeUser.email : null;
-    if (!userEmail) return false;
-
-    setSyncInitStatus('checking');
-    setSyncInitMessage('Buscando invitaciones de acceso familiar...');
-
-    try {
-      // 1. Buscar bases operacionales compartidas con el usuario
-      const sharedFiles = await searchSharedDatabases(token);
-      if (sharedFiles.length === 0) {
-        return false;
-      }
-
-      // 2. Para cada archivo, intentar leer la pestaña InvitacionesFamiliares
-      for (const file of sharedFiles) {
-        try {
-          // Leer InvitacionesFamiliares
-          const ranges = [`'Invitaciones Familiares'!A1:Z100`];
-          const queryStr = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
-          const url = `https://sheets.googleapis.com/v4/spreadsheets/${file.id}/values:batchGet?${queryStr}`;
-          
-          const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-          if (!res.ok) continue;
-
-          const data = await res.json();
-          const rows = data.valueRanges?.[0]?.values || [];
-          if (rows.length <= 1) continue;
-
-          const headers = rows[0];
-          const dataRows = rows.slice(1);
-
-          const fileInvitations = dataRows.map((row: any[]) => {
-            const obj: any = {};
-            headers.forEach((header: string, colIdx: number) => {
-              let val = row[colIdx];
-              if (val === undefined || val === '') val = null;
-              if (val === 'TRUE') val = true;
-              else if (val === 'FALSE') val = false;
-              obj[header] = val;
-            });
-            return obj;
-          });
-
-          // Buscar una invitación para el correo del usuario actual
-          const myInvitation = fileInvitations.find((inv: any) => 
-            inv.invitedEmail && inv.invitedEmail.toLowerCase() === userEmail.toLowerCase()
-          );
-
-          if (myInvitation) {
-            // Si la invitación está ACCEPTED, cargarla directamente!
-            if (myInvitation.status === 'ACCEPTED') {
-              setSharedDatabaseSpreadsheetId(myInvitation.databaseSpreadsheetId);
-              setSharedDriveFolderId(myInvitation.driveFolderId);
-              setFamilyOwnerEmail(myInvitation.familyOwnerEmail);
-              setMemberId(myInvitation.memberId);
-              setRole(myInvitation.role);
-
-              setDatabaseSpreadsheetId(myInvitation.databaseSpreadsheetId);
-              setDatabaseSpreadsheetUrl(`https://docs.google.com/spreadsheets/d/${myInvitation.databaseSpreadsheetId}`);
-
-              setSyncInitMessage('Base familiar compartida encontrada. Descargando datos...');
-              await pullFromGoogleInternal(token, myInvitation.databaseSpreadsheetId);
-
-              setSyncInitStatus('loaded_from_google');
-              setSyncInitMessage(`✅ Acceso compartido cargado (${new Date().toLocaleTimeString('es-CO')})`);
-              return true;
-            }
-
-            // Si está PENDING, mostrar la pantalla de aceptación
-            if (myInvitation.status === 'PENDING') {
-              setPendingInvitation(myInvitation);
-              setSyncInitStatus('needs_auth');
-              setSyncInitMessage('Tienes una invitación familiar pendiente.');
-              return true;
-            }
-          }
-        } catch (readErr) {
-          console.warn(`Error reading shared spreadsheet ${file.name}:`, readErr);
-        }
-      }
-      return false;
-    } catch (err) {
-      console.error('Error checking for shared invitations:', err);
-      return false;
-    }
-  };
-
-  const createInvitation = async (memberId: string, email: string, assignedRole: 'OWNER' | 'MEMBER' | 'CAREGIVER' | 'VIEWER') => {
-    if (activeRole !== 'OWNER') throw new Error('Solo el titular de la familia puede invitar miembros.');
-    const token = await requestGoogleNativeToken();
-    if (!token) throw new Error('No se pudo obtener autorización de Google.');
-
-    const member = members.find(m => m.id === memberId);
-    if (!member) throw new Error('Miembro no encontrado.');
-
-    // 1. Obtener o crear carpeta Drive de la familia
-    const driveFolderId = await getOrCreateFolder(token, 'Paté Salud Familiar');
-
-    // 2. Crear invitación en el estado local
-    const invitationId = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const invitationCode = Math.random().toString(36).substr(2, 6).toUpperCase();
-    const invitationUrl = `${window.location.origin}/login?invite=${invitationCode}`;
-
-    const newInvitation: FamilyInvitation = {
-      id: invitationId,
-      familyOwnerEmail: user?.email || '',
-      familyOwnerName: user?.displayName || '',
-      memberId,
-      memberName: member.fullName,
-      invitedEmail: email,
-      role: assignedRole,
-      status: 'PENDING',
-      databaseSpreadsheetId: databaseSpreadsheetId || '',
-      driveFolderId,
-      invitationCode,
-      invitationUrl,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      syncStatus: 'PENDING_SYNC'
-    };
-
-    // 3. Compartir archivos
-    try {
-      const googleDriveRole = (assignedRole === 'VIEWER') ? 'reader' : 'writer';
-      // Compartir Sheet operacional
-      await shareFileOrFolderWithUser(token, databaseSpreadsheetId || '', email, googleDriveRole, `Has sido invitado a unirte a la familia de ${user?.displayName} en Paté Salud Familiar. Acepta desde la app.`);
-      // Compartir carpeta Drive familiar
-      await shareFileOrFolderWithUser(token, driveFolderId, email, googleDriveRole);
-    } catch (shareErr: any) {
-      console.error('Error sharing files with invited email:', shareErr);
-      alert(`Aviso: La invitación se creó pero no pudimos otorgar accesos en Drive. Detalles: ${shareErr.message}. Puedes reenviar la invitación más tarde.`);
-    }
-
-    // 4. Actualizar miembro familiar
-    const updatedMember: FamilyMember = {
-      ...member,
-      linkedEmail: email,
-      accessRole: assignedRole,
-      invitationStatus: 'PENDING',
-      invitationId,
-      permissionStatus: 'INVITED',
-      updatedAt: new Date().toISOString(),
-      syncStatus: 'PENDING_SYNC'
-    };
-
-    setInvitations(prev => [...prev, newInvitation]);
-    setMembers(prev => prev.map(m => m.id === memberId ? updatedMember : m));
-
-    // Registrar hito
-    const newEvent: MedicalHistoryEvent = {
-      id: `hist-${Date.now()}`,
-      memberId,
-      eventType: 'OTHER',
-      title: 'Invitación enviada',
-      description: `Invitación de acceso enviada a ${email} con el rol de ${assignedRole}.`,
-      eventDate: new Date().toISOString().split('T')[0],
-      createdAt: new Date().toISOString()
-    };
-    setHistory(prev => [newEvent, ...prev]);
-
-    // Sincronizar inmediatamente
-    setTimeout(() => syncNow(), 500);
-  };
-
-  const resendInvitation = async (invitationId: string) => {
-    if (activeRole !== 'OWNER') throw new Error('Solo el titular de la familia puede gestionar invitaciones.');
-    const token = await requestGoogleNativeToken();
-    if (!token) throw new Error('No se pudo obtener autorización de Google.');
-
-    const invite = invitations.find(i => i.id === invitationId);
-    if (!invite) throw new Error('Invitación no encontrada.');
-
-    try {
-      const googleDriveRole = (invite.role === 'VIEWER') ? 'reader' : 'writer';
-      await shareFileOrFolderWithUser(token, databaseSpreadsheetId || '', invite.invitedEmail, googleDriveRole, `Reenvío de invitación a unirte a la familia de ${user?.displayName} en Paté Salud Familiar.`);
-      await shareFileOrFolderWithUser(token, invite.driveFolderId, invite.invitedEmail, googleDriveRole);
-    } catch (shareErr: any) {
-      console.error('Error sharing files on resend:', shareErr);
-      throw new Error(`Fallo al otorgar permisos en Google Drive: ${shareErr.message}`);
-    }
-
-    const updatedInvite: FamilyInvitation = {
-      ...invite,
-      updatedAt: new Date().toISOString(),
-      syncStatus: 'PENDING_SYNC'
-    };
-
-    setInvitations(prev => prev.map(i => i.id === invitationId ? updatedInvite : i));
-    alert('Invitación reenviada correctamente.');
-    setTimeout(() => syncNow(), 500);
-  };
-
-  const revokeInvitation = async (invitationId: string) => {
-    if (activeRole !== 'OWNER') throw new Error('Solo el titular de la familia puede revocar accesos.');
-    const token = await requestGoogleNativeToken();
-    if (!token) throw new Error('No se pudo obtener autorización de Google.');
-
-    const invite = invitations.find(i => i.id === invitationId);
-    if (!invite) throw new Error('Invitación no encontrada.');
-
-    // 1. Quitar accesos en Google Sheets y Drive
-    try {
-      // Buscar permisos en Sheet
-      const sheetPerms = await listFilePermissions(token, databaseSpreadsheetId || '');
-      const sheetPerm = sheetPerms.find(p => p.emailAddress && p.emailAddress.toLowerCase() === invite.invitedEmail.toLowerCase());
-      if (sheetPerm) {
-        await revokeFileOrFolderPermission(token, databaseSpreadsheetId || '', sheetPerm.id);
-      }
-
-      // Buscar permisos en Carpeta Drive
-      const folderPerms = await listFilePermissions(token, invite.driveFolderId);
-      const folderPerm = folderPerms.find(p => p.emailAddress && p.emailAddress.toLowerCase() === invite.invitedEmail.toLowerCase());
-      if (folderPerm) {
-        await revokeFileOrFolderPermission(token, invite.driveFolderId, folderPerm.id);
-      }
-    } catch (revokeErr: any) {
-      console.error('Error revoking permissions from Drive/Sheets:', revokeErr);
-      alert(`Aviso: No se pudieron retirar los permisos en Google Drive/Sheets (${revokeErr.message}). Puede que el usuario conserve acceso. El estado en la app se marcará como revocado.`);
-    }
-
-    // 2. Actualizar invitación
-    const updatedInvite: FamilyInvitation = {
-      ...invite,
-      status: 'REVOKED',
-      revokedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      syncStatus: 'PENDING_SYNC'
-    };
-
-    // 3. Actualizar miembro
-    const member = members.find(m => m.id === invite.memberId);
-    if (member) {
-      const updatedMember: FamilyMember = {
-        ...member,
-        invitationStatus: 'REVOKED',
-        permissionStatus: 'NONE',
-        updatedAt: new Date().toISOString(),
-        syncStatus: 'PENDING_SYNC'
-      };
-      setMembers(prev => prev.map(m => m.id === invite.memberId ? updatedMember : m));
-    }
-
-    setInvitations(prev => prev.map(i => i.id === invitationId ? updatedInvite : i));
-
-    // Registrar hito
-    const newEvent: MedicalHistoryEvent = {
-      id: `hist-${Date.now()}`,
-      memberId: invite.memberId,
-      eventType: 'OTHER',
-      title: 'Acceso revocado',
-      description: `Se revocó el acceso de ${invite.invitedEmail} a la base familiar.`,
-      eventDate: new Date().toISOString().split('T')[0],
-      createdAt: new Date().toISOString()
-    };
-    setHistory(prev => [newEvent, ...prev]);
-
-    alert('Acceso revocado.');
-    setTimeout(() => syncNow(), 500);
-  };
-
-  const acceptInvitation = async (invitation: FamilyInvitation) => {
-    const token = await requestGoogleNativeToken();
-    if (!token) throw new Error('No se pudo obtener autorización de Google.');
-
-    // 1. Marcar invitación como aceptada
-    const acceptedInvite: FamilyInvitation = {
-      ...invitation,
-      status: 'ACCEPTED',
-      acceptedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      syncStatus: 'SYNCED'
-    };
-
-    // 2. Guardar config local del miembro
-    setSharedDatabaseSpreadsheetId(invitation.databaseSpreadsheetId);
-    setSharedDriveFolderId(invitation.driveFolderId);
-    setFamilyOwnerEmail(invitation.familyOwnerEmail);
-    setMemberId(invitation.memberId);
-    setRole(invitation.role);
-    
-    // Set active database spreadsheet ID
-    setDatabaseSpreadsheetId(invitation.databaseSpreadsheetId);
-    setDatabaseSpreadsheetUrl(`https://docs.google.com/spreadsheets/d/${invitation.databaseSpreadsheetId}`);
-
-    // 3. Pull de la base operacional del titular
-    await pullFromGoogleInternal(token, invitation.databaseSpreadsheetId);
-
-    // 4. Buscar y actualizar el miembro y la invitación en la base consolidada
-    setMembers(prev => prev.map(m => {
-      if (m.id === invitation.memberId) {
-        return {
-          ...m,
-          invitationStatus: 'ACCEPTED',
-          permissionStatus: 'ACTIVE',
-          lastAccessAt: new Date().toISOString(),
-          linkedEmail: invitation.invitedEmail,
-          updatedAt: new Date().toISOString(),
-          syncStatus: 'PENDING_SYNC'
-        };
-      }
-      return m;
-    }));
-
-    setInvitations(prev => {
-      const exists = prev.some(i => i.id === invitation.id);
-      if (exists) {
-        return prev.map(i => i.id === invitation.id ? acceptedInvite : i);
-      }
-      return [...prev, acceptedInvite];
-    });
-
-    setPendingInvitation(null);
-    alert('¡Invitación aceptada correctamente! Bienvenido a tu portal de salud familiar.');
-    
-    setTimeout(() => syncNow(), 500);
-  };
-
-  const rejectInvitation = async (invitation: FamilyInvitation) => {
-    setPendingInvitation(null);
-    alert('Invitación cancelada.');
-  };
-
   // ─── repairMemberDocuments ────────────────────────────────────────────────────
   const repairMemberDocuments = async (): Promise<void> => {
-    if (activeRole !== 'OWNER') {
-      alert('Operación restringida: Solo el titular de la familia puede ejecutar la reparación global de documentos.');
-      return;
-    }
     const token = await requestGoogleNativeToken();
     if (!token) throw new Error('No se pudo obtener autorización de Google.');
 
@@ -6143,22 +5595,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       revokeDocumentShare,
       generateAndShareMemberReport,
       revokeMemberReportShare,
-
-      // Shared database configuration states for invited members
-      sharedDatabaseSpreadsheetId,
-      sharedDriveFolderId,
-      familyOwnerEmail,
-      memberId,
-      role,
-      invitations,
-      pendingInvitation,
-
-      // Actions
-      createInvitation,
-      resendInvitation,
-      revokeInvitation,
-      acceptInvitation,
-      rejectInvitation,
 
       // Gmail Import Module Bindings
       emailSources,
