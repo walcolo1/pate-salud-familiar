@@ -127,6 +127,7 @@ export default function SettingsPage() {
     gmailStatus,
     appointmentCandidates,
     repairMemberDocuments,
+    updateDeviceFromGoogle,
     sessionLocked,
     sessionLockedAt,
     autoLockEnabled,
@@ -145,6 +146,7 @@ export default function SettingsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [isRepairing, setIsRepairing] = useState(false);
   const [isRepairingDocs, setIsRepairingDocs] = useState(false);
+  const [isUpdatingDevice, setIsUpdatingDevice] = useState(false);
   const [showLegal, setShowLegal] = useState(false);
   const [integrityReport, setIntegrityReport] = useState<any | null>(null);
   const [isCheckingIntegrity, setIsCheckingIntegrity] = useState(false);
@@ -1226,6 +1228,36 @@ export default function SettingsPage() {
                     <ShieldAlert className="h-3 w-3" />
                   )}
                   <span>Reparar documentos</span>
+                </button>
+              </div>
+
+              {/* Botón 3c: Actualizar este dispositivo desde Google */}
+              <div className="p-3 bg-teal-50 border border-teal-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                <div>
+                  <span className="font-extrabold text-teal-800 block text-[11px] mb-0.5">Actualizar desde Google</span>
+                  <p className="text-[9px] text-teal-600 leading-normal mb-2">Exporta un backup JSON local, hace pull y fusiona de forma segura sin borrar documentos.</p>
+                </div>
+                <button
+                  id="btn-update-device-from-google"
+                  onClick={async () => {
+                    setIsUpdatingDevice(true);
+                    try {
+                      await updateDeviceFromGoogle();
+                    } catch (err: any) {
+                      alert(`Error al actualizar el dispositivo: ${err.message}`);
+                    } finally {
+                      setIsUpdatingDevice(false);
+                    }
+                  }}
+                  disabled={opSyncStatus === 'syncing' || isUpdatingDevice || !databaseSpreadsheetId}
+                  className="py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
+                >
+                  {isUpdatingDevice ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Download className="h-3 w-3" />
+                  )}
+                  <span>Actualizar dispositivo</span>
                 </button>
               </div>
 

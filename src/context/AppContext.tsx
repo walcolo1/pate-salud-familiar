@@ -105,6 +105,90 @@ const sanitizeRemoteAppointment = (appt: any): MedicalAppointment => {
   };
 };
 
+export const MUST_PULL_BEFORE_PUSH_MS = 5 * 60 * 1000;
+
+export const mergeMemberSafely = (localMember: FamilyMember, remoteMember: FamilyMember): FamilyMember => {
+  const localUpdate = localMember.updatedAt ? new Date(localMember.updatedAt).getTime() : 0;
+  const remoteUpdate = remoteMember.updatedAt ? new Date(remoteMember.updatedAt).getTime() : 0;
+
+  // Determinar cuál es el base (última escritura gana)
+  let baseMember = remoteUpdate > localUpdate ? { ...remoteMember } : { ...localMember };
+
+  // Manejar eliminación lógica de forma explícita
+  const localDeleted = !!localMember.deletedAt || localMember.status === 'DELETED';
+  const remoteDeleted = !!remoteMember.deletedAt || remoteMember.status === 'DELETED';
+
+  if (localDeleted || remoteDeleted) {
+    const localDelTime = localMember.deletedAt ? new Date(localMember.deletedAt).getTime() : (localMember.status === 'DELETED' ? localUpdate : 0);
+    const remoteDelTime = remoteMember.deletedAt ? new Date(remoteMember.deletedAt).getTime() : (remoteMember.status === 'DELETED' ? remoteUpdate : 0);
+    
+    const maxDelTime = Math.max(localDelTime, remoteDelTime);
+    const maxUpdateTime = Math.max(localUpdate, remoteUpdate);
+    
+    if (maxDelTime >= maxUpdateTime || (localDeleted && !remoteDeleted && localUpdate >= remoteUpdate) || (remoteDeleted && !localDeleted && remoteUpdate >= localUpdate)) {
+      baseMember.status = 'DELETED';
+      baseMember.deletedAt = localDelTime > remoteDelTime ? (localMember.deletedAt || localMember.updatedAt) : (remoteMember.deletedAt || remoteMember.updatedAt);
+    }
+  }
+
+  // Proteger documentType y documentNumber:
+  const localDocNum = localMember.documentNumber?.trim();
+  const localDocType = localMember.documentType?.trim();
+  const remoteDocNum = remoteMember.documentNumber?.trim();
+  const remoteDocType = remoteMember.documentType?.trim();
+
+  const hasLocalDoc = !!(localDocNum && localDocNum !== '');
+  const hasRemoteDoc = !!(remoteDocNum && remoteDocNum !== '');
+
+  let finalDocNumber = baseMember.documentNumber;
+  let finalDocType = baseMember.documentType;
+
+  if (hasLocalDoc && !hasRemoteDoc) {
+    // Si local tiene documento y remoto viene vacío, conservar local.
+    finalDocNumber = localMember.documentNumber;
+    finalDocType = localMember.documentType;
+  } else if (hasRemoteDoc && !hasLocalDoc) {
+    // Si remoto tiene documento y local viene vacío, conservar remoto.
+    finalDocNumber = remoteMember.documentNumber;
+    finalDocType = remoteMember.documentType;
+  } else if (hasLocalDoc && hasRemoteDoc) {
+    if (localDocNum !== remoteDocNum) {
+      // Si ambos tienen documento diferente, gana el de updatedAt más reciente.
+      if (remoteUpdate > localUpdate) {
+        finalDocNumber = remoteMember.documentNumber;
+        finalDocType = remoteMember.documentType;
+      } else {
+        finalDocNumber = localMember.documentNumber;
+        finalDocType = localMember.documentType;
+      }
+    }
+  }
+
+  // Nunca sobrescribir documentType o documentNumber con null, undefined o ""
+  if (!finalDocNumber || finalDocNumber.trim() === '') {
+    if (hasLocalDoc) {
+      finalDocNumber = localMember.documentNumber;
+      finalDocType = localMember.documentType;
+    } else if (hasRemoteDoc) {
+      finalDocNumber = remoteMember.documentNumber;
+      finalDocType = remoteMember.documentType;
+    }
+  }
+
+  if (finalDocNumber && (!finalDocType || finalDocType.trim() === '')) {
+    if (localDocNum === finalDocNumber && localDocType) {
+      finalDocType = localMember.documentType;
+    } else if (remoteDocNum === finalDocNumber && remoteDocType) {
+      finalDocType = remoteMember.documentType;
+    }
+  }
+
+  baseMember.documentNumber = finalDocNumber;
+  baseMember.documentType = finalDocType;
+
+  return baseMember;
+};
+
 interface AppContextProps {
   user: UserAccount | null;
   familyGroup: FamilyGroup | null;
@@ -201,6 +285,7 @@ interface AppContextProps {
   pullFromGoogle: () => Promise<void>;
   pushToGoogle: () => Promise<void>;
   syncNow: () => Promise<void>;
+  updateDeviceFromGoogle: () => Promise<void>;
   repairGoogleNativeDatabase: () => Promise<void>;
   exportBackupJSON: () => void;
   postLoginGoogleSetup: () => Promise<void>;
@@ -1238,7 +1323,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ...member,
       id: newId,
       familyGroupId: 'family-001',
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      syncStatus: 'PENDING_SYNC'
     };
     setMembers((prev) => [...prev, newMember]);
 
@@ -1298,7 +1386,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           };
           setTimeout(() => setHistory(h => [newEvent, ...h]), 50);
         }
-        return { ...m, ...updatedFields };
+        return {
+          ...m,
+          ...updatedFields,
+          updatedAt: new Date().toISOString(),
+          syncStatus: 'PENDING_SYNC'
+        };
       }
       return m;
     }));
@@ -1342,7 +1435,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return false; 
     }
 
-    setMembers((prev) => prev.filter((m) => m.id !== id));
+    setMembers((prev) => prev.map((m) => {
+      if (m.id === id) {
+        return {
+          ...m,
+          status: 'DELETED',
+          deletedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          syncStatus: 'PENDING_SYNC'
+        };
+      }
+      return m;
+    }));
     
     const adminMember = members.find(m => m.relationship === 'SELF') || members[0];
     if (adminMember) {
@@ -1362,7 +1466,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const inactivateMember = (memberId: string) => {
-    setMembers(prev => prev.map(m => m.id === memberId ? { ...m, status: 'INACTIVE' } : m));
+    setMembers(prev => prev.map(m => m.id === memberId ? { 
+      ...m, 
+      status: 'INACTIVE',
+      updatedAt: new Date().toISOString(),
+      syncStatus: 'PENDING_SYNC'
+    } : m));
     
     const newEvent: MedicalHistoryEvent = {
       id: `hist-${Date.now()}`,
@@ -1378,7 +1487,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const reactivateMember = (memberId: string) => {
-    setMembers(prev => prev.map(m => m.id === memberId ? { ...m, status: 'ACTIVE' } : m));
+    setMembers(prev => prev.map(m => m.id === memberId ? { 
+      ...m, 
+      status: 'ACTIVE',
+      updatedAt: new Date().toISOString(),
+      syncStatus: 'PENDING_SYNC'
+    } : m));
     
     const newEvent: MedicalHistoryEvent = {
       id: `hist-${Date.now()}`,
@@ -3593,48 +3707,56 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           
           if (localIdx >= 0) {
             const localItem = merged[localIdx];
-            const localUpdate = localItem.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
-            const remoteUpdate = remoteItem.updatedAt ? new Date(remoteItem.updatedAt).getTime() : 0;
-
-            if (remoteUpdate > localUpdate) {
-              // Conflicto: Sobrescribir local si el remoto es más reciente
-              if (localItem.syncStatus === 'PENDING_SYNC') {
-                // Registrar conflicto en historia
-                const conflictLog: MedicalHistoryEvent = {
-                  id: `hist-conf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-                  memberId: (remoteItem as any).memberId || (localItem as any).memberId || 'family-owner',
-                  eventType: 'OTHER',
-                  title: 'Conflicto de sincronización resuelto',
-                  description: `Conflicto en tabla ${tableName} para ID: ${remoteItem.id} resuelto aplicando versión remota más reciente (LWW).`,
-                  eventDate: new Date().toISOString().split('T')[0],
-                  createdAt: new Date().toISOString()
-                };
-                setTimeout(() => setHistory(h => [conflictLog, ...h]), 50);
-              }
-              // Merge seguro: si el remoto trae campos de identidad vacíos pero el local los tiene, conservar locales
-              let merged_item = { ...remoteItem, syncStatus: 'SYNCED' } as T;
-              if (tableName === 'Miembros') {
-                const localDoc = (localItem as any).documentNumber;
-                const remoteDoc = (remoteItem as any).documentNumber;
-                const localDocType = (localItem as any).documentType;
-                const remoteDocType = (remoteItem as any).documentType;
-                if (localDoc && !remoteDoc) (merged_item as any).documentNumber = localDoc;
-                if (localDocType && !remoteDocType) (merged_item as any).documentType = localDocType;
-              }
-              merged[localIdx] = merged_item;
+            if (tableName === 'Miembros') {
+              // Fusionar miembros de forma segura usando el helper mergeMemberSafely
+              const localM = localItem as unknown as FamilyMember;
+              const remoteM = remoteItem as unknown as FamilyMember;
+              merged[localIdx] = mergeMemberSafely(localM, remoteM) as unknown as T;
             } else {
-              // El local es más reciente o igual, mantener local
-              merged[localIdx] = { ...localItem };
+              const localUpdate = localItem.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
+              const remoteUpdate = remoteItem.updatedAt ? new Date(remoteItem.updatedAt).getTime() : 0;
+
+              if (remoteUpdate > localUpdate) {
+                // Conflicto: Sobrescribir local si el remoto es más reciente
+                if (localItem.syncStatus === 'PENDING_SYNC') {
+                  // Registrar conflicto en historia
+                  const conflictLog: MedicalHistoryEvent = {
+                    id: `hist-conf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                    memberId: (remoteItem as any).memberId || (localItem as any).memberId || 'family-owner',
+                    eventType: 'OTHER',
+                    title: 'Conflicto de sincronización resuelto',
+                    description: `Conflicto en tabla ${tableName} para ID: ${remoteItem.id} resuelto aplicando versión remota más reciente (LWW).`,
+                    eventDate: new Date().toISOString().split('T')[0],
+                    createdAt: new Date().toISOString()
+                  };
+                  setTimeout(() => setHistory(h => [conflictLog, ...h]), 50);
+                }
+                merged[localIdx] = { ...remoteItem, syncStatus: 'SYNCED' } as T;
+              } else {
+                // El local es más reciente o igual, mantener local
+                merged[localIdx] = { ...localItem };
+              }
             }
           } else {
             // No existe localmente, agregar
-            if (!remoteItem.deletedAt) {
+            const isDeleted = remoteItem.deletedAt || (remoteItem as any).status === 'DELETED';
+            if (!isDeleted) {
               merged.push({ ...remoteItem, syncStatus: 'SYNCED' });
             }
           }
         });
 
-        return merged;
+        // Si se borró en Sheets manualmente, quitar del estado local aquellos items que estaban sincronizados
+        return merged.filter(localItem => {
+          if (localItem.syncStatus === 'LOCAL_ONLY' || localItem.syncStatus === 'PENDING_SYNC') {
+            return true;
+          }
+          if (localItem.deletedAt || (localItem as any).status === 'DELETED') {
+            return true;
+          }
+          const existsInRemote = remoteArray.some(r => r.id === localItem.id);
+          return existsInRemote;
+        });
       };
 
       // Fusión de tablas
@@ -3982,6 +4104,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Pull obligatorio antes de push
+    const now = Date.now();
+    const lastPullTime = lastPullAt ? new Date(lastPullAt).getTime() : 0;
+    const isStale = (now - lastPullTime) > MUST_PULL_BEFORE_PUSH_MS;
+
+    if (!lastPullAt || isStale) {
+      console.log('lastPullAt is missing or stale. Running syncNow (pull + safe merge + push) first.');
+      await syncNow();
+      return;
+    }
+
     // Regla: No hacer push si local está vacío y no se ha hecho pull en esta sesión (o nunca)
     if (!lastPullAt && members.length === 0) {
       if (window.confirm('No se han cargado datos desde Google en este dispositivo. Para evitar sobrescribir datos remotos, se realizará una sincronización completa primero. ¿Proceder?')) {
@@ -4043,42 +4176,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const localIdx = merged.findIndex(l => l.id === remoteItem.id);
           if (localIdx >= 0) {
             const localItem = merged[localIdx];
-            const localUpdate = localItem.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
-            const remoteUpdate = remoteItem.updatedAt ? new Date(remoteItem.updatedAt).getTime() : 0;
-            if (remoteUpdate > localUpdate) {
-              // Conflicto: Sobrescribir local si el remoto es más reciente
-              if (localItem.syncStatus === 'PENDING_SYNC') {
-                const conflictLog: MedicalHistoryEvent = {
-                  id: `hist-conf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-                  memberId: (remoteItem as any).memberId || (localItem as any).memberId || 'family-owner',
-                  eventType: 'OTHER',
-                  title: 'Conflicto de sincronización resuelto',
-                  description: `Conflicto en tabla ${tableName} para ID: ${remoteItem.id} resuelto aplicando versión remota más reciente (LWW).`,
-                  eventDate: new Date().toISOString().split('T')[0],
-                  createdAt: new Date().toISOString()
-                };
-                setTimeout(() => setHistory(h => [conflictLog, ...h]), 50);
-              }
-              // Merge seguro: conservar documentos de identidad locales si remoto los trae vacíos
-              let merged_item = { ...remoteItem, syncStatus: 'SYNCED' } as T;
-              if (tableName === 'Miembros') {
-                const localDoc = (localItem as any).documentNumber;
-                const remoteDoc = (remoteItem as any).documentNumber;
-                const localDocType = (localItem as any).documentType;
-                const remoteDocType = (remoteItem as any).documentType;
-                if (localDoc && !remoteDoc) (merged_item as any).documentNumber = localDoc;
-                if (localDocType && !remoteDocType) (merged_item as any).documentType = localDocType;
-              }
-              merged[localIdx] = merged_item;
+            if (tableName === 'Miembros') {
+              // Fusionar miembros de forma segura usando el helper mergeMemberSafely
+              const localM = localItem as unknown as FamilyMember;
+              const remoteM = remoteItem as unknown as FamilyMember;
+              merged[localIdx] = mergeMemberSafely(localM, remoteM) as unknown as T;
             } else {
-              // El local es igual o más reciente
-              merged[localIdx] = { ...localItem };
+              const localUpdate = localItem.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
+              const remoteUpdate = remoteItem.updatedAt ? new Date(remoteItem.updatedAt).getTime() : 0;
+              if (remoteUpdate > localUpdate) {
+                // Conflicto: Sobrescribir local si el remoto es más reciente
+                if (localItem.syncStatus === 'PENDING_SYNC') {
+                  const conflictLog: MedicalHistoryEvent = {
+                    id: `hist-conf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                    memberId: (remoteItem as any).memberId || (localItem as any).memberId || 'family-owner',
+                    eventType: 'OTHER',
+                    title: 'Conflicto de sincronización resuelto',
+                    description: `Conflicto en tabla ${tableName} para ID: ${remoteItem.id} resuelto aplicando versión remota más reciente (LWW).`,
+                    eventDate: new Date().toISOString().split('T')[0],
+                    createdAt: new Date().toISOString()
+                  };
+                  setTimeout(() => setHistory(h => [conflictLog, ...h]), 50);
+                }
+                merged[localIdx] = { ...remoteItem, syncStatus: 'SYNCED' } as T;
+              } else {
+                // El local es igual o más reciente
+                merged[localIdx] = { ...localItem };
+              }
             }
-          } else if (!remoteItem.deletedAt) {
-            merged.push({ ...remoteItem, syncStatus: 'SYNCED' });
+          } else {
+            // No existe localmente, agregar
+            const isDeleted = remoteItem.deletedAt || (remoteItem as any).status === 'DELETED';
+            if (!isDeleted) {
+              merged.push({ ...remoteItem, syncStatus: 'SYNCED' });
+            }
           }
         });
-        return merged;
+
+        // Si se borró en Sheets manualmente, quitar del estado local aquellos items que estaban sincronizados
+        return merged.filter(localItem => {
+          if (localItem.syncStatus === 'LOCAL_ONLY' || localItem.syncStatus === 'PENDING_SYNC') {
+            return true;
+          }
+          if (localItem.deletedAt || (localItem as any).status === 'DELETED') {
+            return true;
+          }
+          const existsInRemote = remoteArray.some(r => r.id === localItem.id);
+          return existsInRemote;
+        });
       };
 
       // Obtener estados actuales de las referencias (Refs) para evitar stale closures
@@ -5007,52 +5152,126 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setOpSyncError(null);
 
     try {
-      // Paso 1: Asegurar que las columnas documentType/documentNumber existan en Sheets
+      // 1. Asegurar cabeceras
       await migrateOperationalSheetHeaders(token, sheetId);
 
-      // Paso 2: Leer estado remoto actual
+      // 2. Leer miembros remotos
       const remoteState = await readAllOperationalTables(token, sheetId);
-      const remoteMembers: any[] = remoteState.Miembros || [];
+      const remoteMembers: FamilyMember[] = remoteState.Miembros || [];
 
-      // Paso 3: Cruzar local con remoto — si local tiene documento y remoto lo trae vacío, marcar PENDING_SYNC
-      const currentMembers = membersRef.current;
-      let repairedCount = 0;
+      // 1. Leer miembros locales
+      const currentMembers = [...membersRef.current];
+
+      // 3. Fusionar con mergeMemberSafely
+      // 4. Conservar documentos no vacíos
+      // 5. Respetar deletedAt
       const repairedMembers = currentMembers.map(localMember => {
         const remoteMember = remoteMembers.find(r => r.id === localMember.id);
-        let updated = { ...localMember };
-        let needsUpdate = false;
-
-        if (localMember.documentNumber && (!remoteMember || !remoteMember.documentNumber)) {
-          needsUpdate = true;
-        }
-        if (localMember.documentType && (!remoteMember || !remoteMember.documentType)) {
-          needsUpdate = true;
-        }
-
-        if (needsUpdate) {
-          updated = {
-            ...updated,
+        if (remoteMember) {
+          const merged = mergeMemberSafely(localMember, remoteMember);
+          return {
+            ...merged,
             syncStatus: 'PENDING_SYNC' as any,
             updatedAt: new Date().toISOString()
           };
-          repairedCount++;
         }
-        return updated;
+        return {
+          ...localMember,
+          syncStatus: 'PENDING_SYNC' as any,
+          updatedAt: new Date().toISOString()
+        };
+      });
+
+      // Asegurar que si hay remotos no presentes locales se integren (si no están borrados)
+      remoteMembers.forEach(remoteMember => {
+        const localExists = repairedMembers.some(m => m.id === remoteMember.id);
+        const isDeleted = remoteMember.deletedAt || remoteMember.status === 'DELETED';
+        if (!localExists && !isDeleted) {
+          repairedMembers.push({
+            ...remoteMember,
+            syncStatus: 'PENDING_SYNC' as any,
+            updatedAt: new Date().toISOString()
+          });
+        }
       });
 
       setMembers(repairedMembers);
+      membersRef.current = repairedMembers;
 
-      // Paso 4: Forzar sincronización completa para que los datos reparados suban a Sheets
+      // 6. Subir estado consolidado
       await syncNow();
 
-      setOpSyncStatus('synced');
-      alert(`✅ Reparación completada. ${repairedCount} miembro(s) reparado(s) y sincronizado(s) con Google Sheets.`);
+      // 7. Leer de vuelta desde Sheets
+      const verifiedRemoteState = await readAllOperationalTables(token, sheetId);
+      const verifiedRemoteMembers: FamilyMember[] = verifiedRemoteState.Miembros || [];
+
+      // 8. Confirmar que documentType y documentNumber permanecen
+      let verificationSuccess = true;
+      repairedMembers.forEach(rep => {
+        if (rep.status !== 'DELETED' && rep.documentNumber) {
+          const remoteRep = verifiedRemoteMembers.find(r => r.id === rep.id);
+          if (!remoteRep || remoteRep.documentNumber !== rep.documentNumber || remoteRep.documentType !== rep.documentType) {
+            verificationSuccess = false;
+            console.error(`Verification failed for member ${rep.fullName}: remote has ${remoteRep?.documentNumber} but expected ${rep.documentNumber}`);
+          }
+        }
+      });
+
+      if (verificationSuccess) {
+        setOpSyncStatus('synced');
+        alert('✅ Reparación completada con éxito. Se confirmaron los documentos en Google Sheets.');
+      } else {
+        throw new Error('La verificación falló. Algunos documentos no se guardaron correctamente en Google Sheets.');
+      }
     } catch (err: any) {
       console.error('repairMemberDocuments error:', err);
       setOpSyncStatus('error');
       setOpSyncError(err.message || 'Error en reparación de documentos de miembros.');
       throw err;
     }
+  };
+
+  const updateDeviceFromGoogle = async (): Promise<void> => {
+    // 1. Exportar backup local automático
+    exportState();
+
+    // 2. Hacer pull desde Google
+    const token = await requestGoogleNativeToken();
+    if (!token) throw new Error('No se pudo obtener autorización de Google.');
+
+    const sheetId = databaseSpreadsheetId;
+    if (!sheetId) throw new Error('No hay base de datos operacional configurada.');
+
+    // 5. No hacer push inmediato si hay conflictos críticos (advertir primero)
+    const remoteState = await readAllOperationalTables(token, sheetId);
+    const remoteMembers: FamilyMember[] = remoteState.Miembros || [];
+    const localMembers = membersRef.current;
+    
+    let criticalConflictFound = false;
+    let conflictDetails = '';
+
+    localMembers.forEach(localM => {
+      const remoteM = remoteMembers.find(r => r.id === localM.id);
+      if (remoteM) {
+        const localDoc = localM.documentNumber?.trim();
+        const remoteDoc = remoteM.documentNumber?.trim();
+        if (localDoc && remoteDoc && localDoc !== remoteDoc) {
+          criticalConflictFound = true;
+          conflictDetails += `\n- ${localM.fullName}: Local "${localDoc}", Remoto "${remoteDoc}"`;
+        }
+      }
+    });
+
+    if (criticalConflictFound) {
+      const proceed = window.confirm(
+        `⚠️ Conflicto crítico de documentos detectado:${conflictDetails}\n\nSe actualizarán los datos locales aplicando la versión más reciente, pero NO se subirán cambios a Google Sheets para evitar sobrescribir datos. ¿Deseas continuar?`
+      );
+      if (!proceed) return;
+    }
+
+    // 3. Fusionar con mergeMemberSafely
+    // 4. Actualizar LocalStorage local (se gatilla reactivamente al llamar setMembers en pullFromGoogleInternal)
+    await pullFromGoogleInternal(token, sheetId);
   };
 
   // ─── Session lock / inactivity ────────────────────────────────────────────────
@@ -5349,6 +5568,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pullFromGoogle,
       pushToGoogle,
       syncNow,
+      updateDeviceFromGoogle,
       repairGoogleNativeDatabase,
       exportBackupJSON,
       postLoginGoogleSetup,
