@@ -59,3 +59,17 @@ Desarrollo planificado de nuevas capacidades funcionales prioritarias:
 
 ### 8. Compartición de Cuenta y Multiusuario Avanzado
 - Permitir que múltiples cuentas de Google (ej: ambos padres) sincronicen de forma segura con la misma hoja de cálculo operacional compartida de Drive (`SaludFamiliar_OperationalDB`), estableciendo un canal colaborativo en tiempo real.
+
+---
+
+## 🔒 Seguridad y Limitaciones de la Arquitectura Descentralizada (Sin Backend)
+
+### Limitación de Seguridad Conocida
+> [!WARNING]
+> Como la aplicación funciona bajo una arquitectura **Google-native sin backend propio**, la restricción de acceso y filtros por rol (`MEMBER`, `CAREGIVER`, `VIEWER`) se aplican y controlan de forma **exclusiva en el cliente** (dentro de la aplicación web).
+>
+> Debido a que el Google Sheet operacional y la carpeta de Drive se comparten directamente con el correo del familiar invitado para que la app lea y escriba datos usando sus credenciales de Google:
+> 1. Si a un usuario con rol de `MEMBER` o `CAREGIVER` se le concede permiso de escritura en la app (rol `writer` en Google Drive), este técnicamente posee los privilegios necesarios para abrir la hoja de cálculo directamente desde la interfaz de **Google Sheets** o mediante APIs y ver/modificar datos de otros miembros sin pasar por las restricciones cliente de la app.
+> 2. El rol `VIEWER` es compartido como de solo lectura (`reader` en Google Drive), lo que previene modificaciones directas pero aún permite la lectura del archivo de Sheets completo fuera de la app.
+>
+> Para mitigar esto y lograr un control de seguridad fuerte por fila con autenticación blindada, la arquitectura futura migrará en próximas fases hacia un **backend centralizado con base de datos relacional y políticas RLS (Row Level Security)**, por ejemplo usando **Supabase**, desacoplando el acceso directo de los usuarios a las celdas de almacenamiento físico de la base de datos familiar.

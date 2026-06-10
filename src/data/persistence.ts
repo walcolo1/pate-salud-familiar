@@ -17,7 +17,8 @@ import {
   ImportedEmailAppointmentCandidate,
   MedicalOrder,
   MedicationPrescription,
-  MedicationDoseReminder
+  MedicationDoseReminder,
+  FamilyInvitation
 } from '../domain/models';
 
 export interface SavedAppState {
@@ -41,6 +42,12 @@ export interface SavedAppState {
   simulatedEmail?: string | null;
   databaseSpreadsheetId?: string | null;
   databaseSpreadsheetUrl?: string | null;
+  sharedDatabaseSpreadsheetId?: string | null;
+  sharedDriveFolderId?: string | null;
+  familyOwnerEmail?: string | null;
+  memberId?: string | null;
+  role?: 'OWNER' | 'MEMBER' | 'CAREGIVER' | 'VIEWER' | null;
+  invitations?: FamilyInvitation[];
   lastSyncAt?: string | null;
   lastPullAt?: string | null;
   lastPushAt?: string | null;

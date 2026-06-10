@@ -23,6 +23,9 @@ export default function OnboardingSetupPage() {
     isLoading,
     syncInitStatus,
     syncInitMessage,
+    pendingInvitation,
+    acceptInvitation,
+    rejectInvitation,
   } = useApp();
 
   const [setupStep, setSetupStep] = useState<'idle' | 'authorizing' | 'configuring' | 'success' | 'error'>('idle');
@@ -79,7 +82,72 @@ export default function OnboardingSetupPage() {
         </div>
 
         {/* Dynamic Setup Status View */}
-        {setupStep === 'idle' && (
+        {setupStep === 'idle' && pendingInvitation && (
+          <div className="flex flex-col gap-6">
+            <div className="bg-slate-800/40 p-5 rounded-2xl border border-slate-800/60 flex flex-col gap-4 text-sm leading-relaxed">
+              <div className="text-center">
+                <span className="bg-teal-500/10 text-teal-400 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase border border-teal-500/20">
+                  Invitación Familiar Pendiente
+                </span>
+              </div>
+              <p className="text-slate-300 font-semibold text-center mt-2 leading-snug">
+                <strong className="text-white">{pendingInvitation.familyOwnerName}</strong> ({pendingInvitation.familyOwnerEmail}) te ha invitado a unirte a su grupo familiar en Paté Salud Familiar.
+              </p>
+              
+              <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-800/50 flex flex-col gap-2 mt-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400 font-bold">Rol Asignado:</span>
+                  <span className="font-extrabold text-teal-400 uppercase bg-teal-950/40 px-2 py-0.5 rounded border border-teal-500/20">
+                    {pendingInvitation.role === 'OWNER' ? 'Titular' :
+                     pendingInvitation.role === 'MEMBER' ? 'Miembro Familiar' :
+                     pendingInvitation.role === 'CAREGIVER' ? 'Cuidador' : 'Visor'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400 font-bold">Familiar Vinculado:</span>
+                  <span className="text-white font-extrabold">{pendingInvitation.memberName}</span>
+                </div>
+              </div>
+              
+              <p className="text-[11px] text-slate-400 text-center">
+                Al aceptar, tendrás acceso a la base de datos familiar compartida por el titular y podrás administrar la información según tu rol.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={async () => {
+                  setErrorMsg(null);
+                  setSetupStep('configuring');
+                  try {
+                    await acceptInvitation(pendingInvitation);
+                    setSetupStep('success');
+                  } catch (err: any) {
+                    console.error(err);
+                    setSetupStep('error');
+                    setErrorMsg(err.message || 'Error al aceptar la invitación.');
+                  }
+                }}
+                className="h-14 w-full bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white font-extrabold text-sm rounded-2xl shadow-lg shadow-teal-500/10 active:translate-y-0.5 transition-all flex items-center justify-center gap-2"
+              >
+                <span>Aceptar invitación familiar</span>
+                <ArrowRight className="h-4.5 w-4.5" />
+              </button>
+              <button
+                onClick={async () => {
+                  if (window.confirm('¿Estás seguro de que deseas rechazar esta invitación? No podrás unirte a este grupo familiar.')) {
+                    await rejectInvitation(pendingInvitation);
+                  }
+                }}
+                className="h-12 w-full border border-slate-800 hover:bg-slate-800/50 text-slate-400 hover:text-slate-200 font-bold text-xs rounded-xl transition-all"
+              >
+                Rechazar y configurar mi propia cuenta
+              </button>
+            </div>
+          </div>
+        )}
+
+        {setupStep === 'idle' && !pendingInvitation && (
           <div className="flex flex-col gap-6">
             <div className="bg-slate-800/40 p-5 rounded-2xl border border-slate-800/60 flex flex-col gap-4 text-sm leading-relaxed">
               <p className="text-slate-300 font-medium text-center">
@@ -87,7 +155,7 @@ export default function OnboardingSetupPage() {
               </p>
               
               <div className="grid grid-cols-1 gap-3 mt-1">
-                <div className="flex items-start gap-3 p-3 bg-slate-950/40 rounded-xl border border-slate-900/50">
+                <div className="flex items-start gap-3 p-3 bg-slate-950/40 rounded-xl border border-slate-800/50">
                   <Database className="h-5 w-5 text-teal-400 shrink-0 mt-0.5" />
                   <div>
                     <h4 className="text-xs font-extrabold text-white">Google Drive y Sheets</h4>
@@ -95,7 +163,7 @@ export default function OnboardingSetupPage() {
                   </div>
                 </div>
                 
-                <div className="flex items-start gap-3 p-3 bg-slate-950/40 rounded-xl border border-slate-900/50">
+                <div className="flex items-start gap-3 p-3 bg-slate-950/40 rounded-xl border border-slate-800/50">
                   <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
                   <div>
                     <h4 className="text-xs font-extrabold text-white">Google Calendar</h4>

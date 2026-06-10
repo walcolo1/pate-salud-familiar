@@ -88,6 +88,9 @@ export default function SettingsPage() {
     importBackupJSON,
     sharedReports,
     revokeMemberReportShare,
+    invitations,
+    resendInvitation,
+    revokeInvitation,
     documents,
     revokeDocumentShare,
     syncInitStatus,
@@ -1185,51 +1188,55 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              {/* Botón 3: Reparar base Google-native */}
-              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                <div>
-                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reparar base Google-native</span>
-                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Reconstruye pestañas dañadas en Sheets y fuerza la subida local.</p>
-                </div>
-                <button
-                  id="btn-repair-database"
-                  onClick={() => repairGoogleNativeDatabase()}
-                  disabled={opSyncStatus === 'syncing' || isRepairing}
-                  className="py-2.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold rounded-xl transition-all border border-rose-100 flex items-center justify-center gap-1.5 w-full disabled:opacity-50 text-[10px]"
-                >
-                  {isRepairing ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <RotateCcw className="h-3 w-3" />
-                  )}
-                  <span>Reparar base</span>
-                </button>
-              </div>
+              {currentUserRole === 'FAMILY_ADMIN' && (
+                <>
+                  {/* Botón 3: Reparar base Google-native */}
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                    <div>
+                      <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reparar base Google-native</span>
+                      <p className="text-[9px] text-slate-400 leading-normal mb-2">Reconstruye pestañas dañadas en Sheets y fuerza la subida local.</p>
+                    </div>
+                    <button
+                      id="btn-repair-database"
+                      onClick={() => repairGoogleNativeDatabase()}
+                      disabled={opSyncStatus === 'syncing' || isRepairing}
+                      className="py-2.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold rounded-xl transition-all border border-rose-100 flex items-center justify-center gap-1.5 w-full disabled:opacity-50 text-[10px]"
+                    >
+                      {isRepairing ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RotateCcw className="h-3 w-3" />
+                      )}
+                      <span>Reparar base</span>
+                    </button>
+                  </div>
 
-              {/* Botón 3b: Reparar documentos de miembros */}
-              <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                <div>
-                  <span className="font-extrabold text-amber-800 block text-[11px] mb-0.5">Reparar documentos de miembros</span>
-                  <p className="text-[9px] text-amber-600 leading-normal mb-2">Detecta y restaura números de documento que hayan desaparecido al sincronizar con Google Sheets.</p>
-                </div>
-                <button
-                  id="btn-repair-member-docs"
-                  onClick={async () => {
-                    setIsRepairingDocs(true);
-                    try { await repairMemberDocuments(); } catch (_) {}
-                    finally { setIsRepairingDocs(false); }
-                  }}
-                  disabled={opSyncStatus === 'syncing' || isRepairingDocs || !databaseSpreadsheetId}
-                  className="py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
-                >
-                  {isRepairingDocs ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <ShieldAlert className="h-3 w-3" />
-                  )}
-                  <span>Reparar documentos</span>
-                </button>
-              </div>
+                  {/* Botón 3b: Reparar documentos de miembros */}
+                  <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                    <div>
+                      <span className="font-extrabold text-amber-800 block text-[11px] mb-0.5">Reparar documentos de miembros</span>
+                      <p className="text-[9px] text-amber-600 leading-normal mb-2">Detecta y restaura números de documento que hayan desaparecido al sincronizar con Google Sheets.</p>
+                    </div>
+                    <button
+                      id="btn-repair-member-docs"
+                      onClick={async () => {
+                        setIsRepairingDocs(true);
+                        try { await repairMemberDocuments(); } catch (_) {}
+                        finally { setIsRepairingDocs(false); }
+                      }}
+                      disabled={opSyncStatus === 'syncing' || isRepairingDocs || !databaseSpreadsheetId}
+                      className="py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
+                    >
+                      {isRepairingDocs ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <ShieldAlert className="h-3 w-3" />
+                      )}
+                      <span>Reparar documentos</span>
+                    </button>
+                  </div>
+                </>
+              )}
 
               {/* Botón 3c: Actualizar este dispositivo desde Google */}
               <div className="p-3 bg-teal-50 border border-teal-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
@@ -1261,53 +1268,57 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              {/* Botón 4: Crear base si no existe */}
-              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                <div>
-                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Crear base si no existe</span>
-                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Crea una base en blanco en tu Drive si no tienes ninguna.</p>
-                </div>
-                <button
-                  id="btn-create-database"
-                  onClick={() => createGoogleNativeDatabase()}
-                  disabled={opSyncStatus === 'syncing' || !!databaseSpreadsheetId}
-                  className="py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
-                >
-                  <span>Crear base</span>
-                </button>
-              </div>
+              {currentUserRole === 'FAMILY_ADMIN' && (
+                <>
+                  {/* Botón 4: Crear base si no existe */}
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                    <div>
+                      <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Crear base si no existe</span>
+                      <p className="text-[9px] text-slate-400 leading-normal mb-2">Crea una base en blanco en tu Drive si no tienes ninguna.</p>
+                    </div>
+                    <button
+                      id="btn-create-database"
+                      onClick={() => createGoogleNativeDatabase()}
+                      disabled={opSyncStatus === 'syncing' || !!databaseSpreadsheetId}
+                      className="py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
+                    >
+                      <span>Crear base</span>
+                    </button>
+                  </div>
 
-              {/* Botón 5: Descargar datos (Pull) */}
-              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                <div>
-                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Cargar desde Google</span>
-                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Sobrescribe el estado local con la versión de Google Sheets.</p>
-                </div>
-                <button
-                  id="btn-pull-google"
-                  onClick={() => pullFromGoogle()}
-                  disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
-                  className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
-                >
-                  <span>Cargar desde Google</span>
-                </button>
-              </div>
+                  {/* Botón 5: Descargar datos (Pull) */}
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                    <div>
+                      <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Cargar desde Google</span>
+                      <p className="text-[9px] text-slate-400 leading-normal mb-2">Sobrescribe el estado local con la versión de Google Sheets.</p>
+                    </div>
+                    <button
+                      id="btn-pull-google"
+                      onClick={() => pullFromGoogle()}
+                      disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
+                      className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
+                    >
+                      <span>Cargar desde Google</span>
+                    </button>
+                  </div>
 
-              {/* Botón 6: Enviar datos locales (Push) */}
-              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                <div>
-                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Subir cambios locales</span>
-                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Sube todos tus datos locales actuales a Google Sheets.</p>
-                </div>
-                <button
-                  id="btn-push-google"
-                  onClick={() => pushToGoogle()}
-                  disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
-                  className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
-                >
-                  <span>Subir cambios locales</span>
-                </button>
-              </div>
+                  {/* Botón 6: Enviar datos locales (Push) */}
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                    <div>
+                      <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Subir cambios locales</span>
+                      <p className="text-[9px] text-slate-400 leading-normal mb-2">Sube todos tus datos locales actuales a Google Sheets.</p>
+                    </div>
+                    <button
+                      id="btn-push-google"
+                      onClick={() => pushToGoogle()}
+                      disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
+                      className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
+                    >
+                      <span>Subir cambios locales</span>
+                    </button>
+                  </div>
+                </>
+              )}
 
             </div>
 
@@ -1342,211 +1353,294 @@ export default function SettingsPage() {
 
 
       {/* Compartición Google-native */}
-      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-        <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">Compartición Google-native</h4>
-        <hr className="border-slate-50" />
-        
-        <div className="bg-amber-50 p-3 rounded-2xl border border-amber-100 text-amber-700 text-[10px] leading-relaxed font-semibold">
-          <p className="font-extrabold mb-1">ℹ Resguardo de Privacidad:</p>
-          <p>La base operacional completa de tu familia <strong>NO se comparte automáticamente por seguridad</strong>. Solo se concede acceso a reportes clínicos individuales o documentos específicos que tú selecciones explícitamente.</p>
-        </div>
+      {currentUserRole === 'FAMILY_ADMIN' && (
+        <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
+          <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">Compartición Google-native</h4>
+          <hr className="border-slate-50" />
+          
+          <div className="bg-amber-50 p-3 rounded-2xl border border-amber-100 text-amber-700 text-[10px] leading-relaxed font-semibold">
+            <p className="font-extrabold mb-1">ℹ Resguardo de Privacidad:</p>
+            <p>La base operacional completa de tu familia <strong>NO se comparte automáticamente por seguridad</strong>. Solo se concede acceso a reportes clínicos individuales o documentos específicos que tú selecciones explícitamente.</p>
+          </div>
 
-        {/* Shared Reports list */}
-        <div className="flex flex-col gap-3">
-          <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide px-1">Reportes Clínicos Compartidos (Sheets)</span>
-          {sharedReports.length === 0 ? (
-            <p className="text-[10px] text-slate-400 font-semibold italic px-1">No hay reportes de cálculo Sheets compartidos actualmente.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {sharedReports.map((rep) => (
-                <div key={rep.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-semibold text-[10px]">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-extrabold text-slate-800">Reporte para {rep.memberName}</p>
-                    <p className="text-[9px] text-slate-400">Destinatario: {rep.sharedWithEmail}</p>
-                    <p className="text-[8px] text-slate-400 font-bold">Fecha: {new Date(rep.sharedAt).toLocaleDateString('es-CO')}</p>
-                    <span className={`inline-block w-fit text-[8px] font-black px-1.5 py-0.5 rounded uppercase mt-1 leading-none ${
-                      rep.shareStatus === 'SHARED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                    }`}>
-                      {rep.shareStatus === 'SHARED' ? 'Compartido' : 'Acceso Revocado'}
-                    </span>
-                  </div>
-                  {rep.shareStatus === 'SHARED' && (
-                    <div className="flex gap-2 shrink-0">
-                      <a 
-                        href={rep.spreadsheetUrl} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="bg-white border border-slate-200 text-slate-700 hover:text-teal-600 px-3 py-1.5 rounded-xl font-bold transition-all text-center flex items-center justify-center animate-none"
-                      >
-                        Abrir
-                      </a>
-                      <button
-                        onClick={async () => {
-                          try {
-                            await revokeMemberReportShare(rep.id);
-                          } catch (err: any) {
-                            alert(`Error al revocar: ${err.message}`);
-                          }
-                        }}
-                        className="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 px-3 py-1.5 rounded-xl font-bold transition-all text-center"
-                      >
-                        Revocar
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Shared Documents list */}
-        <div className="flex flex-col gap-3 mt-2">
-          <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide px-1">Documentos Clínicos Compartidos (Drive)</span>
-          {documents.filter(d => d.shareStatus === 'SHARED').length === 0 ? (
-            <p className="text-[10px] text-slate-400 font-semibold italic px-1">No hay PDFs o imágenes compartidos actualmente.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {documents
-                .filter(d => d.shareStatus === 'SHARED')
-                .map((doc) => (
-                  <div key={doc.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-semibold text-[10px]">
+          {/* Shared Reports list */}
+          <div className="flex flex-col gap-3">
+            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide px-1">Reportes Clínicos Compartidos (Sheets)</span>
+            {sharedReports.length === 0 ? (
+              <p className="text-[10px] text-slate-400 font-semibold italic px-1">No hay reportes de cálculo Sheets compartidos actualmente.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {sharedReports.map((rep) => (
+                  <div key={rep.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-semibold text-[10px]">
                     <div className="flex-1 min-w-0">
-                      <p className="font-extrabold text-slate-800 truncate">{doc.fileName}</p>
-                      <p className="text-[9px] text-slate-400">Destinatario: {doc.sharedWithEmail}</p>
-                      <p className="text-[8px] text-slate-400 font-bold">Fecha carga: {new Date(doc.uploadedAt).toLocaleDateString('es-CO')}</p>
+                      <p className="font-extrabold text-slate-800">Reporte para {rep.memberName}</p>
+                      <p className="text-[9px] text-slate-400">Destinatario: {rep.sharedWithEmail}</p>
+                      <p className="text-[8px] text-slate-400 font-bold">Fecha: {new Date(rep.sharedAt).toLocaleDateString('es-CO')}</p>
+                      <span className={`inline-block w-fit text-[8px] font-black px-1.5 py-0.5 rounded uppercase mt-1 leading-none ${
+                        rep.shareStatus === 'SHARED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                      }`}>
+                        {rep.shareStatus === 'SHARED' ? 'Compartido' : 'Acceso Revocado'}
+                      </span>
                     </div>
-                    <div className="flex gap-2 shrink-0">
-                      {doc.driveUrl && (
+                    {rep.shareStatus === 'SHARED' && (
+                      <div className="flex gap-2 shrink-0">
                         <a 
-                          href={doc.driveUrl} 
+                          href={rep.spreadsheetUrl} 
                           target="_blank" 
                           rel="noreferrer"
                           className="bg-white border border-slate-200 text-slate-700 hover:text-teal-600 px-3 py-1.5 rounded-xl font-bold transition-all text-center flex items-center justify-center animate-none"
                         >
                           Abrir
                         </a>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await revokeMemberReportShare(rep.id);
+                            } catch (err: any) {
+                              alert(`Error al revocar: ${err.message}`);
+                            }
+                          }}
+                          className="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 px-3 py-1.5 rounded-xl font-bold transition-all text-center"
+                        >
+                          Revocar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Shared Documents list */}
+          <div className="flex flex-col gap-3 mt-2">
+            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide px-1">Documentos Clínicos Compartidos (Drive)</span>
+            {documents.filter(d => d.shareStatus === 'SHARED').length === 0 ? (
+              <p className="text-[10px] text-slate-400 font-semibold italic px-1">No hay PDFs o imágenes compartidos actualmente.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {documents
+                  .filter(d => d.shareStatus === 'SHARED')
+                  .map((doc) => (
+                    <div key={doc.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-semibold text-[10px]">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-extrabold text-slate-800 truncate">{doc.fileName}</p>
+                        <p className="text-[9px] text-slate-400">Destinatario: {doc.sharedWithEmail}</p>
+                        <p className="text-[8px] text-slate-400 font-bold">Fecha carga: {new Date(doc.uploadedAt).toLocaleDateString('es-CO')}</p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        {doc.driveUrl && (
+                          <a 
+                            href={doc.driveUrl} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="bg-white border border-slate-200 text-slate-700 hover:text-teal-600 px-3 py-1.5 rounded-xl font-bold transition-all text-center flex items-center justify-center animate-none"
+                          >
+                            Abrir
+                          </a>
+                        )}
+                        <button
+                          onClick={async () => {
+                            try {
+                              await revokeDocumentShare(doc.id);
+                            } catch (err: any) {
+                              alert(`Error al revocar: ${err.message}`);
+                            }
+                          }}
+                          className="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 px-3 py-1.5 rounded-xl font-bold transition-all text-center"
+                        >
+                          Revocar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Miembros Invitados (Only for OWNERs / FAMILY_ADMIN) */}
+      {currentUserRole === 'FAMILY_ADMIN' && (
+        <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-teal-50 text-teal-600 rounded-xl">
+              <Mail className="h-5 w-5" />
+            </div>
+            <div>
+              <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">Miembros Invitados</h4>
+              <p className="text-[10px] text-slate-400 font-semibold leading-none mt-1">Gestiona las invitaciones de acceso enviadas a tus familiares.</p>
+            </div>
+          </div>
+          <hr className="border-slate-50" />
+          
+          <div className="flex flex-col gap-3">
+            {invitations.length === 0 ? (
+              <p className="text-[10px] text-slate-400 font-semibold italic px-1">No hay invitaciones familiares creadas.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {invitations.map((invite) => (
+                  <div key={invite.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-semibold text-[10px]">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-extrabold text-slate-800">{invite.memberName}</p>
+                      <p className="text-[9px] text-slate-400">Correo: {invite.invitedEmail}</p>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase">Rol: {invite.role}</p>
+                      <p className="text-[8px] text-slate-400 font-medium">Fecha de invitación: {new Date(invite.createdAt).toLocaleDateString('es-CO')}</p>
+                      <span className={`inline-block w-fit text-[8px] font-black px-1.5 py-0.5 rounded uppercase mt-1 leading-none ${
+                        invite.status === 'ACCEPTED' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                        invite.status === 'PENDING' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                        'bg-slate-100 text-slate-500 border border-slate-200'
+                      }`}>
+                        {invite.status === 'ACCEPTED' ? 'Aceptada' :
+                         invite.status === 'PENDING' ? 'Pendiente' :
+                         invite.status === 'REVOKED' ? 'Revocada' : 'Expirada'}
+                      </span>
+                    </div>
+
+                    <div className="flex gap-2 shrink-0">
+                      {invite.status === 'PENDING' && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              await resendInvitation(invite.id);
+                            } catch (err: any) {
+                              alert(`Error al reenviar: ${err.message}`);
+                            }
+                          }}
+                          className="bg-white border border-slate-200 text-slate-700 hover:text-amber-600 px-3 py-1.5 rounded-xl font-bold transition-all text-center"
+                        >
+                          Reenviar
+                        </button>
                       )}
-                      <button
-                        onClick={async () => {
-                          try {
-                            await revokeDocumentShare(doc.id);
-                          } catch (err: any) {
-                            alert(`Error al revocar: ${err.message}`);
-                          }
-                        }}
-                        className="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 px-3 py-1.5 rounded-xl font-bold transition-all text-center"
-                      >
-                        Revocar
-                      </button>
+                      {(invite.status === 'PENDING' || invite.status === 'ACCEPTED') && (
+                        <button
+                          onClick={async () => {
+                            if (window.confirm(`¿Estás seguro de que deseas revocar el acceso de ${invite.invitedEmail}?`)) {
+                              try {
+                                await revokeInvitation(invite.id);
+                              } catch (err: any) {
+                                alert(`Error al revocar: ${err.message}`);
+                              }
+                            }
+                          }}
+                          className="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 px-3 py-1.5 rounded-xl font-bold transition-all text-center"
+                        >
+                          Revocar
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
-            </div>
-          )}
-        </div>
-      </section>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Simulador de Permisos y Roles (Testing) */}
-      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-        <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">Simulador de Roles y Permisos (QA)</h4>
-        <hr className="border-slate-50" />
-        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3.5 font-semibold text-[10px] text-slate-500">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[9px] font-extrabold text-slate-600 uppercase">Rol del portal actual</label>
-            <select
-              value={simulatedRole || 'FAMILY_ADMIN'}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSimulatedRole(val === 'FAMILY_ADMIN' ? null : val as any);
-                alert(`Rol simulado cambiado a: ${val}. La app filtrará vistas correspondientes.`);
-              }}
-              className="h-10 px-3 bg-white border border-slate-200 focus:border-teal-500 rounded-xl text-xs font-semibold text-slate-900 outline-none text-slate-900"
-            >
-              <option value="FAMILY_ADMIN">Administrador Familiar (Completo)</option>
-              <option value="MEMBER_SELF">Miembro Familiar Propio (MEMBER_SELF)</option>
-              <option value="VIEWER">Visualizador (Viewer)</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[9px] font-extrabold text-slate-600 uppercase">Correo de simulación</label>
-            <div className="flex gap-2">
-              <input
-                type="email"
-                defaultValue={simulatedEmail || ''}
-                placeholder="Escribe el email del miembro habilitado..."
-                onBlur={(e) => {
+      {currentUserRole === 'FAMILY_ADMIN' && (
+        <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
+          <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">Simulador de Roles y Permisos (QA)</h4>
+          <hr className="border-slate-50" />
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3.5 font-semibold text-[10px] text-slate-500">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] font-extrabold text-slate-600 uppercase">Rol del portal actual</label>
+              <select
+                value={simulatedRole || 'FAMILY_ADMIN'}
+                onChange={(e) => {
                   const val = e.target.value;
-                  setSimulatedEmail(val.trim() || null);
+                  setSimulatedRole(val === 'FAMILY_ADMIN' ? null : val as any);
+                  alert(`Rol simulado cambiado a: ${val}. La app filtrará vistas correspondientes.`);
                 }}
-                className="flex-1 h-10 px-3 bg-white border border-slate-200 focus:border-teal-500 rounded-xl text-xs font-semibold text-slate-900 outline-none text-slate-900"
-              />
-              <button
-                type="button"
-                onClick={() => alert(`Correo de simulación establecido.`)}
-                className="h-10 px-4 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl transition-colors shrink-0"
+                className="h-10 px-3 bg-white border border-slate-200 focus:border-teal-500 rounded-xl text-xs font-semibold text-slate-900 outline-none text-slate-900"
               >
-                Aplicar
-              </button>
+                <option value="FAMILY_ADMIN">Administrador Familiar (Completo)</option>
+                <option value="MEMBER_SELF">Miembro Familiar Propio (MEMBER_SELF)</option>
+                <option value="VIEWER">Visualizador (Viewer)</option>
+              </select>
             </div>
-            <p className="text-[8px] text-slate-400 mt-0.5">
-              Si el correo coincide con un miembro activo que tiene habilitado el acceso, la app limitará su vista y permisos automáticamente al guardar los cambios o recargar la pestaña.
-            </p>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] font-extrabold text-slate-600 uppercase">Correo de simulación</label>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  defaultValue={simulatedEmail || ''}
+                  placeholder="Escribe el email del miembro habilitado..."
+                  onBlur={(e) => {
+                    const val = e.target.value;
+                    setSimulatedEmail(val.trim() || null);
+                  }}
+                  className="flex-1 h-10 px-3 bg-white border border-slate-200 focus:border-teal-500 rounded-xl text-xs font-semibold text-slate-900 outline-none text-slate-900"
+                />
+                <button
+                  type="button"
+                  onClick={() => alert(`Correo de simulación establecido.`)}
+                  className="h-10 px-4 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl transition-colors shrink-0"
+                >
+                  Aplicar
+                </button>
+              </div>
+              <p className="text-[8px] text-slate-400 mt-0.5">
+                Si el correo coincide con un miembro activo que tiene habilitado el acceso, la app limitará su vista y permisos automáticamente al guardar los cambios o recargar la pestaña.
+              </p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Retención de Historial Clínico */}
-      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-        <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">Retención y Depuración de Historial</h4>
-        <hr className="border-slate-50" />
-        
-        <div className="flex flex-col gap-3">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-rose-50 text-rose-600 rounded-xl shrink-0 mt-0.5">
-              <Clock className="h-4.5 w-4.5" />
-            </div>
-            <div>
-              <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Políticas de Depuración de Citas</h5>
-              <div className="text-[10px] text-slate-400 font-semibold leading-normal mt-1 space-y-1">
-                <p>• Citas completadas: Depuradas 2 años después de finalizar.</p>
-                <p>• Citas no completadas: Depuradas 1 año después del agendamiento.</p>
+      {currentUserRole === 'FAMILY_ADMIN' && (
+        <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
+          <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">Retención y Depuración de Historial</h4>
+          <hr className="border-slate-50" />
+          
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-rose-50 text-rose-600 rounded-xl shrink-0 mt-0.5">
+                <Clock className="h-4.5 w-4.5" />
+              </div>
+              <div>
+                <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Políticas de Depuración de Citas</h5>
+                <div className="text-[10px] text-slate-400 font-semibold leading-normal mt-1 space-y-1">
+                  <p>• Citas completadas: Depuradas 2 años después de finalizar.</p>
+                  <p>• Citas no completadas: Depuradas 1 año después del agendamiento.</p>
+                </div>
               </div>
             </div>
+
+            {/* Metrics list */}
+            <div className="grid grid-cols-3 gap-2.5 mt-1 select-none">
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
+                <span className="text-[8px] font-extrabold text-slate-400 uppercase leading-none">Citas Activas</span>
+                <strong className="text-sm font-black text-slate-700 leading-none mt-1">{activeApptsCount}</strong>
+              </div>
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
+                <span className="text-[8px] font-extrabold text-slate-400 uppercase leading-none">Depuradas</span>
+                <strong className="text-sm font-black text-slate-700 leading-none mt-1">{purgedApptsCount}</strong>
+              </div>
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
+                <span className="text-[8px] font-extrabold text-slate-400 uppercase leading-none">Elegibles</span>
+                <strong className={`text-sm font-black leading-none mt-1 ${eligibleCount > 0 ? 'text-amber-600 animate-pulse' : 'text-slate-700'}`}>{eligibleCount}</strong>
+              </div>
+            </div>
+
+            <p className="text-[9px] font-semibold leading-relaxed text-amber-600 bg-amber-50 p-2.5 rounded-xl border border-amber-100/60">
+              ⚠ Advertencia: La depuración de citas realiza un borrado lógico ocultando los registros del expediente. Los eventos en tu Google Calendar y archivos asociados en Drive <strong>no</strong> se borrarán. Te recomendamos exportar a Sheets o JSON antes de depurar.
+            </p>
+
+            <button
+              onClick={() => {
+                runAppointmentRetentionCleanup();
+                alert(`Limpieza de citas ejecutada con éxito. Se analizaron todos los registros.`);
+              }}
+              className="w-full h-10 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
+            >
+              <span>Ejecutar limpieza de historial</span>
+            </button>
           </div>
-
-          {/* Metrics list */}
-          <div className="grid grid-cols-3 gap-2.5 mt-1 select-none">
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
-              <span className="text-[8px] font-extrabold text-slate-400 uppercase leading-none">Citas Activas</span>
-              <strong className="text-sm font-black text-slate-700 leading-none mt-1">{activeApptsCount}</strong>
-            </div>
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
-              <span className="text-[8px] font-extrabold text-slate-400 uppercase leading-none">Depuradas</span>
-              <strong className="text-sm font-black text-slate-700 leading-none mt-1">{purgedApptsCount}</strong>
-            </div>
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
-              <span className="text-[8px] font-extrabold text-slate-400 uppercase leading-none">Elegibles</span>
-              <strong className={`text-sm font-black leading-none mt-1 ${eligibleCount > 0 ? 'text-amber-600 animate-pulse' : 'text-slate-700'}`}>{eligibleCount}</strong>
-            </div>
-          </div>
-
-          <p className="text-[9px] font-semibold leading-relaxed text-amber-600 bg-amber-50 p-2.5 rounded-xl border border-amber-100/60">
-            ⚠ Advertencia: La depuración de citas realiza un borrado lógico ocultando los registros del expediente. Los eventos en tu Google Calendar y archivos asociados en Drive <strong>no</strong> se borrarán. Te recomendamos exportar a Sheets o JSON antes de depurar.
-          </p>
-
-          <button
-            onClick={() => {
-              runAppointmentRetentionCleanup();
-              alert(`Limpieza de citas ejecutada con éxito. Se analizaron todos los registros.`);
-            }}
-            className="w-full h-10 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
-          >
-            <span>Ejecutar limpieza de historial</span>
-          </button>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Estado PWA / Instalación Offline */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
@@ -1585,129 +1679,131 @@ export default function SettingsPage() {
       </section>
 
       {/* Administración de Datos Local */}
-      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-        <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">Administración de Datos</h4>
-        <hr className="border-slate-50" />
-        
-        {/* Backup JSON */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-              <Download className="h-4.5 w-4.5" />
-            </div>
-            <div>
-              <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Copia de Seguridad</h5>
-              <p className="text-[10px] text-slate-400 font-semibold leading-none mt-1">Exporta o importa el expediente clínico familiar en JSON</p>
-            </div>
-          </div>
+      {currentUserRole === 'FAMILY_ADMIN' && (
+        <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
+          <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">Administración de Datos</h4>
+          <hr className="border-slate-50" />
           
-          <input
-            type="file"
-            id="import-backup-file-input"
-            accept=".json"
-            onChange={handleImportFileChange}
-            className="hidden"
-          />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-            <button
-              onClick={exportState}
-              className="h-10 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors border border-indigo-100 shadow-sm"
-            >
-              <Download className="h-4 w-4" />
-              <span>Exportar Copia (.json)</span>
-            </button>
-
-            <button
-              onClick={() => {
-                document.getElementById('import-backup-file-input')?.click();
-              }}
-              className="h-10 bg-white hover:bg-slate-50 text-indigo-750 font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors border border-indigo-100 shadow-sm"
-            >
-              <Download className="h-4 w-4 rotate-180" />
-              <span>Importar Copia (.json)</span>
-            </button>
-          </div>
-        </div>
-
-        <hr className="border-slate-50 my-1" />
-
-        {/* Database state tools */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-slate-100 text-slate-600 rounded-xl">
-              <Database className="h-4.5 w-4.5" />
+          {/* Backup JSON */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                <Download className="h-4.5 w-4.5" />
+              </div>
+              <div>
+                <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Copia de Seguridad</h5>
+                <p className="text-[10px] text-slate-400 font-semibold leading-none mt-1">Exporta o importa el expediente clínico familiar en JSON</p>
+              </div>
             </div>
-            <div>
-              <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Almacenamiento Local</h5>
-              <p className="text-[10px] text-slate-400 font-semibold leading-none mt-1">Restaura la demostración o limpia los datos locales</p>
+            
+            <input
+              type="file"
+              id="import-backup-file-input"
+              accept=".json"
+              onChange={handleImportFileChange}
+              className="hidden"
+            />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+              <button
+                onClick={exportState}
+                className="h-10 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-750 font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors border border-indigo-100 shadow-sm"
+              >
+                <Download className="h-4 w-4" />
+                <span>Exportar Copia (.json)</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  document.getElementById('import-backup-file-input')?.click();
+                }}
+                className="h-10 bg-white hover:bg-slate-50 text-indigo-750 font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors border border-indigo-100 shadow-sm"
+              >
+                <Download className="h-4 w-4 rotate-180" />
+                <span>Importar Copia (.json)</span>
+              </button>
             </div>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-1">
-            {user?.provider === 'mock' ? (
-              <>
-                <button
-                  onClick={() => {
-                    if (window.confirm('¿Estás seguro de que deseas restaurar la base de datos de demostración? Esto sobrescribirá todos tus cambios actuales.')) {
-                      restoreDemoData();
-                      alert('Base de datos demo restaurada con éxito.');
-                    }
-                  }}
-                  className="h-10 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-amber-100"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  <span>Restaurar Demo</span>
-                </button>
-                
-                <button
-                  onClick={() => {
-                    if (window.confirm('¿Estás seguro de que deseas eliminar los datos de demostración de este navegador?')) {
-                      clearDemoData();
-                      clearAllData();
-                      alert('Datos demo eliminados de este navegador.');
-                      router.push('/login');
-                    }
-                  }}
-                  className="h-10 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-rose-100"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Limpiar Datos Demo</span>
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => {
-                    if (window.confirm('¿Estás seguro de que deseas reiniciar tu cuenta en este navegador? Esto eliminará tus datos locales de esta cuenta pero conservará intactos tus archivos en Google Drive y Sheets.')) {
-                      clearAllData();
-                      alert('Datos locales de la cuenta reiniciados con éxito.');
-                      router.push('/login');
-                    }
-                  }}
-                  className="h-10 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-rose-100"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Reiniciar Cuenta Actual</span>
-                </button>
 
-                <button
-                  onClick={() => {
-                    if (window.confirm('¿Estás seguro de que deseas eliminar los datos demo de este navegador? Esto no afectará a tus datos reales.')) {
-                      clearDemoData();
-                      alert('Datos demo eliminados de este navegador con éxito.');
-                    }
-                  }}
-                  className="h-10 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-100"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  <span>Limpiar Datos Demo</span>
-                </button>
-              </>
-            )}
+          <hr className="border-slate-50 my-1" />
+
+          {/* Database state tools */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-slate-100 text-slate-600 rounded-xl">
+                <Database className="h-4.5 w-4.5" />
+              </div>
+              <div>
+                <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Almacenamiento Local</h5>
+                <p className="text-[10px] text-slate-400 font-semibold leading-none mt-1">Restaura la demostración o limpia los datos locales</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-1">
+              {user?.provider === 'mock' ? (
+                <>
+                  <button
+                    onClick={() => {
+                      if (window.confirm('¿Estás seguro de que deseas restaurar la base de datos de demostración? Esto sobrescribirá todos tus cambios activos.')) {
+                        restoreDemoData();
+                        alert('Base de datos demo restaurada con éxito.');
+                      }
+                    }}
+                    className="h-10 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-amber-100"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    <span>Restaurar Demo</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      if (window.confirm('¿Estás seguro de que deseas eliminar los datos de demostración de este navegador?')) {
+                        clearDemoData();
+                        clearAllData();
+                        alert('Datos demo eliminados de este navegador.');
+                        router.push('/login');
+                      }
+                    }}
+                    className="h-10 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-rose-100"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Limpiar Datos Demo</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      if (window.confirm('¿Estás seguro de que deseas reiniciar tu cuenta en este navegador? Esto eliminará tus datos locales de esta cuenta pero conservará intactos tus archivos en Google Drive y Sheets.')) {
+                        clearAllData();
+                        alert('Datos locales de la cuenta reiniciados con éxito.');
+                        router.push('/login');
+                      }
+                    }}
+                    className="h-10 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-rose-100"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Reiniciar Cuenta Actual</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (window.confirm('¿Estás seguro de que deseas eliminar los datos demo de este navegador? Esto no afectará a tus datos reales.')) {
+                        clearDemoData();
+                        alert('Datos demo eliminados de este navegador con éxito.');
+                      }
+                    }}
+                    className="h-10 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-100"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    <span>Limpiar Datos Demo</span>
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Security & privacy details */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-3">

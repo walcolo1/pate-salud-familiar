@@ -71,6 +71,11 @@ export interface FamilyMember {
   lastSyncedAt?: string | null;
   documentType?: MemberDocumentType | null;
   documentNumber?: string | null;
+  linkedEmail?: string | null;
+  accessRole?: 'OWNER' | 'MEMBER' | 'CAREGIVER' | 'VIEWER' | null;
+  invitationStatus?: 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED' | 'NONE' | null;
+  invitationId?: string | null;
+  lastAccessAt?: string | null;
 }
 
 export interface HealthProfile {
@@ -431,6 +436,28 @@ export interface DataIntegrityReport {
   errors: string[];
   warnings: string[];
   checkedAt: string;
+}
+
+export interface FamilyInvitation {
+  id: string;
+  familyOwnerEmail: string;
+  familyOwnerName: string;
+  memberId: string;
+  memberName: string;
+  invitedEmail: string;
+  role: 'OWNER' | 'MEMBER' | 'CAREGIVER' | 'VIEWER';
+  status: 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED';
+  databaseSpreadsheetId: string;
+  driveFolderId: string;
+  invitationCode: string;
+  invitationUrl: string;
+  createdAt: string;
+  acceptedAt?: string | null;
+  revokedAt?: string | null;
+  expiresAt?: string | null;
+  updatedAt: string;
+  syncStatus?: 'LOCAL_ONLY' | 'SYNCED' | 'PENDING_SYNC' | 'SYNC_ERROR' | null;
+  deletedAt?: string | null;
 }
 
 

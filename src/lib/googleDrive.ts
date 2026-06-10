@@ -105,10 +105,7 @@ async function createFolder(accessToken: string, name: string, parentId?: string
   return data.id;
 }
 
-/**
- * Returns folder ID if it exists, otherwise creates it.
- */
-async function getOrCreateFolder(accessToken: string, name: string, parentId?: string): Promise<string> {
+export async function getOrCreateFolder(accessToken: string, name: string, parentId?: string): Promise<string> {
   const existingId = await findFolder(accessToken, name, parentId);
   if (existingId) return existingId;
   return await createFolder(accessToken, name, parentId);
@@ -259,5 +256,120 @@ export async function revokeFileShare(
     const err = await res.json().catch(() => ({}));
     throw new Error(`Failed to revoke file share: ${err.error?.message || res.statusText}`);
   }
+}
+
+/**
+ * Shares a Google Drive file or folder with a specific user email.
+ * role can be 'writer' or 'reader'.
+ * message is an optional message sent in the notification email.
+ */
+export async function shareFileOrFolderWithUser(
+  accessToken: string,
+  fileId: string,
+  email: string,
+  role: 'writer' | 'reader',
+  message?: string
+): Promise<string> {
+  const sendEmail = !!message;
+  const url = `https://www.googleapis.com/drive/v3/files/${fileId}/permissions?sendNotificationEmail=${sendEmail}`;
+  const body: any = {
+    role,
+    type: 'user',
+    emailAddress: email,
+  };
+  if (message) {
+    body.emailMessage = message;
+  }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Failed to share file or folder: ${err.error?.message || res.statusText}`);
+  }
+
+  const data = await res.json();
+  return data.id; // Returns permission ID
+}
+
+/**
+ * Revokes a user's permission to access a Google Drive file or folder.
+ */
+export async function revokeFileOrFolderPermission(
+  accessToken: string,
+  fileId: string,
+  permissionId: string
+): Promise<void> {
+  return revokeFileShare(accessToken, fileId, permissionId);
+}
+
+export interface DrivePermission {
+  id: string;
+  role: string;
+  type: string;
+  emailAddress?: string;
+  displayName?: string;
+}
+
+/**
+ * Lists permissions for a given file or folder.
+ */
+export async function listFilePermissions(
+  accessToken: string,
+  fileId: string
+): Promise<DrivePermission[]> {
+  const url = `https://www.googleapis.com/drive/v3/files/${fileId}/permissions?fields=permissions(id,role,type,emailAddress,displayName)`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Failed to list permissions: ${err.error?.message || res.statusText}`);
+  }
+
+  const data = await res.json();
+  return data.permissions || [];
+}
+
+export interface SharedFileInfo {
+  id: string;
+  name: string;
+  owners?: {
+    displayName?: string;
+    emailAddress?: string;
+  }[];
+}
+
+/**
+ * Searches for operational spreadsheets shared with the current user.
+ */
+export async function searchSharedDatabases(
+  accessToken: string
+): Promise<SharedFileInfo[]> {
+  const query = `name contains 'Paté Salud Familiar - Base Operacional' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`;
+  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,owners(displayName,emailAddress))`;
+  
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Failed to search shared databases: ${err.error?.message || res.statusText}`);
+  }
+
+  const data = await res.json();
+  return data.files || [];
 }
 

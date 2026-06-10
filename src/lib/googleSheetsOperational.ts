@@ -14,7 +14,12 @@ export const OPERATIONAL_HEADERS = {
     'id', 'familyGroupId', 'fullName', 'birthDate', 'relationship', 'bloodType', 'photoUrl', 
     'notes', 'status', 'email', 'canAccessPortal', 'permissionStatus', 
     'ownerEmail', 'ownerGoogleId', 'sourceDeviceId', 'createdAt', 'updatedAt', 'deletedAt',
-    'documentType', 'documentNumber'
+    'documentType', 'documentNumber', 'linkedEmail', 'accessRole', 'invitationStatus', 'invitationId', 'lastAccessAt'
+  ],
+  InvitacionesFamiliares: [
+    'id', 'familyOwnerEmail', 'familyOwnerName', 'memberId', 'memberName', 'invitedEmail', 'role', 'status', 
+    'databaseSpreadsheetId', 'driveFolderId', 'invitationCode', 'invitationUrl', 
+    'createdAt', 'acceptedAt', 'revokedAt', 'expiresAt', 'updatedAt', 'syncStatus', 'deletedAt'
   ],
   Permisos: [
     'memberId', 'canManageOwnProfile', 'canManageOwnAppointments', 'canManageOwnDocuments', 
@@ -89,6 +94,7 @@ export const OPERATIONAL_TABS = {
   Usuarios: 'Usuarios',
   Familias: 'Familias',
   Miembros: 'Miembros',
+  InvitacionesFamiliares: 'Invitaciones Familiares',
   Permisos: 'Permisos',
   FichasMedicas: 'Fichas Médicas',
   Citas: 'Citas',
