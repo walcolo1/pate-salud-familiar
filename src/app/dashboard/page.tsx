@@ -15,7 +15,8 @@ import {
   ShieldAlert,
   ClipboardList,
   Pill,
-  AlertTriangle 
+  AlertTriangle,
+  Mail
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -385,6 +386,44 @@ export default function DashboardPage() {
             <span className="text-[10px] text-slate-400 font-semibold">Alarmas y tareas</span>
           </div>
         </Link>
+
+        {/* ── Gmail Import Card ── */}
+        {pendingCandidatesCount > 0 ? (
+          <Link
+            href="/appointments/import"
+            className="relative flex items-center gap-4 bg-amber-50 p-4 rounded-2xl border border-amber-200 shadow-sm hover:shadow-md hover:bg-amber-100/60 transition-all duration-200 col-span-2 md:col-span-1"
+          >
+            {/* Pulse badge */}
+            <div className="relative shrink-0">
+              <div className="p-3 bg-amber-100 text-amber-600 rounded-xl">
+                <Mail className="h-5 w-5" />
+              </div>
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white text-[9px] font-black leading-none shadow">
+                {pendingCandidatesCount > 9 ? '9+' : pendingCandidatesCount}
+              </span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-xs font-extrabold text-amber-800 leading-tight">Citas para importar</h4>
+              <span className="text-[10px] text-amber-600 font-semibold block truncate">
+                {pendingCandidatesCount} pendiente{pendingCandidatesCount !== 1 ? 's' : ''} de Gmail
+              </span>
+            </div>
+            <ArrowRight className="h-4 w-4 text-amber-500 shrink-0" />
+          </Link>
+        ) : (
+          <Link
+            href="/appointments/import"
+            className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200"
+          >
+            <div className="p-3 bg-violet-50 text-violet-600 rounded-xl">
+              <Mail className="h-5 w-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-extrabold text-slate-800 leading-tight">Importar citas</h4>
+              <span className="text-[10px] text-slate-400 font-semibold">Escanear Gmail</span>
+            </div>
+          </Link>
+        )}
       </section>
 
       {/* ── Dual Widgets Row ──────────────────────────────────────────────── */}
