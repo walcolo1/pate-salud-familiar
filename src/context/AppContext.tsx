@@ -1081,6 +1081,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ];
         setEmailSources(savedState.emailSources && savedState.emailSources.length > 0 ? savedState.emailSources : defaultSources);
         setAppointmentCandidates(savedState.appointmentCandidates || []);
+        // Gmail auto-scan config — must be loaded here or defaults overwrite LocalStorage on autosave
+        setGmailAutoScanEnabled(savedState.gmailAutoScanEnabled ?? false);
+        setGmailScanTime(savedState.gmailScanTime ?? '00:00');
+        setLastGmailScanAt(savedState.lastGmailScanAt ?? null);
+        setNextGmailScanAt(savedState.nextGmailScanAt ?? null);
+        setGmailScanRangeDays(savedState.gmailScanRangeDays ?? 90);
+        setGmailOnlyFutureAppointments(savedState.gmailOnlyFutureAppointments ?? true);
 
         setDatabaseSpreadsheetId(savedState.databaseSpreadsheetId || null);
         setDatabaseSpreadsheetUrl(savedState.databaseSpreadsheetUrl || null);
@@ -3524,6 +3531,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSharedReports(remoteConfig.permissionRefs.sharedReports);
       }
 
+      // Cargar configuración de escaneo automático de Gmail desde remoto,
+      // pero solo si el campo viene explícito (no undefined). Regla: remoto gana si trae valor; si no, conservar local.
+      if (remoteConfig.gmailAutoScanEnabled !== undefined && remoteConfig.gmailAutoScanEnabled !== null) {
+        setGmailAutoScanEnabled(remoteConfig.gmailAutoScanEnabled);
+      }
+      if (remoteConfig.gmailScanTime !== undefined && remoteConfig.gmailScanTime !== null) {
+        setGmailScanTime(remoteConfig.gmailScanTime);
+      }
+      if (remoteConfig.gmailScanRangeDays !== undefined && remoteConfig.gmailScanRangeDays !== null) {
+        setGmailScanRangeDays(remoteConfig.gmailScanRangeDays);
+      }
+      if (remoteConfig.gmailOnlyFutureAppointments !== undefined && remoteConfig.gmailOnlyFutureAppointments !== null) {
+        setGmailOnlyFutureAppointments(remoteConfig.gmailOnlyFutureAppointments);
+      }
+
       setSyncInitMessage('Base encontrada. Cargando datos desde Google...');
       await pullFromGoogleInternal(token, remoteSheetId);
 
@@ -3658,7 +3680,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         backupRefs: {},
         permissionRefs: {
           sharedReports: sharedReports
-        }
+        },
+        // Gmail auto-scan configuration (persisted remotely to survive device changes)
+        gmailAutoScanEnabled: gmailAutoScanEnabledRef.current,
+        gmailScanTime: gmailScanTimeRef.current,
+        gmailScanRangeDays: gmailScanRangeDaysRef.current,
+        gmailOnlyFutureAppointments: gmailOnlyFutureRef.current
       };
 
       const newConfigId = await writeConfigToAppData(token, newConfig, configId);
@@ -4562,7 +4589,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         backupRefs: {},
         permissionRefs: {
           sharedReports: sharedReports
-        }
+        },
+        // Gmail auto-scan configuration (persisted remotely to survive device changes)
+        gmailAutoScanEnabled: gmailAutoScanEnabledRef.current,
+        gmailScanTime: gmailScanTimeRef.current,
+        gmailScanRangeDays: gmailScanRangeDaysRef.current,
+        gmailOnlyFutureAppointments: gmailOnlyFutureRef.current
       };
 
       const newConfigId = await writeConfigToAppData(token, newConfig, configId || undefined);
@@ -4693,7 +4725,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         backupRefs: {},
         permissionRefs: {
           sharedReports: []
-        }
+        },
+        // Gmail auto-scan configuration (persisted remotely to survive device changes)
+        gmailAutoScanEnabled: gmailAutoScanEnabledRef.current,
+        gmailScanTime: gmailScanTimeRef.current,
+        gmailScanRangeDays: gmailScanRangeDaysRef.current,
+        gmailOnlyFutureAppointments: gmailOnlyFutureRef.current
       };
       
       const newConfigId = await writeConfigToAppData(token, newConfig);
