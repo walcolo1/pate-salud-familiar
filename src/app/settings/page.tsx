@@ -146,7 +146,8 @@ export default function SettingsPage() {
     isFirebaseBackend,
     invitations,
     createInvitation,
-    revokeInvitation
+    revokeInvitation,
+    testFirebaseConnection
   } = useApp();
 
   const [isExporting, setIsExporting] = useState(false);
@@ -2097,6 +2098,16 @@ export default function SettingsPage() {
           )}
         </div>
       </section>
+
+      {/* Dev Mode Firebase Health Check Button */}
+      {process.env.NODE_ENV === 'development' && isFirebaseBackend && (
+        <button
+          onClick={() => testFirebaseConnection()}
+          className="w-full h-12 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 border border-slate-700 transition-all duration-200 mb-4"
+        >
+          <span>🧪 Probar Conexión Firebase (Health Check)</span>
+        </button>
+      )}
 
       {/* Logout button */}
       <button

@@ -136,7 +136,16 @@ function requestGISToken(
       },
     });
 
-    client.requestAccessToken({ prompt: silent ? '' : 'select_account' });
+    if (silent) {
+      reject({ error: 'interaction_required', message: 'Silent token acquisition requires user interaction.' });
+      return;
+    }
+
+    try {
+      client.requestAccessToken({ prompt: 'select_account' });
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 

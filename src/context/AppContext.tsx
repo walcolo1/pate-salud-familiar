@@ -389,6 +389,7 @@ interface AppContextProps {
   revokeInvitation: (invitationId: string) => Promise<void>;
   createNewFamily: (name: string) => Promise<void>;
   checkPendingInvitations: () => Promise<FamilyInvitation[]>;
+  testFirebaseConnection: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -1080,10 +1081,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (isFirebaseBackend) {
         try {
           if (idToken) {
-            const { signInWithCredential, GoogleAuthProvider } = await import('firebase/auth');
-            const { firebaseAuth } = await import('../lib/firebase');
-            const credential = GoogleAuthProvider.credential(idToken);
-            await signInWithCredential(firebaseAuth, credential);
+            try {
+              const { signInWithCredential, GoogleAuthProvider } = await import('firebase/auth');
+              const { firebaseAuth } = await import('../lib/firebase');
+              const credential = GoogleAuthProvider.credential(idToken);
+              await signInWithCredential(firebaseAuth, credential);
+            } catch (authErr: any) {
+              console.error('[AppContext] Detailed Firebase Auth SDK login failed:', authErr);
+              alert('Error de configuración de Google/Firebase. Verifica el Client ID.');
+              setUser(null);
+              setActiveUser(null);
+              setIsLoading(false);
+              setSyncInitStatus('error');
+              setSyncInitMessage('Error de configuración de autenticación.');
+              return;
+            }
           }
 
           setUser(realUser);
@@ -1763,6 +1775,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       throw err;
     } finally {
       setIsLoading(false);
+    }
+  }, [user]);
+
+  const testFirebaseConnection = useCallback(async (): Promise<void> => {
+    const uid = user?.googleId ?? user?.id ?? '';
+    if (!uid) {
+      alert('Error: No hay un usuario autenticado.');
+      return;
+    }
+    const rawUid = uid.replace('user-', '');
+    try {
+      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const { db } = await import('../lib/firebase');
+      
+      const testRef = doc(db, 'test_connection', rawUid);
+      await setDoc(testRef, {
+        testedAt: serverTimestamp(),
+        status: 'OK',
+        uid: rawUid
+      });
+      alert('Conexión a Firebase OK y escritura exitosa');
+    } catch (err: any) {
+      console.error('[HealthCheck] Firebase test write failed:', err);
+      alert(`Error al escribir en Firebase: [${err.code || 'UNKNOWN'}] - ${err.message}`);
     }
   }, [user]);
 
@@ -6594,6 +6630,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       revokeInvitation,
       createNewFamily,
       checkPendingInvitations,
+      testFirebaseConnection,
     }}>
       {children}
     </AppContext.Provider>

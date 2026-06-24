@@ -182,7 +182,12 @@ service cloud.firestore {
       // ── Settings  (/families/{familyId}/settings/{doc}) ──────────────────
       match /settings/{document} {
         allow read:   if hasActiveAccess(familyId);
-        allow create: if canWriteFamily(familyId);
+        allow create: if isAuth() && (
+                        canWriteFamily(familyId)
+                        || (exists(/databases/$(database)/documents/families/$(familyId))
+                            && (get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid == request.auth.uid
+                                || get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid == 'user-' + request.auth.uid))
+                      );
         allow update: if canWriteFamily(familyId);
         allow delete: if false;
       }
@@ -193,7 +198,13 @@ service cloud.firestore {
 
         // OWNER and CAREGIVER can create new members.
         // MEMBER cannot create other members.
-        allow create: if canWriteFamily(familyId) && hasDeletedAtNull();
+        // Allows the family owner to create members during initialization (resolves chicken-and-egg access issues).
+        allow create: if isAuth() && (
+                        canWriteFamily(familyId)
+                        || (exists(/databases/$(database)/documents/families/$(familyId))
+                            && (get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid == request.auth.uid
+                                || get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid == 'user-' + request.auth.uid))
+                      ) && hasDeletedAtNull();
 
         // Any role that can write for this member can update them
         // (includes soft-delete updates that set deletedAt / status='DELETED').
@@ -207,7 +218,12 @@ service cloud.firestore {
       // Document ID equals memberId — one profile per member.
       match /healthProfiles/{memberId} {
         allow read:   if canReadMember(familyId, memberId);
-        allow create: if canWriteMember(familyId, memberId);
+        allow create: if isAuth() && (
+                        canWriteMember(familyId, memberId)
+                        || (exists(/databases/$(database)/documents/families/$(familyId))
+                            && (get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid == request.auth.uid
+                                || get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid == 'user-' + request.auth.uid))
+                      );
         allow update: if canWriteMember(familyId, memberId);
         allow delete: if false;
       }
@@ -286,8 +302,12 @@ service cloud.firestore {
       // ── Medical History  (/families/{familyId}/history/{historyId}) ───────
       match /history/{historyId} {
         allow read:   if canReadMember(familyId, resource.data.memberId);
-        allow create: if canWriteMember(familyId, request.resource.data.memberId)
-                      && hasDeletedAtNull();
+        allow create: if isAuth() && (
+                        canWriteMember(familyId, request.resource.data.memberId)
+                        || (exists(/databases/$(database)/documents/families/$(familyId))
+                            && (get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid == request.auth.uid
+                                || get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid == 'user-' + request.auth.uid))
+                      ) && hasDeletedAtNull();
         allow update: if canWriteMember(familyId, resource.data.memberId);
         allow delete: if false;
       }
@@ -385,6 +405,10 @@ service cloud.firestore {
       }
 
     } // end match /families/{familyId}
+
+    match /test_connection/{uid} {
+      allow read, write: if isAuth() && (request.auth.uid == uid || uid == 'user-' + request.auth.uid);
+    }
 
   } // end match /databases/{database}/documents
 } // end service cloud.firestore
