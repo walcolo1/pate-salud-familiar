@@ -53,14 +53,16 @@ service cloud.firestore {
     function getAccess(familyId) {
       return exists(/databases/$(database)/documents/users/$(request.auth.uid)/familyAccess/$(familyId))
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)/familyAccess/$(familyId)).data
-        : get(/databases/$(database)/documents/users/user-$(request.auth.uid)/familyAccess/$(familyId)).data;
+        : (exists(/databases/$(database)/documents/users/$("user-" + request.auth.uid)/familyAccess/$(familyId))
+            ? get(/databases/$(database)/documents/users/$("user-" + request.auth.uid)/familyAccess/$(familyId)).data
+            : {'role': 'NONE', 'status': 'INACTIVE', 'assignedMemberIds': [], 'memberId': null});
     }
 
     // Returns true if the user has an ACTIVE familyAccess record.
     function hasActiveAccess(familyId) {
       return isAuth()
         && (exists(/databases/$(database)/documents/users/$(request.auth.uid)/familyAccess/$(familyId))
-            || exists(/databases/$(database)/documents/users/user-$(request.auth.uid)/familyAccess/$(familyId)))
+            || exists(/databases/$(database)/documents/users/$("user-" + request.auth.uid)/familyAccess/$(familyId)))
         && getAccess(familyId).status == 'ACTIVE';
     }
 

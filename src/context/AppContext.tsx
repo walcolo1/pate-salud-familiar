@@ -381,6 +381,7 @@ interface AppContextProps {
   validateDataIntegrity: () => DataIntegrityReport;
   importBackupJSON: (data: SavedAppState) => void;
   isFirebaseBackend: boolean;
+  firebaseAuthReady: boolean;
   familyId: string | null;
   pendingInvitations: FamilyInvitation[];
   invitations: FamilyInvitation[];
@@ -397,6 +398,7 @@ const AppContext = createContext<AppContextProps | undefined>(undefined);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserAccount | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [firebaseAuthReady, setFirebaseAuthReady] = useState<boolean>(false);
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [healthProfiles, setHealthProfiles] = useState<Record<string, HealthProfile>>({});
   const [appointments, setAppointments] = useState<MedicalAppointment[]>([]);
@@ -978,6 +980,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
             // Cargar datos familiares desde Firestore
             try {
+              console.info(`[Instrumentación] operation: initFamily, authReady: false, firebaseAuth.currentUser?.uid: ${firebaseUser.uid}, user.id: user-${firebaseUser.uid}, user.googleId: ${firebaseUser.uid}, email: ${firebaseUser.email || ''}, path/query: users/${firebaseUser.uid}`);
               setSyncInitStatus('checking');
               setSyncInitMessage('Sincronizando con Firebase...');
               const repo = await getDataRepository();
@@ -991,6 +994,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               setFamilyId(fid);
 
               if (fid) {
+                console.info(`[Instrumentación] operation: loadAll, authReady: false, firebaseAuth.currentUser?.uid: ${firebaseUser.uid}, user.id: user-${firebaseUser.uid}, user.googleId: ${firebaseUser.uid}, email: ${firebaseUser.email || ''}, path/query: families/${fid}`);
                 const data = await repo.loadAll({
                   uid: firebaseUser.uid,
                   email: firebaseUser.email || '',
@@ -1033,7 +1037,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 setSyncInitMessage('Error al sincronizar con Firebase.');
               }
             } finally {
-              if (isMounted) setIsLoading(false);
+              if (isMounted) {
+                setIsLoading(false);
+                setFirebaseAuthReady(true);
+              }
             }
           } else {
             // // console.info('[AppContext] No Firebase Auth user.');
@@ -1042,7 +1049,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               setUser(null);
               clearAppState();
             }
-            if (isMounted) setIsLoading(false);
+            if (isMounted) {
+              setIsLoading(false);
+              setFirebaseAuthReady(true);
+            }
           }
         });
       } catch (err) {
@@ -1085,7 +1095,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               const { signInWithCredential, GoogleAuthProvider } = await import('firebase/auth');
               const { firebaseAuth } = await import('../lib/firebase');
               const credential = GoogleAuthProvider.credential(idToken);
-              await signInWithCredential(firebaseAuth, credential);
+              const userCredential = await signInWithCredential(firebaseAuth, credential);
+              if (userCredential.user) {
+                realUser.googleId = userCredential.user.uid;
+                realUser.id = `user-${userCredential.user.uid}`;
+              }
             } catch (authErr: any) {
               console.error('[AppContext] Detailed Firebase Auth SDK login failed:', authErr);
               alert('Error de configuración de Google/Firebase. Verifica el Client ID.');
@@ -1106,6 +1120,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const repo = await getDataRepository();
 
           // Resolve or create the Firestore family document.
+          console.info(`[Instrumentación] operation: initFamily, authReady: ${firebaseAuthReady}, firebaseAuth.currentUser?.uid: ${realUser.googleId}, user.id: ${realUser.id}, user.googleId: ${realUser.googleId}, email: ${realUser.email}, path/query: users/${realUser.googleId}`);
           const fid = await repo.initFamily({
             uid: realUser.googleId ?? realUser.id,
             email: realUser.email,
@@ -1115,6 +1130,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
           if (fid) {
             // Load all data from Firestore (returns EMPTY_FAMILY_DATA on first login).
+            console.info(`[Instrumentación] operation: loadAll, authReady: ${firebaseAuthReady}, firebaseAuth.currentUser?.uid: ${realUser.googleId}, user.id: ${realUser.id}, user.googleId: ${realUser.googleId}, email: ${realUser.email}, path/query: families/${fid}`);
             const data = await repo.loadAll({
               uid:      realUser.googleId ?? realUser.id,
               email:    realUser.email,
@@ -1200,6 +1216,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setUser(realUser);
         } finally {
           setIsLoading(false);
+          setFirebaseAuthReady(true);
         }
         return;
       }
@@ -1779,13 +1796,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const testFirebaseConnection = useCallback(async (): Promise<void> => {
-    const uid = user?.googleId ?? user?.id ?? '';
-    if (!uid) {
-      alert('Error: No hay un usuario autenticado.');
-      return;
-    }
-    const rawUid = uid.replace('user-', '');
     try {
+      const { firebaseAuth } = await import('../lib/firebase');
+      const authUid = firebaseAuth.currentUser?.uid;
+      
+      console.info(`[Instrumentación] operation: testFirebaseConnection, authReady: ${firebaseAuthReady}, firebaseAuth.currentUser?.uid: ${authUid || 'null'}, user.id: ${user?.id || 'null'}, user.googleId: ${user?.googleId || 'null'}, email: ${user?.email || 'null'}, path/query: test_connection/${authUid || 'null'}`);
+      
+      if (isFirebaseBackend) {
+        if (!firebaseAuthReady || !firebaseAuth.currentUser) {
+          alert('Error: Firebase Auth no está listo o no está autenticado.');
+          return;
+        }
+      }
+
+      const uid = authUid || (user?.googleId ?? user?.id ?? '');
+      if (!uid) {
+        alert('Error: No hay un usuario autenticado.');
+        return;
+      }
+      const rawUid = uid.replace('user-', '');
       const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
       const { db } = await import('../lib/firebase');
       
@@ -1800,9 +1829,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       console.error('[HealthCheck] Firebase test write failed:', err);
       alert(`Error al escribir en Firebase: [${err.code || 'UNKNOWN'}] - ${err.message}`);
     }
-  }, [user]);
+  }, [user, firebaseAuthReady]);
 
   const checkPendingInvitations = useCallback(async (): Promise<FamilyInvitation[]> => {
+    if (isFirebaseBackend) {
+      const { firebaseAuth } = await import('../lib/firebase');
+      console.info(`[Instrumentación] operation: checkPendingInvitations, authReady: ${firebaseAuthReady}, firebaseAuth.currentUser?.uid: ${firebaseAuth.currentUser?.uid || 'null'}, user.id: ${user?.id || 'null'}, user.googleId: ${user?.googleId || 'null'}, email: ${user?.email || 'null'}, path/query: collectionGroup(invitations).where(invitedEmail, ==, ${user?.email || 'null'})`);
+      if (!firebaseAuthReady || !firebaseAuth.currentUser || !user?.email) {
+        console.info('[Instrumentación] Bloqueando checkPendingInvitations: Auth no lista o usuario incompleto.');
+        return [];
+      }
+    }
     if (!user?.email) return [];
     try {
       const repo = await getDataRepository();
@@ -1813,7 +1850,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       console.error('[AppContext] Failed to get pending invitations:', err);
       return [];
     }
-  }, [user]);
+  }, [user, firebaseAuthReady]);
 
   // ── FUNCIONES DE AUTO-SYNC ────────────────────────────────────────────────
 
@@ -6455,6 +6492,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       driveSyncEnabled,
       calendarSyncEnabled,
       isLoading,
+      firebaseAuthReady,
       familyId,
       
       // Google Drive states

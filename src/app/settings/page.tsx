@@ -1356,15 +1356,20 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {!isFirebaseBackend && (
             <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                  <Database className="h-5 w-5" />
+                  {isFirebaseBackend ? <Cloud className="h-5 w-5" /> : <Database className="h-5 w-5" />}
                 </div>
                 <div>
-                  <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Acciones Manuales de Respaldo</h4>
-                  <p className="text-[10px] text-slate-400 font-semibold">Ejecuta operaciones de respaldo secundarias para resolver conflictos.</p>
+                  <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">
+                    {isFirebaseBackend ? "Conexión de Servicios de Google" : "Acciones Manuales de Respaldo"}
+                  </h4>
+                  <p className="text-[10px] text-slate-400 font-semibold">
+                    {isFirebaseBackend 
+                      ? "Administra la conexión con tu cuenta de Google para Drive, Calendar y Gmail."
+                      : "Ejecuta operaciones de respaldo secundarias para resolver conflictos."}
+                  </p>
                 </div>
               </div>
 
@@ -1373,31 +1378,37 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                 
                 {/* Botón 1: Sincronizar Ahora */}
-                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                  <div>
-                    <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Sincronizar ahora</span>
-                    <p className="text-[9px] text-slate-400 leading-normal mb-2">Descarga cambios de la nube y sube tus cambios pendientes.</p>
+                {!isFirebaseBackend && (
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                    <div>
+                      <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Sincronizar ahora</span>
+                      <p className="text-[9px] text-slate-400 leading-normal mb-2">Descarga cambios de la nube y sube tus cambios pendientes.</p>
+                    </div>
+                    <button
+                      id="btn-sync-now"
+                      onClick={() => syncNow()}
+                      disabled={opSyncStatus === 'syncing' || needsGoogleAuth}
+                      className="py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 w-full text-[10px]"
+                    >
+                      {opSyncStatus === 'syncing' ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3" />
+                      )}
+                      <span>Sincronizar ahora</span>
+                    </button>
                   </div>
-                  <button
-                    id="btn-sync-now"
-                    onClick={() => syncNow()}
-                    disabled={opSyncStatus === 'syncing' || needsGoogleAuth}
-                    className="py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 w-full text-[10px]"
-                  >
-                    {opSyncStatus === 'syncing' ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-3 w-3" />
-                    )}
-                    <span>Sincronizar ahora</span>
-                  </button>
-                </div>
+                )}
 
                 {/* Botón 2: Reconectar Google */}
                 <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                   <div>
                     <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reconectar Google</span>
-                    <p className="text-[9px] text-slate-400 leading-normal mb-2">Solicita y renueva el token global abriendo la ventana de Google.</p>
+                    <p className="text-[9px] text-slate-400 leading-normal mb-2">
+                      {isFirebaseBackend 
+                        ? "Renueva los permisos de Google Drive, Calendar y Gmail si expiran."
+                        : "Solicita y renueva el token global abriendo la ventana de Google."}
+                    </p>
                   </div>
                   <button
                     id="btn-reconnect-google"
@@ -1410,128 +1421,140 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Botón 3: Reparar base Google-native */}
-                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                  <div>
-                    <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reparar base Google-native</span>
-                    <p className="text-[9px] text-slate-400 leading-normal mb-2">Reconstruye pestañas dañadas en Sheets y fuerza la subida local.</p>
+                {!isFirebaseBackend && (
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                    <div>
+                      <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reparar base Google-native</span>
+                      <p className="text-[9px] text-slate-400 leading-normal mb-2">Reconstruye pestañas dañadas en Sheets y fuerza la subida local.</p>
+                    </div>
+                    <button
+                      id="btn-repair-database"
+                      onClick={() => repairGoogleNativeDatabase()}
+                      disabled={opSyncStatus === 'syncing' || isRepairing}
+                      className="py-2.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold rounded-xl transition-all border border-rose-100 flex items-center justify-center gap-1.5 w-full disabled:opacity-50 text-[10px]"
+                    >
+                      {isRepairing ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RotateCcw className="h-3 w-3" />
+                      )}
+                      <span>Reparar base</span>
+                    </button>
                   </div>
-                  <button
-                    id="btn-repair-database"
-                    onClick={() => repairGoogleNativeDatabase()}
-                    disabled={opSyncStatus === 'syncing' || isRepairing}
-                    className="py-2.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold rounded-xl transition-all border border-rose-100 flex items-center justify-center gap-1.5 w-full disabled:opacity-50 text-[10px]"
-                  >
-                    {isRepairing ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <RotateCcw className="h-3 w-3" />
-                    )}
-                    <span>Reparar base</span>
-                  </button>
-                </div>
+                )}
 
                 {/* Botón 3b: Reparar documentos de miembros */}
-                <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                  <div>
-                    <span className="font-extrabold text-amber-800 block text-[11px] mb-0.5">Reparar documentos de miembros</span>
-                    <p className="text-[9px] text-amber-600 leading-normal mb-2">Detecta y restaura números de documento que hayan desaparecido al sincronizar con Google Sheets.</p>
+                {!isFirebaseBackend && (
+                  <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                    <div>
+                      <span className="font-extrabold text-amber-800 block text-[11px] mb-0.5">Reparar documentos de miembros</span>
+                      <p className="text-[9px] text-amber-600 leading-normal mb-2">Detecta y restaura números de documento que hayan desaparecido al sincronizar con Google Sheets.</p>
+                    </div>
+                    <button
+                      id="btn-repair-member-docs"
+                      onClick={async () => {
+                        setIsRepairingDocs(true);
+                        try { await repairMemberDocuments(); } catch (_) {}
+                        finally { setIsRepairingDocs(false); }
+                      }}
+                      disabled={opSyncStatus === 'syncing' || isRepairingDocs || !databaseSpreadsheetId}
+                      className="py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
+                    >
+                      {isRepairingDocs ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <ShieldAlert className="h-3 w-3" />
+                      )}
+                      <span>Reparar documentos</span>
+                    </button>
                   </div>
-                  <button
-                    id="btn-repair-member-docs"
-                    onClick={async () => {
-                      setIsRepairingDocs(true);
-                      try { await repairMemberDocuments(); } catch (_) {}
-                      finally { setIsRepairingDocs(false); }
-                    }}
-                    disabled={opSyncStatus === 'syncing' || isRepairingDocs || !databaseSpreadsheetId}
-                    className="py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
-                  >
-                    {isRepairingDocs ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <ShieldAlert className="h-3 w-3" />
-                    )}
-                    <span>Reparar documentos</span>
-                  </button>
-                </div>
+                )}
 
                 {/* Botón 3c: Actualizar este dispositivo desde Google */}
-                <div className="p-3 bg-teal-50 border border-teal-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                  <div>
-                    <span className="font-extrabold text-teal-800 block text-[11px] mb-0.5">Actualizar desde Google</span>
-                    <p className="text-[9px] text-teal-600 leading-normal mb-2">Exporta un backup JSON local, hace pull y fusiona de forma segura sin borrar documentos.</p>
+                {!isFirebaseBackend && (
+                  <div className="p-3 bg-teal-50 border border-teal-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                    <div>
+                      <span className="font-extrabold text-teal-800 block text-[11px] mb-0.5">Actualizar desde Google</span>
+                      <p className="text-[9px] text-teal-600 leading-normal mb-2">Exporta un backup JSON local, hace pull y fusiona de forma segura sin borrar documentos.</p>
+                    </div>
+                    <button
+                      id="btn-update-device-from-google"
+                      onClick={async () => {
+                        setIsUpdatingDevice(true);
+                        try {
+                          await updateDeviceFromGoogle();
+                        } catch (err: any) {
+                          alert(`Error al actualizar el dispositivo: ${err.message}`);
+                        } finally {
+                          setIsUpdatingDevice(false);
+                        }
+                      }}
+                      disabled={opSyncStatus === 'syncing' || isUpdatingDevice || !databaseSpreadsheetId}
+                      className="py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
+                    >
+                      {isUpdatingDevice ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Download className="h-3 w-3" />
+                      )}
+                      <span>Actualizar dispositivo</span>
+                    </button>
                   </div>
-                  <button
-                    id="btn-update-device-from-google"
-                    onClick={async () => {
-                      setIsUpdatingDevice(true);
-                      try {
-                        await updateDeviceFromGoogle();
-                      } catch (err: any) {
-                        alert(`Error al actualizar el dispositivo: ${err.message}`);
-                      } finally {
-                        setIsUpdatingDevice(false);
-                      }
-                    }}
-                    disabled={opSyncStatus === 'syncing' || isUpdatingDevice || !databaseSpreadsheetId}
-                    className="py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
-                  >
-                    {isUpdatingDevice ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Download className="h-3 w-3" />
-                    )}
-                    <span>Actualizar dispositivo</span>
-                  </button>
-                </div>
+                )}
 
                 {/* Botón 4: Crear base si no existe */}
-                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                  <div>
-                    <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Crear base si no existe</span>
-                    <p className="text-[9px] text-slate-400 leading-normal mb-2">Crea una base en blanco en tu Drive si no tienes ninguna.</p>
+                {!isFirebaseBackend && (
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                    <div>
+                      <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Crear base si no existe</span>
+                      <p className="text-[9px] text-slate-400 leading-normal mb-2">Crea una base en blanco en tu Drive si no tienes ninguna.</p>
+                    </div>
+                    <button
+                      id="btn-create-database"
+                      onClick={() => createGoogleNativeDatabase()}
+                      disabled={opSyncStatus === 'syncing' || !!databaseSpreadsheetId}
+                      className="py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
+                    >
+                      <span>Crear base</span>
+                    </button>
                   </div>
-                  <button
-                    id="btn-create-database"
-                    onClick={() => createGoogleNativeDatabase()}
-                    disabled={opSyncStatus === 'syncing' || !!databaseSpreadsheetId}
-                    className="py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
-                  >
-                    <span>Crear base</span>
-                  </button>
-                </div>
+                )}
 
                 {/* Botón 5: Descargar datos (Pull) */}
-                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                  <div>
-                    <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Cargar desde Google</span>
-                    <p className="text-[9px] text-slate-400 leading-normal mb-2">Sobrescribe el estado local con la versión de Google Sheets.</p>
+                {!isFirebaseBackend && (
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                    <div>
+                      <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Cargar desde Google</span>
+                      <p className="text-[9px] text-slate-400 leading-normal mb-2">Sobrescribe el estado local con la versión de Google Sheets.</p>
+                    </div>
+                    <button
+                      id="btn-pull-google"
+                      onClick={() => pullFromGoogle()}
+                      disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
+                      className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
+                    >
+                      <span>Cargar desde Google</span>
+                    </button>
                   </div>
-                  <button
-                    id="btn-pull-google"
-                    onClick={() => pullFromGoogle()}
-                    disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
-                    className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
-                  >
-                    <span>Cargar desde Google</span>
-                  </button>
-                </div>
+                )}
 
                 {/* Botón 6: Enviar datos locales (Push) */}
-                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                  <div>
-                    <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Subir cambios locales</span>
-                    <p className="text-[9px] text-slate-400 leading-normal mb-2">Sube todos tus datos locales actuales a Google Sheets.</p>
+                {!isFirebaseBackend && (
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                    <div>
+                      <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Subir cambios locales</span>
+                      <p className="text-[9px] text-slate-400 leading-normal mb-2">Sube todos tus datos locales actuales a Google Sheets.</p>
+                    </div>
+                    <button
+                      id="btn-push-google"
+                      onClick={() => pushToGoogle()}
+                      disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
+                      className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
+                    >
+                      <span>Subir cambios locales</span>
+                    </button>
                   </div>
-                  <button
-                    id="btn-push-google"
-                    onClick={() => pushToGoogle()}
-                    disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
-                    className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
-                  >
-                    <span>Subir cambios locales</span>
-                  </button>
-                </div>
+                )}
 
               </div>
 
@@ -1561,19 +1584,24 @@ export default function SettingsPage() {
                 </div>
               )}
             </section>
-          )}
         </div>
       )}
 
 
       {/* Compartición Google-native */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-        <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">Compartición Google-native</h4>
+        <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">
+          {isFirebaseBackend ? "Compartición de Archivos (Drive)" : "Compartición Google-native"}
+        </h4>
         <hr className="border-slate-50" />
         
         <div className="bg-amber-50 p-3 rounded-2xl border border-amber-100 text-amber-700 text-[10px] leading-relaxed font-semibold">
           <p className="font-extrabold mb-1">ℹ Resguardo de Privacidad:</p>
-          <p>La base operacional completa de tu familia <strong>NO se comparte automáticamente por seguridad</strong>. Solo se concede acceso a reportes clínicos individuales o documentos específicos que tú selecciones explícitamente.</p>
+          {isFirebaseBackend ? (
+            <p>La base de datos de tu familia se comparte de forma segura y automática con los miembros autorizados en tu grupo familiar. Los archivos físicos (PDFs/imágenes) almacenados en Google Drive solo se comparten con destinatarios explícitos.</p>
+          ) : (
+            <p>La base operacional completa de tu familia <strong>NO se comparte automáticamente por seguridad</strong>. Solo se concede acceso a reportes clínicos individuales o documentos específicos que tú selecciones explícitamente.</p>
+          )}
         </div>
 
         {/* Shared Reports list */}
@@ -1760,7 +1788,11 @@ export default function SettingsPage() {
           </div>
 
           <p className="text-[9px] font-semibold leading-relaxed text-amber-600 bg-amber-50 p-2.5 rounded-xl border border-amber-100/60">
-            ⚠ Advertencia: La depuración de citas realiza un borrado lógico ocultando los registros del expediente. Los eventos en tu Google Calendar y archivos asociados en Drive <strong>no</strong> se borrarán. Te recomendamos exportar a Sheets o JSON antes de depurar.
+            {isFirebaseBackend ? (
+              <span>⚠ Advertencia: La depuración de citas realiza un borrado lógico ocultando los registros del expediente. Los eventos en tu Google Calendar y archivos asociados en Drive <strong>no</strong> se borrarán. Te recomendamos exportar a JSON antes de depurar.</span>
+            ) : (
+              <span>⚠ Advertencia: La depuración de citas realiza un borrado lógico ocultando los registros del expediente. Los eventos en tu Google Calendar y archivos asociados en Drive <strong>no</strong> se borrarán. Te recomendamos exportar a Sheets o JSON antes de depurar.</span>
+            )}
           </p>
 
           <button
@@ -1906,7 +1938,10 @@ export default function SettingsPage() {
               <>
                 <button
                   onClick={() => {
-                    if (window.confirm('¿Estás seguro de que deseas reiniciar tu cuenta en este navegador? Esto eliminará tus datos locales de esta cuenta pero conservará intactos tus archivos en Google Drive y Sheets.')) {
+                    const confirmMsg = isFirebaseBackend 
+                      ? '¿Estás seguro de que deseas reiniciar tu cuenta en este navegador? Esto eliminará tus datos locales de esta cuenta pero conservará intactos tus archivos en Google Drive.'
+                      : '¿Estás seguro de que deseas reiniciar tu cuenta en este navegador? Esto eliminará tus datos locales de esta cuenta pero conservará intactos tus archivos en Google Drive y Sheets.';
+                    if (window.confirm(confirmMsg)) {
                       clearAllData();
                       alert('Datos locales de la cuenta reiniciados con éxito.');
                       router.push('/login');
@@ -1951,17 +1986,29 @@ export default function SettingsPage() {
 
         {showLegal && (
           <div className="flex flex-col gap-3 mt-2 text-[11px] text-slate-500 leading-relaxed font-semibold animate-in fade-in duration-200">
-            <p>
-              Esta aplicación está diseñada bajo una **arquitectura 100% Google-native**. Esto significa que todos tus datos e historial clínico se almacenan directamente en tu cuenta personal de Google, garantizando soberanía absoluta sobre tu información de salud.
-            </p>
+            {isFirebaseBackend ? (
+              <p>
+                Esta aplicación está diseñada bajo una **arquitectura híbrida segura (Firebase + Google)**. La base de datos operacional se aloja en Firebase Firestore con reglas de seguridad estrictas, mientras que los archivos y agendas siguen vinculados directamente a tus servicios de Google Drive y Calendar para garantizar tu control y privacidad.
+              </p>
+            ) : (
+              <p>
+                Esta aplicación está diseñada bajo una **arquitectura 100% Google-native**. Esto significa que todos tus datos e historial clínico se almacenan directamente en tu cuenta personal de Google, garantizando soberanía absoluta sobre tu información de salud.
+              </p>
+            )}
             
             <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 flex flex-col gap-2 text-[10px] text-slate-600">
               <p>
                 <strong>• Google Drive:</strong> Se utiliza exclusivamente para almacenar los archivos físicos (fotos o PDFs) de tus documentos clínicos y órdenes médicas. La aplicación crea una carpeta privada en tu Drive para que mantengas el control absoluto de tus archivos digitalizados.
               </p>
-              <p>
-                <strong>• Google Sheets:</strong> Funciona como base de datos operacional. Todas tus tablas de datos (miembros, citas, medicamentos, tomas, órdenes) se registran en una hoja de cálculo (`SaludFamiliar_OperationalDB`) dentro de tu Google Drive. Los datos nunca se transmiten a servidores de terceros.
-              </p>
+              {isFirebaseBackend ? (
+                <p>
+                  <strong>• Firebase Firestore:</strong> Funciona como base de datos operacional en tiempo real, almacenando de forma segura tu grupo familiar, citas, vacunas, exámenes y recordatorios con acceso privado restringido a los miembros de tu familia.
+                </p>
+              ) : (
+                <p>
+                  <strong>• Google Sheets:</strong> Funciona como base de datos operacional. Todas tus tablas de datos (miembros, citas, medicamentos, tomas, órdenes) se registran en una hoja de cálculo (`SaludFamiliar_OperationalDB`) dentro de tu Google Drive. Los datos nunca se transmiten a servidores de terceros.
+                </p>
+              )}
               <p>
                 <strong>• Google Calendar:</strong> Sincroniza tus citas médicas y recordatorios de medicamentos. Para los tratamientos farmacológicos, la app incluye una alerta preventiva si programas más de 20 tomas/eventos individuales, evitando saturar tu calendario personal.
               </p>
@@ -1974,7 +2021,11 @@ export default function SettingsPage() {
             </div>
 
             <p>
-              <strong>Copia de seguridad adicional:</strong> Aunque tus datos están respaldados en tu cuenta de Google, te aconsejamos descargar copias manuales en formato JSON con la herramienta a continuación para mayor seguridad.
+              {isFirebaseBackend ? (
+                <span><strong>Copia de seguridad adicional:</strong> Aunque tus datos están respaldados de forma segura en la nube de Firebase, te aconsejamos descargar copias manuales en formato JSON con la herramienta a continuación para mayor seguridad.</span>
+              ) : (
+                <span><strong>Copia de seguridad adicional:</strong> Aunque tus datos están respaldados en tu cuenta de Google, te aconsejamos descargar copias manuales en formato JSON con la herramienta a continuación para mayor seguridad.</span>
+              )}
             </p>
 
             <p className="italic text-rose-500/90 border-t border-slate-50 pt-2 mt-1">
