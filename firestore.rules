@@ -1,0 +1,390 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Firestore Security Rules — Paté Salud Familiar
+//
+// ROLE MODEL
+// ──────────
+//  OWNER     → Full read/write on every collection of their family.
+//  CAREGIVER → Read/write only on the memberIds listed in assignedMemberIds.
+//  MEMBER    → Read/write exclusively on their own memberId.
+//  VIEWER    → Read-only on all family data they have access to.
+//
+// IMPORTANT DESIGN DECISIONS
+// ──────────────────────────
+//  1. Physical deletes are blocked on every document (allow delete: if false).
+//     Deletion is performed by updating deletedAt / status='DELETED' (soft delete).
+//     Exception: gmailSources (no audit need) allows hard delete by OWNER.
+//
+//  2. Role resolution reads from:
+//       users/{uid}/familyAccess/{familyId}
+//     The `.status` field must be 'ACTIVE' — PENDING invitations cannot act.
+//
+//  3. `get()` calls to the same path are memoized within a single request
+//     evaluation by Firestore. The `getAccess()` helper is called multiple
+//     times but counts as a single read operation for billing.
+//
+//  4. Timestamp fields (createdAt, updatedAt) are written by the SDK with
+//     FieldValue.serverTimestamp(). Strict server-timestamp validation is
+//     intentionally omitted because it is impossible to enforce reliably in
+//     Firestore rules without rejecting legitimate writes from different SDK
+//     versions. Access-control (who can write) is the enforceable boundary.
+//
+//  5. The `in` operator checks membership in a list field — e.g.:
+//       memberId in getAccess(familyId).assignedMemberIds
+//     This is natively supported in Firestore Rules v2.
+// ─────────────────────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // HELPER FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Basic authentication guard.
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Returns the familyAccess document data for the requesting user.
+    // Memoized per request — does not cause multiple Firestore reads.
+    // Supports both raw Firebase UID and user- prefix in path lookup.
+    function getAccess(familyId) {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)/familyAccess/$(familyId))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)/familyAccess/$(familyId)).data
+        : get(/databases/$(database)/documents/users/user-$(request.auth.uid)/familyAccess/$(familyId)).data;
+    }
+
+    // Returns true if the user has an ACTIVE familyAccess record.
+    function hasActiveAccess(familyId) {
+      return isAuth()
+        && (exists(/databases/$(database)/documents/users/$(request.auth.uid)/familyAccess/$(familyId))
+            || exists(/databases/$(database)/documents/users/user-$(request.auth.uid)/familyAccess/$(familyId)))
+        && getAccess(familyId).status == 'ACTIVE';
+    }
+
+    // ── Role guards ───────────────────────────────────────────────────────
+
+    function isOwner(familyId) {
+      return hasActiveAccess(familyId) && getAccess(familyId).role == 'OWNER';
+    }
+
+    function isCaregiver(familyId) {
+      return hasActiveAccess(familyId) && getAccess(familyId).role == 'CAREGIVER';
+    }
+
+    function isMember(familyId) {
+      return hasActiveAccess(familyId) && getAccess(familyId).role == 'MEMBER';
+    }
+
+    function isViewer(familyId) {
+      return hasActiveAccess(familyId) && getAccess(familyId).role == 'VIEWER';
+    }
+
+    // ── Composite permission helpers ──────────────────────────────────────
+
+    // Can read any collection (no member-level filter needed).
+    function canReadAll(familyId) {
+      return isOwner(familyId) || isCaregiver(familyId) || isViewer(familyId);
+    }
+
+    // Can read data belonging to a specific memberId.
+    function canReadMember(familyId, memberId) {
+      return canReadAll(familyId)
+        || (isMember(familyId) && getAccess(familyId).memberId == memberId);
+    }
+
+    // Can write data belonging to a specific memberId.
+    // OWNER   → always.
+    // CAREGIVER → only if memberId is in their assignedMemberIds list.
+    // MEMBER  → only their own memberId.
+    // VIEWER  → never.
+    function canWriteMember(familyId, memberId) {
+      return isOwner(familyId)
+        || (isCaregiver(familyId) && memberId in getAccess(familyId).assignedMemberIds)
+        || (isMember(familyId) && getAccess(familyId).memberId == memberId);
+    }
+
+    // Can write family-level data (not tied to a specific member).
+    // Used for: settings, gmail sources, appointment candidates.
+    function canWriteFamily(familyId) {
+      return isOwner(familyId) || isCaregiver(familyId);
+    }
+
+    // Validates that a create request includes the mandatory soft-delete
+    // sentinel so the `where('deletedAt','==',null)` queries work correctly.
+    function hasDeletedAtNull() {
+      return request.resource.data.keys().hasAll(['deletedAt'])
+        && request.resource.data.deletedAt == null;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // USERS  (/users/{uid})
+    // ═══════════════════════════════════════════════════════════════════════
+
+    match /users/{uid} {
+      // A user can only read and write their own profile document. Supports both raw UID and user- prefix.
+      allow read:   if isAuth() && (request.auth.uid == uid || uid == 'user-' + request.auth.uid);
+      allow create: if isAuth() && (request.auth.uid == uid || uid == 'user-' + request.auth.uid);
+      allow update: if isAuth() && (request.auth.uid == uid || uid == 'user-' + request.auth.uid);
+      allow delete: if false; // User profiles are never physically deleted.
+
+      // ── Family Access sub-collection ──────────────────────────────────
+      match /familyAccess/{familyId} {
+        // A user reads their own access records.
+        allow read: if isAuth() && (request.auth.uid == uid || uid == 'user-' + request.auth.uid);
+
+        // A user creates their own access record when:
+        //   (a) they create a new family (self-writes OWNER access), or
+        //   (b) they accept an invitation (the acceptInvitation batch write
+        //       lands here for the invited user's UID).
+        allow create: if isAuth() && (request.auth.uid == uid || uid == 'user-' + request.auth.uid);
+
+        // Updates allowed by:
+        //   - The user themselves (e.g. accepting an invitation changes status).
+        //   - The OWNER of the family (e.g. revoking access).
+        allow update: if (isAuth() && (request.auth.uid == uid || uid == 'user-' + request.auth.uid))
+                      || isOwner(familyId);
+
+        // Access records are revoked by setting status='REVOKED', never deleted.
+        allow delete: if false;
+      }
+    }
+
+    // Collection group rule for invitations so invited users can query their invitations
+    // globally without knowing the familyId in advance.
+    match /{path=**}/invitations/{invitationId} {
+      allow read: if isAuth() && resource.data.invitedEmail == request.auth.token.email;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FAMILIES  (/families/{familyId})
+    // ═══════════════════════════════════════════════════════════════════════
+
+    match /families/{familyId} {
+      // Any user with active access can read the family document.
+      allow read:   if hasActiveAccess(familyId);
+
+      // Only the authenticated user listed as ownerUid can create the family.
+      // (createFamily() in firestoreService writes ownerUid = uid.)
+      // Supports both raw UID and user- prefix.
+      allow create: if isAuth()
+                    && (request.resource.data.ownerUid == request.auth.uid
+                        || request.resource.data.ownerUid == 'user-' + request.auth.uid);
+
+      // Only the OWNER can update the family metadata (name, syncVersion, etc.).
+      allow update: if isOwner(familyId);
+
+      // Families are never physically deleted.
+      allow delete: if false;
+
+      // ── Settings  (/families/{familyId}/settings/{doc}) ──────────────────
+      match /settings/{document} {
+        allow read:   if hasActiveAccess(familyId);
+        allow create: if canWriteFamily(familyId);
+        allow update: if canWriteFamily(familyId);
+        allow delete: if false;
+      }
+
+      // ── Members  (/families/{familyId}/members/{memberId}) ───────────────
+      match /members/{memberId} {
+        allow read:   if canReadMember(familyId, memberId);
+
+        // OWNER and CAREGIVER can create new members.
+        // MEMBER cannot create other members.
+        allow create: if canWriteFamily(familyId) && hasDeletedAtNull();
+
+        // Any role that can write for this member can update them
+        // (includes soft-delete updates that set deletedAt / status='DELETED').
+        allow update: if canWriteMember(familyId, memberId);
+
+        // Hard deletes are never permitted — use soft delete.
+        allow delete: if false;
+      }
+
+      // ── Health Profiles  (/families/{familyId}/healthProfiles/{memberId}) ─
+      // Document ID equals memberId — one profile per member.
+      match /healthProfiles/{memberId} {
+        allow read:   if canReadMember(familyId, memberId);
+        allow create: if canWriteMember(familyId, memberId);
+        allow update: if canWriteMember(familyId, memberId);
+        allow delete: if false;
+      }
+
+      // ── Appointments  (/families/{familyId}/appointments/{appointmentId}) ─
+      match /appointments/{appointmentId} {
+        // For existing documents, check memberId on the stored data.
+        allow read:   if canReadMember(familyId, resource.data.memberId);
+
+        // For creates, check memberId in the incoming payload.
+        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+                      && hasDeletedAtNull();
+
+        // For updates (including soft-delete and retention purge), check the
+        // stored memberId (cannot change memberId of an existing appointment).
+        allow update: if canWriteMember(familyId, resource.data.memberId);
+
+        allow delete: if false;
+      }
+
+      // ── Periodic Checkups  (/families/{familyId}/checkups/{checkupId}) ────
+      match /checkups/{checkupId} {
+        allow read:   if canReadMember(familyId, resource.data.memberId);
+        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+                      && hasDeletedAtNull();
+        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow delete: if false;
+      }
+
+      // ── Vaccine Records  (/families/{familyId}/vaccines/{vaccineId}) ──────
+      match /vaccines/{vaccineId} {
+        allow read:   if canReadMember(familyId, resource.data.memberId);
+        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+                      && hasDeletedAtNull();
+        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow delete: if false;
+      }
+
+      // ── Medical Exams  (/families/{familyId}/exams/{examId}) ─────────────
+      match /exams/{examId} {
+        allow read:   if canReadMember(familyId, resource.data.memberId);
+        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+                      && hasDeletedAtNull();
+        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow delete: if false;
+      }
+
+      // ── Exam Results  (/families/{familyId}/examResults/{resultId}) ───────
+      // Flat collection (no memberId on the result itself). Access is
+      // family-level: OWNER / CAREGIVER / VIEWER can read; MEMBER is
+      // restricted because results belong to a specific exam and we cannot
+      // infer memberId without an extra join (not possible in rules).
+      // For the MEMBER case, the DataRepository layer must filter client-side
+      // to only load results for exams belonging to that member.
+      match /examResults/{resultId} {
+        allow read:   if canReadAll(familyId)
+                      || (isMember(familyId)
+                          && exists(/databases/$(database)/documents/families/$(familyId)/exams/$(resource.data.examId))
+                          && get(/databases/$(database)/documents/families/$(familyId)/exams/$(resource.data.examId)).data.memberId == getAccess(familyId).memberId);
+        allow create: if canWriteFamily(familyId);
+        allow update: if canWriteFamily(familyId);
+        // Exam results use a replace strategy (delete old, write new).
+        // Hard delete is allowed for OWNER / CAREGIVER only.
+        allow delete: if canWriteFamily(familyId);
+      }
+
+      // ── Clinical Documents  (/families/{familyId}/documents/{documentId}) ─
+      match /documents/{documentId} {
+        allow read:   if canReadMember(familyId, resource.data.memberId);
+        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+                      && hasDeletedAtNull();
+        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow delete: if false;
+      }
+
+      // ── Medical History  (/families/{familyId}/history/{historyId}) ───────
+      match /history/{historyId} {
+        allow read:   if canReadMember(familyId, resource.data.memberId);
+        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+                      && hasDeletedAtNull();
+        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow delete: if false;
+      }
+
+      // ── Reminders  (/families/{familyId}/reminders/{reminderId}) ─────────
+      match /reminders/{reminderId} {
+        allow read:   if canReadMember(familyId, resource.data.memberId);
+        allow create: if canWriteMember(familyId, request.resource.data.memberId);
+        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow delete: if false;
+      }
+
+      // ── Follow-Up Tasks  (/families/{familyId}/tasks/{taskId}) ───────────
+      match /tasks/{taskId} {
+        allow read:   if canReadMember(familyId, resource.data.memberId);
+        allow create: if canWriteMember(familyId, request.resource.data.memberId);
+        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow delete: if false;
+      }
+
+      // ── Medical Orders  (/families/{familyId}/medicalOrders/{orderId}) ────
+      match /medicalOrders/{orderId} {
+        allow read:   if canReadMember(familyId, resource.data.memberId);
+        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+                      && hasDeletedAtNull();
+        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow delete: if false;
+      }
+
+      // ── Medications  (/families/{familyId}/medications/{medicationId}) ────
+      match /medications/{medicationId} {
+        allow read:   if canReadMember(familyId, resource.data.memberId);
+        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+                      && hasDeletedAtNull();
+        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow delete: if false;
+      }
+
+      // ── Dose Reminders  (/families/{familyId}/doseReminders/{reminderId}) ─
+      match /doseReminders/{reminderId} {
+        allow read:   if canReadMember(familyId, resource.data.memberId);
+        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+                      && hasDeletedAtNull();
+        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow delete: if false;
+      }
+
+      // ── Gmail Sources  (/families/{familyId}/gmailSources/{sourceId}) ─────
+      // Family-level config; not tied to a specific member.
+      match /gmailSources/{sourceId} {
+        // All authenticated family members can see the configured sources.
+        allow read:   if hasActiveAccess(familyId);
+        allow create: if canWriteFamily(familyId);
+        allow update: if canWriteFamily(familyId);
+        // Gmail sources can be hard-deleted (no audit trail needed).
+        allow delete: if isOwner(familyId);
+      }
+
+      // ── Appointment Candidates  (/families/{familyId}/appointmentCandidates/{id})
+      // These are transient Gmail-imported entries; only OWNER / CAREGIVER manage them.
+      match /appointmentCandidates/{candidateId} {
+        allow read:   if canWriteFamily(familyId);
+        allow create: if canWriteFamily(familyId);
+        allow update: if canWriteFamily(familyId);
+        allow delete: if false;
+      }
+
+      // ── Invitations  (/families/{familyId}/invitations/{invitationId}) ────
+      match /invitations/{invitationId} {
+        // OWNER sees all invitations.
+        // The invited user can read their own pending invitation (matched by email).
+        allow read: if isOwner(familyId)
+                    || (isAuth()
+                        && resource.data.invitedEmail == request.auth.token.email);
+
+        // Only OWNER can create invitations.
+        allow create: if isOwner(familyId);
+
+        // OWNER can update any invitation (e.g. revoke it).
+        // The invited user can update ONLY to transition status → 'ACCEPTED'
+        // and must set their own UID in acceptedByUid. No other fields may be
+        // changed by the invited user.
+        allow update: if isOwner(familyId)
+                      || (isAuth()
+                          && resource.data.invitedEmail == request.auth.token.email
+                          && resource.data.status == 'PENDING'
+                          && request.resource.data.status == 'ACCEPTED'
+                          && request.resource.data.acceptedByUid == request.auth.uid
+                          // Prevent the invited user from altering other fields.
+                          && request.resource.data.diff(resource.data).affectedKeys()
+                              .hasOnly(['status', 'acceptedAt', 'acceptedByUid']));
+
+        // Invitations are revoked by status update, never deleted.
+        allow delete: if false;
+      }
+
+    } // end match /families/{familyId}
+
+  } // end match /databases/{database}/documents
+} // end service cloud.firestore
