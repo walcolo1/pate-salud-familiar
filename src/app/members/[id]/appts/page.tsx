@@ -37,7 +37,8 @@ export default function AppointmentsPage() {
     calendarError,
     syncAppointmentToCalendar,
     pushToGoogle,
-    syncNow
+    syncNow,
+    isFirebaseBackend
   } = useApp();
 
   const [filter, setFilter] = useState<HealthEventStatus | 'ALL'>('ALL');
@@ -254,8 +255,12 @@ export default function AppointmentsPage() {
                   <h4 className="text-sm font-extrabold text-slate-800 leading-tight mb-0.5">{appt.doctorName}</h4>
                   <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                     <span className="text-[10px] text-slate-400 font-bold">{appt.specialty}</span>
-                    <span className="text-slate-300 text-[10px]">·</span>
-                    {getSheetsSyncBadge(appt)}
+                    {!isFirebaseBackend && (
+                      <>
+                        <span className="text-slate-300 text-[10px]">·</span>
+                        {getSheetsSyncBadge(appt)}
+                      </>
+                    )}
                     <span className="text-slate-300 text-[10px]">·</span>
                     {getCalendarSyncBadge(appt)}
                   </div>
@@ -334,16 +339,18 @@ export default function AppointmentsPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="flex flex-col gap-1">
                     {/* Google Sheets Sync Info */}
-                    <div className="flex items-center gap-1.5 text-slate-500">
-                      <span className="font-extrabold text-[10px] uppercase text-slate-400">Base de Datos:</span>
-                      {appt.syncStatus === 'SYNCED' ? (
-                        <span className="text-teal-600">✓ Sincronizado en la Base Operacional</span>
-                      ) : appt.syncStatus === 'SYNC_ERROR' ? (
-                        <span className="text-rose-600 font-semibold">Error al sincronizar con Sheets</span>
-                      ) : (
-                        <span className="text-amber-600 animate-pulse">Pendiente de sincronizar</span>
-                      )}
-                    </div>
+                    {!isFirebaseBackend && (
+                      <div className="flex items-center gap-1.5 text-slate-500">
+                        <span className="font-extrabold text-[10px] uppercase text-slate-400">Base de Datos:</span>
+                        {appt.syncStatus === 'SYNCED' ? (
+                          <span className="text-teal-600">✓ Sincronizado en la Base Operacional</span>
+                        ) : appt.syncStatus === 'SYNC_ERROR' ? (
+                          <span className="text-rose-600 font-semibold">Error al sincronizar con Sheets</span>
+                        ) : (
+                          <span className="text-amber-600 animate-pulse">Pendiente de sincronizar</span>
+                        )}
+                      </div>
+                    )}
                     {/* Google Calendar Sync Info */}
                     <div className="flex items-center gap-1.5 text-slate-500">
                       <span className="font-extrabold text-[10px] uppercase text-slate-400">Google Calendar:</span>
@@ -361,7 +368,7 @@ export default function AppointmentsPage() {
 
                   {/* Actions buttons */}
                   <div className="flex flex-wrap gap-1.5 justify-end">
-                    {appt.syncStatus !== 'SYNCED' && (
+                    {!isFirebaseBackend && appt.syncStatus !== 'SYNCED' && (
                       <button
                         onClick={async () => {
                           try {
@@ -377,7 +384,7 @@ export default function AppointmentsPage() {
                     )}
                     {appt.calendarSyncStatus !== 'SYNCED' && (
                       <button
-                        onClick={() => syncAppointmentToCalendar(appt.id)}
+                        onClick={() => syncAppointmentToCalendar(appt.id, undefined, true)}
                         className="text-[10px] font-black text-rose-600 hover:text-rose-700 bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-100 transition-colors"
                       >
                         Reintentar Calendar

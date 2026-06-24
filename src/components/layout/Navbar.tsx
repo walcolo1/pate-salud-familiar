@@ -19,13 +19,13 @@ import {
 export default function Navbar({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, driveSyncEnabled, signOut, databaseSpreadsheetId, isLoading, sessionLocked, unlockSession } = useApp();
+  const { user, driveSyncEnabled, signOut, databaseSpreadsheetId, isLoading, sessionLocked, unlockSession, isFirebaseBackend } = useApp();
 
   React.useEffect(() => {
-    if (!isLoading && user && user.provider === 'google' && !databaseSpreadsheetId) {
+    if (!isLoading && user && user.provider === 'google' && !databaseSpreadsheetId && !isFirebaseBackend) {
       router.replace('/onboarding/setup');
     }
-  }, [user, isLoading, databaseSpreadsheetId, router]);
+  }, [user, isLoading, databaseSpreadsheetId, router, isFirebaseBackend]);
 
   // If user is not authenticated, we do not render the navigation chrome
   if (!user || pathname === '/login' || pathname === '/onboarding' || pathname === '/' || pathname.startsWith('/onboarding/setup')) {

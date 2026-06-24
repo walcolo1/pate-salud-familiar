@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
@@ -32,8 +32,9 @@ import {
   Edit,
   Lock,
   ShieldAlert,
-  Timer
+  Timer,
 } from 'lucide-react';
+
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -141,7 +142,11 @@ export default function SettingsPage() {
     setAutoLockMinutes,
     setNightLockEnabled,
     setNightLockStart,
-    setNightLockEnd
+    setNightLockEnd,
+    isFirebaseBackend,
+    invitations,
+    createInvitation,
+    revokeInvitation
   } = useApp();
 
   const [isExporting, setIsExporting] = useState(false);
@@ -160,6 +165,48 @@ export default function SettingsPage() {
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
   const [editingSourceEmail, setEditingSourceEmail] = useState('');
   const [editingSourceLabel, setEditingSourceLabel] = useState('');
+
+  // States for invitations
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteMemberId, setInviteMemberId] = useState('');
+  const [inviteRole, setInviteRole] = useState<'OWNER' | 'MEMBER' | 'CAREGIVER' | 'VIEWER'>('MEMBER');
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [revokingInviteId, setRevokingInviteId] = useState<string | null>(null);
+
+  const handleSendInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail.trim() || !inviteMemberId) return;
+    setIsSendingInvite(true);
+    setInviteError(null);
+    setInviteSuccess(false);
+    try {
+      await createInvitation(inviteEmail.trim(), inviteMemberId, inviteRole);
+      setInviteSuccess(true);
+      setInviteEmail('');
+      setInviteMemberId('');
+      setInviteRole('MEMBER');
+    } catch (err: any) {
+      console.error(err);
+      setInviteError(err.message || 'Error al enviar la invitación.');
+    } finally {
+      setIsSendingInvite(false);
+    }
+  };
+
+  const handleRevokeInvite = async (inviteId: string) => {
+    if (!window.confirm('¿Estás seguro de que deseas revocar esta invitación? El usuario ya no podrá acceder a esta familia.')) return;
+    setRevokingInviteId(inviteId);
+    try {
+      await revokeInvitation(inviteId);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error al revocar la invitación.');
+    } finally {
+      setRevokingInviteId(null);
+    }
+  };
 
   const activeApptsCount = appointments.filter(a => (a.retentionStatus || 'ACTIVE') !== 'PURGED').length;
   const purgedApptsCount = appointments.filter(a => (a.retentionStatus || 'ACTIVE') === 'PURGED').length;
@@ -306,132 +353,134 @@ export default function SettingsPage() {
         <div className="flex flex-col gap-6">
           
           {/* Ficha 1: Diagnóstico General y Estado de Sincronización */}
-          <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-teal-50 text-teal-600 rounded-xl">
-                  <Settings className="h-5 w-5" />
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Diagnóstico de Sincronización</h4>
-                  <p className="text-[10px] text-slate-400 font-semibold">Estado en tiempo real de tu base Google-native.</p>
-                </div>
-              </div>
-              <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full border uppercase leading-none ${
-                needsGoogleAuth ? 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse' :
-                opSyncStatus === 'synced' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                opSyncStatus === 'syncing' ? 'bg-blue-50 text-blue-600 border-blue-100 animate-pulse' :
-                opSyncStatus === 'error' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                'bg-slate-50 text-slate-400 border-slate-200'
-              }`}>
-                {needsGoogleAuth ? 'Autenticación Requerida' :
-                 opSyncStatus === 'synced' ? 'Sincronizado' :
-                 opSyncStatus === 'syncing' ? 'Sincronizando' :
-                 opSyncStatus === 'error' ? 'Error de Sincronización' : 'Desconectado'}
-              </span>
-            </div>
-
-            <hr className="border-slate-50" />
-
-            {/* Banner de alerta de consentimiento */}
-            {needsGoogleAuth && (
-              <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-3 font-semibold text-[10px] text-amber-800 leading-relaxed shadow-sm">
-                <div className="flex items-start gap-2.5">
-                  <AlertCircle className="h-4.5 w-4.5 text-amber-600 shrink-0 mt-0.5" />
+          {!isFirebaseBackend && (
+            <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-teal-50 text-teal-600 rounded-xl">
+                    <Settings className="h-5 w-5" />
+                  </div>
                   <div>
-                    <span className="font-bold text-amber-950 block text-[11px] mb-0.5">Necesitamos permiso para sincronizar tus datos</span>
-                    <p>Por políticas de Google, requerimos tu consentimiento explícito para guardar tus datos en Sheets y Drive. Si no autorizas, tus cambios se guardarán localmente como pendientes.</p>
+                    <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Diagnóstico de Sincronización</h4>
+                    <p className="text-[10px] text-slate-400 font-semibold">Estado en tiempo real de tu base Google-native.</p>
                   </div>
                 </div>
-                <button
-                  id="btn-reconnect-consent-banner"
-                  onClick={() => reconnectGoogle()}
-                  className="w-full py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <Wifi className="h-3.5 w-3.5" />
-                  <span>Autorizar sincronización</span>
-                </button>
-              </div>
-            )}
-
-            {/* Grid de Diagnóstico */}
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-4 font-semibold text-[11px] text-slate-500 leading-relaxed">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3.5 gap-x-6">
-                
-                <div className="flex flex-col">
-                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Estado de Conexión</span>
-                  <div className="flex items-center gap-1.5 font-extrabold text-slate-700">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-                    <span>Conectado con Google ({user.email})</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col">
-                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Base Google-Native</span>
-                  <div className="flex items-center gap-1.5 font-extrabold text-slate-700">
-                    {databaseSpreadsheetId ? (
-                      <>
-                        <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-                        <span>Encontrada (Activa)</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
-                        <span>No encontrada (Falta crear)</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
-                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Última Sincronización</span>
-                  <span className="font-extrabold text-slate-700">{lastSyncAt ? new Date(lastSyncAt).toLocaleString('es-CO') : 'Nunca'}</span>
-                </div>
-
-                <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
-                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Cambios locales pendientes</span>
-                  <span className={`font-black ${pendingSyncCount > 0 ? 'text-amber-600' : 'text-slate-700'}`}>
-                    {pendingSyncCount} {pendingSyncCount === 1 ? 'cambio' : 'cambios'}
-                  </span>
-                </div>
-
-                <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
-                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Último Pull (Descarga)</span>
-                  <span className="font-extrabold text-slate-700">{lastPullAt ? new Date(lastPullAt).toLocaleString('es-CO') : 'Nunca'}</span>
-                </div>
-
-                <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
-                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Último Push (Subida)</span>
-                  <span className="font-extrabold text-slate-700">{lastPushAt ? new Date(lastPushAt).toLocaleString('es-CO') : 'Nunca'}</span>
-                </div>
+                <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full border uppercase leading-none ${
+                  needsGoogleAuth ? 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse' :
+                  opSyncStatus === 'synced' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                  opSyncStatus === 'syncing' ? 'bg-blue-50 text-blue-600 border-blue-100 animate-pulse' :
+                  opSyncStatus === 'error' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                  'bg-slate-50 text-slate-400 border-slate-200'
+                }`}>
+                  {needsGoogleAuth ? 'Autenticación Requerida' :
+                    opSyncStatus === 'synced' ? 'Sincronizado' :
+                    opSyncStatus === 'syncing' ? 'Sincronizando' :
+                    opSyncStatus === 'error' ? 'Error de Sincronización' : 'Desconectado'}
+                </span>
               </div>
 
-              {opSyncError && (
-                <div className="bg-rose-50 p-3 rounded-xl border border-rose-100/60 text-rose-600 text-[10px] flex flex-col gap-1 font-semibold leading-relaxed">
-                  <strong className="text-rose-700">Último error registrado:</strong>
-                  <p>{opSyncError}</p>
+              <hr className="border-slate-50" />
+
+              {/* Banner de alerta de consentimiento */}
+              {needsGoogleAuth && (
+                <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-3 font-semibold text-[10px] text-amber-800 leading-relaxed shadow-sm">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="h-4.5 w-4.5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-amber-950 block text-[11px] mb-0.5">Necesitamos permiso para sincronizar tus datos</span>
+                      <p>Por políticas de Google, requerimos tu consentimiento explícito para guardar tus datos en Sheets y Drive. Si no autorizas, tus cambios se guardarán localmente como pendientes.</p>
+                    </div>
+                  </div>
+                  <button
+                    id="btn-reconnect-consent-banner"
+                    onClick={() => reconnectGoogle()}
+                    className="w-full py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Wifi className="h-3.5 w-3.5" />
+                    <span>Autorizar sincronización</span>
+                  </button>
                 </div>
               )}
 
-              {/* Toggle de Auto-Sync */}
-              <div className="flex items-center justify-between border-t border-slate-100/70 pt-3.5 mt-1.5">
-                <div>
-                  <span className="font-extrabold text-slate-700 block text-xs mb-0.5">Sincronización Automática en Fondo</span>
-                  <p className="text-[10px] text-slate-400 font-semibold">Sube cambios de forma silenciosa tras 4 segundos de inactividad.</p>
+              {/* Grid de Diagnóstico */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-4 font-semibold text-[11px] text-slate-500 leading-relaxed">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3.5 gap-x-6">
+                  
+                  <div className="flex flex-col">
+                    <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Estado de Conexión</span>
+                    <div className="flex items-center gap-1.5 font-extrabold text-slate-700">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                      <span>Conectado con Google ({user.email})</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Base Google-Native</span>
+                    <div className="flex items-center gap-1.5 font-extrabold text-slate-700">
+                      {databaseSpreadsheetId ? (
+                        <>
+                          <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                          <span>Encontrada (Activa)</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+                          <span>No encontrada (Falta crear)</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
+                    <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Última Sincronización</span>
+                    <span className="font-extrabold text-slate-700">{lastSyncAt ? new Date(lastSyncAt).toLocaleString('es-CO') : 'Nunca'}</span>
+                  </div>
+
+                  <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
+                    <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Cambios locales pendientes</span>
+                    <span className={`font-black ${pendingSyncCount > 0 ? 'text-amber-600' : 'text-slate-700'}`}>
+                      {pendingSyncCount} {pendingSyncCount === 1 ? 'cambio' : 'cambios'}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
+                    <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Último Pull (Descarga)</span>
+                    <span className="font-extrabold text-slate-700">{lastPullAt ? new Date(lastPullAt).toLocaleString('es-CO') : 'Nunca'}</span>
+                  </div>
+
+                  <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
+                    <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Último Push (Subida)</span>
+                    <span className="font-extrabold text-slate-700">{lastPushAt ? new Date(lastPushAt).toLocaleString('es-CO') : 'Nunca'}</span>
+                  </div>
                 </div>
-                <button 
-                  id="btn-toggle-auto-sync"
-                  type="button"
-                  onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
-                  className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
-                    autoSyncEnabled ? 'bg-teal-600 justify-end' : 'bg-slate-200 justify-start'
-                  }`}
-                >
-                  <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
-                </button>
+
+                {opSyncError && (
+                  <div className="bg-rose-50 p-3 rounded-xl border border-rose-100/60 text-rose-600 text-[10px] flex flex-col gap-1 font-semibold leading-relaxed">
+                    <strong className="text-rose-700">Último error registrado:</strong>
+                    <p>{opSyncError}</p>
+                  </div>
+                )}
+
+                {/* Toggle de Auto-Sync */}
+                <div className="flex items-center justify-between border-t border-slate-100/70 pt-3.5 mt-1.5">
+                  <div>
+                    <span className="font-extrabold text-slate-700 block text-xs mb-0.5">Sincronización Automática en Fondo</span>
+                    <p className="text-[10px] text-slate-400 font-semibold">Sube cambios de forma silenciosa tras 4 segundos de inactividad.</p>
+                  </div>
+                  <button 
+                    id="btn-toggle-auto-sync"
+                    type="button"
+                    onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
+                    className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
+                      autoSyncEnabled ? 'bg-teal-600 justify-end' : 'bg-slate-200 justify-start'
+                    }`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
+                  </button>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
+          )}
 
           {/* Ficha Nueva: Diagnóstico de Datos e Integridad */}
           <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
@@ -504,43 +553,45 @@ export default function SettingsPage() {
             </div>
 
             {/* Sincronización y Hoja Operacional */}
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
-              <div className="flex flex-col gap-2">
-                <div className="flex justify-between border-b border-slate-200/40 pb-2">
-                  <span>Último pull (descarga):</span>
-                  <span className="font-extrabold text-slate-700">{lastPullAt ? new Date(lastPullAt).toLocaleString('es-CO') : 'Nunca'}</span>
+            {!isFirebaseBackend && (
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between border-b border-slate-200/40 pb-2">
+                    <span>Último pull (descarga):</span>
+                    <span className="font-extrabold text-slate-700">{lastPullAt ? new Date(lastPullAt).toLocaleString('es-CO') : 'Nunca'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-200/40 pb-2">
+                    <span>Último push (subida):</span>
+                    <span className="font-extrabold text-slate-700">{lastPushAt ? new Date(lastPushAt).toLocaleString('es-CO') : 'Nunca'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-200/40 pb-2">
+                    <span>Última sincronización:</span>
+                    <span className="font-extrabold text-slate-700">{lastSyncAt ? new Date(lastSyncAt).toLocaleString('es-CO') : 'Nunca'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-200/40 pb-2">
+                    <span>Cambios pendientes locales:</span>
+                    <span className={`font-black ${pendingSyncCount > 0 ? 'text-amber-600' : 'text-slate-700'}`}>{pendingSyncCount}</span>
+                  </div>
+                  <div className="flex justify-between pb-1">
+                    <span>ID de Hoja Operacional:</span>
+                    <span className="font-mono text-[10px] text-slate-700 truncate max-w-[200px]">{databaseSpreadsheetId || 'Sin vincular'}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between border-b border-slate-200/40 pb-2">
-                  <span>Último push (subida):</span>
-                  <span className="font-extrabold text-slate-700">{lastPushAt ? new Date(lastPushAt).toLocaleString('es-CO') : 'Nunca'}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-200/40 pb-2">
-                  <span>Última sincronización:</span>
-                  <span className="font-extrabold text-slate-700">{lastSyncAt ? new Date(lastSyncAt).toLocaleString('es-CO') : 'Nunca'}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-200/40 pb-2">
-                  <span>Cambios pendientes locales:</span>
-                  <span className={`font-black ${pendingSyncCount > 0 ? 'text-amber-600' : 'text-slate-700'}`}>{pendingSyncCount}</span>
-                </div>
-                <div className="flex justify-between pb-1">
-                  <span>ID de Hoja Operacional:</span>
-                  <span className="font-mono text-[10px] text-slate-700 truncate max-w-[200px]">{databaseSpreadsheetId || 'Sin vincular'}</span>
-                </div>
-              </div>
 
-              {databaseSpreadsheetUrl && (
-                <a
-                  href={databaseSpreadsheetUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-1 py-2 px-3 bg-white border border-slate-200 hover:border-teal-500 hover:text-teal-600 text-slate-700 font-extrabold text-[10px] rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
-                >
-                  <FileSpreadsheet className="h-3.5 w-3.5" />
-                  <span>Abrir hoja operacional actual</span>
-                  <ExternalLink className="h-2.5 w-2.5" />
-                </a>
-              )}
-            </div>
+                {databaseSpreadsheetUrl && (
+                  <a
+                    href={databaseSpreadsheetUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 py-2 px-3 bg-white border border-slate-200 hover:border-teal-500 hover:text-teal-600 text-slate-700 font-extrabold text-[10px] rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    <span>Abrir hoja operacional actual</span>
+                    <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                )}
+              </div>
+            )}
 
             {/* Ejecución de Validación de Integridad */}
             <div className="flex flex-col gap-3 pt-1">
@@ -711,44 +762,204 @@ export default function SettingsPage() {
               </div>
 
               {/* Servicio: Google Sheets */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
-                    <div>
-                      <span className="font-extrabold text-slate-800 block text-xs mb-0.5">Google Sheets (Base y Exportación)</span>
-                      <span className="text-[9px] text-slate-400 block leading-none">Guardado de tablas operacionales y reportes familiares</span>
+              {!isFirebaseBackend && (
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+                      <div>
+                        <span className="font-extrabold text-slate-800 block text-xs mb-0.5">Google Sheets (Base y Exportación)</span>
+                        <span className="text-[9px] text-slate-400 block leading-none">Guardado de tablas operacionales y reportes familiares</span>
+                      </div>
                     </div>
+                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
+                      sheetsStatus === 'connected' || sheetsStatus === 'exportado' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                      sheetsStatus === 'error' ? 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse' :
+                      'bg-slate-200 text-slate-500'
+                    }`}>
+                      {sheetsStatus === 'connected' || sheetsStatus === 'exportado' ? 'Autorizado' :
+                       sheetsStatus === 'connecting' || sheetsStatus === 'authorizing' || sheetsStatus === 'exportando' ? 'Conectando...' :
+                       sheetsStatus === 'error' ? 'Error' : 'Sin permiso'}
+                    </span>
                   </div>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
-                    sheetsStatus === 'connected' || sheetsStatus === 'exportado' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                    sheetsStatus === 'error' ? 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse' :
-                    'bg-slate-200 text-slate-500'
-                  }`}>
-                    {sheetsStatus === 'connected' || sheetsStatus === 'exportado' ? 'Autorizado' :
-                     sheetsStatus === 'connecting' || sheetsStatus === 'authorizing' || sheetsStatus === 'exportando' ? 'Conectando...' :
-                     sheetsStatus === 'error' ? 'Error' : 'Sin permiso'}
-                  </span>
-                </div>
 
-                {sheetsError && (
-                  <p className="text-[9px] text-rose-500 bg-rose-50 p-2 rounded-lg border border-rose-100/50">{sheetsError}</p>
-                )}
+                  {sheetsError && (
+                    <p className="text-[9px] text-rose-500 bg-rose-50 p-2 rounded-lg border border-rose-100/50">{sheetsError}</p>
+                  )}
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-100/60 pt-2.5 mt-1">
-                  <span className="text-[9px] text-slate-400 font-bold">Último token: {lastSheetsAuthTime ? new Date(lastSheetsAuthTime).toLocaleTimeString() : 'N/A'}</span>
-                  <button
-                    id="btn-reconnect-sheets"
-                    onClick={() => connectSheets()}
-                    className="py-1.5 px-3 bg-white border border-slate-200 hover:border-teal-500 text-slate-700 font-extrabold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
-                  >
-                    <span>Reconectar Sheets</span>
-                  </button>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-100/60 pt-2.5 mt-1">
+                    <span className="text-[9px] text-slate-400 font-bold">Último token: {lastSheetsAuthTime ? new Date(lastSheetsAuthTime).toLocaleTimeString() : 'N/A'}</span>
+                    <button
+                      id="btn-reconnect-sheets"
+                      onClick={() => connectSheets()}
+                      className="py-1.5 px-3 bg-white border border-slate-200 hover:border-teal-500 text-slate-700 font-extrabold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
+                    >
+                      <span>Reconectar Sheets</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
             </div>
           </section>
+
+          {/* Ficha: Invitaciones Familiares (Firebase only, OWNER only) */}
+          {isFirebaseBackend && currentUserRole === 'FAMILY_ADMIN' && (
+            <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-teal-50 text-teal-600 rounded-xl">
+                  <Mail className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Invitaciones Familiares</h4>
+                  <p className="text-[10px] text-slate-400 font-semibold">Invita a miembros de tu familia para darles acceso a la aplicación.</p>
+                </div>
+              </div>
+
+              <hr className="border-slate-50" />
+
+              {/* Formulario Enviar Invitación */}
+              <form onSubmit={handleSendInvite} className="bg-slate-50 border border-slate-100 p-4 rounded-2xl flex flex-col gap-4">
+                <span className="font-bold text-slate-800 text-[11px] block leading-none">Invitar a un familiar</span>
+                
+                {inviteError && (
+                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 font-semibold text-[10px] flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>{inviteError}</span>
+                  </div>
+                )}
+                
+                {inviteSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-700 font-semibold text-[10px] flex items-center gap-2">
+                    <Check className="h-4 w-4 shrink-0" />
+                    <span>Invitación enviada con éxito.</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] text-slate-400 uppercase font-black tracking-wider px-1">Correo Electrónico</label>
+                    <input
+                      type="email"
+                      required
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      placeholder="familiar@correo.com"
+                      className="h-10 px-3 bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 rounded-xl text-xs font-semibold"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] text-slate-400 uppercase font-black tracking-wider px-1">Asociar a Familiar</label>
+                    <select
+                      required
+                      value={inviteMemberId}
+                      onChange={(e) => setInviteMemberId(e.target.value)}
+                      className="h-10 px-3 bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 rounded-xl text-xs font-semibold"
+                    >
+                      <option value="">-- Seleccionar --</option>
+                      {members.filter(m => m.status !== 'DELETED').map((m) => (
+                        <option key={m.id} value={m.id}>{m.fullName}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] text-slate-400 uppercase font-black tracking-wider px-1">Rol de Acceso</label>
+                    <select
+                      required
+                      value={inviteRole}
+                      onChange={(e) => setInviteRole(e.target.value as any)}
+                      className="h-10 px-3 bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 rounded-xl text-xs font-semibold"
+                    >
+                      <option value="MEMBER">Miembro (Solo ve su propia ficha)</option>
+                      <option value="CAREGIVER">Cuidador (Acceso completo)</option>
+                      <option value="VIEWER">Visualizador (Lectura de todo)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 mt-1">
+                  <button
+                    type="submit"
+                    disabled={isSendingInvite}
+                    className="h-10 px-5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-teal-300 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer border-none"
+                  >
+                    {isSendingInvite ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Enviando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4.5 w-4.5" />
+                        <span>Enviar Invitación</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              {/* Listado de Invitaciones */}
+              <div className="flex flex-col gap-3">
+                <span className="font-extrabold text-slate-800 text-xs tracking-wide uppercase px-1">Invitaciones Enviadas ({invitations.length})</span>
+                
+                {invitations.length === 0 ? (
+                  <p className="text-[10px] text-slate-400 font-semibold px-1 py-1">No se han enviado invitaciones en esta familia.</p>
+                ) : (
+                  <div className="flex flex-col gap-2.5">
+                    {invitations.map((inv) => {
+                      const associatedMember = members.find(m => m.id === inv.invitedMemberId)?.fullName || 'N/A';
+                      const isPending = inv.status === 'PENDING';
+                      const isAccepted = inv.status === 'ACCEPTED';
+                      const isRevoked = inv.status === 'REVOKED';
+
+                      return (
+                        <div
+                          key={inv.id}
+                          className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-semibold text-[11px]"
+                        >
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <span className="font-extrabold text-slate-800 block text-xs truncate">{inv.invitedEmail}</span>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px] text-slate-400 mt-1">
+                              <span>Familiar: <strong className="text-slate-600 font-bold">{associatedMember}</strong></span>
+                              <span>·</span>
+                              <span>Rol: <strong className="text-slate-650 font-bold uppercase">{inv.role}</strong></span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3.5 shrink-0 self-end sm:self-center">
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
+                              isAccepted ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                              isPending ? 'bg-amber-50 text-amber-600 border border-amber-100 animate-pulse' :
+                              'bg-slate-200 text-slate-500 border border-slate-300'
+                            }`}>
+                              {isAccepted ? 'Aceptada' : isPending ? 'Pendiente' : isRevoked ? 'Revocada' : 'Expirada'}
+                            </span>
+
+                            {isPending && (
+                              <button
+                                onClick={() => handleRevokeInvite(inv.id)}
+                                disabled={revokingInviteId === inv.id}
+                                className="p-2 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer border-none bg-transparent"
+                                title="Revocar Invitación"
+                              >
+                                {revokingInviteId === inv.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
 
           {/* Ficha: Correos para programación de citas */}
           <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
@@ -1144,210 +1355,212 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                <Database className="h-5 w-5" />
-              </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Acciones Manuales de Respaldo</h4>
-                <p className="text-[10px] text-slate-400 font-semibold">Ejecuta operaciones de respaldo secundarias para resolver conflictos.</p>
-              </div>
-            </div>
-
-            <hr className="border-slate-50" />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
-              
-              {/* Botón 1: Sincronizar Ahora */}
-              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                <div>
-                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Sincronizar ahora</span>
-                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Descarga cambios de la nube y sube tus cambios pendientes.</p>
+          {!isFirebaseBackend && (
+            <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                  <Database className="h-5 w-5" />
                 </div>
-                <button
-                  id="btn-sync-now"
-                  onClick={() => syncNow()}
-                  disabled={opSyncStatus === 'syncing' || needsGoogleAuth}
-                  className="py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 w-full text-[10px]"
-                >
-                  {opSyncStatus === 'syncing' ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-3 w-3" />
-                  )}
-                  <span>Sincronizar ahora</span>
-                </button>
-              </div>
-
-              {/* Botón 2: Reconectar Google */}
-              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                 <div>
-                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reconectar Google</span>
-                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Solicita y renueva el token global abriendo la ventana de Google.</p>
+                  <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Acciones Manuales de Respaldo</h4>
+                  <p className="text-[10px] text-slate-400 font-semibold">Ejecuta operaciones de respaldo secundarias para resolver conflictos.</p>
                 </div>
-                <button
-                  id="btn-reconnect-google"
-                  onClick={() => reconnectGoogle()}
-                  className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 flex items-center justify-center gap-1.5 w-full text-[10px]"
-                >
-                  <Wifi className="h-3 w-3" />
-                  <span>Reconectar Google</span>
-                </button>
               </div>
 
-              {/* Botón 3: Reparar base Google-native */}
-              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                <div>
-                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reparar base Google-native</span>
-                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Reconstruye pestañas dañadas en Sheets y fuerza la subida local.</p>
-                </div>
-                <button
-                  id="btn-repair-database"
-                  onClick={() => repairGoogleNativeDatabase()}
-                  disabled={opSyncStatus === 'syncing' || isRepairing}
-                  className="py-2.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold rounded-xl transition-all border border-rose-100 flex items-center justify-center gap-1.5 w-full disabled:opacity-50 text-[10px]"
-                >
-                  {isRepairing ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <RotateCcw className="h-3 w-3" />
-                  )}
-                  <span>Reparar base</span>
-                </button>
-              </div>
+              <hr className="border-slate-50" />
 
-              {/* Botón 3b: Reparar documentos de miembros */}
-              <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                <div>
-                  <span className="font-extrabold text-amber-800 block text-[11px] mb-0.5">Reparar documentos de miembros</span>
-                  <p className="text-[9px] text-amber-600 leading-normal mb-2">Detecta y restaura números de documento que hayan desaparecido al sincronizar con Google Sheets.</p>
-                </div>
-                <button
-                  id="btn-repair-member-docs"
-                  onClick={async () => {
-                    setIsRepairingDocs(true);
-                    try { await repairMemberDocuments(); } catch (_) {}
-                    finally { setIsRepairingDocs(false); }
-                  }}
-                  disabled={opSyncStatus === 'syncing' || isRepairingDocs || !databaseSpreadsheetId}
-                  className="py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
-                >
-                  {isRepairingDocs ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <ShieldAlert className="h-3 w-3" />
-                  )}
-                  <span>Reparar documentos</span>
-                </button>
-              </div>
-
-              {/* Botón 3c: Actualizar este dispositivo desde Google */}
-              <div className="p-3 bg-teal-50 border border-teal-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                <div>
-                  <span className="font-extrabold text-teal-800 block text-[11px] mb-0.5">Actualizar desde Google</span>
-                  <p className="text-[9px] text-teal-600 leading-normal mb-2">Exporta un backup JSON local, hace pull y fusiona de forma segura sin borrar documentos.</p>
-                </div>
-                <button
-                  id="btn-update-device-from-google"
-                  onClick={async () => {
-                    setIsUpdatingDevice(true);
-                    try {
-                      await updateDeviceFromGoogle();
-                    } catch (err: any) {
-                      alert(`Error al actualizar el dispositivo: ${err.message}`);
-                    } finally {
-                      setIsUpdatingDevice(false);
-                    }
-                  }}
-                  disabled={opSyncStatus === 'syncing' || isUpdatingDevice || !databaseSpreadsheetId}
-                  className="py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
-                >
-                  {isUpdatingDevice ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Download className="h-3 w-3" />
-                  )}
-                  <span>Actualizar dispositivo</span>
-                </button>
-              </div>
-
-              {/* Botón 4: Crear base si no existe */}
-              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                <div>
-                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Crear base si no existe</span>
-                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Crea una base en blanco en tu Drive si no tienes ninguna.</p>
-                </div>
-                <button
-                  id="btn-create-database"
-                  onClick={() => createGoogleNativeDatabase()}
-                  disabled={opSyncStatus === 'syncing' || !!databaseSpreadsheetId}
-                  className="py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
-                >
-                  <span>Crear base</span>
-                </button>
-              </div>
-
-              {/* Botón 5: Descargar datos (Pull) */}
-              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                <div>
-                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Cargar desde Google</span>
-                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Sobrescribe el estado local con la versión de Google Sheets.</p>
-                </div>
-                <button
-                  id="btn-pull-google"
-                  onClick={() => pullFromGoogle()}
-                  disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
-                  className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
-                >
-                  <span>Cargar desde Google</span>
-                </button>
-              </div>
-
-              {/* Botón 6: Enviar datos locales (Push) */}
-              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                <div>
-                  <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Subir cambios locales</span>
-                  <p className="text-[9px] text-slate-400 leading-normal mb-2">Sube todos tus datos locales actuales a Google Sheets.</p>
-                </div>
-                <button
-                  id="btn-push-google"
-                  onClick={() => pushToGoogle()}
-                  disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
-                  className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
-                >
-                  <span>Subir cambios locales</span>
-                </button>
-              </div>
-
-            </div>
-
-            {/* Enlaces Rápidos a Google Drive / Sheets */}
-            {databaseSpreadsheetUrl && (
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2.5 font-semibold text-[11px] text-slate-500">
-                <a
-                  id="btn-open-spreadsheet"
-                  href={databaseSpreadsheetUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="py-2.5 bg-slate-800 hover:bg-slate-900 active:bg-black text-white font-extrabold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 text-center w-full"
-                >
-                  <Grid3X3 className="h-4.5 w-4.5" />
-                  <span>Abrir hoja operacional actual</span>
-                  <ExternalLink className="h-3 w-3" />
-                </a>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                 
-                <div className="flex justify-between text-[9px] border-t border-slate-200/50 pt-2.5">
-                  <span>ID Hoja de Cálculo:</span>
-                  <span className="font-bold text-slate-700 truncate max-w-[220px]">{databaseSpreadsheetId || 'N/A'}</span>
+                {/* Botón 1: Sincronizar Ahora */}
+                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                  <div>
+                    <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Sincronizar ahora</span>
+                    <p className="text-[9px] text-slate-400 leading-normal mb-2">Descarga cambios de la nube y sube tus cambios pendientes.</p>
+                  </div>
+                  <button
+                    id="btn-sync-now"
+                    onClick={() => syncNow()}
+                    disabled={opSyncStatus === 'syncing' || needsGoogleAuth}
+                    className="py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 w-full text-[10px]"
+                  >
+                    {opSyncStatus === 'syncing' ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
+                    <span>Sincronizar ahora</span>
+                  </button>
                 </div>
-                <div className="flex justify-between text-[9px]">
-                  <span>Dispositivo ID:</span>
-                  <span className="font-bold text-slate-700 truncate max-w-[220px]">{deviceId || 'N/A'}</span>
+
+                {/* Botón 2: Reconectar Google */}
+                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                  <div>
+                    <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reconectar Google</span>
+                    <p className="text-[9px] text-slate-400 leading-normal mb-2">Solicita y renueva el token global abriendo la ventana de Google.</p>
+                  </div>
+                  <button
+                    id="btn-reconnect-google"
+                    onClick={() => reconnectGoogle()}
+                    className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 flex items-center justify-center gap-1.5 w-full text-[10px]"
+                  >
+                    <Wifi className="h-3 w-3" />
+                    <span>Reconectar Google</span>
+                  </button>
                 </div>
+
+                {/* Botón 3: Reparar base Google-native */}
+                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                  <div>
+                    <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reparar base Google-native</span>
+                    <p className="text-[9px] text-slate-400 leading-normal mb-2">Reconstruye pestañas dañadas en Sheets y fuerza la subida local.</p>
+                  </div>
+                  <button
+                    id="btn-repair-database"
+                    onClick={() => repairGoogleNativeDatabase()}
+                    disabled={opSyncStatus === 'syncing' || isRepairing}
+                    className="py-2.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold rounded-xl transition-all border border-rose-100 flex items-center justify-center gap-1.5 w-full disabled:opacity-50 text-[10px]"
+                  >
+                    {isRepairing ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RotateCcw className="h-3 w-3" />
+                    )}
+                    <span>Reparar base</span>
+                  </button>
+                </div>
+
+                {/* Botón 3b: Reparar documentos de miembros */}
+                <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                  <div>
+                    <span className="font-extrabold text-amber-800 block text-[11px] mb-0.5">Reparar documentos de miembros</span>
+                    <p className="text-[9px] text-amber-600 leading-normal mb-2">Detecta y restaura números de documento que hayan desaparecido al sincronizar con Google Sheets.</p>
+                  </div>
+                  <button
+                    id="btn-repair-member-docs"
+                    onClick={async () => {
+                      setIsRepairingDocs(true);
+                      try { await repairMemberDocuments(); } catch (_) {}
+                      finally { setIsRepairingDocs(false); }
+                    }}
+                    disabled={opSyncStatus === 'syncing' || isRepairingDocs || !databaseSpreadsheetId}
+                    className="py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
+                  >
+                    {isRepairingDocs ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <ShieldAlert className="h-3 w-3" />
+                    )}
+                    <span>Reparar documentos</span>
+                  </button>
+                </div>
+
+                {/* Botón 3c: Actualizar este dispositivo desde Google */}
+                <div className="p-3 bg-teal-50 border border-teal-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                  <div>
+                    <span className="font-extrabold text-teal-800 block text-[11px] mb-0.5">Actualizar desde Google</span>
+                    <p className="text-[9px] text-teal-600 leading-normal mb-2">Exporta un backup JSON local, hace pull y fusiona de forma segura sin borrar documentos.</p>
+                  </div>
+                  <button
+                    id="btn-update-device-from-google"
+                    onClick={async () => {
+                      setIsUpdatingDevice(true);
+                      try {
+                        await updateDeviceFromGoogle();
+                      } catch (err: any) {
+                        alert(`Error al actualizar el dispositivo: ${err.message}`);
+                      } finally {
+                        setIsUpdatingDevice(false);
+                      }
+                    }}
+                    disabled={opSyncStatus === 'syncing' || isUpdatingDevice || !databaseSpreadsheetId}
+                    className="py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
+                  >
+                    {isUpdatingDevice ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Download className="h-3 w-3" />
+                    )}
+                    <span>Actualizar dispositivo</span>
+                  </button>
+                </div>
+
+                {/* Botón 4: Crear base si no existe */}
+                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                  <div>
+                    <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Crear base si no existe</span>
+                    <p className="text-[9px] text-slate-400 leading-normal mb-2">Crea una base en blanco en tu Drive si no tienes ninguna.</p>
+                  </div>
+                  <button
+                    id="btn-create-database"
+                    onClick={() => createGoogleNativeDatabase()}
+                    disabled={opSyncStatus === 'syncing' || !!databaseSpreadsheetId}
+                    className="py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
+                  >
+                    <span>Crear base</span>
+                  </button>
+                </div>
+
+                {/* Botón 5: Descargar datos (Pull) */}
+                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                  <div>
+                    <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Cargar desde Google</span>
+                    <p className="text-[9px] text-slate-400 leading-normal mb-2">Sobrescribe el estado local con la versión de Google Sheets.</p>
+                  </div>
+                  <button
+                    id="btn-pull-google"
+                    onClick={() => pullFromGoogle()}
+                    disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
+                    className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
+                  >
+                    <span>Cargar desde Google</span>
+                  </button>
+                </div>
+
+                {/* Botón 6: Enviar datos locales (Push) */}
+                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
+                  <div>
+                    <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Subir cambios locales</span>
+                    <p className="text-[9px] text-slate-400 leading-normal mb-2">Sube todos tus datos locales actuales a Google Sheets.</p>
+                  </div>
+                  <button
+                    id="btn-push-google"
+                    onClick={() => pushToGoogle()}
+                    disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
+                    className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
+                  >
+                    <span>Subir cambios locales</span>
+                  </button>
+                </div>
+
               </div>
-            )}
-          </section>
+
+              {/* Enlaces Rápidos a Google Drive / Sheets */}
+              {databaseSpreadsheetUrl && (
+                <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2.5 font-semibold text-[11px] text-slate-500">
+                  <a
+                    id="btn-open-spreadsheet"
+                    href={databaseSpreadsheetUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="py-2.5 bg-slate-800 hover:bg-slate-900 active:bg-black text-white font-extrabold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 text-center w-full"
+                  >
+                    <Grid3X3 className="h-4.5 w-4.5" />
+                    <span>Abrir hoja operacional actual</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                  
+                  <div className="flex justify-between text-[9px] border-t border-slate-200/50 pt-2.5">
+                    <span>ID Hoja de Cálculo:</span>
+                    <span className="font-bold text-slate-700 truncate max-w-[220px]">{databaseSpreadsheetId || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between text-[9px]">
+                    <span>Dispositivo ID:</span>
+                    <span className="font-bold text-slate-700 truncate max-w-[220px]">{deviceId || 'N/A'}</span>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
         </div>
       )}
 
@@ -1363,53 +1576,55 @@ export default function SettingsPage() {
         </div>
 
         {/* Shared Reports list */}
-        <div className="flex flex-col gap-3">
-          <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide px-1">Reportes Clínicos Compartidos (Sheets)</span>
-          {sharedReports.length === 0 ? (
-            <p className="text-[10px] text-slate-400 font-semibold italic px-1">No hay reportes de cálculo Sheets compartidos actualmente.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {sharedReports.map((rep) => (
-                <div key={rep.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-semibold text-[10px]">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-extrabold text-slate-800">Reporte para {rep.memberName}</p>
-                    <p className="text-[9px] text-slate-400">Destinatario: {rep.sharedWithEmail}</p>
-                    <p className="text-[8px] text-slate-400 font-bold">Fecha: {new Date(rep.sharedAt).toLocaleDateString('es-CO')}</p>
-                    <span className={`inline-block w-fit text-[8px] font-black px-1.5 py-0.5 rounded uppercase mt-1 leading-none ${
-                      rep.shareStatus === 'SHARED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                    }`}>
-                      {rep.shareStatus === 'SHARED' ? 'Compartido' : 'Acceso Revocado'}
-                    </span>
-                  </div>
-                  {rep.shareStatus === 'SHARED' && (
-                    <div className="flex gap-2 shrink-0">
-                      <a 
-                        href={rep.spreadsheetUrl} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="bg-white border border-slate-200 text-slate-700 hover:text-teal-600 px-3 py-1.5 rounded-xl font-bold transition-all text-center flex items-center justify-center animate-none"
-                      >
-                        Abrir
-                      </a>
-                      <button
-                        onClick={async () => {
-                          try {
-                            await revokeMemberReportShare(rep.id);
-                          } catch (err: any) {
-                            alert(`Error al revocar: ${err.message}`);
-                          }
-                        }}
-                        className="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 px-3 py-1.5 rounded-xl font-bold transition-all text-center"
-                      >
-                        Revocar
-                      </button>
+        {!isFirebaseBackend && (
+          <div className="flex flex-col gap-3">
+            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide px-1">Reportes Clínicos Compartidos (Sheets)</span>
+            {sharedReports.length === 0 ? (
+              <p className="text-[10px] text-slate-400 font-semibold italic px-1">No hay reportes de cálculo Sheets compartidos actualmente.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {sharedReports.map((rep) => (
+                  <div key={rep.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-semibold text-[10px]">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-extrabold text-slate-800">Reporte para {rep.memberName}</p>
+                      <p className="text-[9px] text-slate-400">Destinatario: {rep.sharedWithEmail}</p>
+                      <p className="text-[8px] text-slate-400 font-bold">Fecha: {new Date(rep.sharedAt).toLocaleDateString('es-CO')}</p>
+                      <span className={`inline-block w-fit text-[8px] font-black px-1.5 py-0.5 rounded uppercase mt-1 leading-none ${
+                        rep.shareStatus === 'SHARED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                      }`}>
+                        {rep.shareStatus === 'SHARED' ? 'Compartido' : 'Acceso Revocado'}
+                      </span>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                    {rep.shareStatus === 'SHARED' && (
+                      <div className="flex gap-2 shrink-0">
+                        <a 
+                          href={rep.spreadsheetUrl} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="bg-white border border-slate-200 text-slate-700 hover:text-teal-600 px-3 py-1.5 rounded-xl font-bold transition-all text-center flex items-center justify-center animate-none"
+                        >
+                          Abrir
+                        </a>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await revokeMemberReportShare(rep.id);
+                            } catch (err: any) {
+                              alert(`Error al revocar: ${err.message}`);
+                            }
+                          }}
+                          className="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 px-3 py-1.5 rounded-xl font-bold transition-all text-center"
+                        >
+                          Revocar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Shared Documents list */}
         <div className="flex flex-col gap-3 mt-2">

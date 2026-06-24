@@ -1,6 +1,12 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+// ── DataRepository abstraction (Phase 8) ─────────────────────────────────────
+import { isFirebaseBackend } from '../lib/dataBackend';
+import { getDataRepository, resetDataRepository } from '../lib/dataRepository';
+import type { DataUpdate } from '../lib/dataRepository';
+import type { FamilyInvitation } from '../lib/firestoreService';
+
 import { 
   UserAccount, 
   FamilyGroup, 
@@ -81,6 +87,7 @@ import {
   parseAppointmentEmail,
 } from '../lib/gmailAppointmentParser';
 
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '74018068811-phpbiqs6th899onjdquvln1t5tum98ea.apps.googleusercontent.com';
 
 const sanitizeRemoteAppointment = (appt: any): MedicalAppointment => {
   const doctorName = appt.doctorName || appt.doctor || 'Médico';
@@ -226,7 +233,7 @@ interface AppContextProps {
   lastSheetsAuthTime: string | null;
   lastExportMetadata: LastExportMetadata | null;
   
-  signIn: (googleUser?: Omit<UserAccount, 'id' | 'createdAt'>) => Promise<void>;
+  signIn: (googleUser?: Omit<UserAccount, 'id' | 'createdAt'>, idToken?: string) => Promise<void>;
   signOut: () => Promise<void>;
   addMember: (member: Omit<FamilyMember, 'id' | 'familyGroupId'>) => void;
   updateMember: (id: string, member: Partial<FamilyMember>) => void;
@@ -250,7 +257,7 @@ interface AppContextProps {
 
   // Google Calendar Actions
   connectCalendar: () => Promise<string | null>;
-  syncAppointmentToCalendar: (apptId: string, customAppt?: MedicalAppointment) => Promise<void>;
+  syncAppointmentToCalendar: (apptId: string, customAppt?: MedicalAppointment, forcePopup?: boolean) => Promise<void>;
 
   // Google Sheets Actions
   connectSheets: () => Promise<string | null>;
@@ -373,6 +380,15 @@ interface AppContextProps {
   setNightLockEnd: (t: string) => void;
   validateDataIntegrity: () => DataIntegrityReport;
   importBackupJSON: (data: SavedAppState) => void;
+  isFirebaseBackend: boolean;
+  familyId: string | null;
+  pendingInvitations: FamilyInvitation[];
+  invitations: FamilyInvitation[];
+  createInvitation: (email: string, memberId: string, role: 'OWNER' | 'MEMBER' | 'CAREGIVER' | 'VIEWER') => Promise<string>;
+  acceptInvitation: (targetFamilyId: string, invitationId: string) => Promise<void>;
+  revokeInvitation: (invitationId: string) => Promise<void>;
+  createNewFamily: (name: string) => Promise<void>;
+  checkPendingInvitations: () => Promise<FamilyInvitation[]>;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -394,6 +410,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [medicalOrders, setMedicalOrders] = useState<MedicalOrder[]>([]);
   const [medicationPrescriptions, setMedicationPrescriptions] = useState<MedicationPrescription[]>([]);
   const [medicationDoseReminders, setMedicationDoseReminders] = useState<MedicationDoseReminder[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<FamilyInvitation[]>([]);
+  const [invitations, setInvitations] = useState<FamilyInvitation[]>([]);
 
   // Refs to prevent React state stale closures during async sync/pull operations
   const membersRef = useRef<FamilyMember[]>(members);
@@ -519,6 +537,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const nightLockStartRef = useRef<string>('22:00');
   const nightLockEndRef = useRef<string>('06:00');
   const sessionLockedRef = useRef<boolean>(false);
+
+  // ── Firebase DataRepository state (Phase 8) ─────────────────────────────────
+  // familyId is null for the Sheets backend and is set on sign-in for Firebase.
+  const [familyId, setFamilyId] = useState<string | null>(null);
+  const familyIdRef = useRef<string | null>(null);
+  useEffect(() => { familyIdRef.current = familyId; }, [familyId]);
+  // Holds the single unsubscribe function returned by watchAllFamilyData.
+  const firebaseUnsubRef = useRef<(() => void) | null>(null);
+  const firebaseInvitationsUnsubRef = useRef<(() => void) | null>(null);
+
 
   useEffect(() => { autoLockEnabledRef.current = autoLockEnabled; }, [autoLockEnabled]);
   useEffect(() => { autoLockMinutesRef.current = autoLockMinutes; }, [autoLockMinutes]);
@@ -781,7 +809,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
-            .then((reg) => console.log('Service Worker registrado con éxito. Scope:', reg.scope))
             .catch((err) => console.error('Error al registrar el Service Worker:', err));
         });
       }
@@ -885,6 +912,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     isLoading
   ]);
 
+  // Persist settings to Firebase when they change
+  useEffect(() => {
+    if (!isFirebaseBackend || isLoading || !user) return;
+    
+    firebasePersist(async (repo, ctx) => {
+      await repo.saveSettings(ctx, {
+        gmailAutoScanEnabled,
+        gmailScanTime,
+        gmailScanRangeDays,
+        gmailOnlyFutureAppointments,
+        lastGmailScanAt,
+        nextGmailScanAt,
+      });
+    });
+  }, [
+    gmailAutoScanEnabled,
+    gmailScanTime,
+    gmailScanRangeDays,
+    gmailOnlyFutureAppointments,
+    lastGmailScanAt,
+    nextGmailScanAt,
+    isLoading,
+    user
+  ]);
+
   // Ejecutar limpieza de retención de citas al iniciar la app
   useEffect(() => {
     if (!isLoading) {
@@ -892,10 +944,126 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isLoading]);
 
-  const signIn = async (googleUser?: Omit<UserAccount, 'id' | 'createdAt'>) => {
+  // Sincronizar el estado de Firebase Auth SDK con el React Context
+  useEffect(() => {
+    if (!isFirebaseBackend) return;
+
+    let isMounted = true;
+    let unsubscribe: (() => void) | null = null;
+
+    const initFirebaseAuth = async () => {
+      try {
+        const { firebaseAuth } = await import('../lib/firebase');
+        if (!isMounted) return;
+        
+        unsubscribe = firebaseAuth.onAuthStateChanged(async (firebaseUser) => {
+          if (!isMounted) return;
+
+          if (firebaseUser) {
+            // console.info('[AppContext] Firebase Auth user detected:', firebaseUser.email);
+            const realUser: UserAccount = {
+              id: `user-${firebaseUser.uid}`,
+              googleId: firebaseUser.uid,
+              displayName: firebaseUser.displayName || firebaseUser.email || '',
+              email: firebaseUser.email || '',
+              photoUrl: firebaseUser.photoURL || null,
+              createdAt: new Date().toISOString(),
+              provider: 'google',
+              loggedAt: new Date().toISOString()
+            };
+
+            setUser(realUser);
+            setActiveUser(realUser);
+
+            // Cargar datos familiares desde Firestore
+            try {
+              setSyncInitStatus('checking');
+              setSyncInitMessage('Sincronizando con Firebase...');
+              const repo = await getDataRepository();
+              const fid = await repo.initFamily({
+                uid: firebaseUser.uid,
+                email: firebaseUser.email || '',
+                displayName: firebaseUser.displayName || firebaseUser.email || '',
+              });
+              
+              if (!isMounted) return;
+              setFamilyId(fid);
+
+              if (fid) {
+                const data = await repo.loadAll({
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email || '',
+                  familyId: fid,
+                });
+                
+                if (!isMounted) return;
+                
+                // Aplicar datos a React state
+                setMembers(data.members);
+                setHealthProfiles(data.healthProfiles);
+                setAppointments(data.appointments);
+                setCheckups(data.checkups);
+                setVaccines(data.vaccines);
+                setExams(data.exams);
+                setExamResults(data.examResults);
+                setDocuments(data.documents);
+                setHistory(data.history);
+                setReminders(data.reminders);
+                setTasks(data.tasks);
+                setMedicalOrders(data.medicalOrders);
+                setMedicationPrescriptions(data.medications);
+                setMedicationDoseReminders(data.doseReminders);
+
+                const isNew = data.members.length === 0;
+                setSyncInitStatus(isNew ? 'no_remote_data' : 'loaded_from_google');
+                setSyncInitMessage(
+                  isNew
+                    ? 'Base Firebase lista. Agrega tu primer miembro familiar.'
+                    : `${data.members.length} miembro(s) cargado(s) desde Firebase.`
+                );
+              } else {
+                setSyncInitStatus('idle');
+                setSyncInitMessage('Listo para aceptar invitación.');
+              }
+            } catch (err: any) {
+              console.error('[AppContext] Error cargando datos de Firebase:', err);
+              if (isMounted) {
+                setSyncInitStatus('error');
+                setSyncInitMessage('Error al sincronizar con Firebase.');
+              }
+            } finally {
+              if (isMounted) setIsLoading(false);
+            }
+          } else {
+            // // console.info('[AppContext] No Firebase Auth user.');
+            const active = getActiveUser();
+            if (active && active !== 'demo') {
+              setUser(null);
+              clearAppState();
+            }
+            if (isMounted) setIsLoading(false);
+          }
+        });
+      } catch (err) {
+        console.error('[AppContext] Failed to initialize Firebase Auth listener:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    initFirebaseAuth();
+
+    return () => {
+      isMounted = false;
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []);
+
+  const signIn = async (googleUser?: Omit<UserAccount, 'id' | 'createdAt'>, idToken?: string) => {
     setIsLoading(true);
     await new Promise((resolve) => setTimeout(resolve, 800));
-    
+
     if (googleUser) {
       const realUser: UserAccount = {
         id: `user-${googleUser.googleId || Date.now()}`,
@@ -907,8 +1075,125 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         provider: 'google',
         loggedAt: new Date().toISOString()
       };
-      
-      // Establecer usuario activo en LocalStorage
+
+      // ── FIREBASE BACKEND BRANCH ─────────────────────────────────────────────
+      if (isFirebaseBackend) {
+        try {
+          if (idToken) {
+            const { signInWithCredential, GoogleAuthProvider } = await import('firebase/auth');
+            const { firebaseAuth } = await import('../lib/firebase');
+            const credential = GoogleAuthProvider.credential(idToken);
+            await signInWithCredential(firebaseAuth, credential);
+          }
+
+          setUser(realUser);
+          setActiveUser(realUser);
+          setSyncInitStatus('checking');
+          setSyncInitMessage('Conectando con Firebase...');
+
+          const repo = await getDataRepository();
+
+          // Resolve or create the Firestore family document.
+          const fid = await repo.initFamily({
+            uid: realUser.googleId ?? realUser.id,
+            email: realUser.email,
+            displayName: realUser.displayName,
+          });
+          setFamilyId(fid);
+
+          if (fid) {
+            // Load all data from Firestore (returns EMPTY_FAMILY_DATA on first login).
+            const data = await repo.loadAll({
+              uid:      realUser.googleId ?? realUser.id,
+              email:    realUser.email,
+              familyId: fid,
+            });
+
+            // Apply data to React state.
+            setMembers(data.members);
+            setHealthProfiles(data.healthProfiles);
+            setAppointments(data.appointments);
+            setCheckups(data.checkups);
+            setVaccines(data.vaccines);
+            setExams(data.exams);
+            setExamResults(data.examResults);
+            setDocuments(data.documents);
+            setHistory(data.history);
+            setReminders(data.reminders);
+            setTasks(data.tasks);
+            setMedicalOrders(data.medicalOrders);
+            setMedicationPrescriptions(data.medications);
+            setMedicationDoseReminders(data.doseReminders);
+            setEmailSources(
+              data.gmailSources.length > 0
+                ? data.gmailSources
+                : [
+                    {
+                      id: 'source-default',
+                      email: 'noreply@informacion.saludsis.mil.co',
+                      label: 'Salud SIS (Defecto)',
+                      enabled: true,
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                    },
+                  ],
+            );
+            setAppointmentCandidates(data.appointmentCandidates);
+            setGmailAutoScanEnabled(data.gmailAutoScanEnabled);
+            setGmailScanTime(data.gmailScanTime);
+            setGmailScanRangeDays(data.gmailScanRangeDays);
+            setGmailOnlyFutureAppointments(data.gmailOnlyFutureAppointments);
+            setLastGmailScanAt(data.lastGmailScanAt);
+            setNextGmailScanAt(data.nextGmailScanAt);
+
+            const isNew = data.members.length === 0;
+            setSyncInitStatus(isNew ? 'no_remote_data' : 'loaded_from_google');
+            setSyncInitMessage(
+              isNew
+                ? 'Base Firebase lista. Agrega tu primer miembro familiar.'
+                : `${data.members.length} miembro(s) cargado(s) desde Firebase.`,
+            );
+          } else {
+            // Guest user: clear all data
+            setMembers([]);
+            setHealthProfiles({});
+            setAppointments([]);
+            setCheckups([]);
+            setVaccines([]);
+            setExams([]);
+            setExamResults({});
+            setDocuments([]);
+            setHistory([]);
+            setReminders([]);
+            setTasks([]);
+            setMedicalOrders([]);
+            setMedicationPrescriptions([]);
+            setMedicationDoseReminders([]);
+            setEmailSources([]);
+            setAppointmentCandidates([]);
+
+            // Fetch pending invitations
+            const invs = await repo.getInvitationsForEmail(realUser.email);
+            setPendingInvitations(invs);
+            
+            setSyncInitStatus('no_remote_data');
+            setSyncInitMessage('Invitaciones pendientes detectadas.');
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error('[AppContext] Firebase signIn error:', err);
+          setSyncInitStatus('error');
+          setSyncInitMessage(`Error al conectar con Firebase: ${msg}`);
+          // Do not block the user — allow the app to work offline
+          setUser(realUser);
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      }
+      // ── END FIREBASE BRANCH ─────────────────────────────────────────────────
+
+      // Establecer usuario activo en LocalStorage (Sheets path)
       setActiveUser(realUser);
       
       const userKey = realUser.googleId || realUser.email;
@@ -1141,19 +1426,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     setIsLoading(true);
+    try {
+      if (isFirebaseBackend) {
+        const { firebaseAuth } = await import('../lib/firebase');
+        await firebaseAuth.signOut();
+      }
+    } catch (err) {
+      console.error('[AppContext] Error signing out from Firebase:', err);
+    }
     await new Promise((resolve) => setTimeout(resolve, 500));
     // Cancelar timer de auto-sync pendiente
     if (autoSyncTimerRef.current) {
       clearTimeout(autoSyncTimerRef.current);
       autoSyncTimerRef.current = null;
     }
+    // ── Firebase: teardown real-time watchers ─────────────────────────────────
+    if (firebaseUnsubRef.current) {
+      firebaseUnsubRef.current();
+      firebaseUnsubRef.current = null;
+    }
+    if (firebaseInvitationsUnsubRef.current) {
+      firebaseInvitationsUnsubRef.current();
+      firebaseInvitationsUnsubRef.current = null;
+    }
+    resetDataRepository();
+    setFamilyId(null);
+    // ─────────────────────────────────────────────────────────────────────────
     // Limpiar tokens en memoria (seguridad)
     invalidateAllTokens();
+
     setActiveUser(null);
     setUser(null);
     setMembers([]);
     setHealthProfiles({});
     setAppointments([]);
+    setPendingInvitations([]);
+    setInvitations([]);
     setCheckups([]);
     setVaccines([]);
     setExams([]);
@@ -1198,6 +1506,279 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   };
 
+  // ── FIREBASE: Real-time watchers (Phase 8) ──────────────────────────────────
+  // When familyId becomes available (after firebase signIn) start listening to
+  // all Firestore collections. Tears down automatically when familyId clears.
+  useEffect(() => {
+    if (!isFirebaseBackend || !familyId) return;
+
+    let cancelled = false;
+    getDataRepository().then((repo) => {
+      if (cancelled) return;
+      const unsub = repo.watchAll(
+        { uid: '', email: '', familyId },
+        (update: DataUpdate) => {
+          if (cancelled) return;
+          switch (update.type) {
+            case 'members':               setMembers(update.data);                     break;
+            case 'healthProfiles':        setHealthProfiles(update.data);              break;
+            case 'appointments':          setAppointments(update.data);                break;
+            case 'checkups':              setCheckups(update.data);                    break;
+            case 'vaccines':              setVaccines(update.data);                    break;
+            case 'exams':                 setExams(update.data);                       break;
+            case 'documents':             setDocuments(update.data);                   break;
+            case 'history':               setHistory(update.data);                     break;
+            case 'reminders':             setReminders(update.data);                   break;
+            case 'tasks':                 setTasks(update.data);                       break;
+            case 'medicalOrders':         setMedicalOrders(update.data);               break;
+            case 'medications':           setMedicationPrescriptions(update.data);     break;
+            case 'doseReminders':         setMedicationDoseReminders(update.data);     break;
+            case 'gmailSources':          setEmailSources(update.data);                break;
+            case 'appointmentCandidates': setAppointmentCandidates(update.data);       break;
+            case 'settings':
+              if (update.data) {
+                if (update.data.gmailAutoScanEnabled   !== undefined) setGmailAutoScanEnabled(update.data.gmailAutoScanEnabled);
+                if (update.data.gmailScanTime          !== undefined) setGmailScanTime(update.data.gmailScanTime);
+                if (update.data.gmailScanRangeDays     !== undefined) setGmailScanRangeDays(update.data.gmailScanRangeDays);
+                if (update.data.gmailOnlyFutureAppointments !== undefined) setGmailOnlyFutureAppointments(update.data.gmailOnlyFutureAppointments);
+                if (update.data.lastGmailScanAt        !== undefined) setLastGmailScanAt(update.data.lastGmailScanAt ?? null);
+                if (update.data.nextGmailScanAt        !== undefined) setNextGmailScanAt(update.data.nextGmailScanAt ?? null);
+              }
+              break;
+          }
+        },
+      );
+      firebaseUnsubRef.current = unsub;
+    }).catch((err) => {
+      console.error('[AppContext] Firebase watcher setup failed:', err);
+    });
+
+    getDataRepository().then((repo) => {
+      if (cancelled) return;
+      if (repo.watchInvitations) {
+        const unsub = repo.watchInvitations(
+          { uid: user?.googleId ?? user?.id ?? '', email: user?.email ?? '', familyId },
+          (invs) => {
+            if (cancelled) return;
+            setInvitations(invs);
+          }
+        );
+        firebaseInvitationsUnsubRef.current = unsub;
+      }
+    }).catch((err) => {
+      console.error('[AppContext] Firebase invitations watcher setup failed:', err);
+    });
+
+    return () => {
+      cancelled = true;
+      if (firebaseUnsubRef.current) {
+        firebaseUnsubRef.current();
+        firebaseUnsubRef.current = null;
+      }
+      if (firebaseInvitationsUnsubRef.current) {
+        firebaseInvitationsUnsubRef.current();
+        firebaseInvitationsUnsubRef.current = null;
+      }
+    };
+  }, [familyId, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── FIREBASE: State snapshot and rollback for optimistic updates ───────────
+  const stateRef = useRef({
+    members,
+    healthProfiles,
+    appointments,
+    checkups,
+    vaccines,
+    exams,
+    examResults,
+    documents,
+    history,
+    reminders,
+    tasks,
+    medicalOrders,
+    medicationPrescriptions,
+    medicationDoseReminders,
+  });
+
+  stateRef.current = {
+    members,
+    healthProfiles,
+    appointments,
+    checkups,
+    vaccines,
+    exams,
+    examResults,
+    documents,
+    history,
+    reminders,
+    tasks,
+    medicalOrders,
+    medicationPrescriptions,
+    medicationDoseReminders,
+  };
+
+  // ── FIREBASE: firebasePersist helper ────────────────────────────────────────
+  // Non-blocking fire-and-forget helper for individual entity writes.
+  // No-op when the backend is Sheets (AppContext's existing scheduleAutoSync
+  // handles persistence for that path).
+  const firebasePersist = useCallback(
+    (fn: (repo: Awaited<ReturnType<typeof getDataRepository>>, ctx: { uid: string; email: string; familyId: string }) => Promise<void>) => {
+      if (!isFirebaseBackend || !familyIdRef.current) return;
+      const fid = familyIdRef.current;
+
+      // Capture the state snapshot before the async operation starts
+      const snap = { ...stateRef.current };
+
+      getDataRepository().then(async (repo) => {
+        try {
+          await fn(repo, { uid: user?.googleId ?? user?.id ?? '', email: user?.email ?? '', familyId: fid });
+        } catch (err: any) {
+          console.error('[AppContext] firebasePersist error — rolling back state:', err);
+
+          // Rollback all states
+          setMembers(snap.members);
+          setHealthProfiles(snap.healthProfiles);
+          setAppointments(snap.appointments);
+          setCheckups(snap.checkups);
+          setVaccines(snap.vaccines);
+          setExams(snap.exams);
+          setExamResults(snap.examResults);
+          setDocuments(snap.documents);
+          setHistory(snap.history);
+          setReminders(snap.reminders);
+          setTasks(snap.tasks);
+          setMedicalOrders(snap.medicalOrders);
+          setMedicationPrescriptions(snap.medicationPrescriptions);
+          setMedicationDoseReminders(snap.medicationDoseReminders);
+
+          alert(`Error al guardar en base de datos Firebase: ${err.message || 'Permisos insuficientes o error de red.'}`);
+        }
+      }).catch((err) => {
+        console.error('[AppContext] firebasePersist setup error:', err);
+      });
+    },
+    [user], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  // ── FIREBASE: Family Invitations & Access Actions ─────────────────────────
+  const createInvitation = useCallback(async (
+    email: string,
+    memberId: string,
+    role: 'OWNER' | 'MEMBER' | 'CAREGIVER' | 'VIEWER'
+  ): Promise<string> => {
+    const repo = await getDataRepository();
+    const ctx = { uid: user?.googleId ?? user?.id ?? '', email: user?.email ?? '', familyId };
+    return await repo.createInvitation(ctx, email, memberId, role);
+  }, [user, familyId]);
+
+  const acceptInvitation = useCallback(async (
+    targetFamilyId: string,
+    invitationId: string
+  ): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const repo = await getDataRepository();
+      const ctx = { uid: user?.googleId ?? user?.id ?? '', email: user?.email ?? '', familyId: null };
+      await repo.acceptInvitation(ctx, targetFamilyId, invitationId);
+      
+      // Update context familyId to the new familyId!
+      setFamilyId(targetFamilyId);
+      
+      // Reload everything
+      const data = await repo.loadAll({
+        uid: user?.googleId ?? user?.id ?? '',
+        email: user?.email ?? '',
+        familyId: targetFamilyId,
+      });
+
+      setMembers(data.members);
+      setHealthProfiles(data.healthProfiles);
+      setAppointments(data.appointments);
+      setCheckups(data.checkups);
+      setVaccines(data.vaccines);
+      setExams(data.exams);
+      setExamResults(data.examResults);
+      setDocuments(data.documents);
+      setHistory(data.history);
+      setReminders(data.reminders);
+      setTasks(data.tasks);
+      setMedicalOrders(data.medicalOrders);
+      setMedicationPrescriptions(data.medications);
+      setMedicationDoseReminders(data.doseReminders);
+      setEmailSources(data.gmailSources);
+      setAppointmentCandidates(data.appointmentCandidates);
+      
+      // Clear pending invitations since we accepted one
+      setPendingInvitations([]);
+    } catch (err) {
+      console.error('[AppContext] Failed to accept invitation:', err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  const revokeInvitation = useCallback(async (
+    invitationId: string
+  ): Promise<void> => {
+    const repo = await getDataRepository();
+    const ctx = { uid: user?.googleId ?? user?.id ?? '', email: user?.email ?? '', familyId };
+    await repo.revokeInvitation(ctx, invitationId);
+  }, [user, familyId]);
+
+  const createNewFamily = useCallback(async (name: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const repo = await getDataRepository();
+      const ctx = { uid: user?.googleId ?? user?.id ?? '', email: user?.email ?? '', familyId: null };
+      const newFid = await repo.createFamily(ctx, name);
+      
+      setFamilyId(newFid);
+      
+      // Clear state
+      setMembers([]);
+      setHealthProfiles({});
+      setAppointments([]);
+      setCheckups([]);
+      setVaccines([]);
+      setExams([]);
+      setExamResults({});
+      setDocuments([]);
+      setHistory([]);
+      setReminders([]);
+      setTasks([]);
+      setMedicalOrders([]);
+      setMedicationPrescriptions([]);
+      setMedicationDoseReminders([]);
+      
+      // Load all
+      const data = await repo.loadAll({
+        uid: user?.googleId ?? user?.id ?? '',
+        email: user?.email ?? '',
+        familyId: newFid,
+      });
+      setMembers(data.members);
+    } catch (err) {
+      console.error('[AppContext] Failed to create family:', err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  const checkPendingInvitations = useCallback(async (): Promise<FamilyInvitation[]> => {
+    if (!user?.email) return [];
+    try {
+      const repo = await getDataRepository();
+      const invs = await repo.getInvitationsForEmail(user.email);
+      setPendingInvitations(invs);
+      return invs;
+    } catch (err) {
+      console.error('[AppContext] Failed to get pending invitations:', err);
+      return [];
+    }
+  }, [user]);
+
   // ── FUNCIONES DE AUTO-SYNC ────────────────────────────────────────────────
 
   /**
@@ -1207,6 +1788,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * Si no hay token disponible, marca como pending_sync en lugar de fallar.
    */
   const scheduleAutoSync = (reason: string) => {
+    if (isFirebaseBackend) return; // Firebase writes go through firebasePersist, not Sheets
     if (!autoSyncEnabled) return;
     if (typeof window === 'undefined') return;
 
@@ -1333,7 +1915,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       status: 'ACTIVE',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      syncStatus: 'PENDING_SYNC'
+      syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC'
     };
     setMembers((prev) => [...prev, newMember]);
 
@@ -1360,9 +1942,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory((prev) => [newEvent, ...prev]);
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.saveMember(ctx, newMember);
+      await repo.saveHealthProfile(ctx, newId, newProfile);
+      await repo.saveHistoryEvent(ctx, newEvent);
+    });
   };
 
   const updateMember = (id: string, updatedFields: Partial<FamilyMember>) => {
+    let updatedMember: FamilyMember | null = null;
+    let newEvent: MedicalHistoryEvent | null = null;
     setMembers((prev) => prev.map((m) => {
       if (m.id === id) {
         const permissionsChanged = JSON.stringify(m.permissions) !== JSON.stringify(updatedFields.permissions) || 
@@ -1371,7 +1961,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           m.permissionStatus !== updatedFields.permissionStatus;
 
         if (permissionsChanged) {
-          const newEvent: MedicalHistoryEvent = {
+          newEvent = {
             id: `hist-${Date.now()}`,
             memberId: id,
             eventType: 'OTHER',
@@ -1380,9 +1970,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             eventDate: new Date().toISOString().split('T')[0],
             createdAt: new Date().toISOString()
           };
-          setTimeout(() => setHistory(h => [newEvent, ...h]), 50);
+          setTimeout(() => setHistory(h => [newEvent!, ...h]), 50);
         } else {
-          const newEvent: MedicalHistoryEvent = {
+          newEvent = {
             id: `hist-${Date.now()}`,
             memberId: id,
             eventType: 'OTHER',
@@ -1391,18 +1981,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             eventDate: new Date().toISOString().split('T')[0],
             createdAt: new Date().toISOString()
           };
-          setTimeout(() => setHistory(h => [newEvent, ...h]), 50);
+          setTimeout(() => setHistory(h => [newEvent!, ...h]), 50);
         }
-        return {
+        updatedMember = {
           ...m,
           ...updatedFields,
           updatedAt: new Date().toISOString(),
-          syncStatus: 'PENDING_SYNC'
+          syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC'
         };
+        return updatedMember;
       }
       return m;
     }));
     setTimeout(() => scheduleAutoSync('member_updated'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      if (updatedMember) {
+        await repo.saveMember(ctx, updatedMember);
+      }
+      if (newEvent) {
+        await repo.saveHistoryEvent(ctx, newEvent);
+      }
+    });
   };
 
   const deleteMember = (id: string): boolean => {
@@ -1449,15 +2049,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           status: 'DELETED',
           deletedAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          syncStatus: 'PENDING_SYNC'
+          syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC'
         };
       }
       return m;
     }));
     
     const adminMember = members.find(m => m.relationship === 'SELF') || members[0];
+    let newEvent: MedicalHistoryEvent | null = null;
     if (adminMember) {
-      const newEvent: MedicalHistoryEvent = {
+      newEvent = {
         id: `hist-${Date.now()}`,
         memberId: adminMember.id,
         eventType: 'OTHER',
@@ -1466,19 +2067,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         eventDate: new Date().toISOString().split('T')[0],
         createdAt: new Date().toISOString()
       };
-      setHistory(prev => [newEvent, ...prev]);
+      setHistory(prev => [newEvent!, ...prev]);
     }
     setTimeout(() => scheduleAutoSync('member_deleted'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.deleteMember(ctx, id);
+      if (newEvent) {
+        await repo.saveHistoryEvent(ctx, newEvent);
+      }
+    });
     return true; 
   };
 
   const inactivateMember = (memberId: string) => {
-    setMembers(prev => prev.map(m => m.id === memberId ? { 
-      ...m, 
-      status: 'INACTIVE',
-      updatedAt: new Date().toISOString(),
-      syncStatus: 'PENDING_SYNC'
-    } : m));
+    let updatedMember: FamilyMember | null = null;
+    setMembers(prev => prev.map(m => {
+      if (m.id === memberId) {
+        updatedMember = { 
+          ...m, 
+          status: 'INACTIVE',
+          updatedAt: new Date().toISOString(),
+          syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC'
+        };
+        return updatedMember;
+      }
+      return m;
+    }));
     
     const newEvent: MedicalHistoryEvent = {
       id: `hist-${Date.now()}`,
@@ -1491,15 +2106,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setHistory(prev => [newEvent, ...prev]);
     setTimeout(() => scheduleAutoSync('member_inactivated'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      if (updatedMember) {
+        await repo.saveMember(ctx, updatedMember);
+      }
+      await repo.saveHistoryEvent(ctx, newEvent);
+    });
   };
 
   const reactivateMember = (memberId: string) => {
-    setMembers(prev => prev.map(m => m.id === memberId ? { 
-      ...m, 
-      status: 'ACTIVE',
-      updatedAt: new Date().toISOString(),
-      syncStatus: 'PENDING_SYNC'
-    } : m));
+    let updatedMember: FamilyMember | null = null;
+    setMembers(prev => prev.map(m => {
+      if (m.id === memberId) {
+        updatedMember = { 
+          ...m, 
+          status: 'ACTIVE',
+          updatedAt: new Date().toISOString(),
+          syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC'
+        };
+        return updatedMember;
+      }
+      return m;
+    }));
     
     const newEvent: MedicalHistoryEvent = {
       id: `hist-${Date.now()}`,
@@ -1512,6 +2141,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setHistory(prev => [newEvent, ...prev]);
     setTimeout(() => scheduleAutoSync('member_reactivated'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      if (updatedMember) {
+        await repo.saveMember(ctx, updatedMember);
+      }
+      await repo.saveHistoryEvent(ctx, newEvent);
+    });
   };
 
   const runAppointmentRetentionCleanup = () => {
@@ -1588,6 +2224,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const saveHealthProfile = (memberId: string, profileFields: Partial<HealthProfile>) => {
+    let updatedProfile: HealthProfile | null = null;
     setHealthProfiles((prev) => {
       const current = prev[memberId] || {
         id: `hp-${Date.now()}`,
@@ -1597,16 +2234,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         currentMedications: [],
         lastUpdated: ''
       };
+      updatedProfile = {
+        ...current,
+        ...profileFields,
+        lastUpdated: new Date().toISOString()
+      };
       return {
         ...prev,
-        [memberId]: {
-          ...current,
-          ...profileFields,
-          lastUpdated: new Date().toISOString()
-        }
+        [memberId]: updatedProfile
       };
     });
     setTimeout(() => scheduleAutoSync('health_profile_saved'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      if (updatedProfile) {
+        await repo.saveHealthProfile(ctx, memberId, updatedProfile);
+      }
+    });
   };
 
   const addAppointment = (appt: Omit<MedicalAppointment, 'id' | 'documentIds'>) => {
@@ -1629,7 +2273,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       time,
       documentIds: [],
       calendarSyncStatus: calendarSyncEnabled ? 'PENDING_CALENDAR_SYNC' : 'LOCAL_ONLY',
-      syncStatus: 'PENDING_SYNC',
+      syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC',
       createdAt: nowIso,
       updatedAt: nowIso,
       deletedAt: null,
@@ -1670,15 +2314,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         syncAppointmentToCalendar(newId, newAppt);
       }, 200);
     }
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.saveAppointment(ctx, newAppt);
+      await repo.saveReminder(ctx, newReminder);
+      await repo.saveHistoryEvent(ctx, newEvent);
+    });
   };
 
   const updateAppointmentStatus = (id: string, status: HealthEventStatus) => {
+    let updatedAppt: MedicalAppointment | null = null;
+    let newHistoryEvent: MedicalHistoryEvent | null = null;
+    let updatedReminder: Reminder | null = null;
+
     setAppointments((prev) => prev.map((a) => {
       if (a.id === id) {
         const completedAt = status === 'COMPLETED' ? new Date().toISOString() : a.completedAt;
         
         if (status === 'COMPLETED' && a.status !== 'COMPLETED') {
-          const newEvent: MedicalHistoryEvent = {
+          newHistoryEvent = {
             id: `hist-${Date.now()}`,
             memberId: a.memberId,
             eventType: 'APPOINTMENT',
@@ -1687,18 +2341,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             eventDate: new Date().toISOString().split('T')[0],
             createdAt: new Date().toISOString()
           };
-          setTimeout(() => setHistory(h => [newEvent, ...h]), 50);
+          setTimeout(() => setHistory(h => [newHistoryEvent!, ...h]), 50);
         }
 
-        return { ...a, status, completedAt };
+        updatedAppt = { ...a, status, completedAt };
+        return updatedAppt;
       }
       return a;
     }));
     
     if (status === 'COMPLETED') {
-      setReminders((prev) => prev.map((r) => r.relatedEventId === id ? { ...r, status: 'DONE' } : r));
+      setReminders((prev) => prev.map((r) => {
+        if (r.relatedEventId === id) {
+          updatedReminder = { ...r, status: 'DONE' };
+          return updatedReminder;
+        }
+        return r;
+      }));
     }
     setTimeout(() => scheduleAutoSync('appointment_status_updated'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      if (updatedAppt) {
+        await repo.saveAppointment(ctx, updatedAppt);
+      }
+      if (newHistoryEvent) {
+        await repo.saveHistoryEvent(ctx, newHistoryEvent);
+      }
+      if (updatedReminder) {
+        await repo.saveReminder(ctx, updatedReminder);
+      }
+    });
   };
 
   const addCheckup = (chk: Omit<PeriodicCheckup, 'id'>) => {
@@ -1721,6 +2394,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setHistory((prev) => [newEvent, ...prev]);
     setTimeout(() => scheduleAutoSync('checkup_added'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.saveCheckup(ctx, newCheckup);
+      await repo.saveHistoryEvent(ctx, newEvent);
+    });
   };
 
   const addVaccine = (vac: Omit<VaccineRecord, 'id'>) => {
@@ -1731,8 +2409,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setVaccines((prev) => [...prev, newVac]);
 
+    let newReminder: Reminder | null = null;
     if (vac.status === 'SCHEDULED') {
-      const newReminder: Reminder = {
+      newReminder = {
         id: `rem-${Date.now()}`,
         memberId: vac.memberId,
         title: `Vacuna: ${vac.vaccineName} (Dosis ${vac.doseNumber})`,
@@ -1742,7 +2421,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         status: 'PENDING',
         relatedEventId: newId
       };
-      setReminders((prev) => [...prev, newReminder]);
+      setReminders((prev) => [...prev, newReminder!]);
     }
 
     const newEvent: MedicalHistoryEvent = {
@@ -1759,6 +2438,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setHistory((prev) => [newEvent, ...prev]);
     setTimeout(() => scheduleAutoSync('vaccine_added'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.saveVaccine(ctx, newVac);
+      if (newReminder) {
+        await repo.saveReminder(ctx, newReminder);
+      }
+      await repo.saveHistoryEvent(ctx, newEvent);
+    });
   };
 
   const addExam = (
@@ -1795,10 +2482,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setHistory((prev) => [newEvent, ...prev]);
     setTimeout(() => scheduleAutoSync('exam_added'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.saveExam(ctx, newExam);
+      await repo.saveExamResults(ctx, examId, newResults);
+      await repo.saveHistoryEvent(ctx, newEvent);
+    });
   };
 
   const connectDrive = async (): Promise<string | null> => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const clientId = GOOGLE_CLIENT_ID;
     if (!clientId) {
       setDriveStatus('error');
       setDriveError('NEXT_PUBLIC_GOOGLE_CLIENT_ID no configurada.');
@@ -1823,7 +2516,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const connectCalendar = async (): Promise<string | null> => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const clientId = GOOGLE_CLIENT_ID;
     if (!clientId) {
       setCalendarStatus('error');
       setCalendarError('NEXT_PUBLIC_GOOGLE_CLIENT_ID no configurada.');
@@ -1833,7 +2526,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCalendarStatus('authorizing');
     setCalendarError(null);
     try {
-      // Usar TokenManager: intenta caché en memoria primero, luego popup
+      // Usar TokenManager: intenta caché en memoria primero, luego popup (silent = false)
       const token = await ensureCalendarToken(clientId, false);
       setCalendarAccessToken(token);
       setCalendarStatus('connected');
@@ -1847,14 +2540,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const syncAppointmentToCalendar = async (apptId: string, customAppt?: MedicalAppointment) => {
+  const syncAppointmentToCalendar = async (apptId: string, customAppt?: MedicalAppointment, forcePopup = false) => {
     const appt = customAppt || appointments.find((a) => a.id === apptId);
     if (!appt) return;
 
     const member = members.find((m) => m.id === appt.memberId);
     const memberName = member ? member.fullName : 'Familiar';
 
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const clientId = GOOGLE_CLIENT_ID;
     if (!clientId) {
       setAppointments((prev) =>
         prev.map((a) =>
@@ -1862,7 +2555,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             ? {
                 ...a,
                 calendarSyncStatus: 'SYNC_ERROR',
-                calendarError: 'NEXT_PUBLIC_GOOGLE_CLIENT_ID no configurada.'
+                calendarError: 'Google Client ID no configurado.'
               }
             : a
         )
@@ -1879,11 +2572,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
 
     // Usar TokenManager: reusar token en memoria si está vigente
-    const clientId2 = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    // Intentar obtener el token de forma silenciosa primero si forcePopup es false
     let token = calendarAccessToken;
-    if (!token && clientId2) {
+    if (!token) {
       try {
-        token = await ensureCalendarToken(clientId2, false);
+        token = await ensureCalendarToken(clientId, !forcePopup);
         setCalendarAccessToken(token);
         setLastCalendarAuthTime(new Date().toISOString());
       } catch (_) {
@@ -1929,19 +2622,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         );
       }
     } else {
-      setCalendarStatus('error');
-      setCalendarError('Permiso de Google Calendar denegado.');
-      setAppointments((prev) =>
-        prev.map((a) =>
-          a.id === apptId
-            ? {
-                ...a,
-                calendarSyncStatus: 'SYNC_ERROR',
-                calendarError: 'Permiso de Google Calendar denegado.'
-              }
-            : a
-        )
-      );
+      if (!forcePopup) {
+        // En background no lanzamos popup molesto que bloquee el navegador,
+        // simplemente dejamos en PENDING_CALENDAR_SYNC.
+        setCalendarStatus('disconnected');
+        setAppointments((prev) =>
+          prev.map((a) =>
+            a.id === apptId
+              ? {
+                  ...a,
+                  calendarSyncStatus: 'PENDING_CALENDAR_SYNC',
+                  calendarError: 'Requiere autorización de Google Calendar. Haz clic en Reintentar.'
+                }
+              : a
+          )
+        );
+      } else {
+        setCalendarStatus('error');
+        setCalendarError('Permiso de Google Calendar denegado.');
+        setAppointments((prev) =>
+          prev.map((a) =>
+            a.id === apptId
+              ? {
+                  ...a,
+                  calendarSyncStatus: 'SYNC_ERROR',
+                  calendarError: 'Permiso de Google Calendar denegado.'
+                }
+              : a
+          )
+        );
+      }
     }
   };
 
@@ -2017,6 +2727,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           };
           setHistory((prev) => [newEvent, ...prev]);
           setTimeout(() => scheduleAutoSync('document_uploaded'), 100);
+
+          firebasePersist(async (repo, ctx) => {
+            await repo.saveDocument(ctx, newDoc);
+            await repo.saveHistoryEvent(ctx, newEvent);
+          });
+
           return docId;
         } catch (uploadErr: any) {
           console.error('Error subiendo archivo a Google Drive:', uploadErr.message || uploadErr);
@@ -2059,20 +2775,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setHistory((prev) => [newEvent, ...prev]);
     setTimeout(() => scheduleAutoSync('document_uploaded_local'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.saveDocument(ctx, newDoc);
+      await repo.saveHistoryEvent(ctx, newEvent);
+    });
+
     return docId;
   };
 
   const deleteDocument = (id: string) => {
     setDocuments((prev) => prev.filter((d) => d.id !== id));
     setTimeout(() => scheduleAutoSync('document_deleted'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.deleteDocument(ctx, id);
+    });
   };
 
   const completeTask = (id: string) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: 'DONE' } : t)));
+    let updatedTask: FollowUpTask | null = null;
+    setTasks((prev) => prev.map((t) => {
+      if (t.id === id) {
+        updatedTask = { ...t, status: 'DONE' };
+        return updatedTask;
+      }
+      return t;
+    }));
     setTimeout(() => scheduleAutoSync('task_completed'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      if (updatedTask) {
+        await repo.saveTask(ctx, updatedTask);
+      }
+    });
   };
 
   const toggleReminder = (id: string) => {
+    let updatedReminder: Reminder | null = null;
+    let updatedDose: MedicationDoseReminder | null = null;
     setReminders((prev) => {
       let isMedication = false;
       let newStatus: ReminderStatus = 'PENDING';
@@ -2081,7 +2822,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (r.id === id) {
           isMedication = r.reminderType === 'MEDICATION';
           newStatus = r.status === 'DONE' ? 'PENDING' : 'DONE';
-          return { ...r, status: newStatus };
+          updatedReminder = { ...r, status: newStatus };
+          return updatedReminder;
         }
         return r;
       });
@@ -2090,13 +2832,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const doseStatus: DoseReminderStatus = (newStatus as string) === 'DONE' ? 'TAKEN' : 'PENDING';
         setMedicationDoseReminders(doses => doses.map(d => {
           if (d.id === id) {
-            return {
+            updatedDose = {
               ...d,
               status: doseStatus,
               takenAt: doseStatus === 'TAKEN' ? new Date().toISOString() : null,
               updatedAt: new Date().toISOString(),
-              syncStatus: 'PENDING_SYNC' as const
+              syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any
             };
+            return updatedDose;
           }
           return d;
         }));
@@ -2105,6 +2848,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return updated;
     });
     setTimeout(() => scheduleAutoSync('reminder_toggled'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      if (updatedReminder) {
+        await repo.saveReminder(ctx, updatedReminder);
+      }
+      if (updatedDose) {
+        await repo.saveDoseReminder(ctx, updatedDose);
+      }
+    });
   };
 
   const generateDoseReminders = (prescription: MedicationPrescription): MedicationDoseReminder[] => {
@@ -2138,7 +2890,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         status: 'PENDING',
         createdAt: nowIso,
         updatedAt: nowIso,
-        syncStatus: 'PENDING_SYNC',
+        syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC',
         ownerEmail: email,
         ownerGoogleId: uid,
         sourceDeviceId: deviceId || null
@@ -2204,7 +2956,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       status: order.status || (order.requiresAuthorization ? 'PENDING_AUTHORIZATION' : 'AUTHORIZED'),
       createdAt: nowIso,
       updatedAt: nowIso,
-      syncStatus: 'PENDING_SYNC',
+      syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC',
       ownerEmail: email,
       ownerGoogleId: uid,
       sourceDeviceId: deviceId || null
@@ -2225,21 +2977,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setHistory(prev => [newEvent, ...prev]);
 
     setTimeout(() => scheduleAutoSync('medical_order_added'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.saveMedicalOrder(ctx, newOrder);
+      await repo.saveHistoryEvent(ctx, newEvent);
+    });
   };
 
   const updateMedicalOrder = (id: string, fields: Partial<MedicalOrder>) => {
     const nowIso = new Date().toISOString();
+    let updatedOrder: MedicalOrder | null = null;
+    let newEvent: MedicalHistoryEvent | null = null;
     setMedicalOrders(prev => prev.map(o => {
       if (o.id === id) {
-        const updated = {
+        updatedOrder = {
           ...o,
           ...fields,
           updatedAt: nowIso,
-          syncStatus: 'PENDING_SYNC' as const
+          syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any
         };
         
         if (fields.status && fields.status !== o.status) {
-          const newEvent: MedicalHistoryEvent = {
+          newEvent = {
             id: `hist-${Date.now()}-${Math.floor(Math.random()*1000)}`,
             memberId: o.memberId,
             eventType: 'MEDICAL_ORDER',
@@ -2249,31 +3008,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             relatedEntityId: id,
             createdAt: nowIso
           };
-          setTimeout(() => setHistory(h => [newEvent, ...h]), 50);
+          setTimeout(() => setHistory(h => [newEvent!, ...h]), 50);
         }
 
-        return updated;
+        return updatedOrder;
       }
       return o;
     }));
 
     setTimeout(() => scheduleAutoSync('medical_order_updated'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      if (updatedOrder) {
+        await repo.saveMedicalOrder(ctx, updatedOrder);
+      }
+      if (newEvent) {
+        await repo.saveHistoryEvent(ctx, newEvent);
+      }
+    });
   };
 
   const deleteMedicalOrder = (id: string) => {
     const nowIso = new Date().toISOString();
+    let deletedOrder: MedicalOrder | null = null;
     setMedicalOrders(prev => prev.map(o => {
       if (o.id === id) {
-        return {
+        deletedOrder = {
           ...o,
           deletedAt: nowIso,
-          syncStatus: 'PENDING_SYNC' as const,
+          syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any,
           updatedAt: nowIso
         };
+        return deletedOrder;
       }
       return o;
     }));
     setTimeout(() => scheduleAutoSync('medical_order_deleted'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.deleteMedicalOrder(ctx, id);
+    });
   };
 
   const createAppointmentFromOrder = (orderId: string, apptData: Omit<MedicalAppointment, 'id' | 'documentIds' | 'medicalOrderId'>) => {
@@ -2299,7 +3073,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       time,
       documentIds: [],
       calendarSyncStatus: calendarSyncEnabled ? 'PENDING_CALENDAR_SYNC' : 'LOCAL_ONLY',
-      syncStatus: 'PENDING_SYNC',
+      syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC',
       createdAt: nowIso,
       updatedAt: nowIso,
       deletedAt: null,
@@ -2335,15 +3109,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setHistory(prev => [newEventAppt, ...prev]);
 
+    let updatedOrder: MedicalOrder | null = null;
     setMedicalOrders(prev => prev.map(o => {
       if (o.id === orderId) {
-        return {
+        updatedOrder = {
           ...o,
           status: 'APPOINTMENT_SCHEDULED' as const,
           relatedAppointmentId: newId,
           updatedAt: nowIso,
-          syncStatus: 'PENDING_SYNC' as const
+          syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any
         };
+        return updatedOrder;
       }
       return o;
     }));
@@ -2355,6 +3131,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         syncAppointmentToCalendar(newId, newAppt);
       }, 200);
     }
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.saveAppointment(ctx, newAppt);
+      await repo.saveReminder(ctx, newReminder);
+      await repo.saveHistoryEvent(ctx, newEventAppt);
+      if (updatedOrder) {
+        await repo.saveMedicalOrder(ctx, updatedOrder);
+      }
+    });
   };
 
   const syncMedicationCalendarEvents = async (
@@ -2405,7 +3190,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             updatedDoses[doseIdx] = {
               ...updatedDoses[doseIdx],
               googleCalendarEventId: result.eventId,
-              syncStatus: 'PENDING_SYNC'
+              syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC'
             };
             hasUpdates = true;
           }
@@ -2435,7 +3220,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       id: newId,
       createdAt: nowIso,
       updatedAt: nowIso,
-      syncStatus: 'PENDING_SYNC',
+      syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC',
       ownerEmail: email,
       ownerGoogleId: uid,
       sourceDeviceId: deviceId || null
@@ -2478,22 +3263,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         syncMedicationCalendarEvents(newId, generatedDoses, newPrescription);
       }, 200);
     }
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.saveMedication(ctx, newPrescription);
+      for (const dose of generatedDoses) {
+        await repo.saveDoseReminder(ctx, dose);
+      }
+      for (const reminder of globalRemindersToAdd) {
+        await repo.saveReminder(ctx, reminder);
+      }
+      await repo.saveHistoryEvent(ctx, newHistoryEvent);
+    });
   };
 
   const updateMedicationPrescription = (id: string, fields: Partial<MedicationPrescription>) => {
     const nowIso = new Date().toISOString();
+    let updatedPrescription: MedicationPrescription | null = null;
+    let histEvent: MedicalHistoryEvent | null = null;
+    const modifiedDoses: MedicationDoseReminder[] = [];
+    const modifiedReminders: Reminder[] = [];
+
     setMedicationPrescriptions(prev => prev.map(m => {
       if (m.id === id) {
-        const updated = {
+        updatedPrescription = {
           ...m,
           ...fields,
           updatedAt: nowIso,
-          syncStatus: 'PENDING_SYNC' as const
+          syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any
         };
 
         if (fields.status && fields.status !== m.status) {
           const historyMsg = `Medicamento "${m.name}" fue marcado como ${fields.status}.`;
-          const histEvent: MedicalHistoryEvent = {
+          histEvent = {
             id: `hist-${Date.now()}`,
             memberId: m.memberId,
             eventType: 'MEDICATION',
@@ -2503,73 +3304,110 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             relatedEntityId: id,
             createdAt: nowIso
           };
-          setTimeout(() => setHistory(h => [histEvent, ...h]), 50);
+          setTimeout(() => setHistory(h => [histEvent!, ...h]), 50);
 
           if (fields.status === 'SUSPENDED' || fields.status === 'CANCELLED') {
             setMedicationDoseReminders(doses => doses.map(d => {
               if (d.prescriptionId === id && d.status === 'PENDING') {
-                return { ...d, status: 'SKIPPED' as const, updatedAt: nowIso, syncStatus: 'PENDING_SYNC' as const };
+                const skippedDose = { ...d, status: 'SKIPPED' as const, updatedAt: nowIso, syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any };
+                modifiedDoses.push(skippedDose);
+                return skippedDose;
               }
               return d;
             }));
             setReminders(rems => rems.map(r => {
               if (r.relatedEventId === id && r.status === 'PENDING') {
-                return { ...r, status: 'DONE' as const };
+                const doneReminder = { ...r, status: 'DONE' as const };
+                modifiedReminders.push(doneReminder);
+                return doneReminder;
               }
               return r;
             }));
           }
         }
 
-        return updated;
+        return updatedPrescription;
       }
       return m;
     }));
     setTimeout(() => scheduleAutoSync('medication_prescription_updated'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      if (updatedPrescription) {
+        await repo.saveMedication(ctx, updatedPrescription);
+      }
+      if (histEvent) {
+        await repo.saveHistoryEvent(ctx, histEvent);
+      }
+      for (const d of modifiedDoses) {
+        await repo.saveDoseReminder(ctx, d);
+      }
+      for (const r of modifiedReminders) {
+        await repo.saveReminder(ctx, r);
+      }
+    });
   };
 
   const deleteMedicationPrescription = (id: string) => {
     const nowIso = new Date().toISOString();
+    let deletedPrescription: MedicationPrescription | null = null;
+    const deletedDoses: MedicationDoseReminder[] = [];
+
     setMedicationPrescriptions(prev => prev.map(m => {
       if (m.id === id) {
-        return {
+        deletedPrescription = {
           ...m,
           deletedAt: nowIso,
-          syncStatus: 'PENDING_SYNC' as const,
+          syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any,
           updatedAt: nowIso
         };
+        return deletedPrescription;
       }
       return m;
     }));
 
     setMedicationDoseReminders(prev => prev.map(d => {
       if (d.prescriptionId === id) {
-        return {
+        const delDose = {
           ...d,
           deletedAt: nowIso,
-          syncStatus: 'PENDING_SYNC' as const,
+          syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any,
           updatedAt: nowIso
         };
+        deletedDoses.push(delDose);
+        return delDose;
       }
       return d;
     }));
 
     setReminders(prev => prev.filter(r => r.relatedEventId !== id));
     setTimeout(() => scheduleAutoSync('medication_prescription_deleted'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      if (deletedPrescription) {
+        await repo.deleteMedication(ctx, id);
+      }
+      for (const d of deletedDoses) {
+        await repo.deleteDoseReminder(ctx, d.id);
+      }
+    });
   };
 
   const markDoseReminder = (reminderId: string, status: DoseReminderStatus, takenAt?: string | null) => {
     const nowIso = new Date().toISOString();
+    let updatedDose: MedicationDoseReminder | null = null;
+    let updatedReminder: Reminder | null = null;
     
     setMedicationDoseReminders(prev => prev.map(d => {
       if (d.id === reminderId) {
-        return {
+        updatedDose = {
           ...d,
           status,
           takenAt: status === 'TAKEN' ? (takenAt || nowIso) : null,
           updatedAt: nowIso,
-          syncStatus: 'PENDING_SYNC' as const
+          syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any
         };
+        return updatedDose;
       }
       return d;
     }));
@@ -2581,15 +3419,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setReminders(prev => prev.map(r => {
       if (r.id === reminderId) {
-        return {
+        updatedReminder = {
           ...r,
           status: globalStatus
         };
+        return updatedReminder;
       }
       return r;
     }));
 
     setTimeout(() => scheduleAutoSync('medication_dose_marked'), 100);
+
+    firebasePersist(async (repo, ctx) => {
+      if (updatedDose) {
+        await repo.saveDoseReminder(ctx, updatedDose);
+      }
+      if (updatedReminder) {
+        await repo.saveReminder(ctx, updatedReminder);
+      }
+    });
   };
 
   const setDriveSync = (enabled: boolean) => {
@@ -2787,43 +3635,86 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       id: `source-${Date.now()}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      syncStatus: 'PENDING_SYNC' as const
+      syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any
     };
     setEmailSources(prev => [...prev, newSource]);
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.saveGmailSource(ctx, newSource);
+    });
   };
 
   const updateEmailSource = (id: string, fields: Partial<AppointmentEmailSource>) => {
-    setEmailSources(prev => prev.map(s => s.id === id ? {
-      ...s,
-      ...fields,
-      updatedAt: new Date().toISOString(),
-      syncStatus: 'PENDING_SYNC' as const
-    } : s));
+    let updatedSource: AppointmentEmailSource | null = null;
+    setEmailSources(prev => prev.map(s => {
+      if (s.id === id) {
+        updatedSource = {
+          ...s,
+          ...fields,
+          updatedAt: new Date().toISOString(),
+          syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any
+        };
+        return updatedSource;
+      }
+      return s;
+    }));
+
+    firebasePersist(async (repo, ctx) => {
+      if (updatedSource) {
+        await repo.saveGmailSource(ctx, updatedSource);
+      }
+    });
   };
 
   const deleteEmailSource = (id: string) => {
     setEmailSources(prev => prev.filter(s => s.id !== id));
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.deleteGmailSource(ctx, id);
+    });
   };
 
   const addAppointmentCandidate = (candidate: ImportedEmailAppointmentCandidate) => {
+    let updatedCandidate: ImportedEmailAppointmentCandidate | null = null;
     setAppointmentCandidates(prev => {
       const idx = prev.findIndex(c => c.gmailMessageId === candidate.gmailMessageId);
       if (idx >= 0) {
         const updated = [...prev];
-        updated[idx] = { ...candidate, updatedAt: new Date().toISOString(), syncStatus: 'PENDING_SYNC' as const };
+        updatedCandidate = { ...candidate, updatedAt: new Date().toISOString(), syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any };
+        updated[idx] = updatedCandidate;
         return updated;
       }
-      return [...prev, { ...candidate, syncStatus: 'PENDING_SYNC' as const }];
+      updatedCandidate = { ...candidate, syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any };
+      return [...prev, updatedCandidate];
+    });
+
+    firebasePersist(async (repo, ctx) => {
+      if (updatedCandidate) {
+        await repo.saveAppointmentCandidate(ctx, updatedCandidate);
+      }
     });
   };
 
   const updateAppointmentCandidate = (id: string, fields: Partial<ImportedEmailAppointmentCandidate>) => {
-    setAppointmentCandidates(prev => prev.map(c => c.id === id ? {
-      ...c,
-      ...fields,
-      updatedAt: new Date().toISOString(),
-      syncStatus: 'PENDING_SYNC' as const
-    } : c));
+    let updatedCandidate: ImportedEmailAppointmentCandidate | null = null;
+    setAppointmentCandidates(prev => prev.map(c => {
+      if (c.id === id) {
+        updatedCandidate = {
+          ...c,
+          ...fields,
+          updatedAt: new Date().toISOString(),
+          syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any
+        };
+        return updatedCandidate;
+      }
+      return c;
+    }));
+
+    firebasePersist(async (repo, ctx) => {
+      if (updatedCandidate) {
+        await repo.saveAppointmentCandidate(ctx, updatedCandidate);
+      }
+    });
   };
 
   const importAppointmentFromCandidate = async (
@@ -2894,7 +3785,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       sourceEmail: candidate.sourceEmail,
       sourceMessageId: candidate.gmailMessageId,
       sourceSubject: candidate.subject,
-      syncStatus: 'PENDING_SYNC' as const,
+      syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any,
       calendarSyncStatus: 'PENDING_CALENDAR_SYNC' as const,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -2903,13 +3794,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAppointments(prev => [...prev, newAppointment]);
     
     // Marcar candidato como IMPORTADO
-    setAppointmentCandidates(prev => prev.map(c => c.id === candidateId ? {
-      ...c,
-      status: 'IMPORTED' as const,
-      createdAppointmentId: apptId,
-      updatedAt: new Date().toISOString(),
-      syncStatus: 'PENDING_SYNC' as const
-    } : c));
+    let updatedCandidate: ImportedEmailAppointmentCandidate | null = null;
+    setAppointmentCandidates(prev => prev.map(c => {
+      if (c.id === candidateId) {
+        updatedCandidate = {
+          ...c,
+          status: 'IMPORTED' as const,
+          createdAppointmentId: apptId,
+          updatedAt: new Date().toISOString(),
+          syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any
+        };
+        return updatedCandidate;
+      }
+      return c;
+    }));
 
     // Registrar evento de historial
     const importHistoryEvent: MedicalHistoryEvent = {
@@ -2939,6 +3837,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         console.error('Error haciendo push de la cita de Gmail a Google Sheets:', sheetErr);
       }
     }, 1500);
+
+    firebasePersist(async (repo, ctx) => {
+      await repo.saveAppointment(ctx, newAppointment);
+      await repo.saveHistoryEvent(ctx, importHistoryEvent);
+      if (updatedCandidate) {
+        await repo.saveAppointmentCandidate(ctx, updatedCandidate);
+      }
+    });
   };
 
   const scanGmailForAppointmentsAction = async (rangeDays: number): Promise<number> => {
@@ -3042,7 +3948,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               status: 'IGNORED' as const,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
-              syncStatus: 'PENDING_SYNC' as const
+              syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any
             };
             processedCandidates.push(ignoredCand);
             // Cita pasada: no incrementar newCandidatesCount
@@ -3083,7 +3989,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             status: finalStatus,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-            syncStatus: 'PENDING_SYNC' as const
+            syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any
           };
 
           processedCandidates.push(newCand);
@@ -3118,7 +4024,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             lastScanResult: `Éxito. Encontrados ${foundMessages.filter(f => f.sourceEmail.toLowerCase() === s.email.toLowerCase()).length} correos.`,
             lastError: null,
             updatedAt: nowStr,
-            syncStatus: 'PENDING_SYNC' as const
+            syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any
           };
         }
         return s;
@@ -3153,7 +4059,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         lastScannedAt: nowStr,
         lastError: err.message || 'Error de escaneo.',
         updatedAt: nowStr,
-        syncStatus: 'PENDING_SYNC' as const
+        syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any
       } : s));
 
       return 0;
@@ -3439,7 +4345,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const markPendingSync = <T extends { syncStatus?: any; updatedAt?: string }>(arr: T[]): T[] => {
         return arr.map(item => ({
           ...item,
-          syncStatus: 'PENDING_SYNC' as any,
+          syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any,
           updatedAt: item.updatedAt || nowStr
         }));
       };
@@ -4137,7 +5043,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const isStale = (now - lastPullTime) > MUST_PULL_BEFORE_PUSH_MS;
 
     if (!lastPullAt || isStale) {
-      console.log('lastPullAt is missing or stale. Running syncNow (pull + safe merge + push) first.');
+      // Sincronización automática previa al push por falta de pull reciente
       await syncNow();
       return;
     }
@@ -4867,7 +5773,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         revokedAt: null,
         shareStatus: 'SHARED',
         shareError: null,
-        syncStatus: 'PENDING_SYNC',
+        syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC',
         updatedAt: new Date().toISOString()
       };
 
@@ -4939,7 +5845,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...doc,
         revokedAt: new Date().toISOString(),
         shareStatus: 'REVOKED',
-        syncStatus: 'PENDING_SYNC',
+        syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC',
         updatedAt: new Date().toISOString(),
         permissionId: null,
         sharedWithEmail: null
@@ -5208,13 +6114,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const merged = mergeMemberSafely(localMember, remoteMember);
           return {
             ...merged,
-            syncStatus: 'PENDING_SYNC' as any,
+            syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any,
             updatedAt: new Date().toISOString()
           };
         }
         return {
           ...localMember,
-          syncStatus: 'PENDING_SYNC' as any,
+          syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any,
           updatedAt: new Date().toISOString()
         };
       });
@@ -5226,7 +6132,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (!localExists && !isDeleted) {
           repairedMembers.push({
             ...remoteMember,
-            syncStatus: 'PENDING_SYNC' as any,
+            syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as any,
             updatedAt: new Date().toISOString()
           });
         }
@@ -5513,6 +6419,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       driveSyncEnabled,
       calendarSyncEnabled,
       isLoading,
+      familyId,
       
       // Google Drive states
       driveAccessToken,
@@ -5679,6 +6586,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setNightLockEnd,
       validateDataIntegrity,
       importBackupJSON,
+      isFirebaseBackend,
+      pendingInvitations,
+      invitations,
+      createInvitation,
+      acceptInvitation,
+      revokeInvitation,
+      createNewFamily,
+      checkPendingInvitations,
     }}>
       {children}
     </AppContext.Provider>

@@ -14,10 +14,8 @@ export default function LoginPage() {
 
   // Cargar la variable de entorno del cliente de Google de forma segura en el cliente
   useEffect(() => {
-    const id = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (id) {
-      setClientId(id);
-    }
+    const id = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '74018068811-phpbiqs6th899onjdquvln1t5tum98ea.apps.googleusercontent.com';
+    setClientId(id);
   }, []);
 
   useEffect(() => {
@@ -47,7 +45,7 @@ export default function LoginPage() {
                   displayName: decoded.name,
                   email: decoded.email,
                   photoUrl: decoded.picture || null
-                });
+                }, response.credential);
               } else {
                 console.error('No se pudo decodificar la credencial de Google.');
                 setLocalLoading(false);
