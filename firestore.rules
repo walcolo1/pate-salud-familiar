@@ -86,31 +86,90 @@ service cloud.firestore {
 
     // ── Composite permission helpers ──────────────────────────────────────
 
+    // Returns the granular permissions stored in the member's document.
+    // Memoized per request — does not cause multiple Firestore reads.
+    function getMemberPermissions(familyId, memberId) {
+      return exists(/databases/$(database)/documents/families/$(familyId)/members/$(memberId))
+        ? get(/databases/$(database)/documents/families/$(familyId)/members/$(memberId)).data.permissions
+        : {
+            'canManageOwnProfile': true,
+            'canManageOwnAppointments': true,
+            'canManageOwnDocuments': true,
+            'canViewOwnHistory': true,
+            'canUploadDocuments': true,
+            'canExportOwnData': false,
+            'canViewFamilyData': false,
+            'canManageFamilyData': false
+          };
+    }
+
     // Can read any collection (no member-level filter needed).
     function canReadAll(familyId) {
       return isOwner(familyId) || isCaregiver(familyId) || isViewer(familyId);
     }
 
-    // Can read data belonging to a specific memberId.
-    function canReadMember(familyId, memberId) {
-      return hasActiveAccess(familyId);
+    // Returns the own member ID for a Member, or null.
+    function ownMemberId(familyId) {
+      return getAccess(familyId).memberId;
     }
 
-    // Can write data belonging to a specific memberId.
-    // OWNER   → always.
-    // CAREGIVER → only if memberId is in their assignedMemberIds list.
-    // MEMBER  → only their own memberId.
-    // VIEWER  → never.
-    function canWriteMember(familyId, memberId) {
+    // Can read data belonging to a specific memberId.
+    function canReadMember(familyId, memberId) {
+      return canReadAll(familyId)
+        || (isMember(familyId)
+            && (ownMemberId(familyId) == memberId
+                || getMemberPermissions(familyId, ownMemberId(familyId)).canViewFamilyData == true));
+    }
+
+    // Can read history belonging to a specific memberId.
+    function canReadHistory(familyId, memberId) {
+      return canReadAll(familyId)
+        || (isMember(familyId)
+            && ((ownMemberId(familyId) == memberId && getMemberPermissions(familyId, ownMemberId(familyId)).canViewOwnHistory == true)
+                || getMemberPermissions(familyId, ownMemberId(familyId)).canViewFamilyData == true));
+    }
+
+    // Can write profile/health data belonging to a specific memberId.
+    function canWriteProfile(familyId, memberId) {
       return isOwner(familyId)
         || (isCaregiver(familyId) && memberId in getAccess(familyId).assignedMemberIds)
-        || (isMember(familyId) && getAccess(familyId).memberId == memberId);
+        || (isMember(familyId)
+            && ((ownMemberId(familyId) == memberId && getMemberPermissions(familyId, ownMemberId(familyId)).canManageOwnProfile == true)
+                || getMemberPermissions(familyId, ownMemberId(familyId)).canManageFamilyData == true));
+    }
+
+    // Can write health event data (appointments, vaccines, etc.) belonging to a specific memberId.
+    function canWriteAppointment(familyId, memberId) {
+      return isOwner(familyId)
+        || (isCaregiver(familyId) && memberId in getAccess(familyId).assignedMemberIds)
+        || (isMember(familyId)
+            && ((ownMemberId(familyId) == memberId && getMemberPermissions(familyId, ownMemberId(familyId)).canManageOwnAppointments == true)
+                || getMemberPermissions(familyId, ownMemberId(familyId)).canManageFamilyData == true));
+    }
+
+    // Can create/upload clinical document for a specific memberId.
+    function canCreateDocument(familyId, memberId) {
+      return isOwner(familyId)
+        || (isCaregiver(familyId) && memberId in getAccess(familyId).assignedMemberIds)
+        || (isMember(familyId)
+            && ((ownMemberId(familyId) == memberId && getMemberPermissions(familyId, ownMemberId(familyId)).canUploadDocuments == true)
+                || getMemberPermissions(familyId, ownMemberId(familyId)).canManageFamilyData == true));
+    }
+
+    // Can update/manage clinical document belonging to a specific memberId.
+    function canUpdateDocument(familyId, memberId) {
+      return isOwner(familyId)
+        || (isCaregiver(familyId) && memberId in getAccess(familyId).assignedMemberIds)
+        || (isMember(familyId)
+            && ((ownMemberId(familyId) == memberId && getMemberPermissions(familyId, ownMemberId(familyId)).canManageOwnDocuments == true)
+                || getMemberPermissions(familyId, ownMemberId(familyId)).canManageFamilyData == true));
     }
 
     // Can write family-level data (not tied to a specific member).
-    // Used for: settings, gmail sources, appointment candidates.
     function canWriteFamily(familyId) {
-      return isOwner(familyId) || isCaregiver(familyId);
+      return isOwner(familyId)
+        || isCaregiver(familyId)
+        || (isMember(familyId) && getMemberPermissions(familyId, ownMemberId(familyId)).canManageFamilyData == true);
     }
 
     // Validates that a create request includes the mandatory soft-delete
@@ -209,7 +268,7 @@ service cloud.firestore {
 
         // Any role that can write for this member can update them
         // (includes soft-delete updates that set deletedAt / status='DELETED').
-        allow update: if canWriteMember(familyId, memberId);
+        allow update: if canWriteProfile(familyId, memberId);
 
         // Hard deletes are never permitted — use soft delete.
         allow delete: if false;
@@ -220,12 +279,12 @@ service cloud.firestore {
       match /healthProfiles/{memberId} {
         allow read:   if canReadMember(familyId, memberId);
         allow create: if isAuth() && (
-                        canWriteMember(familyId, memberId)
+                        canWriteProfile(familyId, memberId)
                         || (exists(/databases/$(database)/documents/families/$(familyId))
                             && (get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid == request.auth.uid
                                 || get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid == 'user-' + request.auth.uid))
                       );
-        allow update: if canWriteMember(familyId, memberId);
+        allow update: if canWriteProfile(familyId, memberId);
         allow delete: if false;
       }
 
@@ -235,12 +294,12 @@ service cloud.firestore {
         allow read:   if canReadMember(familyId, resource.data.memberId);
 
         // For creates, check memberId in the incoming payload.
-        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+        allow create: if canWriteAppointment(familyId, request.resource.data.memberId)
                       && hasDeletedAtNull();
 
         // For updates (including soft-delete and retention purge), check the
         // stored memberId (cannot change memberId of an existing appointment).
-        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow update: if canWriteAppointment(familyId, resource.data.memberId);
 
         allow delete: if false;
       }
@@ -248,27 +307,27 @@ service cloud.firestore {
       // ── Periodic Checkups  (/families/{familyId}/checkups/{checkupId}) ────
       match /checkups/{checkupId} {
         allow read:   if canReadMember(familyId, resource.data.memberId);
-        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+        allow create: if canWriteAppointment(familyId, request.resource.data.memberId)
                       && hasDeletedAtNull();
-        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow update: if canWriteAppointment(familyId, resource.data.memberId);
         allow delete: if false;
       }
 
       // ── Vaccine Records  (/families/{familyId}/vaccines/{vaccineId}) ──────
       match /vaccines/{vaccineId} {
         allow read:   if canReadMember(familyId, resource.data.memberId);
-        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+        allow create: if canWriteAppointment(familyId, request.resource.data.memberId)
                       && hasDeletedAtNull();
-        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow update: if canWriteAppointment(familyId, resource.data.memberId);
         allow delete: if false;
       }
 
       // ── Medical Exams  (/families/{familyId}/exams/{examId}) ─────────────
       match /exams/{examId} {
         allow read:   if canReadMember(familyId, resource.data.memberId);
-        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+        allow create: if canWriteAppointment(familyId, request.resource.data.memberId)
                       && hasDeletedAtNull();
-        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow update: if canWriteAppointment(familyId, resource.data.memberId);
         allow delete: if false;
       }
 
@@ -280,7 +339,11 @@ service cloud.firestore {
       // For the MEMBER case, the DataRepository layer must filter client-side
       // to only load results for exams belonging to that member.
       match /examResults/{resultId} {
-        allow read:   if hasActiveAccess(familyId);
+        allow read:   if canReadAll(familyId)
+                      || (isMember(familyId)
+                          && (getMemberPermissions(familyId, ownMemberId(familyId)).canViewFamilyData == true
+                              || (exists(/databases/$(database)/documents/families/$(familyId)/exams/$(resource.data.examId))
+                                  && get(/databases/$(database)/documents/families/$(familyId)/exams/$(resource.data.examId)).data.memberId == ownMemberId(familyId))));
         allow create: if canWriteFamily(familyId);
         allow update: if canWriteFamily(familyId);
         // Exam results use a replace strategy (delete old, write new).
@@ -291,65 +354,65 @@ service cloud.firestore {
       // ── Clinical Documents  (/families/{familyId}/documents/{documentId}) ─
       match /documents/{documentId} {
         allow read:   if canReadMember(familyId, resource.data.memberId);
-        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+        allow create: if canCreateDocument(familyId, request.resource.data.memberId)
                       && hasDeletedAtNull();
-        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow update: if canUpdateDocument(familyId, resource.data.memberId);
         allow delete: if false;
       }
 
       // ── Medical History  (/families/{familyId}/history/{historyId}) ───────
       match /history/{historyId} {
-        allow read:   if canReadMember(familyId, resource.data.memberId);
+        allow read:   if canReadHistory(familyId, resource.data.memberId);
         allow create: if isAuth() && (
-                        canWriteMember(familyId, request.resource.data.memberId)
+                        canWriteAppointment(familyId, request.resource.data.memberId)
                         || (exists(/databases/$(database)/documents/families/$(familyId))
                             && (get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid == request.auth.uid
                                 || get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid == 'user-' + request.auth.uid))
                       ) && hasDeletedAtNull();
-        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow update: if canWriteAppointment(familyId, resource.data.memberId);
         allow delete: if false;
       }
 
       // ── Reminders  (/families/{familyId}/reminders/{reminderId}) ─────────
       match /reminders/{reminderId} {
         allow read:   if canReadMember(familyId, resource.data.memberId);
-        allow create: if canWriteMember(familyId, request.resource.data.memberId);
-        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow create: if canWriteAppointment(familyId, request.resource.data.memberId);
+        allow update: if canWriteAppointment(familyId, resource.data.memberId);
         allow delete: if false;
       }
 
       // ── Follow-Up Tasks  (/families/{familyId}/tasks/{taskId}) ───────────
       match /tasks/{taskId} {
         allow read:   if canReadMember(familyId, resource.data.memberId);
-        allow create: if canWriteMember(familyId, request.resource.data.memberId);
-        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow create: if canWriteAppointment(familyId, request.resource.data.memberId);
+        allow update: if canWriteAppointment(familyId, resource.data.memberId);
         allow delete: if false;
       }
 
       // ── Medical Orders  (/families/{familyId}/medicalOrders/{orderId}) ────
       match /medicalOrders/{orderId} {
         allow read:   if canReadMember(familyId, resource.data.memberId);
-        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+        allow create: if canWriteAppointment(familyId, request.resource.data.memberId)
                       && hasDeletedAtNull();
-        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow update: if canWriteAppointment(familyId, resource.data.memberId);
         allow delete: if false;
       }
 
       // ── Medications  (/families/{familyId}/medications/{medicationId}) ────
       match /medications/{medicationId} {
         allow read:   if canReadMember(familyId, resource.data.memberId);
-        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+        allow create: if canWriteAppointment(familyId, request.resource.data.memberId)
                       && hasDeletedAtNull();
-        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow update: if canWriteAppointment(familyId, resource.data.memberId);
         allow delete: if false;
       }
 
       // ── Dose Reminders  (/families/{familyId}/doseReminders/{reminderId}) ─
       match /doseReminders/{reminderId} {
         allow read:   if canReadMember(familyId, resource.data.memberId);
-        allow create: if canWriteMember(familyId, request.resource.data.memberId)
+        allow create: if canWriteAppointment(familyId, request.resource.data.memberId)
                       && hasDeletedAtNull();
-        allow update: if canWriteMember(familyId, resource.data.memberId);
+        allow update: if canWriteAppointment(familyId, resource.data.memberId);
         allow delete: if false;
       }
 

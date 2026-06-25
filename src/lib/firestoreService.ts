@@ -94,6 +94,7 @@ import type {
   MedicationDoseReminder,
   AppointmentEmailSource,
   ImportedEmailAppointmentCandidate,
+  MemberPermissions,
 } from '../domain/models';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -525,7 +526,17 @@ export async function deleteMember(
 /**
  * Returns all active members of a family (excludes soft-deleted).
  */
-export async function getMembers(familyId: string): Promise<FamilyMember[]> {
+export async function getMembers(
+  familyId: string,
+  memberId?: string | null,
+): Promise<FamilyMember[]> {
+  if (memberId) {
+    const snap = await getDoc(doc(col.members(familyId), memberId));
+    if (snap.exists() && !isDeleted(snap.data())) {
+      return [normalizeTimestamps({ id: snap.id, ...snap.data() }) as FamilyMember];
+    }
+    return [];
+  }
   const snap = await getDocs(
     query(col.members(familyId), where('deletedAt', '==', null)),
   );
@@ -538,7 +549,17 @@ export async function getMembers(familyId: string): Promise<FamilyMember[]> {
 export function watchMembers(
   familyId: string,
   callback: (members: FamilyMember[]) => void,
+  memberId?: string | null,
 ): Unsubscribe {
+  if (memberId) {
+    return onSnapshot(doc(col.members(familyId), memberId), (snap) => {
+      if (snap.exists() && !isDeleted(snap.data())) {
+        callback([normalizeTimestamps({ id: snap.id, ...snap.data() }) as FamilyMember]);
+      } else {
+        callback([]);
+      }
+    });
+  }
   const q = query(col.members(familyId), where('deletedAt', '==', null));
   return onSnapshot(q, (snap) => callback(snapshotToArray<FamilyMember>(snap)));
 }
@@ -589,7 +610,17 @@ export async function getHealthProfile(
  */
 export async function getAllHealthProfiles(
   familyId: string,
+  memberId?: string | null,
 ): Promise<Record<string, HealthProfile>> {
+  if (memberId) {
+    const snap = await getDoc(doc(col.healthProfiles(familyId), memberId));
+    const result: Record<string, HealthProfile> = {};
+    if (snap.exists() && !isDeleted(snap.data())) {
+      const profile = normalizeTimestamps({ id: snap.id, ...snap.data() }) as HealthProfile;
+      result[snap.id] = profile;
+    }
+    return result;
+  }
   const snap = await getDocs(col.healthProfiles(familyId));
   const result: Record<string, HealthProfile> = {};
   snap.docs.forEach((d) => {
@@ -608,7 +639,17 @@ export async function getAllHealthProfiles(
 export function watchHealthProfiles(
   familyId: string,
   callback: (profiles: Record<string, HealthProfile>) => void,
+  memberId?: string | null,
 ): Unsubscribe {
+  if (memberId) {
+    return onSnapshot(doc(col.healthProfiles(familyId), memberId), (snap) => {
+      const result: Record<string, HealthProfile> = {};
+      if (snap.exists() && !isDeleted(snap.data())) {
+        result[snap.id] = normalizeTimestamps({ id: snap.id, ...snap.data() }) as HealthProfile;
+      }
+      callback(result);
+    });
+  }
   return onSnapshot(col.healthProfiles(familyId), (snap) => {
     const result: Record<string, HealthProfile> = {};
     snap.docs.forEach((d) => {
@@ -673,10 +714,12 @@ export async function deleteAppointment(
 
 export async function getAppointments(
   familyId: string,
+  memberId?: string | null,
 ): Promise<MedicalAppointment[]> {
-  const snap = await getDocs(
-    query(col.appointments(familyId), where('deletedAt', '==', null)),
-  );
+  const q = memberId
+    ? query(col.appointments(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.appointments(familyId), where('deletedAt', '==', null));
+  const snap = await getDocs(q);
   return snapshotToArray<MedicalAppointment>(snap);
 }
 
@@ -700,8 +743,11 @@ export async function getAppointmentsForMember(
 export function watchAppointments(
   familyId: string,
   callback: (appts: MedicalAppointment[]) => void,
+  memberId?: string | null,
 ): Unsubscribe {
-  const q = query(col.appointments(familyId), where('deletedAt', '==', null));
+  const q = memberId
+    ? query(col.appointments(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.appointments(familyId), where('deletedAt', '==', null));
   return onSnapshot(q, (snap) => callback(snapshotToArray<MedicalAppointment>(snap)));
 }
 
@@ -753,18 +799,25 @@ export async function deleteCheckup(
   });
 }
 
-export async function getCheckups(familyId: string): Promise<PeriodicCheckup[]> {
-  const snap = await getDocs(
-    query(col.checkups(familyId), where('deletedAt', '==', null)),
-  );
+export async function getCheckups(
+  familyId: string,
+  memberId?: string | null,
+): Promise<PeriodicCheckup[]> {
+  const q = memberId
+    ? query(col.checkups(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.checkups(familyId), where('deletedAt', '==', null));
+  const snap = await getDocs(q);
   return snapshotToArray<PeriodicCheckup>(snap);
 }
 
 export function watchCheckups(
   familyId: string,
   callback: (checkups: PeriodicCheckup[]) => void,
+  memberId?: string | null,
 ): Unsubscribe {
-  const q = query(col.checkups(familyId), where('deletedAt', '==', null));
+  const q = memberId
+    ? query(col.checkups(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.checkups(familyId), where('deletedAt', '==', null));
   return onSnapshot(q, (snap) => callback(snapshotToArray<PeriodicCheckup>(snap)));
 }
 
@@ -816,18 +869,25 @@ export async function deleteVaccine(
   });
 }
 
-export async function getVaccines(familyId: string): Promise<VaccineRecord[]> {
-  const snap = await getDocs(
-    query(col.vaccines(familyId), where('deletedAt', '==', null)),
-  );
+export async function getVaccines(
+  familyId: string,
+  memberId?: string | null,
+): Promise<VaccineRecord[]> {
+  const q = memberId
+    ? query(col.vaccines(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.vaccines(familyId), where('deletedAt', '==', null));
+  const snap = await getDocs(q);
   return snapshotToArray<VaccineRecord>(snap);
 }
 
 export function watchVaccines(
   familyId: string,
   callback: (vaccines: VaccineRecord[]) => void,
+  memberId?: string | null,
 ): Unsubscribe {
-  const q = query(col.vaccines(familyId), where('deletedAt', '==', null));
+  const q = memberId
+    ? query(col.vaccines(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.vaccines(familyId), where('deletedAt', '==', null));
   return onSnapshot(q, (snap) => callback(snapshotToArray<VaccineRecord>(snap)));
 }
 
@@ -880,18 +940,25 @@ export async function deleteExam(
   });
 }
 
-export async function getExams(familyId: string): Promise<MedicalExam[]> {
-  const snap = await getDocs(
-    query(col.exams(familyId), where('deletedAt', '==', null)),
-  );
+export async function getExams(
+  familyId: string,
+  memberId?: string | null,
+): Promise<MedicalExam[]> {
+  const q = memberId
+    ? query(col.exams(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.exams(familyId), where('deletedAt', '==', null));
+  const snap = await getDocs(q);
   return snapshotToArray<MedicalExam>(snap);
 }
 
 export function watchExams(
   familyId: string,
   callback: (exams: MedicalExam[]) => void,
+  memberId?: string | null,
 ): Unsubscribe {
-  const q = query(col.exams(familyId), where('deletedAt', '==', null));
+  const q = memberId
+    ? query(col.exams(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.exams(familyId), where('deletedAt', '==', null));
   return onSnapshot(q, (snap) => callback(snapshotToArray<MedicalExam>(snap)));
 }
 
@@ -937,6 +1004,34 @@ export async function getAllExamResults(
     const data = normalizeTimestamps({ id: d.id, ...d.data() }) as ExamResult;
     if (!result[data.examId]) result[data.examId] = [];
     result[data.examId].push(data);
+  });
+  return result;
+}
+
+/**
+ * Returns exam results filtered by a list of examIds (chunked by 30).
+ */
+export async function getExamResultsForExams(
+  familyId: string,
+  examIds: string[],
+): Promise<Record<string, ExamResult[]>> {
+  if (examIds.length === 0) return {};
+  const chunks: string[][] = [];
+  for (let i = 0; i < examIds.length; i += 30) {
+    chunks.push(examIds.slice(i, i + 30));
+  }
+  const result: Record<string, ExamResult[]> = {};
+  const snaps = await Promise.all(
+    chunks.map((chunk) =>
+      getDocs(query(col.examResults(familyId), where('examId', 'in', chunk))),
+    ),
+  );
+  snaps.forEach((snap) => {
+    snap.docs.forEach((d) => {
+      const data = normalizeTimestamps({ id: d.id, ...d.data() }) as ExamResult;
+      if (!result[data.examId]) result[data.examId] = [];
+      result[data.examId].push(data);
+    });
   });
   return result;
 }
@@ -988,18 +1083,25 @@ export async function deleteDocument(
   });
 }
 
-export async function getDocuments(familyId: string): Promise<ClinicalDocument[]> {
-  const snap = await getDocs(
-    query(col.documents(familyId), where('deletedAt', '==', null)),
-  );
+export async function getDocuments(
+  familyId: string,
+  memberId?: string | null,
+): Promise<ClinicalDocument[]> {
+  const q = memberId
+    ? query(col.documents(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.documents(familyId), where('deletedAt', '==', null));
+  const snap = await getDocs(q);
   return snapshotToArray<ClinicalDocument>(snap);
 }
 
 export function watchDocuments(
   familyId: string,
   callback: (documents: ClinicalDocument[]) => void,
+  memberId?: string | null,
 ): Unsubscribe {
-  const q = query(col.documents(familyId), where('deletedAt', '==', null));
+  const q = memberId
+    ? query(col.documents(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.documents(familyId), where('deletedAt', '==', null));
   return onSnapshot(q, (snap) => callback(snapshotToArray<ClinicalDocument>(snap)));
 }
 
@@ -1025,18 +1127,25 @@ export async function createHistoryEvent(
   return ref.id;
 }
 
-export async function getHistory(familyId: string): Promise<MedicalHistoryEvent[]> {
-  const snap = await getDocs(
-    query(col.history(familyId), where('deletedAt', '==', null)),
-  );
+export async function getHistory(
+  familyId: string,
+  memberId?: string | null,
+): Promise<MedicalHistoryEvent[]> {
+  const q = memberId
+    ? query(col.history(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.history(familyId), where('deletedAt', '==', null));
+  const snap = await getDocs(q);
   return snapshotToArray<MedicalHistoryEvent>(snap);
 }
 
 export function watchHistory(
   familyId: string,
   callback: (history: MedicalHistoryEvent[]) => void,
+  memberId?: string | null,
 ): Unsubscribe {
-  const q = query(col.history(familyId), where('deletedAt', '==', null));
+  const q = memberId
+    ? query(col.history(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.history(familyId), where('deletedAt', '==', null));
   return onSnapshot(q, (snap) => callback(snapshotToArray<MedicalHistoryEvent>(snap)));
 }
 
@@ -1064,18 +1173,26 @@ export async function updateReminder(
   });
 }
 
-export async function getReminders(familyId: string): Promise<Reminder[]> {
-  const snap = await getDocs(col.reminders(familyId));
+export async function getReminders(
+  familyId: string,
+  memberId?: string | null,
+): Promise<Reminder[]> {
+  const q = memberId
+    ? query(col.reminders(familyId), where('memberId', '==', memberId))
+    : col.reminders(familyId);
+  const snap = await getDocs(q);
   return snapshotToArray<Reminder>(snap);
 }
 
 export function watchReminders(
   familyId: string,
   callback: (reminders: Reminder[]) => void,
+  memberId?: string | null,
 ): Unsubscribe {
-  return onSnapshot(col.reminders(familyId), (snap) =>
-    callback(snapshotToArray<Reminder>(snap)),
-  );
+  const q = memberId
+    ? query(col.reminders(familyId), where('memberId', '==', memberId))
+    : col.reminders(familyId);
+  return onSnapshot(q, (snap) => callback(snapshotToArray<Reminder>(snap)));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1109,18 +1226,26 @@ export async function updateTask(
   });
 }
 
-export async function getTasks(familyId: string): Promise<FollowUpTask[]> {
-  const snap = await getDocs(col.tasks(familyId));
+export async function getTasks(
+  familyId: string,
+  memberId?: string | null,
+): Promise<FollowUpTask[]> {
+  const q = memberId
+    ? query(col.tasks(familyId), where('memberId', '==', memberId))
+    : col.tasks(familyId);
+  const snap = await getDocs(q);
   return snapshotToArray<FollowUpTask>(snap);
 }
 
 export function watchTasks(
   familyId: string,
   callback: (tasks: FollowUpTask[]) => void,
+  memberId?: string | null,
 ): Unsubscribe {
-  return onSnapshot(col.tasks(familyId), (snap) =>
-    callback(snapshotToArray<FollowUpTask>(snap)),
-  );
+  const q = memberId
+    ? query(col.tasks(familyId), where('memberId', '==', memberId))
+    : col.tasks(familyId);
+  return onSnapshot(q, (snap) => callback(snapshotToArray<FollowUpTask>(snap)));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1170,18 +1295,25 @@ export async function deleteMedicalOrder(
   });
 }
 
-export async function getMedicalOrders(familyId: string): Promise<MedicalOrder[]> {
-  const snap = await getDocs(
-    query(col.medicalOrders(familyId), where('deletedAt', '==', null)),
-  );
+export async function getMedicalOrders(
+  familyId: string,
+  memberId?: string | null,
+): Promise<MedicalOrder[]> {
+  const q = memberId
+    ? query(col.medicalOrders(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.medicalOrders(familyId), where('deletedAt', '==', null));
+  const snap = await getDocs(q);
   return snapshotToArray<MedicalOrder>(snap);
 }
 
 export function watchMedicalOrders(
   familyId: string,
   callback: (orders: MedicalOrder[]) => void,
+  memberId?: string | null,
 ): Unsubscribe {
-  const q = query(col.medicalOrders(familyId), where('deletedAt', '==', null));
+  const q = memberId
+    ? query(col.medicalOrders(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.medicalOrders(familyId), where('deletedAt', '==', null));
   return onSnapshot(q, (snap) => callback(snapshotToArray<MedicalOrder>(snap)));
 }
 
@@ -1232,18 +1364,25 @@ export async function deleteMedication(
   });
 }
 
-export async function getMedications(familyId: string): Promise<MedicationPrescription[]> {
-  const snap = await getDocs(
-    query(col.medications(familyId), where('deletedAt', '==', null)),
-  );
+export async function getMedications(
+  familyId: string,
+  memberId?: string | null,
+): Promise<MedicationPrescription[]> {
+  const q = memberId
+    ? query(col.medications(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.medications(familyId), where('deletedAt', '==', null));
+  const snap = await getDocs(q);
   return snapshotToArray<MedicationPrescription>(snap);
 }
 
 export function watchMedications(
   familyId: string,
   callback: (prescriptions: MedicationPrescription[]) => void,
+  memberId?: string | null,
 ): Unsubscribe {
-  const q = query(col.medications(familyId), where('deletedAt', '==', null));
+  const q = memberId
+    ? query(col.medications(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.medications(familyId), where('deletedAt', '==', null));
   return onSnapshot(q, (snap) =>
     callback(snapshotToArray<MedicationPrescription>(snap)),
   );
@@ -1298,10 +1437,12 @@ export async function deleteDoseReminder(
 
 export async function getDoseReminders(
   familyId: string,
+  memberId?: string | null,
 ): Promise<MedicationDoseReminder[]> {
-  const snap = await getDocs(
-    query(col.doseReminders(familyId), where('deletedAt', '==', null)),
-  );
+  const q = memberId
+    ? query(col.doseReminders(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.doseReminders(familyId), where('deletedAt', '==', null));
+  const snap = await getDocs(q);
   return snapshotToArray<MedicationDoseReminder>(snap);
 }
 
@@ -1325,8 +1466,11 @@ export async function getDoseRemindersForPrescription(
 export function watchDoseReminders(
   familyId: string,
   callback: (reminders: MedicationDoseReminder[]) => void,
+  memberId?: string | null,
 ): Unsubscribe {
-  const q = query(col.doseReminders(familyId), where('deletedAt', '==', null));
+  const q = memberId
+    ? query(col.doseReminders(familyId), where('memberId', '==', memberId), where('deletedAt', '==', null))
+    : query(col.doseReminders(familyId), where('deletedAt', '==', null));
   return onSnapshot(q, (snap) =>
     callback(snapshotToArray<MedicationDoseReminder>(snap)),
   );
@@ -1619,7 +1763,12 @@ export function watchInvitations(
  * This is the function the DataRepository.loadInitialData() implementation
  * will call in Phase 8.
  */
-export async function loadAllFamilyData(familyId: string): Promise<{
+export async function loadAllFamilyData(
+  familyId: string,
+  role?: FamilyRole | null,
+  memberId?: string | null,
+  permissions?: MemberPermissions | null,
+): Promise<{
   members: FamilyMember[];
   healthProfiles: Record<string, HealthProfile>;
   appointments: MedicalAppointment[];
@@ -1638,6 +1787,69 @@ export async function loadAllFamilyData(familyId: string): Promise<{
   appointmentCandidates: ImportedEmailAppointmentCandidate[];
   settings: FamilySettings | null;
 }> {
+  const isRestrictedMember = role === 'MEMBER' && permissions?.canViewFamilyData !== true;
+  const mId = isRestrictedMember ? memberId : null;
+
+  if (isRestrictedMember) {
+    // 1. Fetch exams first so we can extract their IDs for results chunking
+    const exams = await getExams(familyId, mId);
+    const examIds = exams.map((e) => e.id);
+
+    // 2. Fetch other collections in parallel
+    const [
+      members,
+      healthProfiles,
+      appointments,
+      checkups,
+      vaccines,
+      examResults,
+      documents,
+      history,
+      reminders,
+      tasks,
+      medicalOrders,
+      medications,
+      doseReminders,
+      settings,
+    ] = await Promise.all([
+      getMembers(familyId, mId),
+      getAllHealthProfiles(familyId, mId),
+      getAppointments(familyId, mId),
+      getCheckups(familyId, mId),
+      getVaccines(familyId, mId),
+      getExamResultsForExams(familyId, examIds),
+      getDocuments(familyId, mId),
+      getHistory(familyId, mId),
+      getReminders(familyId, mId),
+      getTasks(familyId, mId),
+      getMedicalOrders(familyId, mId),
+      getMedications(familyId, mId),
+      getDoseReminders(familyId, mId),
+      getFamilySettings(familyId),
+    ]);
+
+    return {
+      members,
+      healthProfiles,
+      appointments,
+      checkups,
+      vaccines,
+      exams,
+      examResults,
+      documents,
+      history,
+      reminders,
+      tasks,
+      medicalOrders,
+      medications,
+      doseReminders,
+      gmailSources: [],
+      appointmentCandidates: [],
+      settings,
+    };
+  }
+
+  // Normal flow (Owner / Caregiver / Viewer / Member with canViewFamilyData)
   const [
     members,
     healthProfiles,
@@ -1736,25 +1948,43 @@ export type FamilyDataUpdate =
 export function watchAllFamilyData(
   familyId: string,
   callback: (update: FamilyDataUpdate) => void,
+  role?: FamilyRole | null,
+  memberId?: string | null,
+  permissions?: MemberPermissions | null,
 ): Unsubscribe {
+  const isRestrictedMember = role === 'MEMBER' && permissions?.canViewFamilyData !== true;
+  const mId = isRestrictedMember ? memberId : null;
+
   const unsubs: Unsubscribe[] = [
-    watchMembers(familyId,              (data) => callback({ type: 'members', data })),
-    watchHealthProfiles(familyId,       (data) => callback({ type: 'healthProfiles', data })),
-    watchAppointments(familyId,         (data) => callback({ type: 'appointments', data })),
-    watchCheckups(familyId,             (data) => callback({ type: 'checkups', data })),
-    watchVaccines(familyId,             (data) => callback({ type: 'vaccines', data })),
-    watchExams(familyId,                (data) => callback({ type: 'exams', data })),
-    watchDocuments(familyId,            (data) => callback({ type: 'documents', data })),
-    watchHistory(familyId,              (data) => callback({ type: 'history', data })),
-    watchReminders(familyId,            (data) => callback({ type: 'reminders', data })),
-    watchTasks(familyId,                (data) => callback({ type: 'tasks', data })),
-    watchMedicalOrders(familyId,        (data) => callback({ type: 'medicalOrders', data })),
-    watchMedications(familyId,          (data) => callback({ type: 'medications', data })),
-    watchDoseReminders(familyId,        (data) => callback({ type: 'doseReminders', data })),
-    watchGmailSources(familyId,         (data) => callback({ type: 'gmailSources', data })),
-    watchAppointmentCandidates(familyId,(data) => callback({ type: 'appointmentCandidates', data })),
+    watchMembers(familyId,              (data) => callback({ type: 'members', data }), mId),
+    watchHealthProfiles(familyId,       (data) => callback({ type: 'healthProfiles', data }), mId),
+    watchAppointments(familyId,         (data) => callback({ type: 'appointments', data }), mId),
+    watchCheckups(familyId,             (data) => callback({ type: 'checkups', data }), mId),
+    watchVaccines(familyId,             (data) => callback({ type: 'vaccines', data }), mId),
+    watchExams(familyId,                (data) => callback({ type: 'exams', data }), mId),
+    watchDocuments(familyId,            (data) => callback({ type: 'documents', data }), mId),
+    watchHistory(familyId,              (data) => callback({ type: 'history', data }), mId),
+    watchReminders(familyId,            (data) => callback({ type: 'reminders', data }), mId),
+    watchTasks(familyId,                (data) => callback({ type: 'tasks', data }), mId),
+    watchMedicalOrders(familyId,        (data) => callback({ type: 'medicalOrders', data }), mId),
+    watchMedications(familyId,          (data) => callback({ type: 'medications', data }), mId),
+    watchDoseReminders(familyId,        (data) => callback({ type: 'doseReminders', data }), mId),
+    isRestrictedMember
+      ? () => {}
+      : watchGmailSources(familyId,     (data) => callback({ type: 'gmailSources', data })),
+    isRestrictedMember
+      ? () => {}
+      : watchAppointmentCandidates(familyId,(data) => callback({ type: 'appointmentCandidates', data })),
     watchFamilySettings(familyId,       (data) => callback({ type: 'settings', data })),
   ];
+
+  if (isRestrictedMember) {
+    // Immediately emit empty lists for gmail sources and candidates to avoid loading states
+    setTimeout(() => {
+      callback({ type: 'gmailSources', data: [] });
+      callback({ type: 'appointmentCandidates', data: [] });
+    }, 0);
+  }
 
   return () => unsubs.forEach((fn) => fn());
 }

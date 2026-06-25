@@ -40,6 +40,7 @@ import {
   // Users & Family
   upsertUserProfile,
   getUserFamilyAccess,
+  getFamilyAccess,
   createFamily,
   getFamily,
   getFamiliesOwnedBy,
@@ -61,6 +62,7 @@ import {
   createMember,
   updateMember,
   deleteMember,
+  getMembers,
   // Health Profiles
   saveHealthProfile as fsaveHealthProfile,
   // Appointments
@@ -185,7 +187,26 @@ export class FirebaseRepository implements DataRepository {
     const familyId = requireFamilyId(ctx);
 
     try {
-      const raw = await loadAllFamilyData(familyId);
+      // 1. Fetch user's familyAccess document to determine their role/memberId
+      const access = await getFamilyAccess(ctx.uid, familyId);
+      const role = access?.role ?? null;
+      const memberId = access?.memberId ?? null;
+
+      // 2. Fetch member permissions if the role is MEMBER
+      let permissions = null;
+      if (role === 'MEMBER' && memberId) {
+        try {
+          const membersList = await getMembers(familyId, memberId);
+          if (membersList.length > 0) {
+            permissions = membersList[0].permissions ?? null;
+          }
+        } catch (memberErr) {
+          console.error('[FirebaseRepository] Failed to fetch member permissions in loadAll:', memberErr);
+        }
+      }
+
+      // 3. Load family data using the resolved role/memberId/permissions
+      const raw = await loadAllFamilyData(familyId, role, memberId, permissions);
 
       return {
         members:               raw.members,
@@ -228,7 +249,41 @@ export class FirebaseRepository implements DataRepository {
       console.warn('[FirebaseRepository] watchAll called without familyId — skipping.');
       return () => {};
     }
-    return watchAllFamilyData(ctx.familyId, callback);
+
+    let activeUnsub: (() => void) | null = null;
+    let cancelled = false;
+
+    const initWatcher = async () => {
+      try {
+        const familyId = ctx.familyId!;
+        const access = await getFamilyAccess(ctx.uid, familyId);
+        const role = access?.role ?? null;
+        const memberId = access?.memberId ?? null;
+
+        let permissions = null;
+        if (role === 'MEMBER' && memberId) {
+          const membersList = await getMembers(familyId, memberId);
+          if (membersList.length > 0) {
+            permissions = membersList[0].permissions ?? null;
+          }
+        }
+
+        if (cancelled) return;
+
+        activeUnsub = watchAllFamilyData(familyId, callback, role, memberId, permissions);
+      } catch (err) {
+        console.error('[FirebaseRepository] watchAll setup failed:', err);
+      }
+    };
+
+    initWatcher();
+
+    return () => {
+      cancelled = true;
+      if (activeUnsub) {
+        activeUnsub();
+      }
+    };
   }
 
   // ── Members ───────────────────────────────────────────────────────────────
