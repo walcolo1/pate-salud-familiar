@@ -1694,6 +1694,15 @@ export async function acceptInvitation(
     updatedAt: serverTimestamp(),
   });
 
+  // Update the associated member document's permissionStatus to ACTIVE
+  if (inv.invitedMemberId) {
+    const memberRef = doc(col.members(familyId), inv.invitedMemberId);
+    batch.update(memberRef, {
+      permissionStatus: 'ACTIVE',
+      updatedAt: serverTimestamp(),
+    });
+  }
+
   await batch.commit();
 }
 

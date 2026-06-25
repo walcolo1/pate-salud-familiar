@@ -5829,14 +5829,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Member permissions default configuration
   const matchedMember = currentMemberSelfId ? members.find(m => m.id === currentMemberSelfId) : null;
   const memberPerms: MemberPermissions = matchedMember?.permissions || {
-    canManageOwnProfile: true,
-    canManageOwnAppointments: true,
-    canManageOwnDocuments: true,
+    canManageOwnProfile: currentUserRole !== 'VIEWER',
+    canManageOwnAppointments: currentUserRole !== 'VIEWER',
+    canManageOwnDocuments: currentUserRole !== 'VIEWER',
     canViewOwnHistory: true,
-    canUploadDocuments: true,
+    canUploadDocuments: currentUserRole !== 'VIEWER',
     canExportOwnData: false,
-    canViewFamilyData: true, // Default to true for Admin titular
-    canManageFamilyData: true  // Default to true for Admin titular
+    canViewFamilyData: currentUserRole !== 'MEMBER_SELF',
+    canManageFamilyData: currentUserRole === 'FAMILY_ADMIN'
   };
 
   // If role is MEMBER_SELF, override family data access if granular permissions don't allow it
