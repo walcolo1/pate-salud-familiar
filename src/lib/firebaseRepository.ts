@@ -49,6 +49,8 @@ import {
   getInvitationsForEmail,
   watchInvitations,
   FamilyInvitation,
+  watchUserFamilyAccess,
+  FamilyAccess,
   // Settings
   saveFamilySettings,
   getFamilySettings,
@@ -512,5 +514,12 @@ export class FirebaseRepository implements DataRepository {
   ): () => void {
     const fid = requireFamilyId(ctx);
     return watchInvitations(fid, callback);
+  }
+
+  watchUserFamilyAccess(
+    uid: string,
+    callback: (accessList: FamilyAccess[]) => void
+  ): () => void {
+    return watchUserFamilyAccess(uid, callback);
   }
 }

@@ -5,7 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { isFirebaseBackend } from '../lib/dataBackend';
 import { getDataRepository, resetDataRepository } from '../lib/dataRepository';
 import type { DataUpdate } from '../lib/dataRepository';
-import type { FamilyInvitation } from '../lib/firestoreService';
+import type { FamilyInvitation, FamilyAccess } from '../lib/firestoreService';
 
 import { 
   UserAccount, 
@@ -544,6 +544,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ── Firebase DataRepository state (Phase 8) ─────────────────────────────────
   // familyId is null for the Sheets backend and is set on sign-in for Firebase.
   const [familyId, setFamilyId] = useState<string | null>(null);
+  const [currentUserFamilyAccess, setCurrentUserFamilyAccess] = useState<FamilyAccess | null>(null);
   const familyIdRef = useRef<string | null>(null);
   useEffect(() => { familyIdRef.current = familyId; }, [familyId]);
   // Holds the single unsubscribe function returned by watchAllFamilyData.
@@ -917,7 +918,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Persist settings to Firebase when they change
   useEffect(() => {
-    if (!isFirebaseBackend || isLoading || !user) return;
+    if (!isFirebaseBackend || isLoading || !user || !currentUserFamilyAccess) return;
+
+    // Check if the user has permission to write family settings (OWNER or CAREGIVER)
+    const role = currentUserFamilyAccess.role;
+    if (role !== 'OWNER' && role !== 'CAREGIVER') {
+      console.warn(`[AppContext] Skipping settings persist because user role ${role} is not OWNER or CAREGIVER`);
+      return;
+    }
     
     firebasePersist(async (repo, ctx) => {
       await repo.saveSettings(ctx, {
@@ -937,7 +945,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     lastGmailScanAt,
     nextGmailScanAt,
     isLoading,
-    user
+    user,
+    currentUserFamilyAccess,
   ]);
 
   // Ejecutar limpieza de retención de citas al iniciar la app
@@ -1480,6 +1489,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     resetDataRepository();
     setFamilyId(null);
+    setCurrentUserFamilyAccess(null);
     // ─────────────────────────────────────────────────────────────────────────
     // Limpiar tokens en memoria (seguridad)
     invalidateAllTokens();
@@ -1610,6 +1620,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     };
   }, [familyId, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── FIREBASE: Watch user's family access records (Phase A) ──────────────────
+  useEffect(() => {
+    if (!isFirebaseBackend || !user) {
+      setCurrentUserFamilyAccess(null);
+      return;
+    }
+
+    const uid = user.googleId || user.id || '';
+    let cancelled = false;
+    let unsub: (() => void) | null = null;
+
+    getDataRepository().then((repo) => {
+      if (cancelled) return;
+      unsub = repo.watchUserFamilyAccess(uid, (accessList) => {
+        if (cancelled) return;
+        const active = accessList.find(a => a.familyId === familyId && a.status === 'ACTIVE');
+        setCurrentUserFamilyAccess(active || null);
+        console.info('[AppContext] watchUserFamilyAccess updated active access:', active);
+      });
+    }).catch((err) => {
+      console.error('[AppContext] Firebase watchUserFamilyAccess setup failed:', err);
+    });
+
+    return () => {
+      cancelled = true;
+      if (unsub) {
+        unsub();
+      }
+    };
+  }, [isFirebaseBackend, user, familyId]);
 
   // ── FIREBASE: State snapshot and rollback for optimistic updates ───────────
   const stateRef = useRef({
@@ -5767,6 +5808,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (currentUserRole === 'MEMBER_SELF') {
       const matched = members.find(m => m.email && m.email.toLowerCase() === activeEmail?.toLowerCase() && m.canAccessPortal === true && m.permissionStatus === 'ACTIVE');
       currentMemberSelfId = matched ? matched.id : (members.find(m => m.relationship === 'SELF')?.id || null);
+    }
+  } else if (isFirebaseBackend && currentUserFamilyAccess) {
+    if (currentUserFamilyAccess.role === 'OWNER' || currentUserFamilyAccess.role === 'CAREGIVER') {
+      currentUserRole = 'FAMILY_ADMIN';
+    } else if (currentUserFamilyAccess.role === 'MEMBER') {
+      currentUserRole = 'MEMBER_SELF';
+      currentMemberSelfId = currentUserFamilyAccess.memberId;
+    } else if (currentUserFamilyAccess.role === 'VIEWER') {
+      currentUserRole = 'VIEWER';
     }
   } else if (activeEmail) {
     const matched = members.find(m => m.email && m.email.toLowerCase() === activeEmail.toLowerCase() && m.canAccessPortal === true && m.permissionStatus === 'ACTIVE');

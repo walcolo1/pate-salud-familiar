@@ -34,7 +34,7 @@ import type {
   DataUpdate,
 } from './dataRepository';
 import { EMPTY_FAMILY_DATA } from './dataRepository';
-import type { FamilyInvitation } from './firestoreService';
+import type { FamilyInvitation, FamilyAccess } from './firestoreService';
 import type {
   FamilyMember,
   HealthProfile,
@@ -184,6 +184,13 @@ export class SheetsRepository implements DataRepository {
   watchInvitations(
     _ctx: RepositoryContext,
     _callback: (invitations: FamilyInvitation[]) => void
+  ): () => void {
+    return () => {};
+  }
+
+  watchUserFamilyAccess(
+    _uid: string,
+    _callback: (accessList: FamilyAccess[]) => void
   ): () => void {
     return () => {};
   }

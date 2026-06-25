@@ -820,8 +820,8 @@ export default function SettingsPage() {
               <hr className="border-slate-50" />
 
               {/* Formulario Enviar Invitación */}
-              <form onSubmit={handleSendInvite} className="bg-slate-50 border border-slate-100 p-4 rounded-2xl flex flex-col gap-4">
-                <span className="font-bold text-slate-800 text-[11px] block leading-none">Invitar a un familiar</span>
+              <form onSubmit={handleSendInvite} className="bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-700/40 p-4 rounded-2xl flex flex-col gap-4">
+                <span className="font-bold text-slate-800 dark:text-slate-200 text-[11px] block leading-none">Invitar a un familiar</span>
                 
                 {inviteError && (
                   <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 font-semibold text-[10px] flex items-center gap-2">
@@ -846,7 +846,7 @@ export default function SettingsPage() {
                       value={inviteEmail}
                       onChange={(e) => setInviteEmail(e.target.value)}
                       placeholder="familiar@correo.com"
-                      className="h-10 px-3 bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 rounded-xl text-xs font-semibold"
+                      className="h-10 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-100"
                     />
                   </div>
 
@@ -856,11 +856,11 @@ export default function SettingsPage() {
                       required
                       value={inviteMemberId}
                       onChange={(e) => setInviteMemberId(e.target.value)}
-                      className="h-10 px-3 bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 rounded-xl text-xs font-semibold"
+                      className="h-10 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-100"
                     >
-                      <option value="">-- Seleccionar --</option>
+                      <option value="" className="text-slate-800 dark:text-slate-100">-- Seleccionar --</option>
                       {members.filter(m => m.status !== 'DELETED').map((m) => (
-                        <option key={m.id} value={m.id}>{m.fullName}</option>
+                        <option key={m.id} value={m.id} className="text-slate-800 dark:text-slate-100">{m.fullName}</option>
                       ))}
                     </select>
                   </div>
@@ -871,11 +871,11 @@ export default function SettingsPage() {
                       required
                       value={inviteRole}
                       onChange={(e) => setInviteRole(e.target.value as any)}
-                      className="h-10 px-3 bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 rounded-xl text-xs font-semibold"
+                      className="h-10 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-100"
                     >
-                      <option value="MEMBER">Miembro (Solo ve su propia ficha)</option>
-                      <option value="CAREGIVER">Cuidador (Acceso completo)</option>
-                      <option value="VIEWER">Visualizador (Lectura de todo)</option>
+                      <option value="MEMBER" className="text-slate-800 dark:text-slate-100">Miembro (Solo ve su propia ficha)</option>
+                      <option value="CAREGIVER" className="text-slate-800 dark:text-slate-100">Cuidador (Acceso completo)</option>
+                      <option value="VIEWER" className="text-slate-800 dark:text-slate-100">Visualizador (Lectura de todo)</option>
                     </select>
                   </div>
                 </div>

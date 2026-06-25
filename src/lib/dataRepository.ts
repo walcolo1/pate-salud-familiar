@@ -36,7 +36,7 @@ import type {
   AppointmentEmailSource,
   ImportedEmailAppointmentCandidate,
 } from '../domain/models';
-import type { FamilySettings, FamilyInvitation } from './firestoreService';
+import type { FamilySettings, FamilyInvitation, FamilyAccess } from './firestoreService';
 
 import { isFirebaseBackend } from './dataBackend';
 
@@ -270,6 +270,11 @@ export interface DataRepository {
   watchInvitations(
     ctx: RepositoryContext,
     callback: (invitations: FamilyInvitation[]) => void
+  ): () => void;
+
+  watchUserFamilyAccess(
+    uid: string,
+    callback: (accessList: FamilyAccess[]) => void
   ): () => void;
 }
 
