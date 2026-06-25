@@ -106,8 +106,13 @@ function getFirestoreInstance(): Firestore {
   }
 }
 
+import { getStorage } from 'firebase/storage';
+
 /** Firestore singleton with offline persistence enabled. */
 export const db: Firestore = getFirestoreInstance();
+
+/** Firebase Storage singleton. */
+export const firebaseStorage = getStorage(firebaseApp);
 
 // ---------------------------------------------------------------------------
 // Utility: validate that all required env vars are present at runtime

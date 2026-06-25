@@ -75,7 +75,8 @@ import {
   DocumentData,
 } from 'firebase/firestore';
 
-import { db } from './firebase';
+import { db, firebaseStorage } from './firebase';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 import type {
   FamilyMember,
@@ -2075,3 +2076,131 @@ export function watchAllFamilyData(
 
   return () => unsubs.forEach((fn) => fn());
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 27: Firebase Storage Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Compresses an image file client-side using HTML Canvas.
+ * Returns a JPEG blob of max dimensions 256x256 and quality 0.85.
+ */
+export function compressImage(file: File, maxWidth = 256, maxHeight = 256): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    // Only run in browser environment
+    if (typeof window === 'undefined') {
+      reject(new Error('Browser environment required for image compression'));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Maintain aspect ratio
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Failed to get canvas 2d context'));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Canvas compilation to blob failed'));
+            }
+          },
+          'image/jpeg',
+          0.85
+        );
+      };
+      img.onerror = () => reject(new Error('Failed to load image element'));
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Failed to read file buffer'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Uploads a profile avatar to Firebase Storage.
+ * Validates file type and size, deletes the old avatar path if provided,
+ * compresses the image client-side, and returns the download url and storage path.
+ */
+export async function uploadMemberAvatar(
+  familyId: string,
+  memberId: string,
+  file: File,
+  oldAvatarPath?: string | null,
+): Promise<{ url: string; path: string }> {
+  // 1. Validation
+  if (!file.type.startsWith('image/')) {
+    throw new Error('El archivo seleccionado debe ser una imagen.');
+  }
+
+  const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+  if (file.size > MAX_SIZE) {
+    throw new Error('El archivo seleccionado supera el límite de 2MB.');
+  }
+
+  const newPath = `families/${familyId}/members/${memberId}/avatar`;
+
+  // 2. Delete old avatar if it exists at a different path
+  if (oldAvatarPath && oldAvatarPath !== newPath) {
+    try {
+      const oldRef = ref(firebaseStorage, oldAvatarPath);
+      await deleteObject(oldRef);
+      console.log(`Deleted old avatar at path: ${oldAvatarPath}`);
+    } catch (e) {
+      console.warn(`Could not delete old avatar:`, e);
+    }
+  }
+
+  // 3. Compress image
+  const compressedBlob = await compressImage(file, 256, 256);
+
+  // 4. Upload to Storage
+  const storageRef = ref(firebaseStorage, newPath);
+  await uploadBytes(storageRef, compressedBlob, {
+    contentType: 'image/jpeg',
+  });
+
+  const url = await getDownloadURL(storageRef);
+  return { url, path: newPath };
+}
+
+/**
+ * Deletes a member avatar from Firebase Storage safely.
+ */
+export async function deleteMemberAvatar(avatarPath: string): Promise<void> {
+  try {
+    const storageRef = ref(firebaseStorage, avatarPath);
+    await deleteObject(storageRef);
+    console.log(`Deleted avatar from path: ${avatarPath}`);
+  } catch (e) {
+    console.warn(`Failed to delete avatar from path ${avatarPath}:`, e);
+  }
+}
+

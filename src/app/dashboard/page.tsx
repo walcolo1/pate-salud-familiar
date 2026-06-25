@@ -515,8 +515,24 @@ export default function DashboardPage() {
                   href={`/members/${member.id}`}
                   className="flex flex-col items-center gap-2 bg-white p-4 rounded-2xl min-w-[110px] border border-slate-100 shadow-sm shadow-slate-100/40 hover:shadow-md transition-all duration-200 active:scale-95 shrink-0"
                 >
-                  <div className="h-12 w-12 rounded-full bg-teal-600/10 text-teal-700 border border-teal-600/20 flex items-center justify-center font-black text-sm shrink-0">
-                    {member.fullName.substring(0, 2).toUpperCase()}
+                  <div className="relative h-12 w-12 rounded-full bg-teal-600/10 text-teal-700 border border-teal-600/20 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden">
+                    {member.avatarUrl ? (
+                      <>
+                        <span className="absolute inset-0 flex items-center justify-center">
+                          {member.fullName.substring(0, 2).toUpperCase()}
+                        </span>
+                        <img 
+                          src={member.avatarUrl} 
+                          alt={member.fullName}
+                          className="h-full w-full object-cover relative z-10"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </>
+                    ) : (
+                      member.fullName.substring(0, 2).toUpperCase()
+                    )}
                   </div>
                   <div className="text-center w-full min-w-0">
                     <p className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[90px] mx-auto">{member.fullName.split(' ')[0]}</p>

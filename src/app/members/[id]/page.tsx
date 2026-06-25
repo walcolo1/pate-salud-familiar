@@ -251,8 +251,24 @@ export default function MemberDetailPage() {
       {/* Member Profile Card */}
       <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-5 items-center md:items-start">
         {/* Avatar */}
-        <div className="h-16 w-16 rounded-full bg-teal-600/10 text-teal-700 border border-teal-600/20 flex items-center justify-center font-black text-xl shrink-0">
-          {member.fullName.substring(0, 2).toUpperCase()}
+        <div className="relative h-16 w-16 rounded-full bg-teal-600/10 text-teal-700 border border-teal-600/20 flex items-center justify-center font-black text-xl shrink-0 overflow-hidden">
+          {member.avatarUrl ? (
+            <>
+              <span className="absolute inset-0 flex items-center justify-center">
+                {member.fullName.substring(0, 2).toUpperCase()}
+              </span>
+              <img 
+                src={member.avatarUrl} 
+                alt={member.fullName}
+                className="h-full w-full object-cover relative z-10"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </>
+          ) : (
+            member.fullName.substring(0, 2).toUpperCase()
+          )}
         </div>
 
         {/* Text details */}

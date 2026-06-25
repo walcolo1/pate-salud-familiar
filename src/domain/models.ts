@@ -55,6 +55,8 @@ export interface FamilyMember {
   relationship: Relationship;
   bloodType?: BloodType | null;
   photoUrl?: string | null;
+  avatarUrl?: string | null;
+  avatarPath?: string | null;
   notes?: string | null;
   status?: 'ACTIVE' | 'INACTIVE' | 'DELETED';
   email?: string | null;

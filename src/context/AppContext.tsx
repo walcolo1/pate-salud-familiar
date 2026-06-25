@@ -235,9 +235,11 @@ interface AppContextProps {
   
   signIn: (googleUser?: Omit<UserAccount, 'id' | 'createdAt'>, idToken?: string) => Promise<void>;
   signOut: () => Promise<void>;
-  addMember: (member: Omit<FamilyMember, 'id' | 'familyGroupId'>) => void;
+  addMember: (member: Omit<FamilyMember, 'id' | 'familyGroupId'>, customId?: string) => void;
   updateMember: (id: string, member: Partial<FamilyMember>) => void;
   deleteMember: (id: string) => boolean;
+  uploadMemberAvatar: (memberId: string, file: File, oldAvatarPath?: string | null) => Promise<{ url: string; path: string }>;
+  deleteMemberAvatar: (avatarPath: string) => Promise<void>;
   saveHealthProfile: (memberId: string, profile: Partial<HealthProfile>) => void;
   addAppointment: (appt: Omit<MedicalAppointment, 'id' | 'documentIds'>) => void;
   updateAppointmentStatus: (id: string, status: HealthEventStatus) => void;
@@ -2026,8 +2028,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ─────────────────────────────────────────────────────────────────────────
 
-  const addMember = (member: Omit<FamilyMember, 'id' | 'familyGroupId'>) => {
-    const newId = `member-${Date.now()}`;
+  const addMember = (member: Omit<FamilyMember, 'id' | 'familyGroupId'>, customId?: string) => {
+    const newId = customId || `member-${Date.now()}`;
     const newMember: FamilyMember = {
       ...member,
       id: newId,
@@ -2124,6 +2126,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     });
   };
+
+  const uploadMemberAvatar = useCallback(
+    async (
+      memberId: string,
+      file: File,
+      oldAvatarPath?: string | null,
+    ): Promise<{ url: string; path: string }> => {
+      const repo = await getDataRepository();
+      if (repo.uploadMemberAvatar) {
+        return await repo.uploadMemberAvatar(
+          {
+            uid: user?.googleId ?? user?.id ?? '',
+            email: user?.email ?? '',
+            familyId,
+          },
+          memberId,
+          file,
+          oldAvatarPath,
+        );
+      }
+      throw new Error('El backend actual no soporta subida de archivos');
+    },
+    [familyId, user],
+  );
+
+  const deleteMemberAvatar = useCallback(
+    async (avatarPath: string): Promise<void> => {
+      const repo = await getDataRepository();
+      if (repo.deleteMemberAvatar) {
+        await repo.deleteMemberAvatar(
+          {
+            uid: user?.googleId ?? user?.id ?? '',
+            email: user?.email ?? '',
+            familyId,
+          },
+          avatarPath,
+        );
+        return;
+      }
+      throw new Error('El backend actual no soporta borrado de archivos');
+    },
+    [familyId, user],
+  );
 
   const deleteMember = (id: string): boolean => {
     const memberAppointments = appointments.filter(a => a.memberId === id && a.retentionStatus !== 'PURGED');
@@ -6575,6 +6620,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addMember,
       updateMember,
       deleteMember,
+      uploadMemberAvatar,
+      deleteMemberAvatar,
       saveHealthProfile,
       addAppointment,
       updateAppointmentStatus,

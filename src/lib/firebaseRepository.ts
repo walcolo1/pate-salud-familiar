@@ -59,6 +59,8 @@ import {
   loadAllFamilyData,
   watchAllFamilyData,
   watchAccessAndPermissions,
+  uploadMemberAvatar,
+  deleteMemberAvatar,
   // Members
   createMember,
   updateMember,
@@ -564,5 +566,22 @@ export class FirebaseRepository implements DataRepository {
     callback: (accessList: FamilyAccess[]) => void
   ): () => void {
     return watchUserFamilyAccess(uid, callback);
+  }
+
+  async uploadMemberAvatar(
+    ctx: RepositoryContext,
+    memberId: string,
+    file: File,
+    oldAvatarPath?: string | null
+  ): Promise<{ url: string; path: string }> {
+    const fid = requireFamilyId(ctx);
+    return await uploadMemberAvatar(fid, memberId, file, oldAvatarPath);
+  }
+
+  async deleteMemberAvatar(
+    ctx: RepositoryContext,
+    avatarPath: string
+  ): Promise<void> {
+    await deleteMemberAvatar(avatarPath);
   }
 }

@@ -4,14 +4,14 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
-import { ArrowLeft, Save, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Save, ShieldAlert, Camera, Trash2 } from 'lucide-react';
 import { Relationship, BloodType, MemberDocumentType } from '@/domain/models';
 
 export default function EditMemberPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
-  const { user, members, updateMember, isLoading } = useApp();
+  const { user, members, updateMember, uploadMemberAvatar, deleteMemberAvatar, isLoading } = useApp();
 
   const [fullName, setFullName] = useState('');
   const [birthDate, setBirthDate] = useState('');
@@ -24,6 +24,13 @@ export default function EditMemberPage() {
   const [documentType, setDocumentType] = useState<MemberDocumentType>('CC');
   const [documentNumber, setDocumentNumber] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Avatar states
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarPath, setAvatarPath] = useState<string | null>(null);
+  const [isAvatarDeleted, setIsAvatarDeleted] = useState(false);
   
   // Granular permissions states
   const [canManageOwnProfile, setCanManageOwnProfile] = useState(true);
@@ -81,6 +88,9 @@ export default function EditMemberPage() {
       setCanExportOwnData(perms.canExportOwnData);
       setCanViewFamilyData(perms.canViewFamilyData);
       setCanManageFamilyData(perms.canManageFamilyData);
+      setAvatarUrl(member.avatarUrl || null);
+      setAvatarPath(member.avatarPath || null);
+      setAvatarPreview(member.avatarUrl || null);
       setIsInitialized(true);
     }
   }, [member, isInitialized]);
@@ -123,7 +133,28 @@ export default function EditMemberPage() {
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('El archivo seleccionado debe ser una imagen.');
+      return;
+    }
+
+    const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+    if (file.size > MAX_SIZE) {
+      setError('El archivo seleccionado supera el límite de 2MB.');
+      return;
+    }
+
+    setError(null);
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    setIsAvatarDeleted(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -167,6 +198,30 @@ export default function EditMemberPage() {
       canManageFamilyData
     };
 
+    let finalUrl = avatarUrl;
+    let finalPath = avatarPath;
+
+    if (isAvatarDeleted) {
+      if (avatarPath) {
+        try {
+          await deleteMemberAvatar(avatarPath);
+        } catch (err: any) {
+          console.warn('Failed to delete avatar:', err);
+        }
+      }
+      finalUrl = null;
+      finalPath = null;
+    } else if (avatarFile) {
+      try {
+        const uploadResult = await uploadMemberAvatar(id, avatarFile, avatarPath);
+        finalUrl = uploadResult.url;
+        finalPath = uploadResult.path;
+      } catch (err: any) {
+        setError(err.message || 'Error al subir la imagen de perfil');
+        return;
+      }
+    }
+
     updateMember(id, {
       fullName,
       birthDate,
@@ -178,7 +233,9 @@ export default function EditMemberPage() {
       permissionStatus: canAccessPortal ? permissionStatus : 'NONE',
       permissions: canAccessPortal ? permissions : null,
       documentType,
-      documentNumber: normalizedDocNumber
+      documentNumber: normalizedDocNumber,
+      avatarUrl: finalUrl,
+      avatarPath: finalPath
     });
 
     router.replace(`/members/${id}`);
@@ -209,6 +266,58 @@ export default function EditMemberPage() {
             <span>{error}</span>
           </div>
         )}
+
+        {/* Foto de Perfil */}
+        <div className="flex flex-col items-center gap-3 py-2 border-b border-slate-100">
+          <label className="text-xs font-extrabold text-slate-700 self-start">Foto de Perfil</label>
+          <div className="relative h-20 w-20 rounded-full bg-teal-600/10 border border-slate-200 overflow-hidden flex items-center justify-center font-black text-2xl text-teal-700 shadow-inner group">
+            {avatarPreview ? (
+              <img 
+                src={avatarPreview} 
+                alt="Vista previa" 
+                className="h-full w-full object-cover" 
+              />
+            ) : (
+              fullName ? fullName.substring(0, 2).toUpperCase() : '?'
+            )}
+            <label className="absolute inset-0 bg-black/40 text-white opacity-0 hover:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity duration-200">
+              <Camera className="h-5 w-5 mb-0.5" />
+              <span className="text-[9px] font-bold">Cambiar</span>
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handleFileChange} 
+                className="hidden" 
+              />
+            </label>
+          </div>
+          <div className="flex gap-2 text-[10px] font-bold">
+            <label className="cursor-pointer text-teal-600 hover:text-teal-700 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-100 transition-colors">
+              Subir imagen
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handleFileChange} 
+                className="hidden" 
+              />
+            </label>
+            {(avatarPreview || avatarUrl) && (
+              <button 
+                type="button" 
+                onClick={() => {
+                  setAvatarFile(null);
+                  setAvatarPreview(null);
+                  setIsAvatarDeleted(true);
+                }} 
+                className="text-rose-600 hover:text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 flex items-center gap-1 transition-colors"
+              >
+                <Trash2 className="h-3 w-3" />
+                Eliminar
+              </button>
+            )}
+          </div>
+          <span className="text-[10px] text-slate-400 font-semibold leading-none">Formatos soportados: JPG, PNG · Máximo 2MB</span>
+        </div>
 
         {/* Full Name */}
         <div className="flex flex-col gap-2">

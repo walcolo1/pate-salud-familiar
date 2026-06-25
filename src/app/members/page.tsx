@@ -165,8 +165,24 @@ export default function MembersPage() {
                 className="flex items-center gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm shadow-slate-100/40 hover:shadow-md transition-all duration-200 group"
               >
                 {/* Avatar */}
-                <div className="h-14 w-14 rounded-full bg-teal-600/10 text-teal-700 border border-teal-600/20 flex items-center justify-center font-black text-base shrink-0 group-hover:bg-teal-600 group-hover:text-white transition-all duration-300">
-                  {member.fullName.substring(0, 2).toUpperCase()}
+                <div className="relative h-14 w-14 rounded-full bg-teal-600/10 text-teal-700 border border-teal-600/20 flex items-center justify-center font-black text-base shrink-0 overflow-hidden group-hover:bg-teal-600 group-hover:text-white transition-all duration-300">
+                  {member.avatarUrl ? (
+                    <>
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        {member.fullName.substring(0, 2).toUpperCase()}
+                      </span>
+                      <img 
+                        src={member.avatarUrl} 
+                        alt={member.fullName}
+                        className="h-full w-full object-cover relative z-10"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </>
+                  ) : (
+                    member.fullName.substring(0, 2).toUpperCase()
+                  )}
                 </div>
 
                 {/* Info */}

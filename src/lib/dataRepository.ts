@@ -276,6 +276,18 @@ export interface DataRepository {
     uid: string,
     callback: (accessList: FamilyAccess[]) => void
   ): () => void;
+
+  uploadMemberAvatar?(
+    ctx: RepositoryContext,
+    memberId: string,
+    file: File,
+    oldAvatarPath?: string | null
+  ): Promise<{ url: string; path: string }>;
+
+  deleteMemberAvatar?(
+    ctx: RepositoryContext,
+    avatarPath: string
+  ): Promise<void>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
