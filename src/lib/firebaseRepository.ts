@@ -58,6 +58,7 @@ import {
   // Bulk load & watch
   loadAllFamilyData,
   watchAllFamilyData,
+  watchAccessAndPermissions,
   // Members
   createMember,
   updateMember,
@@ -250,39 +251,26 @@ export class FirebaseRepository implements DataRepository {
       return () => {};
     }
 
-    let activeUnsub: (() => void) | null = null;
-    let cancelled = false;
+    const familyId = ctx.familyId!;
+    const uid = ctx.uid;
 
-    const initWatcher = async () => {
-      try {
-        const familyId = ctx.familyId!;
-        const access = await getFamilyAccess(ctx.uid, familyId);
-        const role = access?.role ?? null;
-        const memberId = access?.memberId ?? null;
+    let activeDataUnsub: (() => void) | null = null;
+    let accessUnsub: (() => void) | null = null;
 
-        let permissions = null;
-        if (role === 'MEMBER' && memberId) {
-          const membersList = await getMembers(familyId, memberId);
-          if (membersList.length > 0) {
-            permissions = membersList[0].permissions ?? null;
-          }
+    if (uid) {
+      accessUnsub = watchAccessAndPermissions(familyId, uid, (role, memberId, permissions) => {
+        if (activeDataUnsub) {
+          activeDataUnsub();
         }
-
-        if (cancelled) return;
-
-        activeUnsub = watchAllFamilyData(familyId, callback, role, memberId, permissions);
-      } catch (err) {
-        console.error('[FirebaseRepository] watchAll setup failed:', err);
-      }
-    };
-
-    initWatcher();
+        activeDataUnsub = watchAllFamilyData(familyId, callback, role, memberId, permissions);
+      });
+    } else {
+      activeDataUnsub = watchAllFamilyData(familyId, callback, null, null, null);
+    }
 
     return () => {
-      cancelled = true;
-      if (activeUnsub) {
-        activeUnsub();
-      }
+      if (accessUnsub) accessUnsub();
+      if (activeDataUnsub) activeDataUnsub();
     };
   }
 

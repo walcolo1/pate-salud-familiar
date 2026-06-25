@@ -338,6 +338,75 @@ export function watchUserFamilyAccess(
   });
 }
 
+/**
+ * Listens in real-time to a user's familyAccess document and their associated
+ * member permissions (if role is MEMBER), providing updates en caliente.
+ */
+export function watchAccessAndPermissions(
+  familyId: string,
+  uid: string,
+  onUpdate: (
+    role: FamilyRole | null,
+    memberId: string | null,
+    permissions: MemberPermissions | null,
+  ) => void,
+): Unsubscribe {
+  let memberUnsub: (() => void) | null = null;
+  let lastMemberId: string | null = null;
+  let lastPermissions: MemberPermissions | null = null;
+
+  const accessRef = doc(col.familyAccess(uid), familyId);
+
+  const accessUnsub = onSnapshot(accessRef, (accessSnap) => {
+    if (!accessSnap.exists()) {
+      if (memberUnsub) {
+        memberUnsub();
+        memberUnsub = null;
+      }
+      onUpdate(null, null, null);
+      return;
+    }
+
+    const accessData = accessSnap.data() as FamilyAccess;
+    const role = accessData.role || null;
+    const memberId = accessData.memberId || null;
+
+    if (role === 'MEMBER' && memberId) {
+      if (memberId !== lastMemberId || !memberUnsub) {
+        if (memberUnsub) memberUnsub();
+
+        const memberRef = doc(col.members(familyId), memberId);
+        memberUnsub = onSnapshot(memberRef, (memberSnap) => {
+          let perms: MemberPermissions | null = null;
+          if (memberSnap.exists()) {
+            const memberData = memberSnap.data();
+            perms = (memberData.permissions || null) as MemberPermissions | null;
+          }
+          lastMemberId = memberId;
+          lastPermissions = perms;
+          onUpdate(role, memberId, perms);
+        });
+      } else {
+        onUpdate(role, memberId, lastPermissions);
+      }
+    } else {
+      if (memberUnsub) {
+        memberUnsub();
+        memberUnsub = null;
+      }
+      lastMemberId = null;
+      lastPermissions = null;
+      onUpdate(role, null, null);
+    }
+  });
+
+  return () => {
+    accessUnsub();
+    if (memberUnsub) memberUnsub();
+  };
+}
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION 6: Families
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1859,6 +1928,11 @@ export async function loadAllFamilyData(
   }
 
   // Normal flow (Owner / Caregiver / Viewer / Member with canViewFamilyData)
+  const canManageFamily =
+    role === 'OWNER' ||
+    role === 'CAREGIVER' ||
+    (role === 'MEMBER' && permissions?.canManageFamilyData === true);
+
   const [
     members,
     healthProfiles,
@@ -1893,7 +1967,7 @@ export async function loadAllFamilyData(
     getMedications(familyId),
     getDoseReminders(familyId),
     getGmailSources(familyId),
-    getAllAppointmentCandidates(familyId),
+    canManageFamily ? getAllAppointmentCandidates(familyId) : Promise.resolve([]),
     getFamilySettings(familyId),
   ]);
 
@@ -1963,6 +2037,10 @@ export function watchAllFamilyData(
 ): Unsubscribe {
   const isRestrictedMember = role === 'MEMBER' && permissions?.canViewFamilyData !== true;
   const mId = isRestrictedMember ? memberId : null;
+  const canManageFamily =
+    role === 'OWNER' ||
+    role === 'CAREGIVER' ||
+    (role === 'MEMBER' && permissions?.canManageFamilyData === true);
 
   const unsubs: Unsubscribe[] = [
     watchMembers(familyId,              (data) => callback({ type: 'members', data }), mId),
@@ -1981,9 +2059,9 @@ export function watchAllFamilyData(
     isRestrictedMember
       ? () => {}
       : watchGmailSources(familyId,     (data) => callback({ type: 'gmailSources', data })),
-    isRestrictedMember
-      ? () => {}
-      : watchAppointmentCandidates(familyId,(data) => callback({ type: 'appointmentCandidates', data })),
+    canManageFamily
+      ? watchAppointmentCandidates(familyId,(data) => callback({ type: 'appointmentCandidates', data }))
+      : () => {},
     watchFamilySettings(familyId,       (data) => callback({ type: 'settings', data })),
   ];
 

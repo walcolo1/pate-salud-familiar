@@ -1555,7 +1555,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     getDataRepository().then((repo) => {
       if (cancelled) return;
       const unsub = repo.watchAll(
-        { uid: '', email: '', familyId },
+        {
+          uid: user?.googleId ?? user?.id ?? '',
+          email: user?.email ?? '',
+          familyId,
+        },
         (update: DataUpdate) => {
           if (cancelled) return;
           switch (update.type) {
@@ -1594,7 +1598,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     getDataRepository().then((repo) => {
       if (cancelled) return;
-      if (repo.watchInvitations) {
+      if (repo.watchInvitations && currentUserFamilyAccess?.role === 'OWNER') {
         const unsub = repo.watchInvitations(
           { uid: user?.googleId ?? user?.id ?? '', email: user?.email ?? '', familyId },
           (invs) => {
@@ -1603,6 +1607,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         );
         firebaseInvitationsUnsubRef.current = unsub;
+      } else {
+        setInvitations([]);
       }
     }).catch((err) => {
       console.error('[AppContext] Firebase invitations watcher setup failed:', err);
@@ -1619,7 +1625,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         firebaseInvitationsUnsubRef.current = null;
       }
     };
-  }, [familyId, user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [familyId, user, currentUserFamilyAccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── FIREBASE: Watch user's family access records (Phase A) ──────────────────
   useEffect(() => {
