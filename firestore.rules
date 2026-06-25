@@ -93,8 +93,7 @@ service cloud.firestore {
 
     // Can read data belonging to a specific memberId.
     function canReadMember(familyId, memberId) {
-      return canReadAll(familyId)
-        || (isMember(familyId) && getAccess(familyId).memberId == memberId);
+      return hasActiveAccess(familyId);
     }
 
     // Can write data belonging to a specific memberId.
@@ -281,10 +280,7 @@ service cloud.firestore {
       // For the MEMBER case, the DataRepository layer must filter client-side
       // to only load results for exams belonging to that member.
       match /examResults/{resultId} {
-        allow read:   if canReadAll(familyId)
-                      || (isMember(familyId)
-                          && exists(/databases/$(database)/documents/families/$(familyId)/exams/$(resource.data.examId))
-                          && get(/databases/$(database)/documents/families/$(familyId)/exams/$(resource.data.examId)).data.memberId == getAccess(familyId).memberId);
+        allow read:   if hasActiveAccess(familyId);
         allow create: if canWriteFamily(familyId);
         allow update: if canWriteFamily(familyId);
         // Exam results use a replace strategy (delete old, write new).
