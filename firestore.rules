@@ -197,6 +197,24 @@ service cloud.firestore {
         || (isMember(familyId) && getMemberPermissions(familyId, ownMemberId(familyId)).canManageFamilyData == true);
     }
 
+    // El destinatario legítimo de una invitación.
+    //
+    // Existen DOS rutas de lectura para el mismo documento (el grupo de
+    // colecciones y la ruta por familia) y las reglas se combinan con OR, así
+    // que ambas deben usar esta función: endurecer solo una no cierra nada.
+    //
+    // email_verified es obligatorio: sin él, un proveedor de identidad que
+    // permita registrar un correo sin comprobarlo deja leer invitaciones ajenas.
+    //
+    // .lower().trim() replica la normalización con la que el campo se escribe
+    // (firestoreService.ts:1708) y con la que la app consulta (:1802). Sin ella
+    // un token con mayúsculas es denegado sobre su propia invitación.
+    function isInvitedRecipient(invitedEmail) {
+      return isAuth()
+        && request.auth.token.email_verified == true
+        && invitedEmail == request.auth.token.email.lower().trim();
+    }
+
     // Validates that a create request includes the mandatory soft-delete
     // sentinel so the `where('deletedAt','==',null)` queries work correctly.
     function hasDeletedAtNull() {
@@ -240,7 +258,7 @@ service cloud.firestore {
     // Collection group rule for invitations so invited users can query their invitations
     // globally without knowing the familyId in advance.
     match /{path=**}/invitations/{invitationId} {
-      allow read: if isAuth() && resource.data.invitedEmail == request.auth.token.email;
+      allow read: if isInvitedRecipient(resource.data.invitedEmail);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -466,8 +484,7 @@ service cloud.firestore {
         // OWNER sees all invitations.
         // The invited user can read their own pending invitation (matched by email).
         allow read: if isOwner(familyId)
-                    || (isAuth()
-                        && resource.data.invitedEmail == request.auth.token.email);
+                    || isInvitedRecipient(resource.data.invitedEmail);
 
         // Only OWNER can create invitations.
         allow create: if isOwner(familyId);
@@ -476,9 +493,11 @@ service cloud.firestore {
         // The invited user can update ONLY to transition status → 'ACCEPTED'
         // and must set their own UID in acceptedByUid. No other fields may be
         // changed by the invited user.
+        // El invitado solo puede pasar su invitación de PENDING a ACCEPTED.
+        // Usa isInvitedRecipient (email_verified + normalización) porque aceptar
+        // es lo que crea el familyAccess: es una puerta más valiosa que leer.
         allow update: if isOwner(familyId)
-                      || (isAuth()
-                          && resource.data.invitedEmail == request.auth.token.email
+                      || (isInvitedRecipient(resource.data.invitedEmail)
                           && resource.data.status == 'PENDING'
                           && request.resource.data.status == 'ACCEPTED'
                           && request.resource.data.acceptedByUid == request.auth.uid
