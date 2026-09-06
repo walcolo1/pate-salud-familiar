@@ -86,21 +86,46 @@ service cloud.firestore {
 
     // ── Composite permission helpers ──────────────────────────────────────
 
-    // Returns the granular permissions stored in the member's document.
+    // Denegación por defecto. Todo camino en el que no se pueda leer un mapa
+    // de permisos explícito desemboca aquí.
+    function noPermissions() {
+      return {
+        'canManageOwnProfile': false,
+        'canManageOwnAppointments': false,
+        'canManageOwnDocuments': false,
+        'canViewOwnHistory': false,
+        'canUploadDocuments': false,
+        'canExportOwnData': false,
+        'canViewFamilyData': false,
+        'canManageFamilyData': false
+      };
+    }
+
+    // Devuelve el documento del miembro, o null si no existe.
     // Memoized per request — does not cause multiple Firestore reads.
-    function getMemberPermissions(familyId, memberId) {
+    function memberDoc(familyId, memberId) {
       return exists(/databases/$(database)/documents/families/$(familyId)/members/$(memberId))
-        ? get(/databases/$(database)/documents/families/$(familyId)/members/$(memberId)).data.permissions
-        : {
-            'canManageOwnProfile': true,
-            'canManageOwnAppointments': true,
-            'canManageOwnDocuments': true,
-            'canViewOwnHistory': true,
-            'canUploadDocuments': true,
-            'canExportOwnData': false,
-            'canViewFamilyData': false,
-            'canManageFamilyData': false
-          };
+        ? get(/databases/$(database)/documents/families/$(familyId)/members/$(memberId)).data
+        : null;
+    }
+
+    // Returns the granular permissions stored in the member's document.
+    //
+    // Tres entradas desembocan en el mismo mapa de ceros, y cada una arreglaba
+    // un fallo distinto de la versión anterior:
+    //   · memberId nulo            → antes construía una ruta inválida.
+    //   · documento ausente        → antes CONCEDÍA cuatro permisos (fuga).
+    //   · permissions == null      → antes devolvía null, y null.campo es un
+    //                                error de evaluación que denegaba TODA la
+    //                                app sin mensaje (bloqueo silencioso).
+    // El campo se escribe como null deliberadamente desde
+    // src/app/members/[id]/edit/page.tsx, así que no es un caso teórico.
+    function getMemberPermissions(familyId, memberId) {
+      return (memberId != null
+              && memberDoc(familyId, memberId) != null
+              && memberDoc(familyId, memberId).permissions != null)
+        ? memberDoc(familyId, memberId).permissions
+        : noPermissions();
     }
 
     // Can read any collection (no member-level filter needed).
