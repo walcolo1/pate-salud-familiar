@@ -1,0 +1,3 @@
+# Normalización de fin de línea · PWA Paté · Salud Familiar
+# El índice queda siempre en LF, sin depender de core.autocrlf de cada máquina.
+* text=auto eol=lf
