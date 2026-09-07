@@ -41,3 +41,25 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# ── Credenciales de servicio · NUNCA versionar ────────────────────────────
+# La clave de auditoría vive fuera del árbol del repositorio; estas reglas
+# son defensa en profundidad por si alguna vez cae una dentro.
+.pate-secrets/
+*.service-account.json
+*service-account*.json
+
+# ── Artefactos de Playwright (A6-F2) ─────────────────────────────────────
+# Pueden contener capturas, videos y trazas con datos de sesion: NUNCA se
+# versionan. La configuracion los desactiva, esto es la segunda barrera.
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/e2e/.auth/
+
+# ── Restos del emulador de Firebase ──────────────────────────────────────
+firestore-debug.log
+firebase-debug.log
+*-debug.log
+.firebase/
