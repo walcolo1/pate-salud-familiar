@@ -51,6 +51,11 @@ import {
   mockTasks 
 } from '../data/mockData';
 import { loadAppState, saveAppState, clearAppState, exportDataAsJSON, getActiveUser, setActiveUser, SavedAppState } from '../data/persistence';
+import {
+  leerPreferencias,
+  guardarPreferencias,
+  migrarPreferenciasDesdeEstado,
+} from '../lib/preferencias';
 import { requestDrivePermission, resolveDrivePath, uploadFile, shareFileWithUser, revokeFileShare } from '../lib/googleDrive';
 import { requestCalendarPermission, createCalendarEvent, createMedicationDoseCalendarEvent } from '../lib/googleCalendar';
 import { requestSheetsPermission, exportFamilyHealthWorkbook } from '../lib/googleSheets';
@@ -536,6 +541,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [nightLockEnd, setNightLockEnd] = useState<string>('06:00');
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nightLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── A6 · Compuerta de escritura ──────────────────────────────────────────
+  // El efecto de autoguardado se dispara ante CUALQUIER cambio de estado. Al
+  // vaciar la memoria clínica —durante una purga (A6-F2) o un bloqueo de
+  // sesión (A6-F3)— ese efecto escribiría el estado vacío sobre
+  // pate-salud-state:{uid} y destruiría los cambios aún no sincronizados.
+  // Esta bandera lo suspende; debe activarse ANTES de tocar el estado.
+  const escrituraSuspendidaRef = useRef<boolean>(false);
+
+  // Evita que el efecto de preferencias escriba los valores por defecto antes
+  // de que la migración y la carga inicial hayan terminado.
+  const preferenciasListasRef = useRef<boolean>(false);
   const autoLockEnabledRef = useRef<boolean>(false);
   const autoLockMinutesRef = useRef<number>(15);
   const nightLockEnabledRef = useRef<boolean>(false);
@@ -561,6 +578,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { nightLockEndRef.current = nightLockEnd; }, [nightLockEnd]);
   useEffect(() => { sessionLockedRef.current = sessionLocked; }, [sessionLocked]);
 
+
+  // ── A6-F1 · Preferencias no clínicas ─────────────────────────────────────
+  // Se ejecuta ANTES del efecto de carga inicial (React respeta el orden de
+  // declaración), de modo que el estado guardado pueda sobrescribir después
+  // sin conflicto: tras la migración ambos orígenes coinciden.
+  //
+  // Este efecto NO borra nada. La purga es responsabilidad de A6-F2.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      migrarPreferenciasDesdeEstado();
+      const prefs = leerPreferencias();
+      setDriveSyncEnabled(prefs.driveSyncEnabled);
+      setCalendarSyncEnabled(prefs.calendarSyncEnabled);
+      setGmailAutoScanEnabled(prefs.gmailAutoScanEnabled);
+      setGmailScanTime(prefs.gmailScanTime);
+      setGmailScanRangeDays(prefs.gmailScanRangeDays);
+      setGmailOnlyFutureAppointments(prefs.gmailOnlyFutureAppointments);
+      setAutoLockEnabled(prefs.autoLockEnabled);
+      setAutoLockMinutes(prefs.autoLockMinutes);
+      setNightLockEnabled(prefs.nightLockEnabled);
+      setNightLockStart(prefs.nightLockStart);
+      setNightLockEnd(prefs.nightLockEnd);
+    } catch (e) {
+      console.error('[AppContext] No se pudieron cargar las preferencias locales:', e);
+    } finally {
+      preferenciasListasRef.current = true;
+    }
+  }, []);
 
   // 1. Carga inicial controlada del LocalStorage (únicamente del lado del cliente)
   useEffect(() => {
@@ -825,8 +871,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // ── A6-F1 · Persistencia de preferencias ─────────────────────────────────
+  // Clave propia, por dispositivo. Es lo único —junto al deviceId— que
+  // sobrevivirá a la purga de A6-F2. La lista blanca de lib/preferencias.ts
+  // garantiza que aquí no pueda colarse PHI ni ningún identificador.
+  useEffect(() => {
+    if (!preferenciasListasRef.current) return;   // aún no se ha cargado
+    if (escrituraSuspendidaRef.current) return;   // purga o bloqueo en curso
+    guardarPreferencias({
+      driveSyncEnabled,
+      calendarSyncEnabled,
+      gmailAutoScanEnabled,
+      gmailScanTime,
+      gmailScanRangeDays,
+      gmailOnlyFutureAppointments,
+      autoLockEnabled,
+      autoLockMinutes,
+      nightLockEnabled,
+      nightLockStart,
+      nightLockEnd,
+    });
+  }, [
+    driveSyncEnabled,
+    calendarSyncEnabled,
+    gmailAutoScanEnabled,
+    gmailScanTime,
+    gmailScanRangeDays,
+    gmailOnlyFutureAppointments,
+    autoLockEnabled,
+    autoLockMinutes,
+    nightLockEnabled,
+    nightLockStart,
+    nightLockEnd,
+  ]);
+
   // 2. Reactividad de Autoguardado: Sincroniza cualquier cambio en caliente al LocalStorage
   useEffect(() => {
+    if (escrituraSuspendidaRef.current) return; // A6: purga o bloqueo en curso — no sobrescribir el snapshot
     if (isLoading) return; // Evita sobreescribir con estados vacíos durante la carga inicial
     if (!user) return; // Evita guardar estados vacíos cuando no hay sesión activa (evita borrar demo en logout)
     
