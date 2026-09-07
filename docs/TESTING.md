@@ -79,6 +79,7 @@ El arnés E2E monta un entorno que **no puede** tocar nada real:
 | Credenciales de Firebase deliberadamente falsas (`demo-e2e-a6`, `e2e-falsa`) | idem |
 | Bloqueo de red hacia `accounts.google.com`, `apis.google.com`, `googleapis.com`, `firebaseio.com`, `gstatic.com` | `e2e/apoyo.ts` → `bloquearGoogle()` |
 | Sesión por el **modo demostración** de la app, nunca OAuth | `e2e/apoyo.ts` → `entrarEnModoDemo()` |
+| Sesión de **origen REAL simulada** —usuario sintético con `provider: 'google'`, sin token ni cuenta— | `e2e/apoyo.ts` → `entrarComoSesionRealSimulada()` |
 | Contexto de navegador aislado por prueba | Comportamiento por defecto de Playwright |
 | `trace: 'off'`, `video: 'off'`, `screenshot: 'off'` | `playwright.config.ts` |
 
@@ -91,9 +92,29 @@ DOCUMENTO-TEST-A6-99887766
 MEDICAMENTO-TEST-A6
 https://drive.google.com/test-spreadsheet-A6
 test@example.invalid
+sesion-e2e@example.invalid
+hoja-e2e-inexistente
+DOCUMENTO-TEST-A6-99887766 (paciente «Paciente Sintetico A6»)
 ```
 
+**Sobre la sesión REAL simulada.** Desde A6-F3 el modo demostración tiene una guarda estructural que impide sincronizar, así que **no puede generar cambios pendientes** y no sirve para probar el diálogo de A6-F2. Para eso se siembra un usuario sintético con `provider: 'google'`: la app lo trata como origen REAL, pero **no hay token, ni cuenta, ni red** —el tráfico a Google sigue bloqueado—, que es precisamente la condición que produce los pendientes. No interviene OAuth en ningún punto.
+
 Deben ser **reconocibles a simple vista como de prueba**. Si un valor podría confundirse con uno real, no sirve.
+
+**Dominios de correo.** Todo correo de prueba —unitario o E2E— termina en
+`@example.invalid`. El TLD `.invalid` está reservado por el RFC 2606 y no
+puede resolverse ni registrarse, así que un fixture nunca puede parecerse a
+una dirección real ni, por accidente, alcanzar a nadie. Quedan prohibidos
+`gmail.com`, `example.com` y cualquier dominio público, aunque el buzón sea
+inventado. Un solo comando comprueba la regla sobre todo el arnés:
+
+```bash
+grep -rnoE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}" src/**/*.test.ts e2e/ | grep -v "@example.invalid"
+```
+
+Debe no devolver nada. Los datos simulados de `src/lib/googleGmail.ts` NO
+entran en esta regla: son datos de producción del modo simulado, no fixtures
+de prueba, y su normalización está registrada como pendiente.
 
 ### 3.2 · Prohibido en el repositorio
 
@@ -174,7 +195,49 @@ Se ejecutan antes del **corte final de Firebase en el bloque G**.
 1. Ventana de incógnito → iniciar sesión → cerrar sesión.
 2. **Criterio:** cierra sin excepciones en consola y redirige a `/login`.
 
-### 6.5 · Estado «sincronizando» durante una operación real
+### 6.5 · Umbral real de 8 horas de bloqueo
+
+*Cubierto a nivel unitario y en E2E con marca de tiempo sembrada (B9).* Esperar ocho horas reales o manipular el reloj del sistema no entra en el arnés.
+
+1. Bloquear la sesión y dejar el navegador abierto ocho horas.
+2. Volver a la pestaña.
+3. **Criterio:** la sesión se cierra sola con purga y aterriza en `/login`; no queda ninguna clave `pate-salud-state:*` ni el marcador `pate:bloqueo:v1`.
+
+### 6.6 · Restauración desde Firestore al desbloquear
+
+*No cubierto.* El arnés corre con backend `sheets`; la rama de Firebase exige sesión real.
+
+1. Con `NEXT_PUBLIC_DATA_BACKEND=firebase` y sesión real, abrir un expediente.
+2. Provocar el bloqueo nocturno desde Ajustes.
+3. Pulsar *Volver al expediente*.
+4. **Criterio:** los datos se recargan desde Firestore —no desde `localStorage`—, la URL no cambia y el marcador desaparece.
+
+### 6.7 · Bloqueo por inactividad con el temporizador real
+
+*No cubierto.* El mínimo configurable es 1 minuto, por encima del tiempo de espera de Playwright. El arnés prueba el bloqueo nocturno, que recorre el mismo `lockSession()`.
+
+1. Configurar el bloqueo automático en 1 minuto.
+2. No tocar el teclado ni el ratón durante ese minuto.
+3. **Criterio:** aparece la superposición con el texto *«La información se ocultó de la pantalla»* y el expediente desaparece del DOM.
+
+### 6.8 · DEMO con un token de Google vivo
+
+*Cubierto a nivel unitario y por ausencia de tráfico en E2E (D4).* Comprobar que la guarda aguanta con un token real exige OAuth.
+
+1. Iniciar sesión real, para que quede un token en memoria.
+2. Sin recargar, entrar en modo demostración desde Ajustes.
+3. Editar datos y esperar más de cinco segundos.
+4. **Criterio:** ninguna petición a `googleapis.com` en la pestaña de red.
+
+### 6.9 · Importar un respaldo DEMO en una sesión REAL
+
+*Cubierto el caso inverso en E2E (D3).* Este exige sesión real de Google.
+
+1. Exportar un respaldo desde el modo demostración (nombre con prefijo `DEMO_`).
+2. Iniciar sesión real e intentar importarlo.
+3. **Criterio:** rechazo con *«Este respaldo es de datos de demostración»* y ningún dato modificado.
+
+### 6.10 · Estado «sincronizando» durante una operación real
 
 *Cubierto a nivel unitario (3 casos de la máquina de estados), no en navegador.* `isSyncInProgress` solo es `true` durante una sincronización real con Google.
 

@@ -34,10 +34,10 @@ function almacenFalso(inicial: Record<string, string> = {}) {
 /** Escenario realista: expediente real, demo, heredada, sesión y preferencias. */
 function escenarioCompleto() {
   return almacenFalso({
-    'pate-salud-state:walter@gmail.com': '{"members":[{"documentNumber":"10203040"}]}',
+    'pate-salud-state:titular@example.invalid': '{"members":[{"documentNumber":"10203040"}]}',
     'pate-salud-state:demo': '{"members":[]}',
     [CLAVE_DEMO_HEREDADA]: '{"members":[]}',
-    'pate_salud_active_user': '{"email":"walter@gmail.com"}',
+    'pate_salud_active_user': '{"email":"titular@example.invalid"}',
     'pate_salud_appdata_boundary': 'algo',
     'pate:purga_firestore_pendiente': '1',
     // Preservadas
@@ -60,7 +60,7 @@ describe('debeEliminarse', () => {
   });
 
   it('elimina cualquier clave de la app no preservada', () => {
-    expect(debeEliminarse('pate-salud-state:alguien@gmail.com')).toBe(true);
+    expect(debeEliminarse('pate-salud-state:alguien@example.invalid')).toBe(true);
     expect(debeEliminarse(CLAVE_DEMO_HEREDADA)).toBe(true);
     expect(debeEliminarse('pate_salud_active_user')).toBe(true);
   });
@@ -83,7 +83,7 @@ describe('purgarPersistenciaLocal', () => {
     const { store, datos } = escenarioCompleto();
     const r = purgarPersistenciaLocal(store);
 
-    expect(datos.has('pate-salud-state:walter@gmail.com')).toBe(false);
+    expect(datos.has('pate-salud-state:titular@example.invalid')).toBe(false);
     expect(datos.has('pate-salud-state:demo')).toBe(false);
     expect(datos.has(CLAVE_DEMO_HEREDADA)).toBe(false);
     expect(datos.has('pate_salud_active_user')).toBe(false);
@@ -183,6 +183,6 @@ describe('purgarPersistenciaLocal', () => {
     purgarPersistenciaLocal(store);
     const restante = JSON.stringify(Array.from(datos.entries()));
     expect(restante).not.toContain('10203040');
-    expect(restante).not.toContain('walter@gmail.com');
+    expect(restante).not.toContain('titular@example.invalid');
   });
 });

@@ -29,6 +29,8 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
     // A6-F2
     estadoCierre, solicitarCierreDeSesion, despacharCierre, reintentarSincronizacion,
     avisoPurgaDiferida, descartarAvisoPurgaDiferida,
+    // A6-F3
+    estadoBloqueo, errorRestauracion,
   } = useApp();
 
   const cierreAbierto = dialogoVisible(estadoCierre);
@@ -272,20 +274,53 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
           <div>
             <h2 className="text-lg font-extrabold text-slate-900 mb-1">Sesión bloqueada</h2>
             <p className="text-sm text-slate-500 font-semibold">
-              Paté Salud Familiar ha bloqueado tu sesión por inactividad o por el horario nocturno configurado.
+              Ocultamos la información en pantalla por inactividad. Vuelve a entrar para seguir
+              consultando el expediente.
             </p>
           </div>
+
+          {/*
+            A6-F3 · El texto dice lo que el bloqueo hace de verdad: oculta la
+            pantalla y vacía la memoria. El expediente sigue en el disco hasta
+            que la fase 4 retire el autoguardado, así que la interfaz no debe
+            prometer que los datos están protegidos.
+          */}
           <div className="flex items-center gap-1.5 bg-teal-50 text-teal-700 text-xs font-bold px-3 py-1.5 rounded-full border border-teal-100">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>Tus datos están protegidos</span>
+            <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>La información se ocultó de la pantalla</span>
           </div>
-          <button
-            id="btn-session-unlock"
-            onClick={() => unlockSession()}
-            className="w-full h-12 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold rounded-2xl transition-all shadow-md shadow-teal-600/20"
-          >
-            Continuar usando la app
-          </button>
+
+          {estadoBloqueo === 'restaurando' && (
+            <p role="status" aria-live="polite" className="flex items-center gap-2 text-sm font-bold text-teal-700">
+              <span aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-teal-600 border-t-transparent" />
+              Restaurando tu expediente…
+            </p>
+          )}
+
+          {estadoBloqueo === 'error_restauracion' && (
+            <p role="alert" className="w-full rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+              {errorRestauracion ?? 'No se pudo restaurar la sesión. Vuelve a iniciar sesión.'}
+            </p>
+          )}
+
+          {estadoBloqueo === 'error_restauracion' ? (
+            <button
+              id="btn-session-relogin"
+              onClick={() => { window.location.replace('/login'); }}
+              className="w-full h-12 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold rounded-2xl transition-all shadow-md shadow-teal-600/20"
+            >
+              Iniciar sesión de nuevo
+            </button>
+          ) : (
+            <button
+              id="btn-session-unlock"
+              onClick={() => { void unlockSession(); }}
+              disabled={estadoBloqueo === 'restaurando'}
+              className="w-full h-12 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold rounded-2xl transition-all shadow-md shadow-teal-600/20 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              Volver al expediente
+            </button>
+          )}
           <button
             id="btn-session-signout"
             onClick={() => solicitarCierreDeSesion()}

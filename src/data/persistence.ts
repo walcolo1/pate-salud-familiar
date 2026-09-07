@@ -19,9 +19,20 @@ import {
   MedicationPrescription,
   MedicationDoseReminder
 } from '../domain/models';
+import {
+  type OrigenDatos,
+  origenDe,
+  nombreExportacion,
+  sobreExportacion,
+} from '../lib/origenDatos';
 
 export interface SavedAppState {
   schemaVersion: number;
+  /**
+   * A6-F3 · Origen de los datos. Impide que un respaldo ficticio entre en un
+   * expediente real y al reves. Ante la duda se trata como REAL.
+   */
+  origen: OrigenDatos;
   user: UserAccount | null;
   members: FamilyMember[];
   healthProfiles: Record<string, HealthProfile>;
@@ -116,15 +127,16 @@ export function getStorageKey(userEmailOrId?: string | null): string {
  * Guarda de forma segura el estado de la aplicación en el LocalStorage.
  * Maneja fallos si el almacenamiento está lleno o bloqueado.
  */
-export function saveAppState(state: Omit<SavedAppState, 'schemaVersion'>, userEmailOrId?: string | null): boolean {
+export function saveAppState(state: Omit<SavedAppState, 'schemaVersion' | 'origen'>, userEmailOrId?: string | null): boolean {
   if (typeof window === 'undefined') return false;
   
   try {
     const fullState: SavedAppState = {
       ...state,
+      origen: origenDe(state.user),
       schemaVersion: CURRENT_SCHEMA_VERSION
     };
-    
+
     const key = getStorageKey(userEmailOrId);
     const serialized = JSON.stringify(fullState);
     window.localStorage.setItem(key, serialized);
@@ -194,24 +206,27 @@ export function clearAppState(userEmailOrId?: string | null): boolean {
 /**
  * Exporta el estado clínico completo como un archivo JSON de respaldo.
  */
-export function exportDataAsJSON(state: Omit<SavedAppState, 'schemaVersion'>): void {
+export function exportDataAsJSON(state: Omit<SavedAppState, 'schemaVersion' | 'origen'>): void {
   if (typeof window === 'undefined') return;
-  
+
   try {
+    const origen = origenDe(state.user);
     const fullState: SavedAppState = {
       ...state,
+      origen,
       schemaVersion: CURRENT_SCHEMA_VERSION
     };
-    
-    const jsonString = JSON.stringify(fullState, null, 2);
+
+    // A6-F3 · Un respaldo de demostracion debe ser inconfundible: prefijo en el
+    // nombre y aviso como primera clave del JSON.
+    const jsonString = JSON.stringify(sobreExportacion(origen, fullState), null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     
     const link = document.createElement('a');
     link.href = url;
     
-    const dateStr = new Date().toISOString().split('T')[0];
-    link.download = `pate_salud_expediente_familiar_${dateStr}.json`;
+    link.download = nombreExportacion(origen, new Date());
     
     document.body.appendChild(link);
     link.click();

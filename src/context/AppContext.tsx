@@ -68,6 +68,23 @@ import {
   type EstadoCierre,
   type AccionCierre,
 } from '../lib/cierreSesion';
+import {
+  CLAVES_ESTADO_CLINICO,
+  decidirArranque,
+  estaEnVentanaNocturna,
+  minutosDelDia,
+  leerMarcadorBloqueo,
+  escribirMarcadorBloqueo,
+  borrarMarcadorBloqueo,
+  superoUmbralBloqueo,
+} from '../lib/bloqueoSesion';
+import {
+  type OrigenDatos,
+  origenDe,
+  origenDeEstado,
+  validarImportacion,
+  type ResultadoImportacion,
+} from '../lib/origenDatos';
 import { requestDrivePermission, resolveDrivePath, uploadFile, shareFileWithUser, revokeFileShare } from '../lib/googleDrive';
 import { requestCalendarPermission, createCalendarEvent, createMedicationDoseCalendarEvent } from '../lib/googleCalendar';
 import { requestSheetsPermission, exportFamilyHealthWorkbook } from '../lib/googleSheets';
@@ -391,14 +408,20 @@ interface AppContextProps {
   nightLockEnabled: boolean;
   nightLockStart: string;
   nightLockEnd: string;
-  unlockSession: () => void;
+  /** A6-F3 · Restaura en sitio; es asincrona porque la restauracion lo es. */
+  unlockSession: () => Promise<void>;
+  /** A6-F3 · Fase del bloqueo, para que la interfaz diga la verdad. */
+  estadoBloqueo: 'abierto' | 'bloqueado' | 'restaurando' | 'error_restauracion';
+  errorRestauracion: string | null;
+  /** A6-F3 · REAL o DEMO. Gobierna las guardas de sincronizacion. */
+  origenDatos: OrigenDatos;
   setAutoLockEnabled: (v: boolean) => void;
   setAutoLockMinutes: (m: number) => void;
   setNightLockEnabled: (v: boolean) => void;
   setNightLockStart: (t: string) => void;
   setNightLockEnd: (t: string) => void;
   validateDataIntegrity: () => DataIntegrityReport;
-  importBackupJSON: (data: SavedAppState) => void;
+  importBackupJSON: (data: SavedAppState) => ResultadoImportacion;
   isFirebaseBackend: boolean;
   firebaseAuthReady: boolean;
   familyId: string | null;
@@ -601,6 +624,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // quedar atrapados en un cierre lexico obsoleto.
   const estadoCierreRef = useRef<EstadoCierre>(ESTADO_CIERRE_INICIAL);
   const pendingSyncCountRef = useRef<number>(0);
+
+  // ── A6-F3 · Bloqueo de sesion veraz ──────────────────────────────────────
+  // Marca de inicio del bloqueo. Vive en memoria Y en el marcador persistente,
+  // que solo contiene { bloqueado, bloqueadoDesde, origen }: ni un dato mas.
+  const bloqueadoDesdeRef = useRef<number | null>(null);
+  // Origen de la sesion. La guarda de DEMO se apoya en esto, no en la ausencia
+  // de token: aunque hubiera token valido, las rutas de sincronizacion salen.
+  const origenDatosRef = useRef<OrigenDatos>('DEMO');
+  const [origenDatos, setOrigenDatos] = useState<OrigenDatos>('DEMO');
+  const [estadoBloqueo, setEstadoBloqueo] = useState<'abierto' | 'bloqueado' | 'restaurando' | 'error_restauracion'>('abierto');
+  const [errorRestauracion, setErrorRestauracion] = useState<string | null>(null);
+  // Hasta que no se resuelve el marcador de bloqueo no se carga nada clinico.
+  const [bloqueoArranqueResuelto, setBloqueoArranqueResuelto] = useState<boolean>(false);
   const autoLockEnabledRef = useRef<boolean>(false);
   const autoLockMinutesRef = useRef<number>(15);
   const nightLockEnabledRef = useRef<boolean>(false);
@@ -662,6 +698,78 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelado = true; };
   }, [purgaDiferidaPendiente]);
 
+  // ── A6-F3 · Arranque con marcador de bloqueo ─────────────────────────────
+  // El bloqueo sobrevive a una recarga. Antes de cargar nada clínico hay que
+  // resolver qué dice el marcador persistente.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (bloqueoArranqueResuelto) return;
+
+    const decision = decidirArranque(leerMarcadorBloqueo(), Date.now());
+
+    if (decision.accion === 'cerrar_sesion') {
+      // Ocho horas o más bloqueada: se cierra con purga.
+      void cerrarSesionYPurgar();
+      return;
+    }
+
+    if (decision.accion === 'ir_a_login') {
+      // Marcador ilegible. No se desbloquea ni se adivina: a iniciar sesión.
+      // El marcador corrupto SÍ se borra, porque conservarlo dejaría la app en
+      // un bucle de redirecciones del que no se puede salir.
+      borrarMarcadorBloqueo();
+      if (window.location.pathname !== '/login') {
+        window.location.replace('/login');
+        return;
+      }
+      setBloqueoArranqueResuelto(true);
+      return;
+    }
+
+    if (decision.accion === 'seguir_bloqueado') {
+      const lectura = leerMarcadorBloqueo();
+      escrituraSuspendidaRef.current = true;
+      sessionLockedRef.current = true;
+      bloqueadoDesdeRef.current =
+        lectura.estado === 'valido' ? lectura.marcador.bloqueadoDesde : Date.now();
+      setSessionLocked(true);
+      setSessionLockedAt(new Date(bloqueadoDesdeRef.current).toISOString());
+      setEstadoBloqueo('bloqueado');
+    }
+
+    setBloqueoArranqueResuelto(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bloqueoArranqueResuelto]);
+
+  // ── A6-F3 · Vigilancia del umbral de 8 horas ─────────────────────────────
+  // Sin un setTimeout largo, que no sobrevive a una pestaña suspendida: se
+  // comparan marcas de tiempo en cuatro momentos distintos.
+  useEffect(() => {
+    if (!sessionLocked) return;
+
+    const comprobar = () => {
+      if (superoUmbralBloqueo(bloqueadoDesdeRef.current, Date.now())) {
+        void cerrarSesionYPurgar();
+      }
+    };
+
+    const alVolverAVerse = () => {
+      if (document.visibilityState === 'visible') comprobar();
+    };
+
+    window.addEventListener('focus', comprobar);
+    document.addEventListener('visibilitychange', alVolverAVerse);
+    const id = setInterval(comprobar, 60_000);
+    comprobar();
+
+    return () => {
+      window.removeEventListener('focus', comprobar);
+      document.removeEventListener('visibilitychange', alVolverAVerse);
+      clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionLocked]);
+
   // ── A6-F1 · Preferencias no clínicas ─────────────────────────────────────
   // Se ejecuta ANTES del efecto de carga inicial (React respeta el orden de
   // declaración), de modo que el estado guardado pueda sobrescribir después
@@ -694,6 +802,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // 1. Carga inicial controlada del LocalStorage (únicamente del lado del cliente)
   useEffect(() => {
     if (purgaDiferidaPendiente) return; // A6-F2: no arrancar sobre una caché por limpiar
+    if (!bloqueoArranqueResuelto) return; // A6-F3: no cargar nada clínico antes de resolver el bloqueo
+
+    // A6-F3 · La sesión arrancó bloqueada: se restaura la IDENTIDAD para que la
+    // interfaz pueda mostrar la superposición, pero NINGÚN dato clínico. Estos
+    // llegarán al desbloquear, desde el backend si el origen es REAL.
+    if (sessionLockedRef.current) {
+      try {
+        const activo = getActiveUser();
+        if (activo && activo !== 'demo') {
+          setUser(activo);
+        } else if (activo === 'demo') {
+          const guardado = loadAppState('demo');
+          if (guardado?.user) setUser(guardado.user);
+        }
+      } catch (e) {
+        console.error('[AppContext] No se pudo restaurar la identidad tras el bloqueo:', e);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     try {
       const activeUser = getActiveUser();
       
@@ -953,7 +1083,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [purgaDiferidaPendiente]);
+  }, [purgaDiferidaPendiente, bloqueoArranqueResuelto]);
 
   // ── A6-F1 · Persistencia de preferencias ─────────────────────────────────
   // Clave propia, por dispositivo. Es lo único —junto al deviceId— que
@@ -1718,6 +1848,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ===========================================================================
 
   useEffect(() => { estadoCierreRef.current = estadoCierre; }, [estadoCierre]);
+  useEffect(() => {
+    const o = origenDe(user);
+    origenDatosRef.current = o;
+    setOrigenDatos(o);
+  }, [user]);
   useEffect(() => { pendingSyncCountRef.current = pendingSyncCount; }, [pendingSyncCount]);
 
   /**
@@ -1872,6 +2007,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isFirebaseBackend || !familyId) return;
     if (purgaDiferidaPendiente) return; // A6-F2: ningún watcher antes de limpiar
+    if (sessionLocked) return; // A6-F3: sin watchers mientras la sesión está bloqueada
 
     let cancelled = false;
     getDataRepository().then((repo) => {
@@ -1947,7 +2083,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         firebaseInvitationsUnsubRef.current = null;
       }
     };
-  }, [familyId, user, currentUserFamilyAccess, purgaDiferidaPendiente]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [familyId, user, currentUserFamilyAccess, purgaDiferidaPendiente, sessionLocked]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── FIREBASE: Watch user's family access records (Phase A) ──────────────────
   useEffect(() => {
@@ -1956,6 +2092,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     if (purgaDiferidaPendiente) return; // A6-F2: ningún watcher antes de limpiar
+    if (sessionLocked) return; // A6-F3: sin watchers mientras la sesión está bloqueada
 
     const uid = user.googleId || user.id || '';
     let cancelled = false;
@@ -1979,7 +2116,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         unsub();
       }
     };
-  }, [isFirebaseBackend, user, familyId, purgaDiferidaPendiente]);
+  }, [isFirebaseBackend, user, familyId, purgaDiferidaPendiente, sessionLocked]);
 
   // ── FIREBASE: State snapshot and rollback for optimistic updates ───────────
   const stateRef = useRef({
@@ -2023,6 +2160,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const firebasePersist = useCallback(
     (fn: (repo: Awaited<ReturnType<typeof getDataRepository>>, ctx: { uid: string; email: string; familyId: string }) => Promise<void>) => {
       if (!isFirebaseBackend || !familyIdRef.current) return;
+      // A6-F3 · Guarda estructural del modo demostración.
+      if (origenDatosRef.current === 'DEMO') return;
       const fid = familyIdRef.current;
 
       // Capture the state snapshot before the async operation starts
@@ -2231,6 +2370,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * Si no hay token disponible, marca como pending_sync en lugar de fallar.
    */
   const scheduleAutoSync = (reason: string) => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return;
     if (isFirebaseBackend) return; // Firebase writes go through firebasePersist, not Sheets
     if (!autoSyncEnabled) return;
     if (typeof window === 'undefined') return;
@@ -2284,6 +2425,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * flushPendingSync — Sincroniza inmediatamente si hay cambios pendientes y token válido.
    */
   const flushPendingSync = async (): Promise<void> => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return;
     if (isSyncInProgress.current) return;
     if (pendingSyncCount === 0) return;
 
@@ -2978,6 +3121,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const connectDrive = async (): Promise<string | null> => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return null;
     const clientId = GOOGLE_CLIENT_ID;
     if (!clientId) {
       setDriveStatus('error');
@@ -3003,6 +3148,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const connectCalendar = async (): Promise<string | null> => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return null;
     const clientId = GOOGLE_CLIENT_ID;
     if (!clientId) {
       setCalendarStatus('error');
@@ -3028,6 +3175,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const syncAppointmentToCalendar = async (apptId: string, customAppt?: MedicalAppointment, forcePopup = false) => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return;
     const appt = customAppt || appointments.find((a) => a.id === apptId);
     if (!appt) return;
 
@@ -3147,6 +3296,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     doc: { fileName: string; fileType: string; description?: string },
     file?: File
   ) => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return '';
     const member = members.find((m) => m.id === memberId);
     const memberName = member ? member.fullName : 'Miembro';
     const categoryName = ({
@@ -3948,6 +4099,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const connectSheets = async (): Promise<string | null> => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return null;
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) {
       setSheetsStatus('error');
@@ -3973,6 +4126,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const exportToSheets = async (memberId: string): Promise<string> => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return '';
     setSheetsStatus('connecting');
     setSheetsError(null);
 
@@ -4093,6 +4248,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const connectGmail = async (): Promise<string | null> => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return null;
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId) {
       setGmailStatus('error');
@@ -4802,8 +4959,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const importBackupJSON = (data: SavedAppState) => {
-    if (!data) return;
+  /**
+   * A6-F3 · Un respaldo ficticio no entra en un expediente real, ni al reves.
+   *
+   * La validacion vive aqui y no en la pagina de Ajustes para que ninguna otra
+   * ruta de importacion pueda saltarsela. El motivo del rechazo se devuelve
+   * como codigo: la interfaz nunca muestra contenido del respaldo.
+   */
+  const importBackupJSON = (data: SavedAppState): ResultadoImportacion => {
+    if (!data) return { ok: false, codigo: 'SIN_ORIGEN' };
+
+    const veredicto = validarImportacion(origenDatosRef.current, origenDeEstado(data));
+    if (!veredicto.ok) return veredicto;
+
     setIsLoading(true);
     try {
       if (Array.isArray(data.members)) setMembers(data.members);
@@ -4862,6 +5030,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
+    return { ok: true };
   };
 
 
@@ -5014,6 +5183,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const createGoogleNativeDatabase = async () => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return;
     const token = await requestGoogleNativeToken();
     if (!token) return;
 
@@ -5250,6 +5421,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const pullFromGoogle = async () => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return;
     const token = await requestGoogleNativeToken();
     if (!token) return;
 
@@ -5514,6 +5687,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const pushToGoogle = async () => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return;
     const token = await requestGoogleNativeToken();
     if (!token) return;
 
@@ -5548,6 +5723,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const syncNow = async () => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return;
     const token = await requestGoogleNativeToken();
     if (!token) return;
 
@@ -6240,6 +6417,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ── SECURE GOOGLE-NATIVE SHARING PHASE 3B METHODS ─────────────────────────────
 
   const shareDocumentWithMember = async (documentId: string, email: string): Promise<void> => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return;
     if (!email) throw new Error('El miembro familiar debe poseer un correo electrónico registrado.');
 
     const token = await requestGoogleNativeToken();
@@ -6376,6 +6555,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const generateAndShareMemberReport = async (memberId: string, email: string): Promise<void> => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return;
     if (!email) throw new Error('El miembro familiar debe poseer un correo electrónico registrado.');
 
     const token = await requestGoogleNativeToken();
@@ -6714,17 +6895,172 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ─── Session lock / inactivity ────────────────────────────────────────────────
-  const unlockSession = () => {
+
+  /** Vacia las 16 estructuras clinicas. NO toca sesion, preferencias ni pendientes. */
+  const vaciarEstadoClinico = () => {
+    setMembers([]);
+    setHealthProfiles({});
+    setAppointments([]);
+    setCheckups([]);
+    setVaccines([]);
+    setExams([]);
+    setExamResults({});
+    setDocuments([]);
+    setHistory([]);
+    setReminders([]);
+    setTasks([]);
+    setMedicalOrders([]);
+    setMedicationPrescriptions([]);
+    setMedicationDoseReminders([]);
+    setAppointmentCandidates([]);
+    setSharedReports([]);
+  };
+
+  /**
+   * Bloquea la sesion de verdad: ademas de la superposicion, vacia la memoria
+   * clinica y desmonta los watchers.
+   *
+   * El orden no es negociable. La compuerta de escritura va PRIMERO: sin ella,
+   * vaciar el estado dispara el autoguardado y este escribe el estado vacio
+   * sobre pate-salud-state:{uid}, destruyendo los cambios sin sincronizar.
+   *
+   * sessionLockedRef se actualiza de forma SINCRONA antes que el estado, para
+   * que no exista una ventana entre el vaciado y el re-render en la que un
+   * onSnapshot en vuelo pueda rehidratar los datos.
+   */
+  const lockSession = () => {
+    if (sessionLockedRef.current) return;
+
+    escrituraSuspendidaRef.current = true;          // (1) antes de tocar nada
+
+    const ahora = Date.now();
+    bloqueadoDesdeRef.current = ahora;              // (2) solo en memoria...
+    escribirMarcadorBloqueo(ahora, origenDatosRef.current);  // ...y en el marcador
+
+    sessionLockedRef.current = true;                // (3) el ref, sincrono
+    setSessionLocked(true);
+    setSessionLockedAt(new Date(ahora).toISOString());
+    setEstadoBloqueo('bloqueado');
+    setErrorRestauracion(null);
+
+    vaciarEstadoClinico();                          // (4) la memoria clinica
+  };
+
+  /**
+   * Restaura el expediente EN SITIO, sin recargar la pagina.
+   *
+   * No se recarga a proposito: una recarga pondria pendingSyncCount a cero y
+   * el usuario perderia la advertencia de cambios sin sincronizar al cerrar
+   * sesion. Ese contador no se toca en ningun punto de esta funcion.
+   *
+   * REAL nunca se restaura desde localStorage: los datos clinicos vienen del
+   * backend. DEMO si puede hacerlo, porque su contenido esta marcado como
+   * sintetico de forma estructural y no hay PHI que proteger.
+   */
+  const unlockSession = async (): Promise<void> => {
+    // (1) Umbral de 8 horas antes que nada.
+    if (superoUmbralBloqueo(bloqueadoDesdeRef.current, Date.now())) {
+      void cerrarSesionYPurgar();
+      return;
+    }
+
+    setEstadoBloqueo('restaurando');
+    setErrorRestauracion(null);
+
+    const alLogin = () => {
+      borrarMarcadorBloqueo();
+      window.location.replace('/login');
+    };
+
+    // (2) La sesion debe seguir vigente.
+    if (!user) { alLogin(); return; }
+    const origen = origenDatosRef.current;
+
+    if (origen === 'REAL' && isFirebaseBackend) {
+      try {
+        const { firebaseAuth } = await import('../lib/firebase');
+        if (!firebaseAuth.currentUser) { alLogin(); return; }
+      } catch {
+        alLogin();
+        return;
+      }
+    }
+
+    // (3) Restauracion segun el origen.
+    try {
+      if (origen === 'DEMO') {
+        const guardado = loadAppState('demo');
+        if (!guardado) throw new Error('sin_estado_demo');
+        aplicarEstadoRestaurado(guardado);
+      } else if (isFirebaseBackend) {
+        const repo = await getDataRepository();
+        const fid = familyIdRef.current;
+        if (!fid) throw new Error('sin_familia');
+        const data = await repo.loadAll({
+          uid: user.googleId || user.id || '',
+          email: user.email,
+          familyId: fid,
+        });
+        aplicarDatosRemotos(data);
+      } else {
+        // Backend Sheets con sesion real: la fuente de verdad es la hoja.
+        await pullFromGoogle();
+      }
+    } catch (err) {
+      console.error('[AppContext] No se pudo restaurar la sesión tras el bloqueo:', err);
+      setEstadoBloqueo('error_restauracion');
+      setErrorRestauracion('No se pudo restaurar la sesión. Vuelve a iniciar sesión.');
+      return;   // SIGUE BLOQUEADO: nunca se muestra un expediente a medias.
+    }
+
+    // (4) Solo ahora se libera la compuerta y se levanta el bloqueo.
+    borrarMarcadorBloqueo();
+    bloqueadoDesdeRef.current = null;
+    sessionLockedRef.current = false;
+    escrituraSuspendidaRef.current = false;
     setSessionLocked(false);
     setSessionLockedAt(null);
-    // Reiniciar temporizador de inactividad al desbloquear
+    setEstadoBloqueo('abierto');
     resetIdleTimer();
   };
 
-  const lockSession = () => {
-    if (sessionLockedRef.current) return;
-    setSessionLocked(true);
-    setSessionLockedAt(new Date().toISOString());
+  /** Repuebla el estado clinico desde una instantanea guardada (solo DEMO). */
+  const aplicarEstadoRestaurado = (g: SavedAppState) => {
+    setMembers(g.members || []);
+    setHealthProfiles(g.healthProfiles || {});
+    setAppointments(g.appointments || []);
+    setCheckups(g.checkups || []);
+    setVaccines(g.vaccines || []);
+    setExams(g.exams || []);
+    setExamResults(g.examResults || {});
+    setDocuments(g.documents || []);
+    setHistory(g.history || []);
+    setReminders(g.reminders || []);
+    setTasks(g.tasks || []);
+    setMedicalOrders(g.medicalOrders || []);
+    setMedicationPrescriptions(g.medicationPrescriptions || []);
+    setMedicationDoseReminders(g.medicationDoseReminders || []);
+    setAppointmentCandidates(g.appointmentCandidates || []);
+    setSharedReports(g.sharedReports || []);
+  };
+
+  /** Repuebla el estado clinico desde el backend (REAL con Firebase). */
+  const aplicarDatosRemotos = (d: Awaited<ReturnType<Awaited<ReturnType<typeof getDataRepository>>['loadAll']>>) => {
+    setMembers(d.members);
+    setHealthProfiles(d.healthProfiles);
+    setAppointments(d.appointments);
+    setCheckups(d.checkups);
+    setVaccines(d.vaccines);
+    setExams(d.exams);
+    setExamResults(d.examResults);
+    setDocuments(d.documents);
+    setHistory(d.history);
+    setReminders(d.reminders);
+    setTasks(d.tasks);
+    setMedicalOrders(d.medicalOrders);
+    setMedicationPrescriptions(d.medications);
+    setMedicationDoseReminders(d.doseReminders);
+    setAppointmentCandidates(d.appointmentCandidates);
   };
 
   const resetIdleTimer = () => {
@@ -6760,17 +7096,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     const checkNightLock = () => {
       if (!nightLockEnabledRef.current) return;
-      const now = new Date();
-      const [startH, startM] = nightLockStartRef.current.split(':').map(Number);
-      const [endH, endM] = nightLockEndRef.current.split(':').map(Number);
-      const startMins = startH * 60 + startM;
-      const endMins = endH * 60 + endM;
-      const nowMins = now.getHours() * 60 + now.getMinutes();
-      // Determinar si estamos en la ventana nocturna (puede cruzar medianoche)
-      const inWindow = startMins > endMins
-        ? (nowMins >= startMins || nowMins < endMins)   // cruza medianoche
-        : (nowMins >= startMins && nowMins < endMins);  // misma noche
-      if (inWindow && !sessionLockedRef.current) {
+      // A6-F3: la logica vive en lib/bloqueoSesion, con pruebas propias que
+      // cubren el cruce de medianoche y las horas mal formadas.
+      const dentro = estaEnVentanaNocturna(
+        minutosDelDia(new Date()),
+        nightLockStartRef.current,
+        nightLockEndRef.current,
+      );
+      if (dentro && !sessionLockedRef.current) {
         lockSession();
       }
     };
@@ -7101,6 +7434,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       cerrarSesionYPurgar,
       avisoPurgaDiferida,
       descartarAvisoPurgaDiferida,
+      estadoBloqueo,
+      errorRestauracion,
+      origenDatos,
     }}>
       {children}
     </AppContext.Provider>

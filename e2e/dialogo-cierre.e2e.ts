@@ -1,7 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 import {
   bloquearGoogle,
-  entrarEnModoDemo,
+  entrarComoSesionRealSimulada,
   sembrarAlmacenamiento,
   volcarAlmacenamiento,
   generarCambiosPendientes,
@@ -21,7 +21,8 @@ import {
 
 async function prepararConPendientes(page: Page) {
   await bloquearGoogle(page);
-  await entrarEnModoDemo(page);
+  // Origen REAL simulado: desde A6-F3 el modo DEMO no genera pendientes.
+  await entrarComoSesionRealSimulada(page);
   await generarCambiosPendientes(page);
   await sembrarAlmacenamiento(page);
 }

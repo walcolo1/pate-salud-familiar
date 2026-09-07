@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
+import { mensajeRechazo } from '@/lib/origenDatos';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { 
   Cloud, 
   Grid3X3, 
@@ -49,6 +51,7 @@ export default function SettingsPage() {
     isLoading,
     clearAllData,
     cerrarSesionYPurgar,
+    origenDatos,
     restoreDemoData,
     clearDemoData,
     exportState,
@@ -151,6 +154,10 @@ export default function SettingsPage() {
     testFirebaseConnection
   } = useApp();
 
+  // A6-F3 · Rechazo de importación cruzada, mostrado en diálogo accesible.
+  // Va junto al resto de hooks, ANTES de cualquier retorno temprano: si se
+  // declara después, React lo llama de forma condicional entre renders.
+  const [rechazoImportacion, setRechazoImportacion] = useState<{ titulo: string; descripcion: string } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isRepairing, setIsRepairing] = useState(false);
   const [isRepairingDocs, setIsRepairingDocs] = useState(false);
@@ -285,8 +292,16 @@ export default function SettingsPage() {
           `¿Estás seguro de que deseas restaurar esta copia de seguridad? Esta acción reemplazará todos tus datos locales actuales en este dispositivo y los sincronizará si estás conectado a Google.`;
 
         if (window.confirm(summary)) {
-          importBackupJSON(parsed);
-          alert('Copia de seguridad importada y restaurada exitosamente.');
+          // A6-F3 · El rechazo de importación cruzada se decide en AppContext,
+          // que es el único punto por el que pasan todas las importaciones.
+          // El mensaje describe el motivo sin exponer contenido del respaldo.
+          const r = importBackupJSON(parsed);
+          if (r.ok) {
+            alert('Copia de seguridad importada y restaurada exitosamente.');
+          } else {
+            const m = mensajeRechazo(r.codigo);
+            setRechazoImportacion(m);
+          }
         }
       } catch (err: any) {
         alert(`Error al procesar el archivo JSON: ${err.message}`);
@@ -2194,6 +2209,23 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* A6-F3 · Rechazo de importación cruzada, accesible y sin exponer contenido */}
+      <ConfirmDialog
+        abierto={rechazoImportacion !== null}
+        titulo={rechazoImportacion?.titulo ?? ''}
+        descripcion={rechazoImportacion?.descripcion ?? ''}
+        opciones={[
+          {
+            id: 'entendido',
+            etiqueta: 'Entendido',
+            tono: 'primario',
+            focoInicial: true,
+            onSelect: () => setRechazoImportacion(null),
+          },
+        ]}
+        onCerrar={() => setRechazoImportacion(null)}
+      />
 
     </div>
   );

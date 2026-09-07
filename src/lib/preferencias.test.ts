@@ -43,7 +43,7 @@ describe('sanearPreferencias', () => {
     const r = sanearPreferencias({
       autoLockMinutes: 30,
       // Campos que jamás deben persistir en esta clave:
-      email: 'alguien@gmail.com',
+      email: 'alguien@example.invalid',
       uid: 'abc123',
       familyId: 'fam_1',
       memberId: 'm_1',
@@ -106,10 +106,10 @@ describe('leerPreferencias y guardarPreferencias', () => {
 
   it('nunca escribe claves ajenas a la lista blanca', () => {
     const { store, datos } = almacenFalso();
-    guardarPreferencias({ autoLockMinutes: 9, email: 'x@y.com' } as never, store);
+    guardarPreferencias({ autoLockMinutes: 9, email: 'x@example.invalid' } as never, store);
     const guardado = JSON.parse(datos.get(CLAVE_PREFERENCIAS)!);
     expect(Object.keys(guardado).sort()).toEqual([...CAMPOS_PREFERENCIAS].sort());
-    expect(JSON.stringify(guardado)).not.toContain('x@y.com');
+    expect(JSON.stringify(guardado)).not.toContain('x@example.invalid');
   });
 
   it('un almacenamiento que lanza al escribir devuelve null en vez de propagar', () => {
@@ -132,13 +132,13 @@ describe('migrarPreferenciasDesdeEstado', () => {
     gmailScanRangeDays: 45,
     gmailScanTime: '08:30',
     // PHI e identificadores que NO deben viajar:
-    user: { email: 'real@gmail.com', googleId: '1234567890' },
+    user: { email: 'real@example.invalid', googleId: '1234567890' },
     members: [{ fullName: 'Persona Real', documentNumber: '10203040' }],
     databaseSpreadsheetId: '1AbCdEfGhIjK',
   });
 
   it('rescata solo los campos de la lista blanca', () => {
-    const { store, datos } = almacenFalso({ 'pate-salud-state:usuario@gmail.com': estadoReal });
+    const { store, datos } = almacenFalso({ 'pate-salud-state:usuario@example.invalid': estadoReal });
     const r = migrarPreferenciasDesdeEstado(store);
 
     expect(r.migrado).toBe(true);
@@ -150,26 +150,26 @@ describe('migrarPreferenciasDesdeEstado', () => {
     expect(prefs.gmailScanTime).toBe('08:30');
 
     const serializado = datos.get(CLAVE_PREFERENCIAS)!;
-    expect(serializado).not.toContain('real@gmail.com');
+    expect(serializado).not.toContain('real@example.invalid');
     expect(serializado).not.toContain('Persona Real');
     expect(serializado).not.toContain('10203040');
     expect(serializado).not.toContain('1AbCdEfGhIjK');
   });
 
   it('no borra el estado original: purgar es tarea de A6-F2', () => {
-    const { store, datos } = almacenFalso({ 'pate-salud-state:usuario@gmail.com': estadoReal });
+    const { store, datos } = almacenFalso({ 'pate-salud-state:usuario@example.invalid': estadoReal });
     migrarPreferenciasDesdeEstado(store);
-    expect(datos.get('pate-salud-state:usuario@gmail.com')).toBe(estadoReal);
+    expect(datos.get('pate-salud-state:usuario@example.invalid')).toBe(estadoReal);
   });
 
   it('es idempotente: la segunda llamada no hace trabajo', () => {
-    const { store } = almacenFalso({ 'pate-salud-state:usuario@gmail.com': estadoReal });
+    const { store } = almacenFalso({ 'pate-salud-state:usuario@example.invalid': estadoReal });
     expect(migrarPreferenciasDesdeEstado(store).migrado).toBe(true);
     expect(migrarPreferenciasDesdeEstado(store).migrado).toBe(false);
   });
 
   it('no modifica preferencias ya guardadas al repetirse', () => {
-    const { store } = almacenFalso({ 'pate-salud-state:usuario@gmail.com': estadoReal });
+    const { store } = almacenFalso({ 'pate-salud-state:usuario@example.invalid': estadoReal });
     migrarPreferenciasDesdeEstado(store);
     guardarPreferencias({ autoLockMinutes: 3 }, store);
     migrarPreferenciasDesdeEstado(store);
@@ -207,7 +207,7 @@ describe('migrarPreferenciasDesdeEstado', () => {
   });
 
   it('un estado corrupto no impide migrar ni lanza', () => {
-    const { store } = almacenFalso({ 'pate-salud-state:x@y.com': '{roto' });
+    const { store } = almacenFalso({ 'pate-salud-state:x@example.invalid': '{roto' });
     const r = migrarPreferenciasDesdeEstado(store);
     expect(r.migrado).toBe(true);
     expect(r.camposRescatados).toBe(0);

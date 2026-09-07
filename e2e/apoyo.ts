@@ -27,6 +27,54 @@ export async function entrarEnModoDemo(page: Page) {
   await expect(page.getByRole('button', { name: 'Cerrar Sesión' })).toBeVisible();
 }
 
+/**
+ * Sesión de ORIGEN REAL simulada, sin OAuth ni credenciales.
+ *
+ * Desde A6-F3 el modo demostración no puede generar cambios pendientes: la
+ * guarda estructural detiene `scheduleAutoSync` antes de contar nada. Eso es
+ * lo correcto, pero deja sin forma de ejercitar el diálogo de cambios
+ * pendientes de A6-F2.
+ *
+ * Este arnés siembra un usuario sintético con `provider: 'google'`, de modo que
+ * la app lo trate como origen REAL. No hay token, ni cuenta, ni red: el tráfico
+ * hacia Google sigue bloqueado y toda llamada falla, que es justo la condición
+ * que produce cambios pendientes.
+ */
+export async function entrarComoSesionRealSimulada(page: Page) {
+  await page.goto('/login');
+  await page.evaluate(() => {
+    const usuario = {
+      id: 'user-e2e-real',
+      googleId: 'e2e-google-id',
+      email: 'sesion-e2e@example.invalid',
+      displayName: 'Sesion E2E',
+      photoUrl: null,
+      provider: 'google',
+      createdAt: new Date().toISOString(),
+      loggedAt: new Date().toISOString(),
+    };
+    localStorage.setItem('pate_salud_active_user', JSON.stringify(usuario));
+    localStorage.setItem(
+      'pate-salud-state:e2e-google-id',
+      JSON.stringify({
+        schemaVersion: 1,
+        origen: 'REAL',
+        user: usuario,
+        members: [], healthProfiles: {}, appointments: [], checkups: [], vaccines: [],
+        exams: [], examResults: {}, documents: [], history: [], reminders: [], tasks: [],
+        medicalOrders: [], medicationPrescriptions: [], medicationDoseReminders: [],
+        appointmentCandidates: [], sharedReports: [], emailSources: [],
+        driveSyncEnabled: true, calendarSyncEnabled: true, lastExportMetadata: null,
+        // Evita el desvío a /onboarding/setup, que exige una hoja configurada.
+        databaseSpreadsheetId: 'hoja-e2e-inexistente',
+        databaseSpreadsheetUrl: 'https://docs.google.com/spreadsheets/d/hoja-e2e-inexistente',
+      }),
+    );
+  });
+  await page.goto('/dashboard');
+  await expect(page.getByRole('button', { name: 'Cerrar Sesión' })).toBeVisible({ timeout: 30_000 });
+}
+
 /** Siembra claves sintéticas, incluidas las que deben sobrevivir y las ajenas. */
 export async function sembrarAlmacenamiento(page: Page) {
   await page.evaluate((s) => {
