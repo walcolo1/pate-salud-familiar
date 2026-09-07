@@ -48,6 +48,7 @@ export default function SettingsPage() {
     signOut, 
     isLoading,
     clearAllData,
+    cerrarSesionYPurgar,
     restoreDemoData,
     clearDemoData,
     exportState,
@@ -1951,6 +1952,17 @@ export default function SettingsPage() {
                 >
                   <Trash2 className="h-4 w-4" />
                   <span>Reiniciar Cuenta Actual</span>
+                </button>
+
+                {/* A6-F2 · Cierre de sesión con purga completa del dispositivo */}
+                <button
+                  onClick={() => { void cerrarSesionYPurgar(); }}
+                  className="h-10 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-extrabold text-xs rounded-xl flex flex-col items-center justify-center transition-colors border border-slate-200 px-3 py-6"
+                >
+                  <span>Cerrar sesión y borrar datos de este dispositivo</span>
+                  <span className="font-semibold text-[10px] text-slate-500 mt-0.5">
+                    Elimina de este navegador el expediente, la caché y la sesión. Tus datos en Google no se tocan.
+                  </span>
                 </button>
 
                 <button

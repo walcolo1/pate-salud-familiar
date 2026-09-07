@@ -13,13 +13,73 @@ import {
   CloudCheck, 
   LogOut,
   Lock,
-  ShieldCheck
+  ShieldCheck,
+  AlertTriangle,
+  X
 } from 'lucide-react';
+import ConfirmDialog, { type OpcionDialogo } from '@/components/ui/ConfirmDialog';
+import { dialogoVisible, estaOcupado } from '@/lib/cierreSesion';
 
 export default function Navbar({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, driveSyncEnabled, signOut, databaseSpreadsheetId, isLoading, sessionLocked, unlockSession, isFirebaseBackend } = useApp();
+  const {
+    user, driveSyncEnabled, databaseSpreadsheetId, isLoading,
+    sessionLocked, unlockSession, isFirebaseBackend,
+    // A6-F2
+    estadoCierre, solicitarCierreDeSesion, despacharCierre, reintentarSincronizacion,
+    avisoPurgaDiferida, descartarAvisoPurgaDiferida,
+  } = useApp();
+
+  const cierreAbierto = dialogoVisible(estadoCierre);
+  const cierreOcupado = estaOcupado(estadoCierre);
+
+  // ── A6-F2 · Contenido del dialogo segun la fase ──────────────────────────
+  const plural = (n: number) => (n === 1 ? 'cambio' : 'cambios');
+
+  let tituloCierre = '';
+  let descripcionCierre: React.ReactNode = null;
+  let opcionesCierre: OpcionDialogo[] = [];
+
+  if (estadoCierre.fase === 'sincronizando') {
+    tituloCierre = 'Guardando cambios';
+    descripcionCierre = 'Estamos guardando cambios en tu expediente. Espera a que el proceso termine antes de cerrar sesion para evitar inconsistencias.';
+    opcionesCierre = [
+      { id: 'esperar', etiqueta: 'Esperar a que termine', tono: 'primario', focoInicial: true, onSelect: () => {} },
+      { id: 'cancelar', etiqueta: 'Cancelar cierre de sesion', tono: 'neutro', onSelect: () => despacharCierre({ tipo: 'cancelar' }) },
+    ];
+  } else if (estadoCierre.fase === 'pendientes') {
+    const n = estadoCierre.pendientes;
+    tituloCierre = 'Tienes cambios sin sincronizar';
+    descripcionCierre = (
+      <>
+        <p>
+          Hay <strong>{n} {plural(n)}</strong> guardado{n === 1 ? '' : 's'} solo en este dispositivo que
+          todavia no se han enviado a tu cuenta de Google. Si sales ahora sin sincronizarlos, se perderan.
+        </p>
+        {estadoCierre.error && (
+          <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-red-700">{estadoCierre.error}</p>
+        )}
+      </>
+    );
+    opcionesCierre = [
+      { id: 'reintentar', etiqueta: 'Reintentar sincronizacion', tono: 'primario', focoInicial: true, onSelect: () => reintentarSincronizacion() },
+      { id: 'descartar', etiqueta: 'Salir y descartar cambios', tono: 'peligro', onSelect: () => despacharCierre({ tipo: 'pedir_descarte' }) },
+      { id: 'cancelar', etiqueta: 'Cancelar', tono: 'neutro', onSelect: () => despacharCierre({ tipo: 'cancelar' }) },
+    ];
+  } else if (estadoCierre.fase === 'confirmar_descarte') {
+    const n = estadoCierre.pendientes;
+    tituloCierre = `Se perderan ${n} ${plural(n)}`;
+    descripcionCierre = `Esta accion no se puede deshacer. Los ${n} ${plural(n)} que no se sincronizaron se borraran de este dispositivo junto con el resto de tus datos.`;
+    opcionesCierre = [
+      { id: 'volver', etiqueta: 'Volver', tono: 'primario', focoInicial: true, onSelect: () => despacharCierre({ tipo: 'cancelar' }) },
+      { id: 'salir', etiqueta: 'Salir y borrar', tono: 'peligro', onSelect: () => despacharCierre({ tipo: 'confirmar_descarte' }) },
+    ];
+  } else if (estadoCierre.fase === 'purgando') {
+    tituloCierre = 'Cerrando sesion';
+    descripcionCierre = 'Estamos borrando los datos de este dispositivo.';
+    opcionesCierre = [];
+  }
 
   React.useEffect(() => {
     if (!isLoading && user && user.provider === 'google' && !databaseSpreadsheetId && !isFirebaseBackend) {
@@ -27,9 +87,52 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading, databaseSpreadsheetId, router, isFirebaseBackend]);
 
+  // ── A6-F2 · Aviso de limpieza pendiente ──────────────────────────────────
+  // Se muestra tambien en rutas publicas: el usuario acaba de cerrar sesion y
+  // aterriza en /login. NO afirma que los datos se borraron.
+  const avisoLimpieza = avisoPurgaDiferida ? (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex items-start gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-amber-900"
+    >
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+      <p className="flex-1 text-xs font-semibold leading-relaxed">
+        Se cerró tu sesión, pero quedan datos en caché en este navegador. Se borrarán por completo
+        la próxima vez que abras la app. Para completarlo ahora, cierra las demás pestañas de Paté Salud.
+      </p>
+      <button
+        type="button"
+        onClick={descartarAvisoPurgaDiferida}
+        aria-label="Descartar aviso de limpieza pendiente"
+        className="shrink-0 rounded-lg p-1 hover:bg-amber-100"
+      >
+        <X className="h-4 w-4" aria-hidden="true" />
+      </button>
+    </div>
+  ) : null;
+
+  const dialogoCierre = (
+    <ConfirmDialog
+      abierto={cierreAbierto}
+      titulo={tituloCierre}
+      descripcion={descripcionCierre}
+      opciones={opcionesCierre}
+      ocupado={cierreOcupado}
+      mensajeOcupado={cierreOcupado ? 'Borrando los datos de este dispositivo…' : undefined}
+      onCerrar={() => despacharCierre({ tipo: 'cancelar' })}
+    />
+  );
+
   // If user is not authenticated, we do not render the navigation chrome
   if (!user || pathname === '/login' || pathname === '/onboarding' || pathname === '/' || pathname.startsWith('/onboarding/setup')) {
-    return <>{children}</>;
+    return (
+      <>
+        {avisoLimpieza}
+        {children}
+        {dialogoCierre}
+      </>
+    );
   }
 
   const navItems = [
@@ -41,6 +144,8 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      {avisoLimpieza}
+      {dialogoCierre}
       <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
       {/* ── Desktop Sidebar ────────────────────────────────────────────────── */}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-100 p-6 shrink-0 justify-between select-none">
@@ -100,7 +205,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <button 
-            onClick={() => signOut()}
+            onClick={() => solicitarCierreDeSesion()}
             className="flex items-center justify-center gap-2 w-full py-2.5 bg-slate-50 hover:bg-red-50 text-slate-600 hover:text-red-600 rounded-xl text-xs font-bold transition-all duration-200"
           >
             <LogOut className="h-4 w-4" />
@@ -183,7 +288,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
           </button>
           <button
             id="btn-session-signout"
-            onClick={() => signOut()}
+            onClick={() => solicitarCierreDeSesion()}
             className="text-xs text-slate-400 hover:text-slate-600 font-semibold underline"
           >
             Cerrar sesión

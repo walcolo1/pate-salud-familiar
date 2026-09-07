@@ -56,6 +56,18 @@ import {
   guardarPreferencias,
   migrarPreferenciasDesdeEstado,
 } from '../lib/preferencias';
+import { purgarPersistenciaLocal } from '../lib/purgaLocal';
+import {
+  purgarCacheFirestore,
+  ejecutarPurgaDiferidaSiProcede,
+  hayPurgaPendiente,
+} from '../lib/purgaFirestore';
+import {
+  reducirCierre,
+  ESTADO_CIERRE_INICIAL,
+  type EstadoCierre,
+  type AccionCierre,
+} from '../lib/cierreSesion';
 import { requestDrivePermission, resolveDrivePath, uploadFile, shareFileWithUser, revokeFileShare } from '../lib/googleDrive';
 import { requestCalendarPermission, createCalendarEvent, createMedicationDoseCalendarEvent } from '../lib/googleCalendar';
 import { requestSheetsPermission, exportFamilyHealthWorkbook } from '../lib/googleSheets';
@@ -398,6 +410,21 @@ interface AppContextProps {
   createNewFamily: (name: string) => Promise<void>;
   checkPendingInvitations: () => Promise<FamilyInvitation[]>;
   testFirebaseConnection: () => Promise<void>;
+
+  // ── A6-F2 · Cierre de sesion seguro y purga local ────────────────────────
+  /** Fase actual del flujo de cierre; gobierna el ConfirmDialog. */
+  estadoCierre: EstadoCierre;
+  /** Punto de entrada desde la interfaz. Decide si hace falta dialogo. */
+  solicitarCierreDeSesion: () => void;
+  /** Transiciones disparadas por los botones del dialogo. */
+  despacharCierre: (accion: AccionCierre) => void;
+  /** Reintenta enviar los cambios pendientes antes de cerrar. */
+  reintentarSincronizacion: () => Promise<void>;
+  /** Ejecuta la secuencia completa de limpieza. Usado tambien desde Ajustes. */
+  cerrarSesionYPurgar: () => Promise<void>;
+  /** La limpieza de la cache de Firestore quedo pendiente (otra pestana). */
+  avisoPurgaDiferida: boolean;
+  descartarAvisoPurgaDiferida: () => void;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -553,6 +580,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Evita que el efecto de preferencias escriba los valores por defecto antes
   // de que la migración y la carga inicial hayan terminado.
   const preferenciasListasRef = useRef<boolean>(false);
+
+  // ── A6-F2 · Purga diferida de la caché de Firestore ──────────────────────
+  // El inicializador perezoso se evalúa DURANTE EL PRIMER RENDER, antes que
+  // cualquier efecto. Mientras valga true, el arranque, la autenticación y los
+  // watchers de Firestore quedan detenidos: clearIndexedDbPersistence solo
+  // puede tener éxito si no hay ninguna suscripción viva.
+  const [purgaDiferidaPendiente, setPurgaDiferidaPendiente] = useState<boolean>(
+    () => (typeof window === 'undefined' ? false : hayPurgaPendiente()),
+  );
+  // Se muestra cuando la limpieza no pudo completarse (otra pestaña abierta).
+  const [avisoPurgaDiferida, setAvisoPurgaDiferida] = useState<boolean>(false);
+
+  // ── A6-F2 · Cierre de sesión ─────────────────────────────────────────────
+  const [estadoCierre, setEstadoCierre] = useState<EstadoCierre>(ESTADO_CIERRE_INICIAL);
+  // Guarda reentrante. Es un ref y no un estado a propósito: dos clics dentro
+  // del mismo ciclo de render verían el mismo valor de estado y ambos pasarían.
+  const cierreEnCursoRef = useRef<boolean>(false);
+  // Espejos para leer el estado real desde manejadores y temporizadores, sin
+  // quedar atrapados en un cierre lexico obsoleto.
+  const estadoCierreRef = useRef<EstadoCierre>(ESTADO_CIERRE_INICIAL);
+  const pendingSyncCountRef = useRef<number>(0);
   const autoLockEnabledRef = useRef<boolean>(false);
   const autoLockMinutesRef = useRef<number>(15);
   const nightLockEnabledRef = useRef<boolean>(false);
@@ -578,6 +626,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { nightLockEndRef.current = nightLockEnd; }, [nightLockEnd]);
   useEffect(() => { sessionLockedRef.current = sessionLocked; }, [sessionLocked]);
 
+
+  // ── A6-F2 · Purga diferida · PRIMER EFECTO DEL PROVEEDOR ─────────────────
+  // Se declara ANTES que ningún otro para que React lo ejecute primero, y los
+  // efectos que tocan Firestore (autenticación, watchAll, watchUserFamilyAccess
+  // y la carga inicial) están además detenidos por `purgaDiferidaPendiente`.
+  //
+  // Si la purga se completa, `terminate()` deja la instancia de Firestore
+  // inutilizable, así que hay que recargar: el marcador ya se borró, de modo
+  // que la recarga no puede entrar en bucle.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!purgaDiferidaPendiente) return;
+
+    let cancelado = false;
+    ejecutarPurgaDiferidaSiProcede()
+      .then((resultado) => {
+        if (cancelado) return;
+        if (resultado === 'ok') {
+          window.location.reload();
+          return;
+        }
+        if (resultado === 'diferida') {
+          // No se afirma que los datos se borraron: se avisa y se continúa.
+          setAvisoPurgaDiferida(true);
+        }
+        setPurgaDiferidaPendiente(false);
+      })
+      .catch(() => {
+        if (cancelado) return;
+        setAvisoPurgaDiferida(true);
+        setPurgaDiferidaPendiente(false);
+      });
+
+    return () => { cancelado = true; };
+  }, [purgaDiferidaPendiente]);
 
   // ── A6-F1 · Preferencias no clínicas ─────────────────────────────────────
   // Se ejecuta ANTES del efecto de carga inicial (React respeta el orden de
@@ -610,6 +693,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // 1. Carga inicial controlada del LocalStorage (únicamente del lado del cliente)
   useEffect(() => {
+    if (purgaDiferidaPendiente) return; // A6-F2: no arrancar sobre una caché por limpiar
     try {
       const activeUser = getActiveUser();
       
@@ -869,7 +953,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [purgaDiferidaPendiente]);
 
   // ── A6-F1 · Persistencia de preferencias ─────────────────────────────────
   // Clave propia, por dispositivo. Es lo único —junto al deviceId— que
@@ -1042,6 +1126,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Sincronizar el estado de Firebase Auth SDK con el React Context
   useEffect(() => {
     if (!isFirebaseBackend) return;
+    if (purgaDiferidaPendiente) return; // A6-F2: ningún listener antes de limpiar
 
     let isMounted = true;
     let unsubscribe: (() => void) | null = null;
@@ -1161,7 +1246,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         unsubscribe();
       }
     };
-  }, []);
+  }, [purgaDiferidaPendiente]);
 
   const signIn = async (googleUser?: Omit<UserAccount, 'id' | 'createdAt'>, idToken?: string) => {
     setIsLoading(true);
@@ -1628,11 +1713,165 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   };
 
+  // ===========================================================================
+  // A6-F2 . CIERRE DE SESION SEGURO
+  // ===========================================================================
+
+  useEffect(() => { estadoCierreRef.current = estadoCierre; }, [estadoCierre]);
+  useEffect(() => { pendingSyncCountRef.current = pendingSyncCount; }, [pendingSyncCount]);
+
+  /**
+   * Secuencia de limpieza. El orden es el acordado y no es negociable: cada
+   * paso depende de que el anterior haya ocurrido.
+   *
+   * Ningun fallo aborta la secuencia. Un error al limpiar jamas debe dejar al
+   * usuario dentro de una vista que muestra el expediente, asi que cada paso
+   * va en su propio try/catch y siempre se llega a la recarga final.
+   */
+  const cerrarSesionYPurgar = async (): Promise<void> => {
+    // (a) Guarda reentrante. Un segundo clic no arranca una segunda purga.
+    if (cierreEnCursoRef.current) return;
+    cierreEnCursoRef.current = true;
+
+    // (b) Compuerta de escritura: impide que el vaciado del estado dispare el
+    //     autoguardado y sobrescriba el snapshot con datos vacios.
+    escrituraSuspendidaRef.current = true;
+
+    const fallos: string[] = [];
+
+    // (c) Temporizadores. Se cancelan aqui de forma explicita para garantizar
+    //     el orden; signOut los vuelve a cancelar, lo cual es idempotente.
+    try {
+      if (autoSyncTimerRef.current) { clearTimeout(autoSyncTimerRef.current); autoSyncTimerRef.current = null; }
+      if (idleTimerRef.current) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
+      if (nightLockTimerRef.current) { clearTimeout(nightLockTimerRef.current); nightLockTimerRef.current = null; }
+      if (gmailAutoScanTimerRef.current) { clearTimeout(gmailAutoScanTimerRef.current); gmailAutoScanTimerRef.current = null; }
+    } catch { fallos.push('temporizadores'); }
+
+    // (d) Watchers de Firestore.
+    try {
+      if (firebaseUnsubRef.current) { firebaseUnsubRef.current(); firebaseUnsubRef.current = null; }
+      if (firebaseInvitationsUnsubRef.current) { firebaseInvitationsUnsubRef.current(); firebaseInvitationsUnsubRef.current = null; }
+    } catch { fallos.push('watchers'); }
+
+    // (e) Preferencias no clinicas, ANTES de vaciar nada.
+    try {
+      guardarPreferencias({
+        driveSyncEnabled,
+        calendarSyncEnabled,
+        gmailAutoScanEnabled,
+        gmailScanTime,
+        gmailScanRangeDays,
+        gmailOnlyFutureAppointments,
+        autoLockEnabled,
+        autoLockMinutes,
+        nightLockEnabled,
+        nightLockStart,
+        nightLockEnd,
+      });
+    } catch { fallos.push('preferencias'); }
+
+    // (f)(g)(h)(k) signOut ya cierra Firebase Auth, invalida los tokens en
+    //     memoria, reinicia el repositorio y vacia el estado de React.
+    try {
+      await signOut();
+    } catch { fallos.push('signOut'); }
+
+    // (i) localStorage.
+    try {
+      const r = purgarPersistenciaLocal();
+      if (r.errores.length > 0) fallos.push('localStorage');
+    } catch { fallos.push('localStorage'); }
+
+    // (j) Cache IndexedDB de Firestore.
+    let resultadoFirestore: 'ok' | 'diferida' | 'no_aplica' = 'no_aplica';
+    try {
+      resultadoFirestore = await purgarCacheFirestore();
+    } catch { resultadoFirestore = 'diferida'; }
+    if (resultadoFirestore === 'diferida') fallos.push('cacheFirestore');
+
+    if (fallos.length > 0) {
+      console.warn('[AppContext] Cierre de sesion con limpieza incompleta:', fallos.join(','));
+    }
+
+    // (l) Recarga controlada. `replace` y no `push`: el boton de retroceso no
+    //     debe devolver a una vista que todavia tuviera datos montados.
+    try {
+      window.location.replace('/login');
+    } catch {
+      cierreEnCursoRef.current = false;
+      escrituraSuspendidaRef.current = false;
+    }
+  };
+
+  const descartarAvisoPurgaDiferida = () => setAvisoPurgaDiferida(false);
+
+  /** Aplica una transicion y lanza la purga cuando la maquina llega a ella. */
+  const aplicarEstadoCierre = (siguiente: EstadoCierre) => {
+    const anterior = estadoCierreRef.current;
+    estadoCierreRef.current = siguiente;
+    setEstadoCierre(siguiente);
+    if (siguiente.fase === 'purgando' && anterior.fase !== 'purgando') {
+      void cerrarSesionYPurgar();
+    }
+  };
+
+  const despacharCierre = (accion: AccionCierre) => {
+    aplicarEstadoCierre(reducirCierre(estadoCierreRef.current, accion));
+  };
+
+  /**
+   * Punto de entrada unico desde la interfaz. Lee el estado REAL -no una
+   * copia- de la sincronizacion en curso y de los cambios pendientes.
+   */
+  const solicitarCierreDeSesion = () => {
+    if (cierreEnCursoRef.current) return;
+    despacharCierre({
+      tipo: 'solicitar',
+      sincronizando: isSyncInProgress.current,
+      pendientes: pendingSyncCountRef.current,
+    });
+  };
+
+  const ERROR_REINTENTO =
+    'No se pudo sincronizar. Revisa tu conexion o vuelve a conectar tu cuenta de Google. Tus cambios siguen guardados en este dispositivo.';
+
+  const reintentarSincronizacion = async (): Promise<void> => {
+    try {
+      await flushPendingSync();
+      if (pendingSyncCountRef.current === 0) {
+        despacharCierre({ tipo: 'reintento_ok' });
+      } else {
+        despacharCierre({ tipo: 'reintento_fallido', error: ERROR_REINTENTO });
+      }
+    } catch {
+      despacharCierre({ tipo: 'reintento_fallido', error: ERROR_REINTENTO });
+    }
+  };
+
+  /**
+   * Mientras se espera a una sincronizacion en curso hay que vigilar
+   * isSyncInProgress, que es un ref y no provoca re-render. Un sondeo corto es
+   * la forma honesta de observarlo sin reescribir la capa de sincronizacion,
+   * que es territorio del bloque H.
+   */
+  useEffect(() => {
+    if (estadoCierre.fase !== 'sincronizando') return;
+    const id = setInterval(() => {
+      if (!isSyncInProgress.current) {
+        despacharCierre({ tipo: 'sync_finalizada', pendientes: pendingSyncCountRef.current });
+      }
+    }, 250);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estadoCierre.fase]);
+
   // ── FIREBASE: Real-time watchers (Phase 8) ──────────────────────────────────
   // When familyId becomes available (after firebase signIn) start listening to
   // all Firestore collections. Tears down automatically when familyId clears.
   useEffect(() => {
     if (!isFirebaseBackend || !familyId) return;
+    if (purgaDiferidaPendiente) return; // A6-F2: ningún watcher antes de limpiar
 
     let cancelled = false;
     getDataRepository().then((repo) => {
@@ -1708,7 +1947,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         firebaseInvitationsUnsubRef.current = null;
       }
     };
-  }, [familyId, user, currentUserFamilyAccess]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [familyId, user, currentUserFamilyAccess, purgaDiferidaPendiente]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── FIREBASE: Watch user's family access records (Phase A) ──────────────────
   useEffect(() => {
@@ -1716,6 +1955,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCurrentUserFamilyAccess(null);
       return;
     }
+    if (purgaDiferidaPendiente) return; // A6-F2: ningún watcher antes de limpiar
 
     const uid = user.googleId || user.id || '';
     let cancelled = false;
@@ -1739,7 +1979,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         unsub();
       }
     };
-  }, [isFirebaseBackend, user, familyId]);
+  }, [isFirebaseBackend, user, familyId, purgaDiferidaPendiente]);
 
   // ── FIREBASE: State snapshot and rollback for optimistic updates ───────────
   const stateRef = useRef({
@@ -2056,6 +2296,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (token) {
         await syncNow();
         setPendingSyncCount(0);
+        pendingSyncCountRef.current = 0; // espejo sincrono: el reintento lo consulta de inmediato
         setNeedsGoogleAuth(false);
       }
     } catch (_) {
@@ -6853,6 +7094,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createNewFamily,
       checkPendingInvitations,
       testFirebaseConnection,
+      estadoCierre,
+      solicitarCierreDeSesion,
+      despacharCierre,
+      reintentarSincronizacion,
+      cerrarSesionYPurgar,
+      avisoPurgaDiferida,
+      descartarAvisoPurgaDiferida,
     }}>
       {children}
     </AppContext.Provider>
