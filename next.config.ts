@@ -161,6 +161,17 @@ const nextConfig: NextConfig = {
   // No anunciar el framework: quita una pista gratuita a quien enumere.
   poweredByHeader: false,
 
+  /**
+   * Bloque B · Directorio de compilación configurable.
+   *
+   * El arnés necesita una segunda compilación —sin
+   * NEXT_PUBLIC_GOOGLE_CLIENT_ID— para poder probar la pantalla de error de
+   * configuración. Como Next incrusta las variables NEXT_PUBLIC_* en tiempo
+   * de compilación, no basta con cambiarlas al arrancar: hacen falta dos
+   * compilaciones, y por tanto dos directorios que no se pisen.
+   */
+  distDir: process.env.NEXT_DIST_DIR || '.next',
+
   async headers() {
     return [
       {

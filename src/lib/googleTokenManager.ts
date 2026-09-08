@@ -19,7 +19,17 @@ export const OPERATIONAL_SCOPES = [
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 export const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
-export const GMAIL_READ_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
+/**
+ * Bloque B · `gmail.readonly` se retiró por completo.
+ *
+ * Era un ámbito RESTRINGIDO: publicar con él obliga a una evaluación de
+ * seguridad CASA por un tercero, de pago y anual. Para una aplicación
+ * familiar es desproporcionado, y la función que lo justificaba —interpretar
+ * el correo de la EPS— sigue existiendo sin él: ahora la persona pega el
+ * texto. Ver `docs/TRANSICION-GMAIL.md`.
+ *
+ * No lo reintroduzcas. Hay una prueba que falla si vuelve.
+ */
 
 export const ALL_REQUIRED_SCOPES = [
   'profile',
@@ -39,11 +49,10 @@ interface TokenCache {
 
 const TOKEN_LIFETIME_MS = 55 * 60 * 1000; // 55 minutos en ms
 
-// Cache por scope-group (operacional, drive, calendar, gmail)
+// Cache por scope-group (operacional, drive, calendar)
 let _operationalCache: TokenCache | null = null;
 let _driveCache: TokenCache | null = null;
 let _calendarCache: TokenCache | null = null;
-let _gmailCache: TokenCache | null = null;
 
 // Singleton del tokenClient de GIS (se recrea si cambia el clientId)
 let _tokenClient: any = null;
@@ -72,11 +81,6 @@ export function getDriveTokenIfValid(): string | null {
 
 export function getCalendarTokenIfValid(): string | null {
   if (isCacheValid(_calendarCache)) return _calendarCache!.accessToken;
-  return null;
-}
-
-export function getGmailTokenIfValid(): string | null {
-  if (isCacheValid(_gmailCache)) return _gmailCache!.accessToken;
   return null;
 }
 
@@ -230,26 +234,6 @@ export async function ensureCalendarToken(
 }
 
 /**
- * Obtiene un token de Gmail (gmail.readonly).
- */
-export async function ensureGmailReadToken(
-  clientId: string,
-  silent = false,
-): Promise<string> {
-  if (isCacheValid(_gmailCache)) {
-    return _gmailCache!.accessToken;
-  }
-
-  const token = await requestGISToken(clientId, GMAIL_READ_SCOPE, silent);
-  _gmailCache = {
-    accessToken: token,
-    expiresAt: Date.now() + TOKEN_LIFETIME_MS,
-    scopes: GMAIL_READ_SCOPE,
-  };
-  return token;
-}
-
-/**
  * Obtiene un token con todos los scopes requeridos (Drive file, AppData, Sheets, Calendar).
  * Rellena las cachés correspondientes para evitar solicitudes adicionales a Google.
  */
@@ -284,7 +268,6 @@ export function invalidateAllTokens(): void {
   _operationalCache = null;
   _driveCache = null;
   _calendarCache = null;
-  _gmailCache = null;
   _tokenClient = null;
   _lastClientId = null;
 }
@@ -297,8 +280,7 @@ export function hasAnyValidToken(): boolean {
   return (
     isCacheValid(_operationalCache) ||
     isCacheValid(_driveCache) ||
-    isCacheValid(_calendarCache) ||
-    isCacheValid(_gmailCache)
+    isCacheValid(_calendarCache)
   );
 }
 

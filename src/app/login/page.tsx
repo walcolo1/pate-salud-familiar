@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { decodeGoogleToken } from '@/lib/googleAuth';
-import { Activity, ShieldAlert, Heart, Info } from 'lucide-react';
+import { Activity, ShieldAlert, Heart, AlertTriangle } from 'lucide-react';
+import { clientIdConfigurado, MENSAJE_SIN_CLIENT_ID } from '@/lib/importacionManual';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,10 +13,17 @@ export default function LoginPage() {
   const [localLoading, setLocalLoading] = useState(false);
   const [clientId, setClientId] = useState<string | null>(null);
 
-  // Cargar la variable de entorno del cliente de Google de forma segura en el cliente
+  /**
+   * Bloque B · Aquí había un Client ID incrustado como valor por defecto.
+   *
+   * Eso ataba el binario a un proyecto de Google Cloud concreto y convertía
+   * una configuración ausente en un fallo silencioso: en lugar de avisar, la
+   * aplicación intentaba autenticar contra un proyecto ajeno. Ahora, si falta
+   * la variable, no se inicia Google Identity Services y se dice por qué.
+   */
   useEffect(() => {
-    const id = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '74018068811-phpbiqs6th899onjdquvln1t5tum98ea.apps.googleusercontent.com';
-    setClientId(id);
+    const id = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    setClientId(clientIdConfigurado(id) ? id!.trim() : null);
   }, []);
 
   useEffect(() => {
@@ -123,14 +131,18 @@ export default function LoginPage() {
             </button>
           </div>
         ) : (
-          /* Fallback Mock de Desarrollo para pruebas sin variables de entorno */
-          <div className="flex flex-col gap-3 p-4 bg-amber-600/10 border border-amber-500/20 rounded-2xl text-center select-none text-amber-100">
+          /* Error de configuración: sin Client ID no se inicia sesión con Google */
+          <div
+            id="error-config-client-id"
+            role="alert"
+            className="flex flex-col gap-3 p-4 bg-amber-600/10 border border-amber-500/20 rounded-2xl text-center select-none text-amber-100"
+          >
             <div className="flex items-center justify-center gap-1.5 font-black text-xs text-amber-300">
-              <Info className="h-4 w-4 shrink-0" />
-              <span>Modo Demostración Activo</span>
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>Falta configuración</span>
             </div>
             <p className="text-[10px] text-amber-200/80 leading-relaxed font-bold">
-              Para habilitar Google Sign-In real, crea un Client ID OAuth y configúralo en <code className="bg-slate-900/60 p-0.5 px-1 rounded font-mono">NEXT_PUBLIC_GOOGLE_CLIENT_ID</code> en tu archivo <code className="bg-slate-900/60 p-0.5 px-1 rounded font-mono">.env.local</code>.
+              {MENSAJE_SIN_CLIENT_ID} Defínela en <code className="bg-slate-900/60 p-0.5 px-1 rounded font-mono">.env.local</code> y vuelve a compilar. Mientras tanto puedes explorar la aplicación en modo demostración, con datos ficticios.
             </p>
             <button
               onClick={handleSignIn}

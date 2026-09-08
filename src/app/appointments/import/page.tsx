@@ -20,9 +20,17 @@ import {
   AlertCircle, 
   Filter,
   CheckCircle2,
-  Edit2
+  Edit2,
+  Upload
 } from 'lucide-react';
 import Link from 'next/link';
+import {
+  validarAdjunto,
+  mensajeRechazoAdjunto,
+  AVISO_ADJUNTO_NO_EXTRAIBLE,
+  TIPOS_ADJUNTO_ACEPTADOS,
+} from '@/lib/importacionManual';
+import { extraerTextoPdf, mensajeResultadoPdf } from '@/lib/extraerTextoPdf';
 
 export default function AppointmentsImportPage() {
   const router = useRouter();
@@ -30,20 +38,21 @@ export default function AppointmentsImportPage() {
     user,
     isLoading,
     members,
-    emailSources,
     appointmentCandidates,
     updateAppointmentCandidate,
     importAppointmentFromCandidate,
-    scanGmailForAppointmentsAction,
-    gmailStatus,
-    gmailError,
-    connectGmail
+    crearCandidatoManual,
   } = useApp();
 
-  const [rangeDays, setRangeDays] = useState(90);
+  // Bloque B · Entrada manual. No hay token, ni estado de conexión, ni
+  // escaneo: lo único que existe es el texto que la persona aporta.
+  const [textoPegado, setTextoPegado] = useState('');
+  const [avisoAdjunto, setAvisoAdjunto] = useState<string | null>(null);
+  const [errorAdjunto, setErrorAdjunto] = useState<string | null>(null);
+  const [nombreAdjunto, setNombreAdjunto] = useState<string | null>(null);
+  const [leyendoPdf, setLeyendoPdf] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'PENDING_REVIEW' | 'IMPORTED' | 'IGNORED' | 'DUPLICATE'>('PENDING_REVIEW');
-  const [scanning, setScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<string | null>(null);
 
   // States for inline candidate editing
   const [editingCandidateId, setEditingCandidateId] = useState<string | null>(null);
@@ -71,19 +80,94 @@ export default function AppointmentsImportPage() {
     );
   }
 
-  const activeSources = emailSources.filter(s => s.enabled);
-
-  const handleScan = async () => {
-    setScanning(true);
-    setScanResult(null);
-    try {
-      const count = await scanGmailForAppointmentsAction(rangeDays);
-      setScanResult(`Escaneo completado. Se encontraron ${count} nuevas citas pendientes de revisión.`);
-    } catch (err: any) {
-      console.error('Error during scan:', err);
-    } finally {
-      setScanning(false);
+  /**
+   * Crea el borrador a partir del texto pegado.
+   *
+   * Nada viaja a ningún servidor: el análisis ocurre en este navegador. Y el
+   * resultado es un borrador, nunca una cita.
+   */
+  const handleCrearBorrador = () => {
+    setErrorAdjunto(null);
+    const candidato = crearCandidatoManual(textoPegado, nombreAdjunto);
+    if (!candidato) {
+      setResultado(null);
+      setErrorAdjunto('Pega el texto del correo antes de crear el borrador.');
+      return;
     }
+    setResultado(
+      candidato.status === 'IGNORED'
+        ? 'La cita detectada ya pasó, así que el borrador quedó marcado como ignorado. Puedes verlo en la pestaña «Ignoradas».'
+        : 'Borrador creado. Revísalo abajo, corrige lo que haga falta y confírmalo.',
+    );
+    setTextoPegado('');
+    setNombreAdjunto(null);
+    setAvisoAdjunto(null);
+    setFilterStatus(candidato.status === 'IGNORED' ? 'IGNORED' : 'PENDING_REVIEW');
+  };
+
+  /**
+   * Adjuntar un archivo.
+   *
+   * El archivo NO se envía a ningún sitio: ni el PDF, ni su texto, ni su
+   * nombre. De un .txt o un .eml se lee el texto directamente; de un PDF se
+   * extrae con pdf.js dentro de este navegador, con su worker servido desde
+   * el propio origen.
+   *
+   * De una imagen no se extrae nada: haría falta OCR, que no entra en esta
+   * fase. Y un PDF escaneado es una imagen dentro de un PDF, así que tampoco.
+   * En ambos casos se dice con claridad y la persona completa el borrador a
+   * mano, en lugar de dejar un botón que aparenta hacer algo que no hace.
+   */
+  const handleAdjuntar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = '';
+    if (!archivo) return;
+
+    setResultado(null);
+    setAvisoAdjunto(null);
+    setErrorAdjunto(null);
+
+    const veredicto = validarAdjunto({
+      name: archivo.name,
+      type: archivo.type,
+      size: archivo.size,
+    });
+
+    if (!veredicto.ok) {
+      setErrorAdjunto(mensajeRechazoAdjunto(veredicto.motivo));
+      return;
+    }
+
+    setNombreAdjunto(archivo.name);
+
+    if (veredicto.extraible) {
+      const texto = await archivo.text();
+      setTextoPegado(texto);
+      setAvisoAdjunto(`Se leyó el texto de «${archivo.name}». Revísalo y crea el borrador.`);
+      return;
+    }
+
+    if (archivo.type === 'application/pdf') {
+      setLeyendoPdf(true);
+      try {
+        const datos = new Uint8Array(await archivo.arrayBuffer());
+        const resultado = await extraerTextoPdf(datos);
+
+        if (resultado.estado === 'ok') {
+          setTextoPegado(resultado.texto);
+          setAvisoAdjunto(`Se leyó el texto de «${archivo.name}». Revísalo y crea el borrador.`);
+        } else {
+          // PDF escaneado, dañado o cifrado: se dice lo que pasó y se deja el
+          // camino abierto, en vez de fingir una extracción vacía.
+          setErrorAdjunto(mensajeResultadoPdf(resultado));
+        }
+      } finally {
+        setLeyendoPdf(false);
+      }
+      return;
+    }
+
+    setAvisoAdjunto(`«${archivo.name}». ${AVISO_ADJUNTO_NO_EXTRAIBLE}`);
   };
 
   const handleStartEdit = (cand: any) => {
@@ -174,13 +258,13 @@ export default function AppointmentsImportPage() {
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
-            <h2 className="text-2xl font-black text-slate-800 leading-tight">Importar citas desde correo</h2>
-            <p className="text-xs font-semibold text-slate-400">Escanea remitentes en tu Gmail y agéndalos con un solo toque.</p>
+            <h2 className="text-2xl font-black text-slate-800 leading-tight">Importar una cita</h2>
+            <p className="text-xs font-semibold text-slate-400">Pega el texto del correo de tu EPS o adjunta el documento.</p>
           </div>
         </div>
         <Link href="/settings" className="p-2.5 hover:bg-slate-50 text-slate-500 hover:text-slate-800 rounded-xl transition-all shadow-sm border border-slate-100 flex items-center gap-1.5 text-xs font-bold bg-white">
           <Settings className="h-4 w-4" />
-          <span className="hidden sm:inline">Configurar Remitentes</span>
+          <span className="hidden sm:inline">Ajustes</span>
         </Link>
       </section>
 
@@ -188,98 +272,84 @@ export default function AppointmentsImportPage() {
       <div className="p-4.5 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-3 text-blue-800 text-[11px] leading-relaxed font-semibold shadow-sm">
         <AlertCircle className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
         <div>
-          <span className="font-bold text-blue-950 block text-xs mb-0.5">Seguridad y Privacidad Garantizada</span>
-          <p>La app solo leerá correos de los remitentes que configures para detectar programaciones de citas médicas. Los tokens de acceso se manejan estrictamente en memoria y no se guardan en el dispositivo.</p>
+          <span className="font-bold text-blue-950 block text-xs mb-0.5">La aplicación no lee tu correo</span>
+          <p>Nunca pide acceso a tu buzón. Tú decides qué pegar o adjuntar, el análisis ocurre en este dispositivo y nada se envía a ningún servicio externo. Lo que se crea es un borrador: ninguna cita se registra sin que la revises y la confirmes.</p>
         </div>
       </div>
 
-      {/* Control panel & scan */}
+      {/* Entrada manual (Bloque B) */}
       <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
         <div className="flex flex-col gap-1">
-          <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Escanear cuentas de Gmail</h4>
-          <p className="text-[10px] text-slate-400 font-semibold">Configura el rango de tiempo y busca sugerencias de citas.</p>
+          <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Pega el correo o adjunta el documento</h4>
+          <p className="text-[10px] text-slate-400 font-semibold">
+            Copia el texto del mensaje que te envió la EPS. Se reconocerán paciente, fecha, hora, médico, especialidad y lugar.
+          </p>
         </div>
 
-        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-4 font-semibold text-[11px] text-slate-500">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-            {/* Rango de días */}
-            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-              <label className="text-[9px] font-extrabold text-slate-400 uppercase">Rango de días recientes</label>
-              <select
-                value={rangeDays}
-                onChange={(e) => setRangeDays(Number(e.target.value))}
-                className="h-10 px-3 bg-white border border-slate-200 focus:border-teal-500 rounded-xl text-xs font-bold text-slate-800 outline-none"
-              >
-                <option value={30}>Últimos 30 días</option>
-                <option value={90}>Últimos 90 días</option>
-                <option value={180}>Últimos 180 días</option>
-              </select>
-            </div>
+        <textarea
+          id="texto-cita"
+          value={textoPegado}
+          onChange={(e) => setTextoPegado(e.target.value)}
+          rows={7}
+          placeholder="Pega aquí el texto del correo…"
+          className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs outline-none focus:border-violet-500 text-slate-900 font-medium resize-y"
+        />
 
-            {/* Remitentes activos info */}
-            <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
-              <span className="text-[9px] font-extrabold text-slate-400 uppercase leading-none mb-1">Fuentes de correo activas</span>
-              <div className="font-extrabold text-slate-700">
-                {activeSources.length === 0 ? (
-                  <span className="text-rose-500">Ningún remitente activo. Agrega uno en Configuración.</span>
-                ) : (
-                  <span>{activeSources.length} remitente(s) activo(s) listado(s).</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2 border-t border-slate-200/50 pt-4">
-            <button
-              onClick={handleScan}
-              disabled={scanning || activeSources.length === 0}
-              className="py-2.5 px-5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5"
-            >
-              {scanning ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Escaneando correos...</span>
-                </>
-              ) : (
-                <>
-                  <Search className="h-4 w-4" />
-                  <span>Buscar citas en Gmail</span>
-                </>
-              )}
-            </button>
-            
-            {user.provider === 'mock' && (
-              <button
-                onClick={async () => {
-                  setScanning(true);
-                  try {
-                    await scanGmailForAppointmentsAction(90);
-                    setScanResult('Escaneo de sandbox completado exitosamente.');
-                  } catch (err: any) {
-                    alert(`Error: ${err.message}`);
-                  } finally {
-                    setScanning(false);
-                  }
-                }}
-                className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl transition-all"
-              >
-                Simular correos sandbox (Mock)
-              </button>
-            )}
-          </div>
-        </div>
-
-        {scanResult && (
-          <div className="bg-emerald-50 text-emerald-700 p-3.5 border border-emerald-100 rounded-2xl text-[11px] leading-relaxed font-bold flex items-center gap-2">
-            <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
-            <span>{scanResult}</span>
+        {avisoAdjunto && (
+          <div id="aviso-adjunto" className="p-3.5 bg-amber-50 border border-amber-100 rounded-2xl text-amber-800 text-[11px] leading-relaxed font-semibold flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <span>{avisoAdjunto}</span>
           </div>
         )}
 
-        {gmailError && (
-          <div className="bg-rose-50 text-rose-700 p-3.5 border border-rose-100 rounded-2xl text-[11px] leading-relaxed font-bold flex items-center gap-2">
-            <AlertTriangle className="h-4.5 w-4.5 text-rose-600 shrink-0" />
-            <span>{gmailError}</span>
+        {errorAdjunto && (
+          <div id="error-adjunto" className="p-3.5 bg-rose-50 border border-rose-100 rounded-2xl text-rose-700 text-[11px] leading-relaxed font-bold flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+            <span>{errorAdjunto}</span>
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+          <label
+            htmlFor="adjunto-cita"
+            className="cursor-pointer py-2.5 px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-extrabold text-[11px] rounded-xl shadow-sm flex items-center gap-2 w-fit transition-all"
+          >
+            {leyendoPdf ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span id="leyendo-pdf">Leyendo el documento…</span>
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4" />
+                <span>Adjuntar PDF, imagen o texto</span>
+              </>
+            )}
+          </label>
+          <input
+            id="adjunto-cita"
+            type="file"
+            accept={TIPOS_ADJUNTO_ACEPTADOS.join(',')}
+            onChange={handleAdjuntar}
+            className="hidden"
+          />
+
+          <button
+            id="btn-crear-borrador"
+            type="button"
+            onClick={handleCrearBorrador}
+            disabled={!textoPegado.trim()}
+            className="py-2.5 px-5 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold text-[11px] rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all"
+          >
+            <Check className="h-4 w-4" />
+            <span>Crear borrador</span>
+          </button>
+        </div>
+
+        {resultado && (
+          <div id="resultado-borrador" className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-800 text-[11px] leading-relaxed font-semibold flex items-start gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+            <span>{resultado}</span>
           </div>
         )}
       </section>
@@ -351,7 +421,7 @@ export default function AppointmentsImportPage() {
           )}
           {filteredCandidates.length === 0 && filterStatus !== 'IGNORED' ? (
             <div className="text-center py-10 text-slate-400 text-xs font-semibold">
-              No hay citas médicas registradas en esta pestaña. Presiona &quot;Buscar citas en Gmail&quot; arriba para escanear.
+              No hay borradores en esta pestaña. Pega el texto de un correo arriba y presiona &quot;Crear borrador&quot;.
             </div>
           ) : (
             <div className="flex flex-col gap-4">

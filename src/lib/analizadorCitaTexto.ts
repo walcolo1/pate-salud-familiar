@@ -1,3 +1,15 @@
+/**
+ * Analizador de citas a partir de TEXTO (Bloque B).
+ *
+ * Antes se llamaba `gmailAppointmentParser`, pero el nombre mentía: esta
+ * función nunca supo nada de Gmail. Recibe un asunto, un cuerpo y la lista de
+ * familiares, y devuelve lo que reconoce. De dónde salga ese texto —un correo
+ * pegado a mano, un adjunto, lo que sea— es problema de quien la llama.
+ *
+ * Por eso sobrevive entera a la retirada de `gmail.readonly`: era la parte
+ * valiosa, y no dependía del ámbito restringido.
+ */
+
 import { FamilyMember } from '../domain/models';
 
 export interface ParsedAppointmentDetails {
@@ -116,7 +128,11 @@ export function parseAppointmentEmail(
 
   // 4. Detect Doctor
   let detectedDoctor: string | null = null;
-  const docRegex = /\b(?:Dr\.|Dra\.|doctor|doctora|médico|medico)\s+([A-ZÁÉÍÓÚ][a-zA-ZáéíóúÁÉÍÓÚñÑ]+(?:\s+[A-ZÁÉÍÓÚ][a-zA-ZáéíóúÁÉÍÓÚñÑ]+)*)\b/;
+  // Bloque B: el separador es [ \t]+ y NO \s+. Con \s+ el nombre se comía el
+  // salto de línea y arrastraba la primera palabra del renglón siguiente
+  // ("Sintetica Prueba\nEspecialidad"). Con Gmail el cuerpo venía en un solo
+  // párrafo y casi nunca se notaba; con texto pegado a mano, siempre.
+  const docRegex = /\b(?:Dr\.|Dra\.|doctor|doctora|médico|medico)[ \t]+([A-ZÁÉÍÓÚ][a-zA-ZáéíóúÁÉÍÓÚñÑ]+(?:[ \t]+[A-ZÁÉÍÓÚ][a-zA-ZáéíóúÁÉÍÓÚñÑ]+)*)\b/;
   const docMatch = combinedText.match(docRegex);
   if (docMatch) {
     detectedDoctor = docMatch[1];

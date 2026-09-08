@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Bloque B · Compilacion secundaria del arnes E2E.
+    ".next-sin-config/**",
+    // Bloque B · Codigo de terceros servido tal cual: el worker de pdf.js se
+    // copia minificado desde node_modules. No es codigo del proyecto y
+    // analizarlo solo produce ruido (1.571 avisos) sobre algo que no se edita.
+    "public/pdf.worker.min.mjs",
   ]),
 ]);
 

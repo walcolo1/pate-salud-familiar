@@ -1,4 +1,9 @@
 {
-  "src/context/AppContext.tsx": 83,
-  "src/app/settings/page.tsx": 15
+  "src/app/appointments/import/page.tsx": 3,
+  "src/app/dashboard/page.tsx": 6,
+  "src/app/login/page.tsx": 5,
+  "src/app/settings/page.tsx": 14,
+  "src/context/AppContext.tsx": 75,
+  "src/lib/analizadorCitaTexto.ts": 3,
+  "src/lib/googleTokenManager.ts": 3
 }

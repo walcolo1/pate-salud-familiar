@@ -57,12 +57,13 @@ export interface Preferencias {
   driveSyncEnabled: boolean;
   /** Sincronización con Calendar activada. */
   calendarSyncEnabled: boolean;
-  /** Escaneo automático de correo activado. */
-  gmailAutoScanEnabled: boolean;
-  /** Hora del escaneo automático, formato HH:mm. */
-  gmailScanTime: string;
-  /** Días hacia atrás que abarca el escaneo. */
-  gmailScanRangeDays: number;
+  /**
+   * Bloque B · Solo se admiten citas futuras al importar.
+   *
+   * Conserva el nombre `gmail*` a propósito: renombrarlo descartaría el valor
+   * ya guardado por quien lo tuviera configurado. La preferencia sigue
+   * aplicando, pero ahora a la importación MANUAL, no a ningún escaneo.
+   */
   /** Descartar citas ya pasadas al importar. */
   gmailOnlyFutureAppointments: boolean;
   /** Bloqueo por inactividad activado. */
@@ -80,9 +81,6 @@ export interface Preferencias {
 export const PREFERENCIAS_POR_DEFECTO: Preferencias = {
   driveSyncEnabled: true,
   calendarSyncEnabled: true,
-  gmailAutoScanEnabled: false,
-  gmailScanTime: '00:00',
-  gmailScanRangeDays: 90,
   gmailOnlyFutureAppointments: true,
   autoLockEnabled: false,
   autoLockMinutes: 15,
@@ -148,23 +146,12 @@ export function sanearPreferencias(entrada: unknown): Preferencias {
 
   booleano('driveSyncEnabled');
   booleano('calendarSyncEnabled');
-  booleano('gmailAutoScanEnabled');
   booleano('gmailOnlyFutureAppointments');
   booleano('autoLockEnabled');
   booleano('nightLockEnabled');
 
-  hora('gmailScanTime');
   hora('nightLockStart');
   hora('nightLockEnd');
-
-  if (
-    typeof bruto.gmailScanRangeDays === 'number' &&
-    Number.isFinite(bruto.gmailScanRangeDays) &&
-    bruto.gmailScanRangeDays >= 1 &&
-    bruto.gmailScanRangeDays <= 365
-  ) {
-    base.gmailScanRangeDays = Math.floor(bruto.gmailScanRangeDays);
-  }
 
   if (
     typeof bruto.autoLockMinutes === 'number' &&

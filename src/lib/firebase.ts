@@ -8,7 +8,8 @@
  * so they are safe to expose in the browser bundle (no private keys here).
  *
  * After obtaining a Firebase Auth token, the app must still request additional
- * Google OAuth scopes (drive.file, calendar.events, gmail.readonly) via GIS
+ * Google OAuth scopes (drive.file, drive.appdata, spreadsheets,
+ * calendar.events) via GIS. `gmail.readonly` se retiró en el Bloque B.
  * to maintain Drive, Calendar and Gmail integrations — those tokens are kept
  * in memory as before and are NOT stored in Firestore or LocalStorage.
  */

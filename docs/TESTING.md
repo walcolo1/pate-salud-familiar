@@ -116,6 +116,23 @@ Debe no devolver nada. Los datos simulados de `src/lib/googleGmail.ts` NO
 entran en esta regla: son datos de producción del modo simulado, no fixtures
 de prueba, y su normalización está registrada como pendiente.
 
+### 3.1.1 · Dos compilaciones, dos servidores
+
+Desde el Bloque B el arnés levanta **dos** servidores:
+
+| Proyecto | Puerto | Compilación |
+|---|---|---|
+| `app` | 3100 | normal |
+| `sin-config` | 3101 | **sin** `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, en `.next-sin-config/` |
+
+El segundo existe porque Next incrusta las variables `NEXT_PUBLIC_*` en el
+paquete durante la compilación: vaciarlas al arrancar el servidor no cambia
+nada. Para probar de verdad la pantalla de «falta configuración» hay que
+compilar sin la variable, y para que las dos compilaciones no se pisen,
+`next.config.ts` acepta `NEXT_DIST_DIR`.
+
+`.next-sin-config/` está en `.gitignore`.
+
 ### 3.2 · Prohibido en el repositorio
 
 Nunca se versiona, ni siquiera temporalmente:

@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { mensajeRechazo } from '@/lib/origenDatos';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import Link from 'next/link';
 import { 
+  Inbox,
   Cloud, 
   Grid3X3, 
   ShieldCheck, 
@@ -113,24 +115,10 @@ export default function SettingsPage() {
     flushPendingSync,
     checkForExistingDatabase,
     repairGoogleNativeDatabase,
-    emailSources,
-    addEmailSource,
-    updateEmailSource,
-    deleteEmailSource,
-    // Gmail auto-scan
-    gmailAutoScanEnabled,
-    gmailScanTime,
-    lastGmailScanAt,
-    nextGmailScanAt,
-    gmailScanRangeDays,
+
+    // Importación de citas (Bloque B: manual)
     gmailOnlyFutureAppointments,
-    setGmailAutoScanEnabled,
-    setGmailScanTime,
-    setGmailScanRangeDays,
     setGmailOnlyFutureAppointments,
-    triggerGmailAutoScan,
-    gmailStatus,
-    gmailAccessToken,
     appointmentCandidates,
     repairMemberDocuments,
     updateDeviceFromGoogle,
@@ -165,15 +153,6 @@ export default function SettingsPage() {
   const [showLegal, setShowLegal] = useState(false);
   const [integrityReport, setIntegrityReport] = useState<any | null>(null);
   const [isCheckingIntegrity, setIsCheckingIntegrity] = useState(false);
-
-  // States for Gmail source forms
-  const [isAddingSource, setIsAddingSource] = useState(false);
-  const [newSourceEmail, setNewSourceEmail] = useState('');
-  const [newSourceLabel, setNewSourceLabel] = useState('');
-  
-  const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
-  const [editingSourceEmail, setEditingSourceEmail] = useState('');
-  const [editingSourceLabel, setEditingSourceLabel] = useState('');
 
   // States for invitations
   const [inviteEmail, setInviteEmail] = useState('');
@@ -365,7 +344,61 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
-      </section>      {/* ── PANEL DE DIAGNÓSTICO Y RESPALDO DE GOOGLE-NATIVE ── */}
+      </section>
+
+      {/* Ficha: Importación de citas (Bloque B — manual, sin Gmail) */}
+        <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-violet-50 text-violet-600 rounded-xl">
+              <Inbox className="h-5 w-5" />
+            </div>
+            <div>
+              <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Importación de citas</h4>
+              <p className="text-[10px] text-slate-400 font-semibold">
+                Pega el texto del correo de tu EPS o adjunta el documento. La aplicación no lee tu correo.
+              </p>
+            </div>
+          </div>
+
+          <hr className="border-slate-50" />
+
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="font-extrabold text-slate-700 block text-xs mb-0.5">Solo importar citas futuras</span>
+              <p className="text-[10px] text-slate-400">Marca como ignoradas las citas cuya fecha ya pasó.</p>
+            </div>
+            <button
+              id="btn-toggle-future-only"
+              type="button"
+              onClick={() => setGmailOnlyFutureAppointments(!gmailOnlyFutureAppointments)}
+              className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
+                gmailOnlyFutureAppointments ? 'bg-teal-600 justify-end' : 'bg-slate-200 justify-start'
+              }`}
+            >
+              <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
+            </button>
+          </div>
+
+          <div className="border-t border-slate-100/70 pt-3.5 flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Pendientes de revisión</span>
+              <span className={`font-extrabold text-xs ${
+                appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length > 0 ? 'text-amber-600' : 'text-emerald-600'
+              }`}>
+                {appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length} borradores
+              </span>
+            </div>
+            <Link
+              href="/appointments/import"
+              id="link-importar-cita"
+              className="py-2 px-3.5 bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-[10px] rounded-lg shadow-sm transition-all"
+            >
+              Importar una cita
+            </Link>
+          </div>
+        </section>
+
+      {/* ── PANEL DE DIAGNÓSTICO Y RESPALDO DE GOOGLE-NATIVE ── */}
       {user.provider === 'google' && (
         <div className="flex flex-col gap-6">
           
@@ -978,400 +1011,6 @@ export default function SettingsPage() {
             </section>
           )}
 
-          {/* Ficha: Correos para programación de citas */}
-          <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-                  <Mail className="h-5 w-5" />
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Correos para programación de citas</h4>
-                  <p className="text-[10px] text-slate-400 font-semibold">Configura las direcciones desde donde recibes programaciones de citas para importarlas automáticamente.</p>
-                </div>
-              </div>
-              
-              {!isAddingSource && !editingSourceId && (
-                <button
-                  id="btn-add-email-source"
-                  onClick={() => {
-                    setNewSourceEmail('');
-                    setNewSourceLabel('');
-                    setIsAddingSource(true);
-                  }}
-                  className="py-1.5 px-3 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-[10px] rounded-lg shadow-sm flex items-center gap-1 transition-all"
-                >
-                  <Plus className="h-3 w-3" />
-                  <span>Agregar fuente</span>
-                </button>
-              )}
-            </div>
-
-            <hr className="border-slate-50" />
-
-            {/* Banner explicativo */}
-            <div className="p-3 bg-blue-50 border border-blue-100 rounded-2xl text-blue-700 text-[10px] font-semibold leading-relaxed">
-              <p>“La app solo leerá correos de los remitentes que configures para detectar programaciones de citas médicas.”</p>
-            </div>
-
-            {/* Formulario Agregar Fuente */}
-            {isAddingSource && (
-              <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
-                <span className="font-bold text-slate-800 text-[11px]">Nueva fuente de correo</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[9px] text-slate-400">Etiqueta (ej: Clinica, EPS)</label>
-                    <input
-                      type="text"
-                      value={newSourceLabel}
-                      onChange={(e) => setNewSourceLabel(e.target.value)}
-                      placeholder="Ej. Clínica del Norte"
-                      className="h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-teal-500 text-slate-900"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[9px] text-slate-400">Dirección de correo remitente</label>
-                    <input
-                      type="email"
-                      value={newSourceEmail}
-                      onChange={(e) => setNewSourceEmail(e.target.value)}
-                      placeholder="correo@ejemplo.com"
-                      className="h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-teal-500 text-slate-900"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 mt-1">
-                  <button
-                    onClick={() => setIsAddingSource(false)}
-                    className="py-1.5 px-3 bg-white border border-slate-200 text-slate-700 font-bold text-[10px] rounded-lg"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (!newSourceLabel.trim() || !newSourceEmail.trim()) {
-                        alert('Por favor completa todos los campos.');
-                        return;
-                      }
-                      if (!newSourceEmail.includes('@')) {
-                        alert('Ingresa una dirección de correo válida.');
-                        return;
-                      }
-                      const exists = emailSources.some(s => s.email.toLowerCase() === newSourceEmail.trim().toLowerCase());
-                      if (exists) {
-                        alert('Esta dirección de correo ya está configurada.');
-                        return;
-                      }
-                      addEmailSource({
-                        email: newSourceEmail.trim().toLowerCase(),
-                        label: newSourceLabel.trim(),
-                        enabled: true
-                      });
-                      setIsAddingSource(false);
-                    }}
-                    className="py-1.5 px-3 bg-teal-600 hover:bg-teal-700 text-white font-bold text-[10px] rounded-lg"
-                  >
-                    Guardar Fuente
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Formulario Editar Fuente */}
-            {editingSourceId && (
-              <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
-                <span className="font-bold text-slate-800 text-[11px]">Editar fuente de correo</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[9px] text-slate-400">Etiqueta</label>
-                    <input
-                      type="text"
-                      value={editingSourceLabel}
-                      onChange={(e) => setEditingSourceLabel(e.target.value)}
-                      placeholder="Ej. Clínica del Norte"
-                      className="h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-teal-500 text-slate-900"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[9px] text-slate-400">Dirección de correo remitente</label>
-                    <input
-                      type="email"
-                      value={editingSourceEmail}
-                      onChange={(e) => setEditingSourceEmail(e.target.value)}
-                      placeholder="correo@ejemplo.com"
-                      className="h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-teal-500 text-slate-900"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 mt-1">
-                  <button
-                    onClick={() => setEditingSourceId(null)}
-                    className="py-1.5 px-3 bg-white border border-slate-200 text-slate-700 font-bold text-[10px] rounded-lg"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (!editingSourceLabel.trim() || !editingSourceEmail.trim()) {
-                        alert('Por favor completa todos los campos.');
-                        return;
-                      }
-                      if (!editingSourceEmail.includes('@')) {
-                        alert('Ingresa una dirección de correo válida.');
-                        return;
-                      }
-                      const exists = emailSources.some(s => s.id !== editingSourceId && s.email.toLowerCase() === editingSourceEmail.trim().toLowerCase());
-                      if (exists) {
-                        alert('Esta dirección de correo ya está configurada para otra fuente.');
-                        return;
-                      }
-                      updateEmailSource(editingSourceId, {
-                        email: editingSourceEmail.trim().toLowerCase(),
-                        label: editingSourceLabel.trim()
-                      });
-                      setEditingSourceId(null);
-                    }}
-                    className="py-1.5 px-3 bg-teal-600 hover:bg-teal-700 text-white font-bold text-[10px] rounded-lg"
-                  >
-                    Actualizar Fuente
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Listado de Fuentes */}
-            <div className="flex flex-col gap-3">
-              {emailSources.length === 0 ? (
-                <div className="text-center py-6 text-slate-400 text-xs font-semibold">
-                  No hay remitentes configurados. Agrega uno arriba.
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3.5">
-                  {emailSources.map((source) => (
-                    <div
-                      key={source.id}
-                      className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-semibold text-[11px]"
-                    >
-                      <div className="flex-1 min-w-0 flex items-start gap-3">
-                        <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${source.enabled ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-200 text-slate-400'}`}>
-                          <Mail className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-extrabold text-slate-800 text-xs">{source.label}</span>
-                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase leading-none ${
-                              source.enabled ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'
-                            }`}>
-                              {source.enabled ? 'Activo' : 'Inactivo'}
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">{source.email}</p>
-                          
-                          {/* Scan status */}
-                          {(source.lastScannedAt || source.lastError) && (
-                            <div className="mt-2 pt-2 border-t border-slate-200/40 text-[9px] text-slate-400 font-semibold space-y-1">
-                              {source.lastScannedAt && (
-                                <p>Último escaneo: {new Date(source.lastScannedAt).toLocaleString('es-CO')}</p>
-                              )}
-                              {source.lastScanResult && (
-                                <p className="text-slate-500 font-bold">Resultado: {source.lastScanResult}</p>
-                              )}
-                              {source.lastError && (
-                                <p className="text-rose-500 font-extrabold">Error: {source.lastError}</p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
-                        <button
-                          onClick={() => {
-                            updateEmailSource(source.id, { enabled: !source.enabled });
-                          }}
-                          className={`py-1 px-2.5 rounded-lg border text-[9px] font-black transition-colors ${
-                            source.enabled ? 'bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100'
-                          }`}
-                        >
-                          {source.enabled ? 'Desactivar' : 'Activar'}
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setEditingSourceId(source.id);
-                            setEditingSourceEmail(source.email);
-                            setEditingSourceLabel(source.label);
-                            setIsAddingSource(false);
-                          }}
-                          className="p-1.5 bg-white border border-slate-200 hover:border-teal-500 text-slate-600 rounded-lg shadow-sm transition-colors"
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            if (confirm(`¿Estás seguro de eliminar el remitente "${source.label}"?`)) {
-                              deleteEmailSource(source.id);
-                            }
-                          }}
-                          className="p-1.5 bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* Ficha: Escaneo automático diario de Gmail */}
-          <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-violet-50 text-violet-600 rounded-xl">
-                  <Clock className="h-5 w-5" />
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Escaneo automático diario de Gmail</h4>
-                  <p className="text-[10px] text-slate-400 font-semibold">Configura la hora diaria para buscar nuevas citas desde tus correos configurados.</p>
-                </div>
-              </div>
-              {/* Toggle maestro */}
-              <button
-                id="btn-toggle-gmail-autoscan"
-                type="button"
-                onClick={() => setGmailAutoScanEnabled(!gmailAutoScanEnabled)}
-                className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
-                  gmailAutoScanEnabled ? 'bg-violet-600 justify-end' : 'bg-slate-200 justify-start'
-                }`}
-              >
-                <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
-              </button>
-            </div>
-
-            {/* Aviso: Gmail no conectado pero escaneo activo */}
-            {gmailAutoScanEnabled && !gmailAccessToken && (
-              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                <p className="text-[10px] text-amber-700 font-semibold leading-snug">
-                  Gmail no está conectado. El escaneo automático no se ejecutará hasta que autorices el acceso en la sección <strong>Importar citas desde Gmail</strong>.
-                </p>
-              </div>
-            )}
-
-            <hr className="border-slate-50" />
-
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-4 font-semibold text-[11px] text-slate-500">
-              {/* Hora de escaneo */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <span className="font-extrabold text-slate-700 block text-xs mb-0.5">Hora de escaneo diario</span>
-                  <p className="text-[10px] text-slate-400">La app buscará citas en Gmail a esta hora cada día.</p>
-                </div>
-                <input
-                  type="time"
-                  value={gmailScanTime}
-                  onChange={(e) => setGmailScanTime(e.target.value)}
-                  disabled={!gmailAutoScanEnabled}
-                  className="h-9 px-3 bg-white border border-slate-200 focus:border-violet-500 rounded-xl text-xs font-bold text-slate-800 outline-none disabled:opacity-50"
-                />
-              </div>
-
-              {/* Rango de días */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-slate-100/70 pt-3.5">
-                <div>
-                  <span className="font-extrabold text-slate-700 block text-xs mb-0.5">Rango de búsqueda</span>
-                  <p className="text-[10px] text-slate-400">Cuántos días atrás buscar correos de citas.</p>
-                </div>
-                <select
-                  value={gmailScanRangeDays}
-                  onChange={(e) => setGmailScanRangeDays(Number(e.target.value))}
-                  disabled={!gmailAutoScanEnabled}
-                  className="h-9 px-3 bg-white border border-slate-200 focus:border-violet-500 rounded-xl text-xs font-bold text-slate-800 outline-none disabled:opacity-50"
-                >
-                  <option value={30}>30 días</option>
-                  <option value={60}>60 días</option>
-                  <option value={90}>90 días</option>
-                  <option value={180}>180 días</option>
-                </select>
-              </div>
-
-              {/* Filtro de citas futuras */}
-              <div className="flex items-center justify-between border-t border-slate-100/70 pt-3.5">
-                <div>
-                  <span className="font-extrabold text-slate-700 block text-xs mb-0.5">Solo importar citas futuras</span>
-                  <p className="text-[10px] text-slate-400">Descarta automáticamente citas cuya fecha ya haya pasado.</p>
-                </div>
-                <button
-                  id="btn-toggle-future-only"
-                  type="button"
-                  onClick={() => setGmailOnlyFutureAppointments(!gmailOnlyFutureAppointments)}
-                  className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
-                    gmailOnlyFutureAppointments ? 'bg-teal-600 justify-end' : 'bg-slate-200 justify-start'
-                  }`}
-                >
-                  <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
-                </button>
-              </div>
-
-              {/* Estado del escaneo */}
-              <div className="border-t border-slate-100/70 pt-3.5 grid grid-cols-1 sm:grid-cols-2 gap-y-2.5 gap-x-4">
-                <div className="flex flex-col">
-                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Candidatos pendientes de revisión</span>
-                  <span className={`font-extrabold ${
-                    appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length > 0 ? 'text-amber-600' : 'text-emerald-600'
-                  }`}>
-                    {appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length} citas pendientes
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Citas pasadas ignoradas</span>
-                  <span className="font-extrabold text-slate-600">
-                    {appointmentCandidates.filter(c => c.status === 'IGNORED').length} ignoradas
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Último escaneo automático</span>
-                  <span className="font-extrabold text-slate-700">{lastGmailScanAt ? new Date(lastGmailScanAt).toLocaleString('es-CO') : 'Nunca'}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Próximo escaneo programado</span>
-                  <span className="font-extrabold text-slate-700">{nextGmailScanAt ? new Date(nextGmailScanAt).toLocaleString('es-CO') : 'No configurado'}</span>
-                </div>
-              </div>
-
-              {/* Botón escaneo manual */}
-              <div className="border-t border-slate-100/70 pt-3.5 flex justify-end">
-                <button
-                  id="btn-trigger-gmail-autoscan"
-                  onClick={async () => {
-                    try {
-                      await triggerGmailAutoScan();
-                    } catch (err: any) {
-                      alert(`Error al escanear: ${err.message}`);
-                    }
-                  }}
-                  disabled={gmailStatus === 'scanning' || emailSources.filter(s => s.enabled).length === 0}
-                  className="py-2 px-4 bg-violet-600 hover:bg-violet-700 active:bg-violet-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5"
-                >
-                  {gmailStatus === 'scanning' ? (
-                    <>
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      <span>Escaneando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Mail className="h-3 w-3" />
-                      <span>Escanear Gmail ahora</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </section>
-
             <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
@@ -1383,7 +1022,7 @@ export default function SettingsPage() {
                   </h4>
                   <p className="text-[10px] text-slate-400 font-semibold">
                     {isFirebaseBackend 
-                      ? "Administra la conexión con tu cuenta de Google para Drive, Calendar y Gmail."
+                      ? "Administra la conexión con tu cuenta de Google para Drive y Calendar."
                       : "Ejecuta operaciones de respaldo secundarias para resolver conflictos."}
                   </p>
                 </div>
@@ -1422,7 +1061,7 @@ export default function SettingsPage() {
                     <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reconectar Google</span>
                     <p className="text-[9px] text-slate-400 leading-normal mb-2">
                       {isFirebaseBackend 
-                        ? "Renueva los permisos de Google Drive, Calendar y Gmail si expiran."
+                        ? "Renueva los permisos de Google Drive y Calendar si expiran."
                         : "Solicita y renueva el token global abriendo la ventana de Google."}
                     </p>
                   </div>
@@ -2040,7 +1679,7 @@ export default function SettingsPage() {
                 <strong>• Google Calendar:</strong> Sincroniza tus citas médicas y recordatorios de medicamentos. Para los tratamientos farmacológicos, la app incluye una alerta preventiva si programas más de 20 tomas/eventos individuales, evitando saturar tu calendario personal.
               </p>
               <p>
-                <strong>• Gmail (Solo Lectura):</strong> Habilita el escaneo automático para la detección de citas médicas. El escaneo lee únicamente los remitentes que configures explícitamente en la sección de filtros. **La aplicación tiene prohibido borrar correos, moverlos, archivarlos o marcarlos como leídos.**
+                <strong>• Gmail:</strong> La aplicación <strong>no pide acceso a tu correo</strong>. El permiso de solo lectura se retiró por completo: para registrar una cita, pegas el texto del mensaje o adjuntas el documento, y el análisis ocurre en tu dispositivo.
               </p>
               <p>
                 <strong>• Seguridad de Tokens:</strong> Para proteger tu seguridad, los tokens de acceso y credenciales de Google OAuth **nunca se guardan en el LocalStorage ni SessionStorage** del navegador. Se administran mediante una sesión efímera en memoria y expiran automáticamente tras 60 minutos de inactividad.

@@ -406,15 +406,15 @@ export default function DashboardPage() {
       });
     });
 
-  // 8. Gmail candidates pending review
+  // 8. Borradores de cita pendientes de revisión
   const pendingCandidatesCount = appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length;
   if (pendingCandidatesCount > 0) {
     dashboardAlerts.push({
-      id: 'gmail-candidates-pending',
-      title: 'Citas de Gmail por Revisar',
-      description: `Tienes ${pendingCandidatesCount} cita(s) importada(s) de Gmail pendientes de confirmación.`,
+      id: 'candidatos-cita-pendientes',
+      title: 'Borradores de cita por revisar',
+      description: `Tienes ${pendingCandidatesCount} borrador(es) de cita pendientes de confirmación.`,
       severity: 'warning',
-      memberName: 'Gmail',
+      memberName: 'Importación',
       href: '/appointments/import',
       iconType: 'general'
     });
@@ -592,7 +592,7 @@ export default function DashboardPage() {
           </div>
         </Link>
 
-        {/* ── Gmail Import Card ── */}
+        {/* ── Tarjeta de importación de citas ── */}
         {pendingCandidatesCount > 0 ? (
           <Link
             href="/appointments/import"
@@ -610,7 +610,7 @@ export default function DashboardPage() {
             <div className="min-w-0 flex-1">
               <h4 className="text-xs font-extrabold text-amber-800 leading-tight">Citas para importar</h4>
               <span className="text-[10px] text-amber-600 font-semibold block truncate">
-                {pendingCandidatesCount} pendiente{pendingCandidatesCount !== 1 ? 's' : ''} de Gmail
+                {pendingCandidatesCount} borrador{pendingCandidatesCount !== 1 ? 'es' : ''} por revisar
               </span>
             </div>
             <ArrowRight className="h-4 w-4 text-amber-500 shrink-0" />
@@ -625,7 +625,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <h4 className="text-xs font-extrabold text-slate-800 leading-tight">Importar citas</h4>
-              <span className="text-[10px] text-slate-400 font-semibold">Escanear Gmail</span>
+              <span className="text-[10px] text-slate-400 font-semibold">Pegar o adjuntar</span>
             </div>
           </Link>
         )}

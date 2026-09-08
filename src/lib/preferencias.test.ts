@@ -55,9 +55,8 @@ describe('sanearPreferencias', () => {
   });
 
   it('rechaza horas mal formadas y conserva el valor por defecto', () => {
-    const r = sanearPreferencias({ nightLockStart: '25:00', gmailScanTime: 'abc', nightLockEnd: '07:30' });
+    const r = sanearPreferencias({ nightLockStart: '25:00', nightLockEnd: '07:30' });
     expect(r.nightLockStart).toBe(PREFERENCIAS_POR_DEFECTO.nightLockStart);
-    expect(r.gmailScanTime).toBe(PREFERENCIAS_POR_DEFECTO.gmailScanTime);
     expect(r.nightLockEnd).toBe('07:30');
   });
 
@@ -65,8 +64,6 @@ describe('sanearPreferencias', () => {
     expect(sanearPreferencias({ autoLockMinutes: 0 }).autoLockMinutes).toBe(15);
     expect(sanearPreferencias({ autoLockMinutes: 9999 }).autoLockMinutes).toBe(15);
     expect(sanearPreferencias({ autoLockMinutes: 20.7 }).autoLockMinutes).toBe(20);
-    expect(sanearPreferencias({ gmailScanRangeDays: 400 }).gmailScanRangeDays).toBe(90);
-    expect(sanearPreferencias({ gmailScanRangeDays: 30 }).gmailScanRangeDays).toBe(30);
   });
 
   it('ignora booleanos enviados como cadena', () => {
@@ -129,8 +126,13 @@ describe('migrarPreferenciasDesdeEstado', () => {
     schemaVersion: 1,
     // Preferencias que sí deben rescatarse:
     driveSyncEnabled: false,
+    calendarSyncEnabled: false,
+    gmailOnlyFutureAppointments: false,
+    // Bloque B · Estas tres ya no son preferencias: se retiraron con Gmail.
+    // Aunque aparezcan en un estado guardado antiguo, NO deben rescatarse.
     gmailScanRangeDays: 45,
     gmailScanTime: '08:30',
+    gmailAutoScanEnabled: true,
     // PHI e identificadores que NO deben viajar:
     user: { email: 'real@example.invalid', googleId: '1234567890' },
     members: [{ fullName: 'Persona Real', documentNumber: '10203040' }],
@@ -146,8 +148,15 @@ describe('migrarPreferenciasDesdeEstado', () => {
 
     const prefs = leerPreferencias(store);
     expect(prefs.driveSyncEnabled).toBe(false);
-    expect(prefs.gmailScanRangeDays).toBe(45);
-    expect(prefs.gmailScanTime).toBe('08:30');
+    expect(prefs.calendarSyncEnabled).toBe(false);
+    expect(prefs.gmailOnlyFutureAppointments).toBe(false);
+
+    // Bloque B · Las preferencias del escaneo de Gmail ya no existen: un
+    // estado antiguo que las traiga no puede resucitarlas.
+    const serializadoPrefs = datos.get(CLAVE_PREFERENCIAS)!;
+    expect(serializadoPrefs).not.toContain('gmailScanRangeDays');
+    expect(serializadoPrefs).not.toContain('gmailScanTime');
+    expect(serializadoPrefs).not.toContain('gmailAutoScanEnabled');
 
     const serializado = datos.get(CLAVE_PREFERENCIAS)!;
     expect(serializado).not.toContain('real@example.invalid');
