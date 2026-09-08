@@ -75,6 +75,26 @@ Eso llega en el Bloque E. Hasta entonces, la capa actual —el navegador
 llamando a las APIs de Google con los ámbitos de arriba— es transitoria, y por
 eso no se consolida ni se optimiza.
 
+## Verificado con recursos reales
+
+El 8 de septiembre de 2026 se comprobó, con una cuenta `@gmail.com` personal y
+con la consola de Google Cloud, que la retirada está completa:
+
+- La **Gmail API está deshabilitada** en el proyecto y `gmail.readonly` no
+  figura entre los ámbitos declarados.
+- La pantalla de consentimiento **no menciona** Gmail, correo, mensajes ni
+  bandeja de entrada.
+- Drive y Calendar se autorizan **por separado y bajo demanda**, con
+  `drive.file` y `calendar.events`.
+- La importación manual funciona de principio a fin, y la cita se crea
+  **solo** tras confirmarla a mano.
+- Cero solicitudes a `gmail.googleapis.com` en el tráfico real.
+
+Queda una comprobación por hacer antes del corte de Firebase: la sesión de
+esa prueba ya tenía permisos concedidos, así que falta repetirla tras revocar
+el consentimiento, para descartar que lo observado viniera de una autorización
+anterior. Está registrada en `TESTING.md` §6.11.
+
 ## Qué queda pendiente
 
 - **Lectura automática de adjuntos.** Hoy se acepta el archivo y se abre un

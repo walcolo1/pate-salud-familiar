@@ -262,6 +262,76 @@ Se ejecutan antes del **corte final de Firebase en el bloque G**.
 2. Pulsar *Cerrar Sesión* mientras está en curso.
 3. **Criterio:** aparece *"Guardando cambios"* con **solo** dos opciones —*Esperar a que termine* y *Cancelar cierre de sesión*—, sin ninguna forma de abortar la sincronización. Al terminar, el cierre continúa solo si no quedan pendientes.
 
+### 6.11 · Consentimiento OAuth completamente limpio
+
+*Pendiente. La validación B5 se ejecutó sobre una sesión que **ya tenía permisos
+concedidos**, así que confirma que no se pide Gmail, pero no puede descartar que
+lo observado viniera de un consentimiento anterior en caché.*
+
+**Antes del corte final de Firebase:**
+
+1. En `myaccount.google.com` → Seguridad → conexiones con aplicaciones de
+   terceros: capturar los permisos concedidos y **revocar** el acceso.
+2. Iniciar sesión en una ventana de incógnito, con perfil limpio.
+3. Comprobar que los ámbitos se piden **bajo demanda**: identidad al entrar;
+   `drive.file` solo al conectar Drive; `calendar.events` solo al conectar
+   Calendar.
+4. Revisar la lista final de permisos concedidos.
+5. **Criterio:** ninguna pantalla menciona Gmail, correo, mensajes ni bandeja,
+   y la lista final no incluye ningún ámbito de Gmail.
+
+---
+
+## 6-bis · Validaciones manuales YA EJECUTADAS
+
+Lo que sigue no está pendiente: se ejecutó contra recursos reales y se
+registra aquí para no repetirlo ni confundirlo con evidencia automatizada.
+
+### B4 · Consola de Google Cloud — verificado (2026-09-08)
+
+| Comprobación | Resultado |
+|---|---|
+| Proyecto | `pate-salud-familiar`; Firebase y OAuth en el **mismo** proyecto |
+| Tipo / estado de la pantalla de consentimiento | **External · Testing** |
+| Usuarios de prueba | 1 cuenta `@gmail.com` personal |
+| `gmail.readonly` | **no declarado** |
+| **Gmail API** | **deshabilitada** |
+| Drive API | habilitada · `drive.file` declarado |
+| Calendar API | habilitada · `calendar.events` declarado |
+| Sheets API | **deshabilitada** · `spreadsheets` **no declarado** |
+| Clientes OAuth | uno solo, de tipo web |
+
+**Pendiente B4.1:** confirmar los orígenes de JavaScript autorizados y los URIs
+de redirección del cliente web, y si `drive.appdata` y `spreadsheets` figuran
+entre los ámbitos declarados.
+
+**Discrepancia registrada, sin resolver.** El código pide `spreadsheets` y
+`drive.appdata` en nueve puntos —los grupos `OPERATIONAL_SCOPES` y
+`ALL_REQUIRED_SCOPES`—, pero ninguno de los dos consta como declarado. Con
+`NEXT_PUBLIC_DATA_BACKEND=firebase` esas rutas son secundarias y probablemente
+nadie las ha ejecutado desde que se fijaron los ámbitos; si se ejecutan, Google
+las rechaza. Se decide en el Bloque E, cuando el backend de Apps Script
+sustituya a esa capa.
+
+### B5 · Prueba real con cuenta personal — aprobada (2026-09-08)
+
+Ejecutada con una cuenta `@gmail.com` personal, sin Workspace.
+
+| Caso | Resultado |
+|---|---|
+| Botón de Google visible e inicio de sesión | ✅ llega al panel |
+| **Consentimiento sin Gmail** | ✅ ni «Gmail», ni correo, ni mensajes, ni bandeja |
+| Drive bajo demanda | ✅ `drive.file`, sin Gmail |
+| Calendar bajo demanda | ✅ `calendar.events`, sin Gmail |
+| Importación manual | ✅ borrador generado, editable, y cita creada **solo** tras confirmación explícita |
+| Red | ✅ **cero** solicitudes a `gmail.googleapis.com` |
+
+**Conclusión: la Gmail API no se usa.** Confirmado por tres vías
+independientes —el arnés automatizado, la consola de Google Cloud y esta
+prueba con tráfico real.
+
+**Salvedad:** la sesión ya tenía permisos concedidos. Queda pendiente §6.11.
+
 ---
 
 ## 7 · Política de trabajo
