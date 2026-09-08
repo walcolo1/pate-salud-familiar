@@ -271,66 +271,93 @@ comprobación partiendo de cero.*
 
 **Se ejecuta antes del corte final de Firebase.**
 
-> **Fecha de ejecución:**
-> **Ejecutada por:**
-> **Cuenta usada:** (una cuenta `@gmail.com` personal — no anotar la dirección)
+> **Fecha de ejecución:** 2026-09-08
+> **Ejecutada por:** el titular
+> **Cuenta usada:** una cuenta `@gmail.com` personal (dirección no versionada)
+> **Navegador:** ventana de incógnito, cookies y caché limpias
+> **Entorno:** producción en Vercel — no local
+>
+> **Estado: APROBADA**, con una salvedad en los pasos 9 y 10 (ver más abajo).
 
 #### Procedimiento
 
 **Preparación**
 
-- [ ] 1 · En `myaccount.google.com` → Seguridad → **Tus conexiones con
+- [x] 1 · En `myaccount.google.com` → Seguridad → **Tus conexiones con
       aplicaciones y servicios de terceros**, localizar la aplicación y
       **anotar los permisos que figuran concedidos** antes de tocar nada.
-- [ ] 2 · **Revocar** el acceso de la aplicación.
-- [ ] 3 · Abrir una **ventana de incógnito** y limpiar cookies y caché.
-- [ ] 4 · Levantar la aplicación en local y abrir `/login`.
+- [x] 2 · **Revocar** el acceso de la aplicación.
+- [x] 3 · Abrir una **ventana de incógnito** y limpiar cookies y caché.
+- [x] 4 · Abrir `/login`. *(Se ejecutó contra producción en Vercel, no en
+      local: es un entorno más exigente y la comprobación sigue siendo válida.)*
 
 **Consentimiento inicial**
 
-- [ ] 5 · Iniciar sesión con Google y **leer entera** la pantalla de
+- [x] 5 · Iniciar sesión con Google y **leer entera** la pantalla de
       consentimiento antes de aceptar.
-- [ ] 6 · **No** menciona Gmail, correo, mensajes ni bandeja de entrada.
-- [ ] 7 · Pide **solo identidad básica**: nombre, dirección de correo y foto de
+- [x] 6 · **No** menciona Gmail, correo, mensajes ni bandeja de entrada.
+- [x] 7 · Pide **solo identidad básica**: nombre, dirección de correo y foto de
       perfil.
-- [ ] 8 · **Drive y Calendar NO aparecen todavía.** Es el resultado correcto,
+- [x] 8 · **Drive y Calendar NO aparecen todavía.** Es el resultado correcto,
       no un fallo: en este diseño no se piden al entrar. Si aparecieran aquí,
       la prueba **falla**.
 
 **Ámbitos bajo demanda**
 
-- [ ] 9 · En Ajustes, conectar **Drive**. Aparece una segunda pantalla que pide
+- [~] 9 · En Ajustes, conectar **Drive**. Aparece una segunda pantalla que pide
       únicamente *«Ver y gestionar los archivos que abras o crees con esta
       app»* (`drive.file`). No menciona Gmail ni pide todos los archivos.
-- [ ] 10 · En Ajustes, conectar **Calendar**. Tercera pantalla, solo
+- [~] 10 · En Ajustes, conectar **Calendar**. Tercera pantalla, solo
       `calendar.events`. No menciona Gmail.
 
 **Cierre**
 
-- [ ] 11 · Volver a `myaccount.google.com` y revisar la **lista final** de
+- [x] 11 · Volver a `myaccount.google.com` y revisar la **lista final** de
       permisos concedidos.
-- [ ] 12 · **Criterio de aprobación:** ninguna de las tres pantallas mencionó
+- [x] 12 · **Criterio de aprobación:** ninguna de las tres pantallas mencionó
       Gmail, correo, mensajes ni bandeja, y la lista final no incluye ningún
       ámbito de Gmail.
 
 #### Resultado
 
-| # | Comprobación | Resultado | Observaciones |
-|---|---|---|---|
-| 6 | Consentimiento sin mención a Gmail | | |
-| 7 | Solo identidad básica | | |
-| 8 | Drive y Calendar ausentes al entrar | | |
-| 9 | Drive bajo demanda, solo `drive.file` | | |
-| 10 | Calendar bajo demanda, solo `calendar.events` | | |
-| 11 | Lista final sin ámbitos de Gmail | | |
+| Fase | Resultado | Observaciones |
+|---|---|---|
+| Preparación | **APROBADO** | Revocación confirmada por Google |
+| Consentimiento inicial | **APROBADO** | Sin mención de Gmail, correo ni bandeja |
+| Ámbitos bajo demanda | **PARCIAL** | Drive y Calendar solo se ofrecen en Ajustes, nunca en el consentimiento inicial. Pero seguían autorizados de antes, así que no se llegó a ver una pantalla de concesión nueva |
+| Cierre | **APROBADO** | Panel cargado; 5 familiares visibles |
 
-**Permisos que figuraban ANTES de revocar** (paso 1):
+| # | Comprobación | Resultado |
+|---|---|---|
+| 6 | Consentimiento sin mención a Gmail | **NO menciona** |
+| 7 | Correo, bandeja o mensajes mencionados | **NO** |
+| 8 | Solo identidad básica solicitada | **SÍ** |
+| 9 | Drive y Calendar ausentes del consentimiento inicial | **SÍ** |
+| 10 | Drive ofrecido bajo demanda en Ajustes | SÍ — *ya autorizado previamente* |
+| 11 | Calendar ofrecido bajo demanda en Ajustes | SÍ — *ya autorizado previamente* |
+| 12 | Redirección correcta al panel | **SÍ** |
+| 13 | Datos cargados | **SÍ** — 5 familiares |
 
-**Permisos concedidos DESPUÉS** (paso 11):
+**Permisos ANTES de revocar** (paso 1): autorizado; revocado para la prueba.
 
-**Desviaciones observadas:**
+**Permisos DESPUÉS** (paso 11): autorizado; reconcedido durante la prueba.
 
-**Veredicto:**
+**Desviaciones observadas:** ninguna en el comportamiento de la aplicación.
+
+**Salvedad sobre los pasos 9 y 10.** La revocación limpió el consentimiento de
+identidad, pero Drive y Calendar seguían autorizados de una sesión anterior, así
+que **no se observó una pantalla de concesión nueva para ninguno de los dos**.
+Lo que sí queda demostrado —y es lo que esta validación perseguía— es que
+**ninguno de los dos aparece en el consentimiento inicial**: solo se ofrecen
+desde Ajustes, cuando la persona activa la función.
+
+Queda sin observar de forma directa el texto exacto de esas dos pantallas de
+concesión. Para verlo haría falta revocar *también* Drive y Calendar en
+`myaccount.google.com` y repetir solo los pasos 9 y 10. No bloquea el cierre del
+Bloque B, porque el ámbito retirado era `gmail.readonly` y esa retirada sí está
+verificada por tres vías independientes.
+
+**Veredicto: APROBADO.** El Bloque B queda cerrado.
 
 #### Sobre la evidencia gráfica
 
@@ -363,9 +390,10 @@ registra aquí para no repetirlo ni confundirlo con evidencia automatizada.
 | Sheets API | **deshabilitada** · `spreadsheets` **no declarado** |
 | Clientes OAuth | uno solo, de tipo web |
 
-**Pendiente B4.1:** confirmar los orígenes de JavaScript autorizados y los URIs
-de redirección del cliente web, y si `drive.appdata` y `spreadsheets` figuran
-entre los ámbitos declarados.
+**B4.1 cerrado** el 2026-09-08; ver la sección propia más abajo.
+
+**Sigue pendiente:** confirmar si `drive.appdata` y `spreadsheets` figuran entre
+los ámbitos declarados. Ver la discrepancia justo debajo.
 
 **Discrepancia registrada, sin resolver.** El código pide `spreadsheets` y
 `drive.appdata` en nueve puntos —los grupos `OPERATIONAL_SCOPES` y
@@ -374,6 +402,29 @@ entre los ámbitos declarados.
 nadie las ha ejecutado desde que se fijaron los ámbitos; si se ejecutan, Google
 las rechaza. Se decide en el Bloque E, cuando el backend de Apps Script
 sustituya a esa capa.
+
+### B4.1 · Orígenes autorizados del cliente OAuth — aprobado (2026-09-08)
+
+| Comprobación | Resultado |
+|---|---|
+| **Orígenes de JavaScript autorizados** | `http://localhost:3000` · `https://pate-salud-familiar.vercel.app` |
+| **URIs de redireccionamiento OAuth** | **no aplican** — la aplicación no usa NextAuth ni ninguna ruta de servidor |
+| **URI de redirección de Firebase Auth** | conservado intacto |
+| **Orígenes sobrantes** | **ninguno** |
+| **Clientes OAuth** | uno solo, de tipo web |
+
+**Por qué no hay URIs de redireccionamiento.** La autenticación es enteramente
+Google Identity Services en el navegador: `google.accounts.id.initialize` para
+la identidad y `google.accounts.oauth2.initTokenClient` para Drive y Calendar,
+y después `signInWithCredential` contra Firebase. Ese flujo se autoriza por
+**origen de JavaScript**, no por URI de redirección. No existe
+`src/app/api/`, ni ninguna referencia a `redirect_uri` en el código.
+
+Añadir un URI del estilo `/api/auth/callback/google` —la convención de
+NextAuth— no rompería nada, pero apuntaría a un endpoint inexistente. Se
+descartó a propósito.
+
+**Veredicto: APROBADO.** Con esto queda cerrado B4.
 
 ### B5 · Prueba real con cuenta personal — aprobada (2026-09-08)
 
