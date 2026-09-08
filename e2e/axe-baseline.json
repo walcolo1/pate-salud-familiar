@@ -18,19 +18,19 @@
     "minor": 0
   },
   "reminders": {
-    "critical": 3,
+    "critical": 0,
     "serious": 13,
     "moderate": 1,
     "minor": 0
   },
   "settings": {
-    "critical": 4,
+    "critical": 0,
     "serious": 27,
     "moderate": 1,
     "minor": 0
   },
   "total": {
-    "critical": 7,
+    "critical": 0,
     "serious": 77,
     "moderate": 5,
     "minor": 0

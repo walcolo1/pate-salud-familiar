@@ -1,6 +1,6 @@
 # Accesibilidad
 
-> Bloque C · Paso C1.1 · Última actualización: **2026-09-08**
+> Bloque C · Pasos C1.1 y C1.2 · Última actualización: **2026-09-08**
 
 ## Qué es axe-core y por qué se usa
 
@@ -109,6 +109,34 @@ explicar por qué.
 
 Todas requieren sesión, así que la suite entra por `entrarEnModoDemo()`: sin
 cuenta de Google, sin OAuth y sin red, igual que el resto del arnés.
+
+## Estado tras C1.2
+
+| Ruta | Críticas | Graves | Moderadas | Leves |
+|---|---|---|---|---|
+| `dashboard` | 0 | 20 | 1 | 0 |
+| `members` | 0 | 7 | 1 | 0 |
+| `settings` | **0** ▼4 | 27 | 1 | 0 |
+| `appointments-import` | 0 | 10 | 1 | 0 |
+| `reminders` | **0** ▼3 | 13 | 1 | 0 |
+| **TOTAL** | **0** ▼7 | **77** | **5** | **0** |
+
+Las siete violaciones críticas se resolvieron en C1.2: tres conmutadores y un
+`<select>` en Ajustes, y dos indicadores de estado en Recordatorios que se
+anunciaban como botones sin serlo.
+
+**Los indicadores de Recordatorios no recibieron un nombre: dejaron de ser
+controles.** Eran `<button>` sin manejador propio —quien responde al clic es
+la tarjeta entera—, así que ponerles `aria-label` habría anunciado una acción
+que no existe. Ahora son `<span aria-hidden>`, que es lo que siempre fueron.
+
+**Queda un problema de teclado que esto deja al descubierto y que corresponde a
+C1.5:** la tarjeta de recordatorio responde al clic desde un `<div>`, no desde
+un control, así que **con teclado no se puede marcar un recordatorio como
+hecho**. axe no lo detecta porque no hay nada mal etiquetado: sencillamente no
+hay control.
+
+---
 
 ## Línea base inicial (C1.1)
 

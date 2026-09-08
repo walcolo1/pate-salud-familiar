@@ -7,9 +7,12 @@
  */
 import { spawnSync } from 'node:child_process';
 
-const r = spawnSync(
-  process.platform === 'win32' ? 'npx.cmd' : 'npx',
-  ['playwright', 'test', 'e2e/accesibilidad.e2e.ts'],
-  { stdio: 'inherit', env: { ...process.env, AXE_ACTUALIZAR: '1' } },
-);
+// `shell: true` es necesario en Windows: sin él, spawnSync no resuelve `npx`
+// y termina en silencio, sin salida y sin regenerar nada.
+const r = spawnSync('npx playwright test e2e/accesibilidad.e2e.ts', {
+  stdio: 'inherit',
+  shell: true,
+  env: { ...process.env, AXE_ACTUALIZAR: '1' },
+});
+
 process.exit(r.status ?? 1);

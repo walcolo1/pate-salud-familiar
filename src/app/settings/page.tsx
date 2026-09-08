@@ -364,12 +364,15 @@ export default function SettingsPage() {
 
           <div className="flex items-center justify-between">
             <div>
-              <span className="font-extrabold text-slate-700 block text-xs mb-0.5">Solo importar citas futuras</span>
+              <span id="etiqueta-solo-futuras" className="font-extrabold text-slate-700 block text-xs mb-0.5">Solo importar citas futuras</span>
               <p className="text-[10px] text-slate-400">Marca como ignoradas las citas cuya fecha ya pasó.</p>
             </div>
             <button
               id="btn-toggle-future-only"
               type="button"
+              role="switch"
+              aria-checked={gmailOnlyFutureAppointments}
+              aria-labelledby="etiqueta-solo-futuras"
               onClick={() => setGmailOnlyFutureAppointments(!gmailOnlyFutureAppointments)}
               className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
                 gmailOnlyFutureAppointments ? 'bg-teal-600 justify-end' : 'bg-slate-200 justify-start'
@@ -1363,8 +1366,9 @@ export default function SettingsPage() {
         <hr className="border-slate-50" />
         <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3.5 font-semibold text-[10px] text-slate-500">
           <div className="flex flex-col gap-1.5">
-            <label className="text-[9px] font-extrabold text-slate-600 uppercase">Rol del portal actual</label>
+            <label htmlFor="simulador-rol" className="text-[9px] font-extrabold text-slate-600 uppercase">Rol del portal actual</label>
             <select
+              id="simulador-rol"
               value={simulatedRole || 'FAMILY_ADMIN'}
               onChange={(e) => {
                 const val = e.target.value;
@@ -1734,11 +1738,12 @@ export default function SettingsPage() {
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-extrabold text-slate-800">Bloqueo por inactividad</p>
+              <p id="etiqueta-autolock" className="text-[11px] font-extrabold text-slate-800">Bloqueo por inactividad</p>
               <p className="text-[9px] text-slate-400 leading-normal">Bloquea la sesión automáticamente si el usuario no interactúa.</p>
             </div>
             <button
               id="btn-toggle-autolock"
+              aria-labelledby="etiqueta-autolock"
               onClick={() => setAutoLockEnabled(!autoLockEnabled)}
               className={`relative w-10 h-5.5 rounded-full transition-colors duration-200 flex-shrink-0 ${autoLockEnabled ? 'bg-teal-500' : 'bg-slate-200'}`}
               role="switch"
@@ -1771,11 +1776,12 @@ export default function SettingsPage() {
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-extrabold text-slate-800">Cierre lógico nocturno</p>
+              <p id="etiqueta-nightlock" className="text-[11px] font-extrabold text-slate-800">Cierre lógico nocturno</p>
               <p className="text-[9px] text-slate-400 leading-normal">Bloquea automáticamente la sesión durante una ventana horaria configurada.</p>
             </div>
             <button
               id="btn-toggle-nightlock"
+              aria-labelledby="etiqueta-nightlock"
               onClick={() => setNightLockEnabled(!nightLockEnabled)}
               className={`relative w-10 h-5.5 rounded-full transition-colors duration-200 flex-shrink-0 ${nightLockEnabled ? 'bg-indigo-500' : 'bg-slate-200'}`}
               role="switch"

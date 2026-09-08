@@ -131,14 +131,17 @@ export default function RemindersPage() {
                     isCompleted ? 'opacity-60 hover:opacity-80' : 'hover:shadow-md'
                   } ${isOverdue ? 'bg-rose-50/30 border-rose-100' : 'border-slate-100'}`}
                 >
-                  {/* Circle check box */}
-                  <button className={`p-1.5 rounded-full shrink-0 border ${
+                  {/* Indicador de estado. NO es un control: no tiene manejador propio y
+                      quien responde al clic es la tarjeta entera. Como <button> se
+                      anunciaba como un control sin nombre que ademas no hacia nada
+                      al pulsarlo. El estado ya lo dice el texto de la tarjeta. */}
+                  <span aria-hidden="true" className={`p-1.5 rounded-full shrink-0 border ${
                     isCompleted 
                       ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-600/10' 
                       : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'
                   }`}>
                     {isCompleted ? <CheckSquare className="h-4.5 w-4.5" /> : <Square className="h-4.5 w-4.5" />}
-                  </button>
+                  </span>
 
                   {/* Info details */}
                   <div className="flex-1 min-w-0">
@@ -189,14 +192,15 @@ export default function RemindersPage() {
                     isCompleted ? 'opacity-50 pointer-events-none' : 'hover:shadow-md cursor-pointer hover:border-slate-200'
                   }`}
                 >
-                  {/* Circle check box */}
-                  <button className={`p-1.5 rounded-full shrink-0 border ${
+                  {/* Indicador de estado, no un control. Ver el comentario de la lista
+                      de recordatorios, mas arriba. */}
+                  <span aria-hidden="true" className={`p-1.5 rounded-full shrink-0 border ${
                     isCompleted 
                       ? 'bg-teal-600 text-white border-teal-600' 
                       : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'
                   }`}>
                     {isCompleted ? <CheckSquare className="h-4.5 w-4.5" /> : <Square className="h-4.5 w-4.5" />}
-                  </button>
+                  </span>
 
                   {/* Info details */}
                   <div className="flex-1 min-w-0">

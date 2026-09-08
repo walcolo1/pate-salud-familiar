@@ -98,6 +98,18 @@ test.describe('C1 · accesibilidad', () => {
         }
       }
 
+      // De las críticas y graves se imprime tambien QUE elemento falla: sin el
+      // selector, el recuento dice que hay deuda pero no por donde entrarle.
+      for (const v of violaciones) {
+        if (v.impact !== 'critical' && v.impact !== 'serious') continue;
+        for (const nodo of (v.nodes ?? []) as Array<{ target?: string[]; html?: string }>) {
+          const selector = (nodo.target ?? []).join(' ');
+          const html = (nodo.html ?? '').replace(/\s+/g, ' ').slice(0, 110);
+          console.log(`    · ${v.id}  ${selector}`);
+          console.log(`      ${html}`);
+        }
+      }
+
       if (ACTUALIZAR) {
         test.info().annotations.push({
           type: 'linea-base',
