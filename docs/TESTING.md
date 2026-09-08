@@ -266,19 +266,81 @@ Se ejecutan antes del **corte final de Firebase en el bloque G**.
 
 *Pendiente. La validación B5 se ejecutó sobre una sesión que **ya tenía permisos
 concedidos**, así que confirma que no se pide Gmail, pero no puede descartar que
-lo observado viniera de un consentimiento anterior en caché.*
+lo observado viniera de un consentimiento anterior en caché. Esta repite la
+comprobación partiendo de cero.*
 
-**Antes del corte final de Firebase:**
+**Se ejecuta antes del corte final de Firebase.**
 
-1. En `myaccount.google.com` → Seguridad → conexiones con aplicaciones de
-   terceros: capturar los permisos concedidos y **revocar** el acceso.
-2. Iniciar sesión en una ventana de incógnito, con perfil limpio.
-3. Comprobar que los ámbitos se piden **bajo demanda**: identidad al entrar;
-   `drive.file` solo al conectar Drive; `calendar.events` solo al conectar
-   Calendar.
-4. Revisar la lista final de permisos concedidos.
-5. **Criterio:** ninguna pantalla menciona Gmail, correo, mensajes ni bandeja,
-   y la lista final no incluye ningún ámbito de Gmail.
+> **Fecha de ejecución:**
+> **Ejecutada por:**
+> **Cuenta usada:** (una cuenta `@gmail.com` personal — no anotar la dirección)
+
+#### Procedimiento
+
+**Preparación**
+
+- [ ] 1 · En `myaccount.google.com` → Seguridad → **Tus conexiones con
+      aplicaciones y servicios de terceros**, localizar la aplicación y
+      **anotar los permisos que figuran concedidos** antes de tocar nada.
+- [ ] 2 · **Revocar** el acceso de la aplicación.
+- [ ] 3 · Abrir una **ventana de incógnito** y limpiar cookies y caché.
+- [ ] 4 · Levantar la aplicación en local y abrir `/login`.
+
+**Consentimiento inicial**
+
+- [ ] 5 · Iniciar sesión con Google y **leer entera** la pantalla de
+      consentimiento antes de aceptar.
+- [ ] 6 · **No** menciona Gmail, correo, mensajes ni bandeja de entrada.
+- [ ] 7 · Pide **solo identidad básica**: nombre, dirección de correo y foto de
+      perfil.
+- [ ] 8 · **Drive y Calendar NO aparecen todavía.** Es el resultado correcto,
+      no un fallo: en este diseño no se piden al entrar. Si aparecieran aquí,
+      la prueba **falla**.
+
+**Ámbitos bajo demanda**
+
+- [ ] 9 · En Ajustes, conectar **Drive**. Aparece una segunda pantalla que pide
+      únicamente *«Ver y gestionar los archivos que abras o crees con esta
+      app»* (`drive.file`). No menciona Gmail ni pide todos los archivos.
+- [ ] 10 · En Ajustes, conectar **Calendar**. Tercera pantalla, solo
+      `calendar.events`. No menciona Gmail.
+
+**Cierre**
+
+- [ ] 11 · Volver a `myaccount.google.com` y revisar la **lista final** de
+      permisos concedidos.
+- [ ] 12 · **Criterio de aprobación:** ninguna de las tres pantallas mencionó
+      Gmail, correo, mensajes ni bandeja, y la lista final no incluye ningún
+      ámbito de Gmail.
+
+#### Resultado
+
+| # | Comprobación | Resultado | Observaciones |
+|---|---|---|---|
+| 6 | Consentimiento sin mención a Gmail | | |
+| 7 | Solo identidad básica | | |
+| 8 | Drive y Calendar ausentes al entrar | | |
+| 9 | Drive bajo demanda, solo `drive.file` | | |
+| 10 | Calendar bajo demanda, solo `calendar.events` | | |
+| 11 | Lista final sin ámbitos de Gmail | | |
+
+**Permisos que figuraban ANTES de revocar** (paso 1):
+
+**Permisos concedidos DESPUÉS** (paso 11):
+
+**Desviaciones observadas:**
+
+**Veredicto:**
+
+#### Sobre la evidencia gráfica
+
+Una captura de la pantalla de consentimiento **contiene la dirección de correo
+completa**. Si se guardan capturas, van en `docs/evidencia/` con el correo
+tapado y se referencian desde aquí; nunca se pegan sin enmascarar. El registro
+en texto de la tabla de arriba es evidencia suficiente por sí solo.
+
+De la URL de consentimiento, recortar **todo lo que siga a `?`**: ahí viajan
+`client_id`, `scope` y `state`.
 
 ---
 
