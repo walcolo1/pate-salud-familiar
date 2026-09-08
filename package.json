@@ -12,7 +12,9 @@
     "e2e": "playwright test",
     "lint:cambiados": "node scripts/lint-cambiados.mjs",
     "typecheck": "tsc --noEmit",
-    "test:all": "npm run test:run && npm run typecheck && npm run lint:cambiados && npm run e2e"
+    "test:all": "npm run test:run && npm run typecheck && npm run lint:cambiados && npm run e2e",
+    "axe": "playwright test e2e/accesibilidad.e2e.ts",
+    "axe:linea-base": "node scripts/axe-linea-base.mjs"
   },
   "dependencies": {
     "firebase": "^12.15.0",
@@ -23,6 +25,7 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

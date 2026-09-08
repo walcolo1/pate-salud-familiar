@@ -1,0 +1,38 @@
+{
+  "appointments-import": {
+    "critical": 0,
+    "serious": 10,
+    "moderate": 1,
+    "minor": 0
+  },
+  "dashboard": {
+    "critical": 0,
+    "serious": 20,
+    "moderate": 1,
+    "minor": 0
+  },
+  "members": {
+    "critical": 0,
+    "serious": 7,
+    "moderate": 1,
+    "minor": 0
+  },
+  "reminders": {
+    "critical": 3,
+    "serious": 13,
+    "moderate": 1,
+    "minor": 0
+  },
+  "settings": {
+    "critical": 4,
+    "serious": 27,
+    "moderate": 1,
+    "minor": 0
+  },
+  "total": {
+    "critical": 7,
+    "serious": 77,
+    "moderate": 5,
+    "minor": 0
+  }
+}
