@@ -175,6 +175,57 @@ test.describe('C1 · accesibilidad', () => {
     });
   }
 
+  /**
+   * Los tres diálogos de órdenes médicas (C1.3b).
+   *
+   * No salen en `SUBRUTAS` porque no basta con pulsar un botón: sus botones
+   * solo existen cuando hay una orden en el estado adecuado, y la base de
+   * demostración no trae ninguna. Se siembran dos órdenes sintéticas —una
+   * pendiente de autorización y otra ya autorizada— y desde ahí se abre cada
+   * diálogo. Sin esto, tres formularios clínicos migrados quedarían sin medir.
+   */
+  test('A11Y · miembro-orders · diálogos', async ({ page }) => {
+    const id = await primerFamiliar(page);
+    await page.evaluate((memberId) => {
+      const clave = 'pate-salud-state:demo';
+      const e = JSON.parse(localStorage.getItem(clave) ?? '{}');
+      const ahora = new Date().toISOString();
+      const base = {
+        memberId,
+        orderType: 'EXAM',
+        description: null,
+        doctorName: 'Profesional Sintetico',
+        issuedAt: ahora.slice(0, 10),
+        requiresAuthorization: true,
+        createdAt: ahora,
+        updatedAt: ahora,
+      };
+      e.medicalOrders = [
+        ...(e.medicalOrders ?? []),
+        { ...base, id: 'orden-a11y-pendiente', title: 'ORDEN-A11Y-PENDIENTE', status: 'PENDING_AUTHORIZATION', authorizationStatus: 'PENDING' },
+        { ...base, id: 'orden-a11y-autorizada', title: 'ORDEN-A11Y-AUTORIZADA', status: 'AUTHORIZED', authorizationStatus: 'AUTHORIZED' },
+      ];
+      localStorage.setItem(clave, JSON.stringify(e));
+    }, id);
+
+    await page.goto(`/members/${id}/orders`);
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await expect(page.locator('main').first()).toBeVisible();
+
+    const dialogo = page.locator('dialog[open]');
+    const abrirYMedir = async (boton: string | RegExp, nombre: string) => {
+      await page.getByRole('button', { name: boton }).first().click();
+      await expect(dialogo, `no se abrió ${nombre}`).toBeVisible({ timeout: 10_000 });
+      await medirYComparar(page, nombre);
+      await page.keyboard.press('Escape');
+      await expect(dialogo).toBeHidden();
+    };
+
+    await abrirYMedir('Registrar Aprobación', 'miembro-orders-autorizacion');
+    await abrirYMedir('Adjuntar Soporte', 'miembro-orders-soporte');
+    await abrirYMedir('Agendar Cita Médica', 'miembro-orders-agendar');
+  });
+
   test.afterAll(() => {
     if (Object.keys(medido).length === 0) return;
 

@@ -78,6 +78,9 @@ try {
 }
 
 const nuevas = {};
+// Archivos realmente analizados aquí: son los únicos que pueden PERDER su
+// anotación al actualizar la línea base.
+const analizadas = new Set();
 let empeora = false;
 let mejora = false;
 
@@ -87,6 +90,7 @@ for (const inf of informes) {
   const errores = inf.messages.filter((m) => m.severity === 2).length;
   const avisos = inf.messages.filter((m) => m.severity === 1).length;
   const permitidos = lineaBase[ruta] ?? 0;
+  analizadas.add(ruta);
   if (errores > 0) nuevas[ruta] = errores;
 
   let estado;
@@ -108,8 +112,21 @@ for (const inf of informes) {
 }
 
 if (actualizar) {
-  writeFileSync(RUTA_BASE, `${JSON.stringify(nuevas, null, 2)}\n`, 'utf8');
-  console.log(`\nlint-cambiados: línea base reescrita en ${RUTA_BASE}.`);
+  // Solo se analizan los archivos TOCADOS en esta rama, así que `nuevas` no
+  // es la línea base completa: es un parche sobre ella. Escribirla tal cual
+  // borra las anotaciones de todo lo que no se haya tocado hoy, que es justo
+  // lo que pasó en C1.3a y costó recuperar siete entradas a mano.
+  const fusionada = { ...lineaBase, ...nuevas };
+  // Un archivo que quedó limpio pierde su anotación: la deuda no vuelve sola.
+  for (const ruta of analizadas) if (!nuevas[ruta]) delete fusionada[ruta];
+  const ordenada = Object.fromEntries(
+    Object.keys(fusionada).sort().map((k) => [k, fusionada[k]]),
+  );
+  writeFileSync(RUTA_BASE, `${JSON.stringify(ordenada, null, 2)}\n`, 'utf8');
+  console.log(
+    `\nlint-cambiados: línea base actualizada en ${RUTA_BASE} ` +
+      `(${Object.keys(ordenada).length} entradas).`,
+  );
   process.exit(0);
 }
 

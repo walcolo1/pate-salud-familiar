@@ -469,6 +469,10 @@ web/
 │   └── lint-cambiados.mjs        ESLint dirigido a lo que toca el cambio
 ├── e2e/
 │   ├── apoyo.ts                  bloqueo de red, sesión demo, datos sintéticos
+│   ├── validar-accesibilidad.ts   lógica de la línea base de axe, sin navegador
+│   ├── axe-baseline.json         deuda de accesibilidad medida, solo puede bajar
+│   ├── accesibilidad.e2e.ts      24 mediciones: rutas en reposo y diálogos abiertos
+│   ├── confirmaciones-destructivas.e2e.ts
 │   ├── purga-almacenamiento.e2e.ts
 │   └── dialogo-cierre.e2e.ts
 ├── src/lib/*.test.ts             unitarias junto al módulo que prueban

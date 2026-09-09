@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
+import { useConfirmacion } from '@/context/Confirmacion';
+import { useAviso } from '@/context/Avisos';
 import { mensajeRechazo } from '@/lib/origenDatos';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Link from 'next/link';
@@ -141,6 +143,8 @@ export default function SettingsPage() {
     revokeInvitation,
     testFirebaseConnection
   } = useApp();
+  const confirmar = useConfirmacion();
+  const avisar = useAviso();
 
   // A6-F3 · Rechazo de importación cruzada, mostrado en diálogo accesible.
   // Va junto al resto de hooks, ANTES de cualquier retorno temprano: si se
@@ -184,7 +188,13 @@ export default function SettingsPage() {
   };
 
   const handleRevokeInvite = async (inviteId: string) => {
-    if (!window.confirm('¿Estás seguro de que deseas revocar esta invitación? El usuario ya no podrá acceder a esta familia.')) return;
+    const aceptado = await confirmar({
+      titulo: 'Revocar invitación',
+      descripcion: 'La persona invitada dejará de tener acceso al expediente de esta familia.',
+      etiquetaConfirmar: 'Revocar invitación',
+      tono: 'peligro',
+    });
+    if (!aceptado) return;
     setRevokingInviteId(inviteId);
     try {
       await revokeInvitation(inviteId);
@@ -242,7 +252,7 @@ export default function SettingsPage() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (!parsed || typeof parsed !== 'object') {
@@ -262,21 +272,33 @@ export default function SettingsPage() {
         const oCount = Array.isArray(parsed.medicalOrders) ? parsed.medicalOrders.filter((o: any) => !o.deletedAt).length : 0;
         const pCount = Array.isArray(parsed.medicationPrescriptions) ? parsed.medicationPrescriptions.filter((p: any) => !p.deletedAt).length : 0;
 
-        const summary = `Se ha verificado la copia de seguridad. Resumen de datos a restaurar:\n\n` +
-          `• Miembros de la familia: ${mCount}\n` +
-          `• Citas médicas: ${aCount}\n` +
-          `• Documentos clínicos: ${dCount}\n` +
-          `• Órdenes médicas: ${oCount}\n` +
-          `• Medicamentos: ${pCount}\n\n` +
-          `¿Estás seguro de que deseas restaurar esta copia de seguridad? Esta acción reemplazará todos tus datos locales actuales en este dispositivo y los sincronizará si estás conectado a Google.`;
+        // El resumen dice CUÁNTO se restaura, nunca QUÉ: ni un nombre, ni un
+        // documento, ni un dato clínico salen del archivo a la pantalla.
+        const resumen = (
+          <>
+            <p>Se reemplazarán todos los datos locales de este dispositivo por el contenido de la copia:</p>
+            <ul className="mt-2 list-disc pl-5">
+              <li>Miembros de la familia: {mCount}</li>
+              <li>Citas médicas: {aCount}</li>
+              <li>Documentos clínicos: {dCount}</li>
+              <li>Órdenes médicas: {oCount}</li>
+              <li>Medicamentos: {pCount}</li>
+            </ul>
+          </>
+        );
 
-        if (window.confirm(summary)) {
+        if (await confirmar({
+          titulo: 'Restaurar copia de seguridad',
+          descripcion: resumen,
+          etiquetaConfirmar: 'Restaurar copia',
+          tono: 'peligro',
+        })) {
           // A6-F3 · El rechazo de importación cruzada se decide en AppContext,
           // que es el único punto por el que pasan todas las importaciones.
           // El mensaje describe el motivo sin exponer contenido del respaldo.
           const r = importBackupJSON(parsed);
           if (r.ok) {
-            alert('Copia de seguridad importada y restaurada exitosamente.');
+            avisar('Copia de seguridad restaurada.');
           } else {
             const m = mensajeRechazo(r.codigo);
             setRechazoImportacion(m);
@@ -1373,7 +1395,7 @@ export default function SettingsPage() {
               onChange={(e) => {
                 const val = e.target.value;
                 setSimulatedRole(val === 'FAMILY_ADMIN' ? null : val as any);
-                alert(`Rol simulado cambiado a: ${val}. La app filtrará vistas correspondientes.`);
+                avisar(`Rol simulado cambiado a: ${val}.`);
               }}
               className="h-10 px-3 bg-white border border-slate-200 focus:border-teal-500 rounded-xl text-xs font-semibold text-slate-900 outline-none text-slate-900"
             >
@@ -1398,7 +1420,7 @@ export default function SettingsPage() {
               />
               <button
                 type="button"
-                onClick={() => alert(`Correo de simulación establecido.`)}
+                onClick={() => avisar('Correo de simulación establecido.')}
                 className="h-10 px-4 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl transition-colors shrink-0"
               >
                 Aplicar
@@ -1457,7 +1479,7 @@ export default function SettingsPage() {
           <button
             onClick={() => {
               runAppointmentRetentionCleanup();
-              alert(`Limpieza de citas ejecutada con éxito. Se analizaron todos los registros.`);
+              avisar('Limpieza de citas ejecutada.');
             }}
             className="w-full h-10 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
           >
@@ -1566,11 +1588,16 @@ export default function SettingsPage() {
             {user?.provider === 'mock' ? (
               <>
                 <button
-                  onClick={() => {
-                    if (window.confirm('¿Estás seguro de que deseas restaurar la base de datos de demostración? Esto sobrescribirá todos tus cambios actuales.')) {
-                      restoreDemoData();
-                      alert('Base de datos demo restaurada con éxito.');
-                    }
+                  onClick={async () => {
+                    const aceptado = await confirmar({
+                      titulo: 'Restaurar la demostración',
+                      descripcion: 'Los cambios que hayas hecho en el modo demostración se perderán y volverá la base original de ejemplo.',
+                      etiquetaConfirmar: 'Restaurar demostración',
+                      tono: 'peligro',
+                    });
+                    if (!aceptado) return;
+                    restoreDemoData();
+                    avisar('Base de demostración restaurada.');
                   }}
                   className="h-10 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-amber-100"
                 >
@@ -1579,13 +1606,18 @@ export default function SettingsPage() {
                 </button>
                 
                 <button
-                  onClick={() => {
-                    if (window.confirm('¿Estás seguro de que deseas eliminar los datos de demostración de este navegador?')) {
-                      clearDemoData();
-                      clearAllData();
-                      alert('Datos demo eliminados de este navegador.');
-                      router.push('/login');
-                    }
+                  onClick={async () => {
+                    const aceptado = await confirmar({
+                      titulo: 'Eliminar los datos de demostración',
+                      descripcion: 'Se borrarán de este navegador todos los datos de la demostración y se cerrará la sesión.',
+                      etiquetaConfirmar: 'Eliminar datos demo',
+                      tono: 'peligro',
+                    });
+                    if (!aceptado) return;
+                    clearDemoData();
+                    clearAllData();
+                    avisar('Datos de demostración eliminados de este navegador.');
+                    router.push('/login');
                   }}
                   className="h-10 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-rose-100"
                 >
@@ -1596,15 +1628,19 @@ export default function SettingsPage() {
             ) : (
               <>
                 <button
-                  onClick={() => {
-                    const confirmMsg = isFirebaseBackend 
-                      ? '¿Estás seguro de que deseas reiniciar tu cuenta en este navegador? Esto eliminará tus datos locales de esta cuenta pero conservará intactos tus archivos en Google Drive.'
-                      : '¿Estás seguro de que deseas reiniciar tu cuenta en este navegador? Esto eliminará tus datos locales de esta cuenta pero conservará intactos tus archivos en Google Drive y Sheets.';
-                    if (window.confirm(confirmMsg)) {
-                      clearAllData();
-                      alert('Datos locales de la cuenta reiniciados con éxito.');
-                      router.push('/login');
-                    }
+                  onClick={async () => {
+                    const aceptado = await confirmar({
+                      titulo: 'Reiniciar la cuenta en este navegador',
+                      descripcion: isFirebaseBackend
+                        ? 'Se borrarán los datos locales de esta cuenta en este navegador. Tus archivos en Google Drive quedan intactos.'
+                        : 'Se borrarán los datos locales de esta cuenta en este navegador. Tus archivos en Google Drive y Sheets quedan intactos.',
+                      etiquetaConfirmar: 'Reiniciar cuenta',
+                      tono: 'peligro',
+                    });
+                    if (!aceptado) return;
+                    clearAllData();
+                    avisar('Datos locales de la cuenta reiniciados.');
+                    router.push('/login');
                   }}
                   className="h-10 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-rose-100"
                 >
@@ -1624,11 +1660,16 @@ export default function SettingsPage() {
                 </button>
 
                 <button
-                  onClick={() => {
-                    if (window.confirm('¿Estás seguro de que deseas eliminar los datos demo de este navegador? Esto no afectará a tus datos reales.')) {
-                      clearDemoData();
-                      alert('Datos demo eliminados de este navegador con éxito.');
-                    }
+                  onClick={async () => {
+                    const aceptado = await confirmar({
+                      titulo: 'Eliminar los datos de demostración',
+                      descripcion: 'Se borrarán de este navegador los datos de la demostración. Tus datos reales no se tocan.',
+                      etiquetaConfirmar: 'Eliminar datos demo',
+                      tono: 'peligro',
+                    });
+                    if (!aceptado) return;
+                    clearDemoData();
+                    avisar('Datos de demostración eliminados de este navegador.');
                   }}
                   className="h-10 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-100"
                 >

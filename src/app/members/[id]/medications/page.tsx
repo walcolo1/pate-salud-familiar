@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Dialog from '@/components/ui/Dialog';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
+import { useConfirmacion } from '@/context/Confirmacion';
 import { 
   ArrowLeft, 
   Plus, 
@@ -64,6 +65,7 @@ export default function MedicationsPage() {
     calendarSyncEnabled,
     calendarStatus
   } = useApp();
+  const confirmar = useConfirmacion();
 
   const [activeTab, setActiveTab] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -167,7 +169,7 @@ export default function MedicationsPage() {
     setSpecificTimes(specificTimes.filter(t => t !== time));
   };
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !startDate || durationDays <= 0) return;
 
@@ -178,12 +180,13 @@ export default function MedicationsPage() {
     }
 
     if (showCalendarWarning && !calendarExcessConfirmed) {
-      const proceed = window.confirm(
-        `Atención: Sincronizarás más de 20 eventos (${estimatedDoses}) en Google Calendar. Esto puede tomar unos instantes y saturar tu agenda. ¿Deseas continuar?`
-      );
-      if (!proceed) {
-        return;
-      }
+      const proceed = await confirmar({
+        titulo: 'Sincronizar muchos eventos',
+        descripcion: `Se crearán ${estimatedDoses} eventos en tu Google Calendar. Puede tardar unos instantes y llenará tu agenda de recordatorios de toma.`,
+        etiquetaConfirmar: 'Crear los eventos',
+        tono: 'primario',
+      });
+      if (!proceed) return;
       setCalendarExcessConfirmed(true);
     }
 
@@ -557,10 +560,14 @@ export default function MedicationsPage() {
                       Marcar Finalizado
                     </button>
                     <button
-                      onClick={() => {
-                        if (window.confirm('¿Estás seguro de que deseas eliminar este medicamento y todos sus recordatorios asociados?')) {
-                          deleteMedicationPrescription(prescription.id);
-                        }
+                      onClick={async () => {
+                        const aceptado = await confirmar({
+                          titulo: 'Eliminar medicamento',
+                          descripcion: `Se eliminará «${prescription.name}» junto con todos sus recordatorios de toma. Esta acción no se puede deshacer.`,
+                          etiquetaConfirmar: 'Eliminar definitivamente',
+                          tono: 'peligro',
+                        });
+                        if (aceptado) deleteMedicationPrescription(prescription.id);
                       }}
                       className="px-3.5 h-8.5 text-[10px] font-extrabold text-rose-600 bg-rose-50 border border-rose-100 hover:bg-rose-100 rounded-xl transition-colors flex items-center gap-1"
                     >
@@ -627,10 +634,14 @@ export default function MedicationsPage() {
                       Reactivar Tratamiento
                     </button>
                     <button
-                      onClick={() => {
-                        if (window.confirm('¿Estás seguro de que deseas eliminar definitivamente este registro del historial?')) {
-                          deleteMedicationPrescription(prescription.id);
-                        }
+                      onClick={async () => {
+                        const aceptado = await confirmar({
+                          titulo: 'Eliminar registro del historial',
+                          descripcion: `Se eliminará el registro de «${prescription.name}» del historial clínico. Esta acción no se puede deshacer.`,
+                          etiquetaConfirmar: 'Eliminar definitivamente',
+                          tono: 'peligro',
+                        });
+                        if (aceptado) deleteMedicationPrescription(prescription.id);
                       }}
                       className="px-3.5 h-8.5 text-[10px] font-extrabold text-rose-600 bg-rose-50 border border-rose-100 hover:bg-rose-100 rounded-xl transition-colors flex items-center gap-1"
                     >

@@ -6,6 +6,7 @@
   "src/app/members/[id]/checkups/page.tsx": 1,
   "src/app/members/[id]/medications/page.tsx": 2,
   "src/app/members/[id]/orders/page.tsx": 3,
+  "src/app/members/[id]/page.tsx": 3,
   "src/app/members/[id]/vaccines/page.tsx": 1,
   "src/app/settings/page.tsx": 14,
   "src/context/AppContext.tsx": 75,

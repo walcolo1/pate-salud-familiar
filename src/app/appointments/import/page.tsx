@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
+import { useConfirmacion } from '@/context/Confirmacion';
+import { useAviso } from '@/context/Avisos';
 import { 
   Mail, 
   Search, 
@@ -43,6 +45,8 @@ export default function AppointmentsImportPage() {
     importAppointmentFromCandidate,
     crearCandidatoManual,
   } = useApp();
+  const confirmar = useConfirmacion();
+  const avisar = useAviso();
 
   // Bloque B · Entrada manual. No hay token, ni estado de conexión, ni
   // escaneo: lo único que existe es el texto que la persona aporta.
@@ -232,7 +236,7 @@ export default function AppointmentsImportPage() {
       };
 
       await importAppointmentFromCandidate(cand.id, targetMemberId, details);
-      alert('Cita importada exitosamente en la aplicación y sincronizada.');
+      avisar('Cita importada y sincronizada.');
       if (editingCandidateId === cand.id) {
         setEditingCandidateId(null);
       }
@@ -241,10 +245,14 @@ export default function AppointmentsImportPage() {
     }
   };
 
-  const handleIgnore = (candId: string) => {
-    if (confirm('¿Estás seguro de ignorar esta cita sugerida? No se volverá a escanear.')) {
-      updateAppointmentCandidate(candId, { status: 'IGNORED' as const });
-    }
+  const handleIgnore = async (candId: string) => {
+    const aceptado = await confirmar({
+      titulo: 'Ignorar cita sugerida',
+      descripcion: 'La cita dejará de aparecer entre las sugerencias pendientes. Podrás volver a importarla creándola a mano.',
+      etiquetaConfirmar: 'Ignorar cita',
+      tono: 'primario',
+    });
+    if (aceptado) updateAppointmentCandidate(candId, { status: 'IGNORED' as const });
   };
 
   const filteredCandidates = appointmentCandidates.filter(c => c.status === filterStatus);

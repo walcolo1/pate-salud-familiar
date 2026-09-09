@@ -4,6 +4,8 @@ import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
+import { useConfirmacion } from '@/context/Confirmacion';
+import { useAviso } from '@/context/Avisos';
 import { 
   ArrowLeft, 
   Edit3, 
@@ -68,6 +70,8 @@ export default function MemberDetailPage() {
     medicationPrescriptions,
     isFirebaseBackend
   } = useApp();
+  const confirmar = useConfirmacion();
+  const avisar = useAviso();
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -390,7 +394,7 @@ export default function MemberDetailPage() {
                       permissionStatus: 'INVITED',
                       canAccessPortal: true 
                     });
-                    alert(`Invitación enviada al correo ${member.email}. En esta fase simulada, puedes simular el rol asignándolo en Configuración.`);
+                    avisar('Invitación enviada. En esta fase simulada puedes aceptarla o rechazarla desde este panel.');
                   }}
                   className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors text-center"
                 >
@@ -403,7 +407,7 @@ export default function MemberDetailPage() {
                       permissionStatus: 'REVOKED',
                       canAccessPortal: false 
                     });
-                    alert(`Acceso revocado para el miembro ${member.fullName}.`);
+                    avisar(`Acceso revocado para ${member.fullName}.`);
                   }}
                   className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors text-center"
                 >
@@ -415,7 +419,7 @@ export default function MemberDetailPage() {
                 <button
                   onClick={() => {
                     updateMember(member.id, { permissionStatus: 'ACTIVE' });
-                    alert(`Simulación: El miembro ha aceptado la invitación. Estado actualizado a Activo.`);
+                    avisar('Simulación: invitación aceptada. Estado actualizado a Activo.');
                   }}
                   className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors text-center animate-pulse"
                 >
@@ -601,11 +605,14 @@ export default function MemberDetailPage() {
         <div className="flex flex-wrap gap-2.5">
           {(member.status || 'ACTIVE') !== 'INACTIVE' ? (
             <button
-              onClick={() => {
-                if (window.confirm(`¿Estás seguro de que deseas marcar como INACTIVO a ${member.fullName}? Su historial clínico se conservará, pero ya no aparecerá en las pantallas principales.`)) {
-                  inactivateMember(member.id);
-                  alert(`${member.fullName} ha sido marcado como inactivo.`);
-                }
+              onClick={async () => {
+                const aceptado = await confirmar({
+                  titulo: 'Inactivar familiar',
+                  descripcion: `${member.fullName} dejará de aparecer en las pantallas principales. Su historial clínico se conserva y puede reactivarse en cualquier momento.`,
+                  etiquetaConfirmar: 'Inactivar familiar',
+                  tono: 'primario',
+                });
+                if (aceptado) inactivateMember(member.id);
               }}
               className="flex-1 min-w-[140px] py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl shadow-sm transition-colors text-center"
             >
@@ -615,7 +622,7 @@ export default function MemberDetailPage() {
             <button
               onClick={() => {
                 reactivateMember(member.id);
-                alert(`${member.fullName} ha sido reactivado con éxito.`);
+                avisar(`${member.fullName} ha sido reactivado.`);
               }}
               className="flex-1 min-w-[140px] py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-extrabold text-xs rounded-xl border border-emerald-100 shadow-sm transition-colors text-center"
             >
@@ -624,15 +631,20 @@ export default function MemberDetailPage() {
           )}
 
           <button
-            onClick={() => {
-              if (window.confirm(`¿Estás seguro de que deseas eliminar permanentemente a ${member.fullName}? Esta acción no se puede deshacer.`)) {
-                const success = deleteMember(member.id);
-                if (success) {
-                  alert(`${member.fullName} ha sido eliminado permanentemente.`);
-                  router.push('/members');
-                } else {
-                  alert(`No se puede eliminar a ${member.fullName} porque tiene historial médico asociado (citas, vacunas, documentos, exámenes, etc.). Por favor, inactívalo en su lugar.`);
-                }
+            onClick={async () => {
+              const aceptado = await confirmar({
+                titulo: 'Eliminar familiar permanentemente',
+                descripcion: `Se borrará la ficha de ${member.fullName} de este dispositivo. Esta acción no se puede deshacer. Si tiene historial clínico asociado no podrá borrarse: inactívalo en su lugar.`,
+                etiquetaConfirmar: 'Eliminar definitivamente',
+                tono: 'peligro',
+              });
+              if (!aceptado) return;
+              if (deleteMember(member.id)) {
+                router.push('/members');
+              } else {
+                // Error recuperable: la ficha sigue ahí y la alternativa
+                // —inactivar— está a un botón de distancia.
+                alert(`No se puede eliminar a ${member.fullName} porque tiene historial médico asociado (citas, vacunas, documentos, exámenes, etc.). Por favor, inactívalo en su lugar.`);
               }
             }}
             className="flex-1 min-w-[140px] py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold text-xs rounded-xl border border-rose-100 shadow-sm transition-colors text-center"

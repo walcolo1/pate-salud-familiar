@@ -89,9 +89,27 @@
     "moderate": 1,
     "minor": 0
   },
+  "miembro-orders-agendar": {
+    "critical": 1,
+    "serious": 1,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-orders-autorizacion": {
+    "critical": 2,
+    "serious": 1,
+    "moderate": 1,
+    "minor": 0
+  },
   "miembro-orders-dialogo": {
     "critical": 3,
     "serious": 1,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-orders-soporte": {
+    "critical": 1,
+    "serious": 0,
     "moderate": 1,
     "minor": 0
   },
@@ -126,9 +144,9 @@
     "minor": 0
   },
   "total": {
-    "critical": 27,
-    "serious": 143,
-    "moderate": 21,
+    "critical": 31,
+    "serious": 145,
+    "moderate": 24,
     "minor": 0
   }
 }

@@ -64,9 +64,10 @@ los dos. Sí quedó verificado que **no aparecen en el consentimiento inicial**.
 
 | Paso | Estado |
 |---|---|
-| C1.1 · Arnés de accesibilidad con axe | pendiente |
-| C1.2 · Botones sin nombre accesible | pendiente |
-| C1.3 · Componente `Dialog` base y migración de modales | pendiente |
+| C1.1 · Arnés de accesibilidad con axe | **cerrado** |
+| C1.2 · Botones sin nombre accesible | **cerrado** |
+| C1.3a · Componente `Dialog` base, 8 diálogos y cobertura ampliada | **cerrado** |
+| C1.3b · 3 diálogos de órdenes, 18 `confirm` y 23 `alert` sustituidos | **cerrado** |
 | C1.4 · Etiquetas de los campos de formulario | pendiente |
 | C1.5 · Foco visible, teclado y contraste AA | pendiente |
 

@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/context/AppContext";
+import { ConfirmacionProvider } from "@/context/Confirmacion";
+import { AvisosProvider } from "@/context/Avisos";
 import Navbar from "@/components/layout/Navbar";
 import Script from "next/script";
 
@@ -52,11 +54,15 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 select-none">
-        <AppProvider>
-          <Navbar>
-            {children}
-          </Navbar>
-        </AppProvider>
+        <AvisosProvider>
+          <ConfirmacionProvider>
+            <AppProvider>
+              <Navbar>
+                {children}
+              </Navbar>
+            </AppProvider>
+          </ConfirmacionProvider>
+        </AvisosProvider>
         <Script 
           src="https://accounts.google.com/gsi/client" 
           strategy="afterInteractive" 

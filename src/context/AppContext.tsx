@@ -117,6 +117,8 @@ import {
 import {
   parseAppointmentEmail,
 } from '../lib/analizadorCitaTexto';
+import { useConfirmacion } from './Confirmacion';
+import { useAviso } from './Avisos';
 
 /**
  * Bloque B · Sin valor por defecto incrustado.
@@ -446,6 +448,11 @@ interface AppContextProps {
 const AppContext = createContext<AppContextProps | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  // C1.3b · Ambos proveedores envuelven a este en el layout, de modo que el
+  // contexto puede preguntar y avisar sin recurrir a los cuadros del navegador.
+  const confirmar = useConfirmacion();
+  const avisar = useAviso();
+
   const [user, setUser] = useState<UserAccount | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [firebaseAuthReady, setFirebaseAuthReady] = useState<boolean>(false);
@@ -2269,7 +2276,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         status: 'OK',
         uid: rawUid
       });
-      alert('Conexión a Firebase OK y escritura exitosa');
+      avisar('Conexión a Firebase correcta: la escritura de prueba funcionó.');
     } catch (err: any) {
       console.error('[HealthCheck] Firebase test write failed:', err);
       alert(`Error al escribir en Firebase: [${err.code || 'UNKNOWN'}] - ${err.message}`);
@@ -4789,7 +4796,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setSharedReports(remoteConfig.permissionRefs.sharedReports);
           }
           
-          alert('Se ha encontrado una base operacional existente en tu cuenta de Google. Procederemos a cargar tu historial desde ella.');
+          avisar('Se encontró una base operacional en tu cuenta de Google. Se cargará tu historial.');
           // Proceder a jalar el historial
           await pullFromGoogleInternal(token, foundSheetId);
           return;
@@ -5290,7 +5297,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Regla: No hacer push si local está vacío y no se ha hecho pull en esta sesión (o nunca)
     if (!lastPullAt && members.length === 0) {
-      if (window.confirm('No se han cargado datos desde Google en este dispositivo. Para evitar sobrescribir datos remotos, se realizará una sincronización completa primero. ¿Proceder?')) {
+      const aceptado = await confirmar({
+        titulo: 'Sincronizar antes de subir',
+        descripcion: 'Este dispositivo aún no ha descargado nada desde Google. Para no sobrescribir lo que ya hay allí, primero se hará una sincronización completa.',
+        etiquetaConfirmar: 'Sincronizar primero',
+        tono: 'primario',
+      });
+      if (aceptado) {
         await syncNow();
         return;
       }
@@ -5766,7 +5779,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toISOString()
       };
       setHistory(h => [newAudit, ...h]);
-      alert('¡Base operacional reparada exitosamente! Se reconstruyó la estructura de Sheets y se subieron los datos locales.');
+      avisar('Base operacional reparada: se reconstruyó la estructura y se subieron los datos locales.');
     } catch (err: any) {
       console.error('Error al reparar base de datos:', err);
       setOpSyncStatus('error');
@@ -6008,9 +6021,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!doc) throw new Error('Documento no encontrado.');
     if (!doc.driveFileId) throw new Error('El archivo no ha sido subido a Google Drive aún.');
 
-    if (!window.confirm(`¿Deseas compartir el documento "${doc.fileName}" con el correo ${email}?`)) {
-      return;
-    }
+    const aceptadoCompartir = await confirmar({
+      titulo: 'Compartir documento',
+      descripcion: `Se dará acceso al documento «${doc.fileName}» a ${email}. Podrá abrirlo desde su cuenta de Google mientras no revoques el acceso.`,
+      etiquetaConfirmar: 'Compartir documento',
+      tono: 'primario',
+    });
+    if (!aceptadoCompartir) return;
 
     try {
       setOpSyncStatus('syncing');
@@ -6049,7 +6066,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Sincronizar en lote a la base operacional Sheets en segundo plano
       setTimeout(() => scheduleAutoSync('document_shared'), 100);
 
-      alert(`El documento "${doc.fileName}" se compartió con éxito.`);
+      avisar(`El documento «${doc.fileName}» se compartió correctamente.`);
     } catch (err: any) {
       console.error('Error al compartir documento:', err);
       setDocuments(prev => prev.map(d => d.id === documentId ? {
@@ -6084,9 +6101,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const targetEmail = doc.sharedWithEmail || 'correo';
 
-    if (!window.confirm(`¿Estás seguro de que deseas revocar el acceso a "${doc.fileName}" para ${targetEmail}?`)) {
-      return;
-    }
+    const aceptadoRevocarDoc = await confirmar({
+      titulo: 'Revocar acceso al documento',
+      descripcion: `${targetEmail} dejará de poder abrir «${doc.fileName}».`,
+      etiquetaConfirmar: 'Revocar acceso',
+      tono: 'peligro',
+    });
+    if (!aceptadoRevocarDoc) return;
 
     try {
       setOpSyncStatus('syncing');
@@ -6122,7 +6143,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setTimeout(() => scheduleAutoSync('document_share_revoked'), 100);
 
-      alert(`Se revocó con éxito el acceso de ${targetEmail} al documento.`);
+      avisar(`Se revocó el acceso de ${targetEmail} al documento.`);
     } catch (err: any) {
       console.error('Error al revocar acceso al documento:', err);
       setDocuments(prev => prev.map(d => d.id === documentId ? {
@@ -6145,9 +6166,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const targetMember = members.find(m => m.id === memberId);
     if (!targetMember) throw new Error('Familiar no encontrado.');
 
-    if (!window.confirm(`¿Deseas crear y compartir un Reporte Clínico individual de Sheets para ${targetMember.fullName} con el correo ${email}?`)) {
-      return;
-    }
+    const aceptadoReporte = await confirmar({
+      titulo: 'Crear y compartir reporte clínico',
+      descripcion: `Se creará una hoja de cálculo con el historial de ${targetMember.fullName} y se compartirá con ${email}.`,
+      etiquetaConfirmar: 'Crear y compartir',
+      tono: 'primario',
+    });
+    if (!aceptadoReporte) return;
 
     try {
       setOpSyncStatus('syncing');
@@ -6239,7 +6264,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setOpSyncStatus('synced');
       
-      alert(`Reporte clínico individual para ${targetMember.fullName} creado y compartido.`);
+      avisar(`Reporte clínico de ${targetMember.fullName} creado y compartido.`);
     } catch (err: any) {
       console.error('Error al generar o compartir reporte individual:', err);
       setOpSyncStatus('error');
@@ -6267,9 +6292,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const rep = sharedReports.find(r => r.id === reportId);
     if (!rep) throw new Error('Reporte compartido no encontrado.');
 
-    if (!window.confirm(`¿Estás seguro de que deseas revocar el acceso al Reporte Clínico de Sheets para ${rep.memberName} a ${rep.sharedWithEmail}?`)) {
-      return;
-    }
+    const aceptadoRevocarRep = await confirmar({
+      titulo: 'Revocar acceso al reporte clínico',
+      descripcion: `${rep.sharedWithEmail} dejará de poder abrir el reporte clínico de ${rep.memberName}.`,
+      etiquetaConfirmar: 'Revocar acceso',
+      tono: 'peligro',
+    });
+    if (!aceptadoRevocarRep) return;
 
     try {
       setOpSyncStatus('syncing');
@@ -6328,7 +6357,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setHistory(prev => [revokeEvent, ...prev]);
 
       setOpSyncStatus('synced');
-      alert(`Se revocó con éxito el acceso de ${rep.sharedWithEmail} al reporte.`);
+      avisar(`Se revocó el acceso de ${rep.sharedWithEmail} al reporte.`);
     } catch (err: any) {
       console.error('Error al revocar acceso al reporte individual:', err);
       setOpSyncStatus('error');
@@ -6419,7 +6448,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (verificationSuccess) {
         setOpSyncStatus('synced');
-        alert('✅ Reparación completada con éxito. Se confirmaron los documentos en Google Sheets.');
+        avisar('Reparación completada: los documentos quedaron confirmados en Google Sheets.');
       } else {
         throw new Error('La verificación falló. Algunos documentos no se guardaron correctamente en Google Sheets.');
       }
@@ -6463,9 +6492,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (criticalConflictFound) {
-      const proceed = window.confirm(
-        `⚠️ Conflicto crítico de documentos detectado:${conflictDetails}\n\nSe actualizarán los datos locales aplicando la versión más reciente, pero NO se subirán cambios a Google Sheets para evitar sobrescribir datos. ¿Deseas continuar?`
-      );
+      const proceed = await confirmar({
+        titulo: 'Conflicto de números de documento',
+        descripcion: (
+          <>
+            <p>
+              El número de documento de uno o más familiares no coincide entre este dispositivo y
+              Google.
+            </p>
+            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-2 text-[11px] font-semibold text-slate-700">
+              {conflictDetails.trim()}
+            </pre>
+            <p className="mt-2">
+              Se aplicará la versión más reciente en este dispositivo, pero NO se subirá nada a
+              Google, para no sobrescribir datos allí.
+            </p>
+          </>
+        ),
+        etiquetaConfirmar: 'Aplicar la versión más reciente',
+        tono: 'peligro',
+      });
       if (!proceed) return;
     }
 

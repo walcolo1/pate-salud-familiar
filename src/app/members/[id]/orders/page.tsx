@@ -708,83 +708,82 @@ export default function MedicalOrdersPage() {
         const order = medicalOrders.find(o => o.id === showAuthFormId);
         if (!order) return null;
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
-              <h3 className="font-extrabold text-base text-slate-800 mb-4">
-                {authStatus === 'AUTHORIZED' ? 'Registrar Aprobación de Autorización' : 'Registrar Negación de Autorización'}
-              </h3>
-              
-              <div className="flex flex-col gap-4">
-                {authStatus === 'AUTHORIZED' ? (
-                  <>
+          <Dialog
+            abierto
+            titulo={authStatus === 'AUTHORIZED' ? 'Registrar Aprobación de Autorización' : 'Registrar Negación de Autorización'}
+            onCerrar={() => setShowAuthFormId(null)}
+          >
+            
+            <div className="flex flex-col gap-4">
+              {authStatus === 'AUTHORIZED' ? (
+                <>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-extrabold text-slate-700 uppercase">Número de Autorización</label>
+                    <input
+                      type="text"
+                      required
+                      value={authNumber}
+                      onChange={(e) => setAuthNumber(e.target.value)}
+                      placeholder="Ej. AUT-894729"
+                      className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3.5">
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-extrabold text-slate-700 uppercase">Número de Autorización</label>
+                      <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha Aprobación</label>
                       <input
-                        type="text"
+                        type="date"
                         required
-                        value={authNumber}
-                        onChange={(e) => setAuthNumber(e.target.value)}
-                        placeholder="Ej. AUT-894729"
-                        className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+                        value={authDate}
+                        onChange={(e) => setAuthDate(e.target.value)}
+                        className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3.5">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha Aprobación</label>
-                        <input
-                          type="date"
-                          required
-                          value={authDate}
-                          onChange={(e) => setAuthDate(e.target.value)}
-                          className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-extrabold text-slate-700 uppercase">Vence Autorización</label>
-                        <input
-                          type="date"
-                          value={authExpiresAt}
-                          onChange={(e) => setAuthExpiresAt(e.target.value)}
-                          className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                        />
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="p-4 bg-rose-50 text-rose-700 rounded-xl flex gap-3 text-xs leading-relaxed">
-                    <AlertTriangle className="h-5 w-5 shrink-0 text-rose-500" />
-                    <div>
-                      <p className="font-extrabold">Trámite Negado</p>
-                      <p className="mt-0.5">La orden se marcará como negada. Podrás reiniciarla o editarla en el futuro si obtienes aprobación tras recurso.</p>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-700 uppercase">Vence Autorización</label>
+                      <input
+                        type="date"
+                        value={authExpiresAt}
+                        onChange={(e) => setAuthExpiresAt(e.target.value)}
+                        className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
+                      />
                     </div>
                   </div>
-                )}
-
-                <div className="flex gap-2.5 mt-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setShowAuthFormId(null)}
-                    className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={() => handleAuthorizationSubmit(order)}
-                    className={`flex-1 h-11 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md transition-colors ${
-                      authStatus === 'AUTHORIZED'
-                        ? 'bg-teal-600 hover:bg-teal-700 text-white shadow-teal-600/10'
-                        : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/10'
-                    }`}
-                  >
-                    <Save className="h-4 w-4" />
-                    <span>Guardar Registro</span>
-                  </button>
+                </>
+              ) : (
+                <div className="p-4 bg-rose-50 text-rose-700 rounded-xl flex gap-3 text-xs leading-relaxed">
+                  <AlertTriangle className="h-5 w-5 shrink-0 text-rose-500" />
+                  <div>
+                    <p className="font-extrabold">Trámite Negado</p>
+                    <p className="mt-0.5">La orden se marcará como negada. Podrás reiniciarla o editarla en el futuro si obtienes aprobación tras recurso.</p>
+                  </div>
                 </div>
+              )}
+
+              <div className="flex gap-2.5 mt-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowAuthFormId(null)}
+                  className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleAuthorizationSubmit(order)}
+                  className={`flex-1 h-11 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md transition-colors ${
+                    authStatus === 'AUTHORIZED'
+                      ? 'bg-teal-600 hover:bg-teal-700 text-white shadow-teal-600/10'
+                      : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/10'
+                  }`}
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Guardar Registro</span>
+                </button>
               </div>
             </div>
-          </div>
+          </Dialog>
         );
       })()}
 
@@ -793,152 +792,154 @@ export default function MedicalOrdersPage() {
         const order = medicalOrders.find(o => o.id === showScheduleFormId);
         if (!order) return null;
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
-              <h3 className="font-extrabold text-base text-slate-800 mb-4">Agendar Cita desde Orden</h3>
-              
-              <form onSubmit={handleScheduleSubmit} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Médico</label>
-                  <input
-                    type="text"
-                    required
-                    value={apptDoctor}
-                    onChange={(e) => setApptDoctor(e.target.value)}
-                    placeholder="Ej. Dr. Andrés Restrepo"
-                    className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase">Especialidad</label>
-                  <input
-                    type="text"
-                    required
-                    value={apptSpecialty}
-                    onChange={(e) => setApptSpecialty(e.target.value)}
-                    placeholder="Ej. Cardiología"
-                    className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha y Hora Agendada</label>
-                  <input
-                    type="datetime-local"
-                    required
-                    value={apptScheduledAt}
-                    onChange={(e) => setApptScheduledAt(e.target.value)}
-                    className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase">Lugar de Consulta</label>
-                  <input
-                    type="text"
-                    value={apptLocation}
-                    onChange={(e) => setApptLocation(e.target.value)}
-                    placeholder="Ej. Clínica Las Américas - Piso 3"
-                    className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase">Motivo / Síntomas</label>
-                  <input
-                    type="text"
-                    required
-                    value={apptReason}
-                    onChange={(e) => setApptReason(e.target.value)}
-                    placeholder="Ej. Consulta por cefalea o examen de ecografía"
-                    className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase">Notas adicionales / Preparación</label>
-                  <textarea
-                    value={apptNotes}
-                    onChange={(e) => setApptNotes(e.target.value)}
-                    placeholder="Llevar orden física original, ayuno de 8h..."
-                    className="h-16 p-3 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none resize-none transition-colors"
-                  />
-                </div>
-
-                <div className="flex gap-2.5 mt-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setShowScheduleFormId(null)}
-                    className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
-                  >
-                    <Calendar className="h-4 w-4" />
-                    <span>Programar Cita</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Add Document upload modal backdrop */}
-      {uploadingForOrderId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
-            <h3 className="font-extrabold text-base text-slate-800 mb-4.5">Adjuntar Soporte de Orden</h3>
+          <Dialog
+            abierto
+            titulo="Agendar Cita desde Orden"
+            onCerrar={() => setShowScheduleFormId(null)}
+          >
             
-            <form onSubmit={handleDocumentUpload} className="flex flex-col gap-4">
+            <form onSubmit={handleScheduleSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Seleccionar Documento (PDF, Imagen)</label>
+                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Médico</label>
                 <input
-                  type="file"
+                  type="text"
                   required
-                  accept=".pdf,.png,.jpg,.jpeg"
-                  onChange={(e) => {
-                    setSelectedFile(e.target.files?.[0] || null);
-                  }}
-                  className="w-full text-xs font-semibold text-slate-800 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer border border-dashed border-slate-200 p-2 rounded-xl"
+                  value={apptDoctor}
+                  onChange={(e) => setApptDoctor(e.target.value)}
+                  placeholder="Ej. Dr. Andrés Restrepo"
+                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
                 />
               </div>
 
-              {isUploading && (
-                <div className="flex items-center gap-2 text-xs font-bold text-teal-600 p-2.5 bg-teal-50 rounded-xl">
-                  <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                  <span>Subiendo y guardando documento en Google Drive...</span>
-                </div>
-              )}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Especialidad</label>
+                <input
+                  type="text"
+                  required
+                  value={apptSpecialty}
+                  onChange={(e) => setApptSpecialty(e.target.value)}
+                  placeholder="Ej. Cardiología"
+                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha y Hora Agendada</label>
+                <input
+                  type="datetime-local"
+                  required
+                  value={apptScheduledAt}
+                  onChange={(e) => setApptScheduledAt(e.target.value)}
+                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Lugar de Consulta</label>
+                <input
+                  type="text"
+                  value={apptLocation}
+                  onChange={(e) => setApptLocation(e.target.value)}
+                  placeholder="Ej. Clínica Las Américas - Piso 3"
+                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Motivo / Síntomas</label>
+                <input
+                  type="text"
+                  required
+                  value={apptReason}
+                  onChange={(e) => setApptReason(e.target.value)}
+                  placeholder="Ej. Consulta por cefalea o examen de ecografía"
+                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Notas adicionales / Preparación</label>
+                <textarea
+                  value={apptNotes}
+                  onChange={(e) => setApptNotes(e.target.value)}
+                  placeholder="Llevar orden física original, ayuno de 8h..."
+                  className="h-16 p-3 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none resize-none transition-colors"
+                />
+              </div>
 
               <div className="flex gap-2.5 mt-2.5">
                 <button
                   type="button"
-                  disabled={isUploading}
-                  onClick={() => {
-                    setSelectedFile(null);
-                    setUploadingForOrderId(null);
-                  }}
-                  className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors disabled:opacity-50"
+                  onClick={() => setShowScheduleFormId(null)}
+                  className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={isUploading || !selectedFile}
-                  className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors disabled:opacity-50"
+                  className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
                 >
-                  <Upload className="h-4 w-4" />
-                  <span>Subir Soporte</span>
+                  <Calendar className="h-4 w-4" />
+                  <span>Programar Cita</span>
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+          </Dialog>
+        );
+      })()}
+
+      {/* Add Document upload modal backdrop */}
+      {uploadingForOrderId && (
+        <Dialog
+          abierto
+          titulo="Adjuntar Soporte de Orden"
+          onCerrar={() => setUploadingForOrderId(null)}
+        >
+          
+          <form onSubmit={handleDocumentUpload} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Seleccionar Documento (PDF, Imagen)</label>
+              <input
+                type="file"
+                required
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={(e) => {
+                  setSelectedFile(e.target.files?.[0] || null);
+                }}
+                className="w-full text-xs font-semibold text-slate-800 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer border border-dashed border-slate-200 p-2 rounded-xl"
+              />
+            </div>
+
+            {isUploading && (
+              <div className="flex items-center gap-2 text-xs font-bold text-teal-600 p-2.5 bg-teal-50 rounded-xl">
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                <span>Subiendo y guardando documento en Google Drive...</span>
+              </div>
+            )}
+
+            <div className="flex gap-2.5 mt-2.5">
+              <button
+                type="button"
+                disabled={isUploading}
+                onClick={() => {
+                  setSelectedFile(null);
+                  setUploadingForOrderId(null);
+                }}
+                className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isUploading || !selectedFile}
+                className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors disabled:opacity-50"
+              >
+                <Upload className="h-4 w-4" />
+                <span>Subir Soporte</span>
+              </button>
+            </div>
+          </form>
+        </Dialog>
       )}
 
     </div>

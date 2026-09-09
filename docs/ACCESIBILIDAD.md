@@ -1,6 +1,6 @@
 # Accesibilidad
 
-> Bloque C · Pasos C1.1, C1.2 y C1.3a · Última actualización: **2026-09-08**
+> Bloque C · Pasos C1.1, C1.2, C1.3a y C1.3b · Última actualización: **2026-09-08**
 
 ## Qué es axe-core y por qué se usa
 
@@ -50,6 +50,11 @@ del familiar, `/members/new` y `/onboarding`, y **cada diálogo migrado se abre
 antes de analizar**. La deuda que estaba escondida salió a la luz: las
 violaciones críticas pasaron de 0 a 27, y las graves de 77 a 143. No es que
 haya empeorado nada; es que antes no se estaba mirando.
+
+**C1.3b** añadió los tres diálogos de órdenes médicas: **24 mediciones**, con un
+total de 31 críticas, 145 graves y 24 moderadas. Las 21 mediciones anteriores
+quedaron **idénticas**, así que las migraciones no rompieron nada; lo que sube
+es solo lo que antes no se miraba.
 
 Ahora el trabajo de C1.4 sobre los campos **sí** moverá los números.
 
@@ -111,6 +116,7 @@ explicar por qué.
 | `/members/new` | Alta de familiar: el formulario más largo de la aplicación |
 | `/onboarding` | Primera pantalla que ve alguien nuevo |
 | `/members/:id/appts` · `checkups` · `documents` · `exams` · `medications` · `orders` · `vaccines` | Las siete subrutas de la ficha, **cada una medida dos veces**: en reposo y con su diálogo abierto |
+| `/members/:id/orders` · tres diálogos | C1.3b: autorización, agendar y adjuntar soporte. Sus botones solo existen si hay una orden en el estado adecuado, así que la prueba **siembra dos órdenes sintéticas** antes de abrirlos |
 
 Todas requieren sesión, así que la suite entra por `entrarEnModoDemo()`: sin
 cuenta de Google, sin OAuth y sin red, igual que el resto del arnés.
@@ -143,7 +149,7 @@ contratos son distintos.
 
 | Clasificación | Cuántos | Qué se hizo |
 |---|---|---|
-| **Diálogo interactivo** | 11 | Migrar a `Dialog`. **8 hechos en C1.3a**, 3 en C1.3b |
+| **Diálogo interactivo** | 11 | Migrados a `Dialog`: 8 en C1.3a y los 3 restantes en C1.3b. **Completo** |
 | **Capa de carga** | 2 | Se conservan: sincronización con Calendar (`appts`) y subida (`documents`). No son diálogos; solo necesitan `role="status"` |
 | **Ya correcto** | 1 | El bloqueo de sesión de la Navbar, con `role="dialog"` y `aria-modal` desde A6-F3 |
 | **Falso positivo** | 1 | `settings:1847` es un overlay de carga, no un modal |
@@ -152,8 +158,47 @@ Migrados en C1.3a: Programar Nueva Cita, Registrar Control de Salud, Subir
 Documento Clínico, Resultados de Laboratorio, Registrar Examen Clínico,
 Registrar Nuevo Medicamento, Registrar Nueva Orden Médica y Registrar Vacuna.
 
-Pendientes para C1.3b: los tres de `orders` —autorización, agendar y adjuntar
-soporte—, que viven dentro de funciones inmediatas con título dinámico.
+Migrados en C1.3b: los tres de `orders` —autorización, agendar y adjuntar
+soporte—. Dos viven dentro de funciones inmediatas cuyo único trabajo es buscar
+la orden y salir si no existe; esa envoltura **se conserva** (es donde se decide
+si hay algo que mostrar) y lo que cambió es su interior. No hizo falta extraer
+componentes ni subir estado: el título dinámico es una expresión más en la
+propiedad `titulo`.
+
+## Confirmaciones y avisos (C1.3b)
+
+`window.confirm` resultaba cómodo —`if (confirm(...)) borrar()`— y el precio era
+alto: el cuadro lo pinta el navegador, así que no tiene nombre accesible propio,
+no se puede localizar por rol en una prueba, no se puede estilar y, en un PWA
+instalado, aparece como un aviso del sistema ajeno a la aplicación. Algunos
+navegadores lo suprimen del todo en pestañas de segundo plano: la pregunta
+desaparece y el flujo se queda a medias sin que nadie decida nada.
+
+**`src/context/Confirmacion.tsx`** conserva la ergonomía y quita el precio:
+
+```ts
+if (await confirmar({ titulo, descripcion, etiquetaConfirmar })) borrar();
+```
+
+Por dentro es el `ConfirmDialog` de A6-F2 sobre `<dialog>` nativo. El contrato
+que fija la prueba `e2e/confirmaciones-destructivas.e2e.ts`:
+
+1. La acción **no ocurre** hasta que alguien la confirma explícitamente.
+2. **Escape cancela, nunca confirma.** La promesa se resuelve a `false` en todo
+   camino que no sea pulsar el botón de confirmación, incluido el desmontaje.
+3. El diálogo se localiza **por rol y nombre accesible**, que es como lo
+   encuentra un lector de pantalla.
+4. El **foco inicial no está en el botón destructivo**: lo recibe «Cancelar»,
+   de modo que un Intro reflejo cancela en vez de borrar.
+
+**`src/context/Avisos.tsx`** hace lo propio con `alert`. Un `alert` detiene la
+aplicación entera para decir «listo»: lo más ruidoso posible para lo menos
+importante. Se sustituye por una región viva (`role="status"`,
+`aria-live="polite"`) que anuncia sin robar el foco y se retira sola.
+
+Los **errores recuperables siguen usando `alert` a propósito**: interrumpen
+porque hay algo que decidir. Llevarlos al sitio donde ocurrió el fallo es
+trabajo de C1.5. De los 46 `alert` originales quedan 23, y todos son errores.
 
 ---
 

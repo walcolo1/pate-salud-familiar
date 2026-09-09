@@ -62,12 +62,21 @@ test.describe('A6-F3 · salvaguardas DEMO', () => {
 
     const antes = JSON.stringify(await volcarAlmacenamiento(page));
 
-    page.once('dialog', (d) => d.accept()); // el window.confirm del resumen previo
     await page.locator('input[type="file"]').last().setInputFiles({
       name: 'respaldo-real.json',
       mimeType: 'application/json',
       buffer: Buffer.from(respaldoReal, 'utf8'),
     });
+
+    // C1.3b · El resumen previo era un `window.confirm` que la prueba aceptaba
+    // desde fuera. Ahora es un diálogo de la propia aplicación, así que se
+    // confirma como lo haría una persona. De paso queda comprobado que el
+    // resumen dice CUÁNTO se restaura y nunca QUÉ.
+    const resumen = page.getByRole('dialog', { name: 'Restaurar copia de seguridad' });
+    await expect(resumen).toBeVisible({ timeout: 20_000 });
+    await expect(resumen).not.toContainText('NO DEBE IMPORTARSE');
+    await expect(resumen).not.toContainText('REAL-TEST-A6');
+    await resumen.getByRole('button', { name: 'Restaurar copia' }).click();
 
     // Rechazo accesible, con el motivo y sin exponer contenido del respaldo.
     const dialogo = page.getByRole('dialog');
