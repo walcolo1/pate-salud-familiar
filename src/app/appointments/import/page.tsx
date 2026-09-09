@@ -296,6 +296,7 @@ export default function AppointmentsImportPage() {
 
         <textarea
           id="texto-cita"
+          aria-label="Texto del correo con la cita"
           value={textoPegado}
           onChange={(e) => setTextoPegado(e.target.value)}
           rows={7}
@@ -556,8 +557,9 @@ export default function AppointmentsImportPage() {
                           
                           {/* Selector de Miembro */}
                           <div className="flex flex-col gap-1">
-                            <label className="text-[8.5px] text-slate-400 uppercase font-bold">Familiar Paciente</label>
+                            <label htmlFor="imp-familiar-paciente" className="text-[8.5px] text-slate-400 uppercase font-bold">Familiar Paciente</label>
                             <select
+                              id="imp-familiar-paciente"
                               value={editMemberId}
                               onChange={(e) => {
                                 setEditMemberId(e.target.value);
@@ -576,8 +578,9 @@ export default function AppointmentsImportPage() {
                           </div>
 
                           <div className="flex flex-col gap-1">
-                            <label className="text-[8.5px] text-slate-400 uppercase font-bold">Fecha</label>
+                            <label htmlFor="imp-fecha" className="text-[8.5px] text-slate-400 uppercase font-bold">Fecha</label>
                             <input
+                              id="imp-fecha"
                               type="date"
                               value={editDate}
                               onChange={(e) => setEditDate(e.target.value)}
@@ -586,8 +589,9 @@ export default function AppointmentsImportPage() {
                           </div>
 
                           <div className="flex flex-col gap-1">
-                            <label className="text-[8.5px] text-slate-400 uppercase font-bold">Hora</label>
+                            <label htmlFor="imp-hora" className="text-[8.5px] text-slate-400 uppercase font-bold">Hora</label>
                             <input
+                              id="imp-hora"
                               type="time"
                               value={editTime}
                               onChange={(e) => setEditTime(e.target.value)}
@@ -596,8 +600,9 @@ export default function AppointmentsImportPage() {
                           </div>
 
                           <div className="flex flex-col gap-1">
-                            <label className="text-[8.5px] text-slate-400 uppercase font-bold">Especialidad</label>
+                            <label htmlFor="imp-especialidad" className="text-[8.5px] text-slate-400 uppercase font-bold">Especialidad</label>
                             <input
+                              id="imp-especialidad"
                               type="text"
                               value={editSpecialty}
                               onChange={(e) => setEditSpecialty(e.target.value)}
@@ -606,8 +611,9 @@ export default function AppointmentsImportPage() {
                           </div>
 
                           <div className="flex flex-col gap-1">
-                            <label className="text-[8.5px] text-slate-400 uppercase font-bold">Médico</label>
+                            <label htmlFor="imp-medico" className="text-[8.5px] text-slate-400 uppercase font-bold">Médico</label>
                             <input
+                              id="imp-medico"
                               type="text"
                               value={editDoctor}
                               onChange={(e) => setEditDoctor(e.target.value)}
@@ -616,8 +622,9 @@ export default function AppointmentsImportPage() {
                           </div>
 
                           <div className="flex flex-col gap-1">
-                            <label className="text-[8.5px] text-slate-400 uppercase font-bold">Ubicación</label>
+                            <label htmlFor="imp-ubicacion" className="text-[8.5px] text-slate-400 uppercase font-bold">Ubicación</label>
                             <input
+                              id="imp-ubicacion"
                               type="text"
                               value={editLocation}
                               onChange={(e) => setEditLocation(e.target.value)}

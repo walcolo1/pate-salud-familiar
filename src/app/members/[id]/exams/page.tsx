@@ -251,8 +251,9 @@ export default function ExamsPage() {
         <form onSubmit={handleCreate} className="flex flex-col gap-4">
           {/* Exam Name */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Examen</label>
+            <label htmlFor="examen-nombre-del-examen" className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Examen</label>
             <input
+              id="examen-nombre-del-examen"
               type="text"
               required
               value={examName}
@@ -264,8 +265,9 @@ export default function ExamsPage() {
 
           {/* Ordered Date */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha Realización</label>
+            <label htmlFor="examen-fecha-realizacion" className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha Realización</label>
             <input
+              id="examen-fecha-realizacion"
               type="date"
               required
               value={orderedDate}
@@ -276,8 +278,9 @@ export default function ExamsPage() {
 
           {/* Ordered By */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Médico que ordena (Opcional)</label>
+            <label htmlFor="examen-medico-que-ordena-opcional" className="text-[10px] font-extrabold text-slate-700 uppercase">Médico que ordena (Opcional)</label>
             <input
+              id="examen-medico-que-ordena-opcional"
               type="text"
               value={orderedBy}
               onChange={(e) => setOrderedBy(e.target.value)}
@@ -288,8 +291,9 @@ export default function ExamsPage() {
 
           {/* Laboratory */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Laboratorio (Opcional)</label>
+            <label htmlFor="examen-laboratorio-opcional" className="text-[10px] font-extrabold text-slate-700 uppercase">Laboratorio (Opcional)</label>
             <input
+              id="examen-laboratorio-opcional"
               type="text"
               value={laboratory}
               onChange={(e) => setLaboratory(e.target.value)}
@@ -305,8 +309,9 @@ export default function ExamsPage() {
           <div className="grid grid-cols-2 gap-4">
             {/* Glucose */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[9px] font-extrabold text-slate-700">Glucosa en ayunas (mg/dL)</label>
+              <label htmlFor="examen-glucosa-en-ayunas-mg-dl" className="text-[9px] font-extrabold text-slate-700">Glucosa en ayunas (mg/dL)</label>
               <input
+                id="examen-glucosa-en-ayunas-mg-dl"
                 type="number"
                 value={glucoseValue}
                 onChange={(e) => setGlucoseValue(e.target.value)}
@@ -316,8 +321,9 @@ export default function ExamsPage() {
 
             {/* Cholesterol */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[9px] font-extrabold text-slate-700">Colesterol Total (mg/dL)</label>
+              <label htmlFor="examen-colesterol-total-mg-dl" className="text-[9px] font-extrabold text-slate-700">Colesterol Total (mg/dL)</label>
               <input
+                id="examen-colesterol-total-mg-dl"
                 type="number"
                 value={cholesterolValue}
                 onChange={(e) => setCholesterolValue(e.target.value)}

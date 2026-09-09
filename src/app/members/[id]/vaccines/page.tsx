@@ -182,8 +182,9 @@ export default function VaccinesPage() {
         <form onSubmit={handleCreate} className="flex flex-col gap-4">
           {/* Vaccine Name */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre de la Vacuna</label>
+            <label htmlFor="vacuna-nombre-de-la-vacuna" className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre de la Vacuna</label>
             <input
+              id="vacuna-nombre-de-la-vacuna"
               type="text"
               required
               value={vaccineName}
@@ -197,8 +198,9 @@ export default function VaccinesPage() {
           <div className="grid grid-cols-2 gap-4">
             {/* Dose Number */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Dosis No.</label>
+              <label htmlFor="vacuna-dosis-no" className="text-[10px] font-extrabold text-slate-700 uppercase">Dosis No.</label>
               <input
+                id="vacuna-dosis-no"
                 type="number"
                 required
                 value={doseNumber}
@@ -210,8 +212,9 @@ export default function VaccinesPage() {
 
             {/* Date */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha Aplicación</label>
+              <label htmlFor="vacuna-fecha-aplicacion" className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha Aplicación</label>
               <input
+                id="vacuna-fecha-aplicacion"
                 type="date"
                 required
                 value={dateApplied}
@@ -223,8 +226,9 @@ export default function VaccinesPage() {
 
           {/* Institution */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Punto de Vacunación (Opcional)</label>
+            <label htmlFor="vacuna-punto-de-vacunacion-opcional" className="text-[10px] font-extrabold text-slate-700 uppercase">Punto de Vacunación (Opcional)</label>
             <input
+              id="vacuna-punto-de-vacunacion-opcional"
               type="text"
               value={institution}
               onChange={(e) => setInstitution(e.target.value)}
@@ -235,8 +239,9 @@ export default function VaccinesPage() {
 
           {/* Next booster date */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Próximo Refuerzo (Opcional)</label>
+            <label htmlFor="vacuna-proximo-refuerzo-opcional" className="text-[10px] font-extrabold text-slate-700 uppercase">Próximo Refuerzo (Opcional)</label>
             <input
+              id="vacuna-proximo-refuerzo-opcional"
               type="date"
               value={nextDoseDate}
               onChange={(e) => setNextDoseDate(e.target.value)}
@@ -246,8 +251,9 @@ export default function VaccinesPage() {
 
           {/* Status */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Estado</label>
+            <label htmlFor="vacuna-estado" className="text-[10px] font-extrabold text-slate-700 uppercase">Estado</label>
             <select
+              id="vacuna-estado"
               value={status}
               onChange={(e) => setStatus(e.target.value as any)}
               className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
@@ -259,8 +265,9 @@ export default function VaccinesPage() {
 
           {/* Notes */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Indicaciones / Observaciones</label>
+            <label htmlFor="vacuna-indicaciones-observaciones" className="text-[10px] font-extrabold text-slate-700 uppercase">Indicaciones / Observaciones</label>
             <textarea
+              id="vacuna-indicaciones-observaciones"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Reacción leve, lote número 12345, cuidado del brazo..."

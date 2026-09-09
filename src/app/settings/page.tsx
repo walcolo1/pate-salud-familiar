@@ -913,8 +913,9 @@ export default function SettingsPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] text-slate-400 uppercase font-black tracking-wider px-1">Correo Electrónico</label>
+                    <label htmlFor="ajustes-correo-electronico" className="text-[10px] text-slate-400 uppercase font-black tracking-wider px-1">Correo Electrónico</label>
                     <input
+                      id="ajustes-correo-electronico"
                       type="email"
                       required
                       value={inviteEmail}
@@ -925,8 +926,9 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] text-slate-400 uppercase font-black tracking-wider px-1">Asociar a Familiar</label>
+                    <label htmlFor="ajustes-asociar-a-familiar" className="text-[10px] text-slate-400 uppercase font-black tracking-wider px-1">Asociar a Familiar</label>
                     <select
+                      id="ajustes-asociar-a-familiar"
                       required
                       value={inviteMemberId}
                       onChange={(e) => setInviteMemberId(e.target.value)}
@@ -940,8 +942,9 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] text-slate-400 uppercase font-black tracking-wider px-1">Rol de Acceso</label>
+                    <label htmlFor="ajustes-rol-de-acceso" className="text-[10px] text-slate-400 uppercase font-black tracking-wider px-1">Rol de Acceso</label>
                     <select
+                      id="ajustes-rol-de-acceso"
                       required
                       value={inviteRole}
                       onChange={(e) => setInviteRole(e.target.value as any)}
@@ -1406,9 +1409,10 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[9px] font-extrabold text-slate-600 uppercase">Correo de simulación</label>
+            <label htmlFor="ajustes-correo-de-simulacion" className="text-[9px] font-extrabold text-slate-600 uppercase">Correo de simulación</label>
             <div className="flex gap-2">
               <input
+                id="ajustes-correo-de-simulacion"
                 type="email"
                 defaultValue={simulatedEmail || ''}
                 placeholder="Escribe el email del miembro habilitado..."
@@ -1544,6 +1548,7 @@ export default function SettingsPage() {
           <input
             type="file"
             id="import-backup-file-input"
+            aria-label="Archivo de copia de seguridad"
             accept=".json"
             onChange={handleImportFileChange}
             className="hidden"

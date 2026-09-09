@@ -553,8 +553,9 @@ export default function MedicalOrdersPage() {
         <form onSubmit={handleCreate} className="flex flex-col gap-4">
           {/* Title */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Título de la Orden / Descripción</label>
+            <label htmlFor="orden-titulo-de-la-orden-descripcion" className="text-[10px] font-extrabold text-slate-700 uppercase">Título de la Orden / Descripción</label>
             <input
+              id="orden-titulo-de-la-orden-descripcion"
               type="text"
               required
               value={title}
@@ -566,8 +567,9 @@ export default function MedicalOrdersPage() {
 
           {/* Order Type */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Tipo de Requerimiento</label>
+            <label htmlFor="orden-tipo-de-requerimiento" className="text-[10px] font-extrabold text-slate-700 uppercase">Tipo de Requerimiento</label>
             <select
+              id="orden-tipo-de-requerimiento"
               value={orderType}
               onChange={(e) => setOrderType(e.target.value as MedicalOrderType)}
               className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
@@ -585,8 +587,9 @@ export default function MedicalOrdersPage() {
           <div className="grid grid-cols-2 gap-3.5">
             {/* Doctor */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Médico Emisor</label>
+              <label htmlFor="orden-medico-emisor" className="text-[10px] font-extrabold text-slate-700 uppercase">Médico Emisor</label>
               <input
+                id="orden-medico-emisor"
                 type="text"
                 value={doctorName}
                 onChange={(e) => setDoctorName(e.target.value)}
@@ -597,8 +600,9 @@ export default function MedicalOrdersPage() {
 
             {/* Specialty */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Especialidad</label>
+              <label htmlFor="orden-especialidad-2" className="text-[10px] font-extrabold text-slate-700 uppercase">Especialidad</label>
               <input
+                id="orden-especialidad-2"
                 type="text"
                 value={specialty}
                 onChange={(e) => setSpecialty(e.target.value)}
@@ -611,8 +615,9 @@ export default function MedicalOrdersPage() {
           <div className="grid grid-cols-2 gap-3.5">
             {/* Date */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha Emisión</label>
+              <label htmlFor="orden-fecha-emision" className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha Emisión</label>
               <input
+                id="orden-fecha-emision"
                 type="date"
                 required
                 value={issuedAt}
@@ -623,8 +628,9 @@ export default function MedicalOrdersPage() {
 
             {/* Expires */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Vencimiento (Opcional)</label>
+              <label htmlFor="orden-vencimiento-opcional" className="text-[10px] font-extrabold text-slate-700 uppercase">Vencimiento (Opcional)</label>
               <input
+                id="orden-vencimiento-opcional"
                 type="date"
                 value={expiresAt}
                 onChange={(e) => setExpiresAt(e.target.value)}
@@ -650,8 +656,9 @@ export default function MedicalOrdersPage() {
           <div className="grid grid-cols-2 gap-3.5">
             {/* EPS */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">EPS / Aseguradora</label>
+              <label htmlFor="orden-eps-aseguradora" className="text-[10px] font-extrabold text-slate-700 uppercase">EPS / Aseguradora</label>
               <input
+                id="orden-eps-aseguradora"
                 type="text"
                 value={epsOrProvider}
                 onChange={(e) => setEpsOrProvider(e.target.value)}
@@ -662,8 +669,9 @@ export default function MedicalOrdersPage() {
 
             {/* Clinic */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">IPS sugerida / Clínica</label>
+              <label htmlFor="orden-ips-sugerida-clinica" className="text-[10px] font-extrabold text-slate-700 uppercase">IPS sugerida / Clínica</label>
               <input
+                id="orden-ips-sugerida-clinica"
                 type="text"
                 value={ipsOrClinic}
                 onChange={(e) => setIpsOrClinic(e.target.value)}
@@ -675,8 +683,9 @@ export default function MedicalOrdersPage() {
 
           {/* Notes */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Indicaciones clínicas / Observaciones</label>
+            <label htmlFor="orden-indicaciones-clinicas-observaciones" className="text-[10px] font-extrabold text-slate-700 uppercase">Indicaciones clínicas / Observaciones</label>
             <textarea
+              id="orden-indicaciones-clinicas-observaciones"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Llevar orden física original, ayuno de 8h, etc."
@@ -718,8 +727,9 @@ export default function MedicalOrdersPage() {
               {authStatus === 'AUTHORIZED' ? (
                 <>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-extrabold text-slate-700 uppercase">Número de Autorización</label>
+                    <label htmlFor="orden-numero-de-autorizacion" className="text-[10px] font-extrabold text-slate-700 uppercase">Número de Autorización</label>
                     <input
+                      id="orden-numero-de-autorizacion"
                       type="text"
                       required
                       value={authNumber}
@@ -731,8 +741,9 @@ export default function MedicalOrdersPage() {
 
                   <div className="grid grid-cols-2 gap-3.5">
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha Aprobación</label>
+                      <label htmlFor="orden-fecha-aprobacion" className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha Aprobación</label>
                       <input
+                        id="orden-fecha-aprobacion"
                         type="date"
                         required
                         value={authDate}
@@ -742,8 +753,9 @@ export default function MedicalOrdersPage() {
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-extrabold text-slate-700 uppercase">Vence Autorización</label>
+                      <label htmlFor="orden-vence-autorizacion" className="text-[10px] font-extrabold text-slate-700 uppercase">Vence Autorización</label>
                       <input
+                        id="orden-vence-autorizacion"
                         type="date"
                         value={authExpiresAt}
                         onChange={(e) => setAuthExpiresAt(e.target.value)}
@@ -800,8 +812,9 @@ export default function MedicalOrdersPage() {
             
             <form onSubmit={handleScheduleSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Médico</label>
+                <label htmlFor="orden-nombre-del-medico" className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Médico</label>
                 <input
+                  id="orden-nombre-del-medico"
                   type="text"
                   required
                   value={apptDoctor}
@@ -812,8 +825,9 @@ export default function MedicalOrdersPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Especialidad</label>
+                <label htmlFor="orden-especialidad" className="text-[10px] font-extrabold text-slate-700 uppercase">Especialidad</label>
                 <input
+                  id="orden-especialidad"
                   type="text"
                   required
                   value={apptSpecialty}
@@ -824,8 +838,9 @@ export default function MedicalOrdersPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha y Hora Agendada</label>
+                <label htmlFor="orden-fecha-y-hora-agendada" className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha y Hora Agendada</label>
                 <input
+                  id="orden-fecha-y-hora-agendada"
                   type="datetime-local"
                   required
                   value={apptScheduledAt}
@@ -835,8 +850,9 @@ export default function MedicalOrdersPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Lugar de Consulta</label>
+                <label htmlFor="orden-lugar-de-consulta" className="text-[10px] font-extrabold text-slate-700 uppercase">Lugar de Consulta</label>
                 <input
+                  id="orden-lugar-de-consulta"
                   type="text"
                   value={apptLocation}
                   onChange={(e) => setApptLocation(e.target.value)}
@@ -846,8 +862,9 @@ export default function MedicalOrdersPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Motivo / Síntomas</label>
+                <label htmlFor="orden-motivo-sintomas" className="text-[10px] font-extrabold text-slate-700 uppercase">Motivo / Síntomas</label>
                 <input
+                  id="orden-motivo-sintomas"
                   type="text"
                   required
                   value={apptReason}
@@ -858,8 +875,9 @@ export default function MedicalOrdersPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Notas adicionales / Preparación</label>
+                <label htmlFor="orden-notas-adicionales-preparacion" className="text-[10px] font-extrabold text-slate-700 uppercase">Notas adicionales / Preparación</label>
                 <textarea
+                  id="orden-notas-adicionales-preparacion"
                   value={apptNotes}
                   onChange={(e) => setApptNotes(e.target.value)}
                   placeholder="Llevar orden física original, ayuno de 8h..."
@@ -898,8 +916,9 @@ export default function MedicalOrdersPage() {
           
           <form onSubmit={handleDocumentUpload} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Seleccionar Documento (PDF, Imagen)</label>
+              <label htmlFor="orden-seleccionar-documento-pdf-imagen" className="text-[10px] font-extrabold text-slate-700 uppercase">Seleccionar Documento (PDF, Imagen)</label>
               <input
+                id="orden-seleccionar-documento-pdf-imagen"
                 type="file"
                 required
                 accept=".pdf,.png,.jpg,.jpeg"

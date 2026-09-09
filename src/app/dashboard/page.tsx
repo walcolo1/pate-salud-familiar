@@ -210,6 +210,7 @@ export default function DashboardPage() {
             <div className="flex gap-2">
               <input
                 type="text"
+                aria-label="Nombre de la familia"
                 value={newFamilyName}
                 onChange={(e) => setNewFamilyName(e.target.value)}
                 placeholder={`Familia de ${user.displayName.split(' ')[0]}`}

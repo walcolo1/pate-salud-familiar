@@ -217,8 +217,9 @@ export default function NewMemberPage() {
 
         {/* Full Name */}
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-extrabold text-slate-700">Nombre Completo</label>
+          <label htmlFor="nuevo-nombre-completo" className="text-xs font-extrabold text-slate-700">Nombre Completo</label>
           <input
+            id="nuevo-nombre-completo"
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
@@ -229,8 +230,9 @@ export default function NewMemberPage() {
 
         {/* Birth Date */}
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-extrabold text-slate-700">Fecha de Nacimiento</label>
+          <label htmlFor="nuevo-fecha-de-nacimiento" className="text-xs font-extrabold text-slate-700">Fecha de Nacimiento</label>
           <input
+            id="nuevo-fecha-de-nacimiento"
             type="date"
             value={birthDate}
             onChange={(e) => setBirthDate(e.target.value)}
@@ -241,8 +243,9 @@ export default function NewMemberPage() {
         {/* Document Type and Document Number */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-extrabold text-slate-700">Tipo de Documento</label>
+            <label htmlFor="nuevo-tipo-de-documento" className="text-xs font-extrabold text-slate-700">Tipo de Documento</label>
             <select
+              id="nuevo-tipo-de-documento"
               value={documentType}
               onChange={(e) => setDocumentType(e.target.value as any)}
               className="h-12 px-4.5 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-900 outline-none transition-all duration-200"
@@ -256,8 +259,9 @@ export default function NewMemberPage() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-extrabold text-slate-700">Número de Documento</label>
+            <label htmlFor="nuevo-numero-de-documento" className="text-xs font-extrabold text-slate-700">Número de Documento</label>
             <input
+              id="nuevo-numero-de-documento"
               type="text"
               value={documentNumber}
               onChange={(e) => setDocumentNumber(e.target.value)}
@@ -271,8 +275,9 @@ export default function NewMemberPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Relationship */}
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-extrabold text-slate-700">Parentesco</label>
+            <label htmlFor="nuevo-parentesco" className="text-xs font-extrabold text-slate-700">Parentesco</label>
             <select
+              id="nuevo-parentesco"
               value={relationship}
               onChange={(e) => setRelationship(e.target.value as Relationship)}
               className="h-12 px-4.5 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-900 outline-none transition-all duration-200"
@@ -289,8 +294,9 @@ export default function NewMemberPage() {
 
           {/* Blood Type */}
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-extrabold text-slate-700">Grupo Sanguíneo</label>
+            <label htmlFor="nuevo-grupo-sanguineo" className="text-xs font-extrabold text-slate-700">Grupo Sanguíneo</label>
             <select
+              id="nuevo-grupo-sanguineo"
               value={bloodType}
               onChange={(e) => setBloodType(e.target.value as BloodType | '')}
               className="h-12 px-4.5 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-900 outline-none transition-all duration-200"
@@ -310,8 +316,9 @@ export default function NewMemberPage() {
 
         {/* Notes */}
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-extrabold text-slate-700">Alertas o Notas Médicas (Opcional)</label>
+          <label htmlFor="nuevo-alertas-o-notas-medicas-opcional" className="text-xs font-extrabold text-slate-700">Alertas o Notas Médicas (Opcional)</label>
           <textarea
+            id="nuevo-alertas-o-notas-medicas-opcional"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Alergia a la penicilina, intolerancia a la lactosa, asma activa..."

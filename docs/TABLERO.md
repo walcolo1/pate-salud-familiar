@@ -68,7 +68,7 @@ los dos. Sí quedó verificado que **no aparecen en el consentimiento inicial**.
 | C1.2 · Botones sin nombre accesible | **cerrado** |
 | C1.3a · Componente `Dialog` base, 8 diálogos y cobertura ampliada | **cerrado** |
 | C1.3b · 3 diálogos de órdenes, 18 `confirm` y 23 `alert` sustituidos | **cerrado** |
-| C1.4 · Etiquetas de los campos de formulario | pendiente |
+| C1.4 · Etiquetas de los campos de formulario | **cerrado** |
 | C1.5 · Foco visible, teclado y contraste AA | pendiente |
 
 ---

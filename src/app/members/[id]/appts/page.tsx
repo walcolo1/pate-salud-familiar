@@ -420,8 +420,9 @@ export default function AppointmentsPage() {
         <form onSubmit={handleCreate} className="flex flex-col gap-4">
           {/* Doctor */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Médico</label>
+            <label htmlFor="cita-nombre-del-medico" className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Médico</label>
             <input
+              id="cita-nombre-del-medico"
               type="text"
               required
               value={doctorName}
@@ -433,8 +434,9 @@ export default function AppointmentsPage() {
  
           {/* Specialty */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Especialidad</label>
+            <label htmlFor="cita-especialidad" className="text-[10px] font-extrabold text-slate-700 uppercase">Especialidad</label>
             <select
+              id="cita-especialidad"
               value={specialty}
               onChange={(e) => setSpecialty(e.target.value)}
               className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
@@ -451,8 +453,9 @@ export default function AppointmentsPage() {
  
           {/* Date */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha y Hora</label>
+            <label htmlFor="cita-fecha-y-hora" className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha y Hora</label>
             <input
+              id="cita-fecha-y-hora"
               type="datetime-local"
               required
               value={scheduledAt}
@@ -463,8 +466,9 @@ export default function AppointmentsPage() {
  
           {/* Location */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Lugar de Consulta</label>
+            <label htmlFor="cita-lugar-de-consulta" className="text-[10px] font-extrabold text-slate-700 uppercase">Lugar de Consulta</label>
             <input
+              id="cita-lugar-de-consulta"
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
@@ -475,8 +479,9 @@ export default function AppointmentsPage() {
  
           {/* Reason */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Motivo / Síntomas</label>
+            <label htmlFor="cita-motivo-sintomas" className="text-[10px] font-extrabold text-slate-700 uppercase">Motivo / Síntomas</label>
             <input
+              id="cita-motivo-sintomas"
               type="text"
               required
               value={reason}
@@ -488,8 +493,9 @@ export default function AppointmentsPage() {
  
           {/* Notes */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Notas adicionales (Opcional)</label>
+            <label htmlFor="cita-notas-adicionales-opcional" className="text-[10px] font-extrabold text-slate-700 uppercase">Notas adicionales (Opcional)</label>
             <textarea
+              id="cita-notas-adicionales-opcional"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Llevar ayunas de 8 horas, reportes previos..."

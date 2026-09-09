@@ -1,6 +1,6 @@
 # Accesibilidad
 
-> Bloque C · Pasos C1.1, C1.2, C1.3a y C1.3b · Última actualización: **2026-09-08**
+> Bloque C · Pasos C1.1, C1.2, C1.3a, C1.3b y C1.4 · Última actualización: **2026-09-08**
 
 ## Qué es axe-core y por qué se usa
 
@@ -56,7 +56,88 @@ total de 31 críticas, 145 graves y 24 moderadas. Las 21 mediciones anteriores
 quedaron **idénticas**, así que las migraciones no rompieron nada; lo que sube
 es solo lo que antes no se miraba.
 
-Ahora el trabajo de C1.4 sobre los campos **sí** moverá los números.
+**Y en C1.4 los números se movieron**: las críticas pasaron de **31 a 1**. Esa
+es la prueba de que la ampliación de cobertura servía para algo — sin ella, el
+trabajo sobre los campos habría movido un cero a otro cero.
+
+## Los campos de formulario (C1.4)
+
+### Inventario de partida
+
+102 campos en 13 archivos. Solo 7 tenían `<label htmlFor>` y 6 más estaban
+envueltos por su propia `<label>`. Los **89 restantes no tenían nombre
+accesible de ningún tipo**: un lector de pantalla anunciaba «cuadro de edición,
+en blanco» doce veces seguidas en el formulario de medicamentos.
+
+El `placeholder` **no cuenta como nombre**: desaparece en cuanto se escribe, y
+buena parte de los lectores de pantalla no lo anuncian. Que casi todos los
+campos lo tuvieran explica por qué la deuda pasó desapercibida tanto tiempo:
+en pantalla parecía resuelto.
+
+| Archivo | Campos sin nombre |
+|---|---|
+| `members/[id]/orders` | 19 |
+| `members/[id]/medications` | 12 |
+| `members/[id]/edit` | 9 |
+| `appointments/import` · `members/[id]/vaccines` · `members/new` | 7 cada uno |
+| `members/[id]/appts` · `members/[id]/exams` | 6 cada uno |
+| `members/[id]/checkups` · `settings` | 5 cada uno |
+| `members/[id]/documents` | 4 |
+| `dashboard` · `members` | 1 cada uno |
+
+### El patrón aplicado
+
+- **Con etiqueta visible (85 campos):** `id` único derivado del texto de la
+  etiqueta, y `htmlFor` en la `<label>` que ya estaba ahí. El id lleva prefijo
+  por pantalla (`med-`, `orden-`, `vacuna-`…) para que dos formularios no
+  choquen si algún día comparten documento.
+- **Sin etiqueta visible (4 campos):** `aria-label`. Son la búsqueda de
+  familiares, el nombre de la familia nueva, el área de pegado del correo y el
+  selector de archivo de la copia de seguridad.
+- **Ya envueltos por su `<label>` (6 campos):** no se tocaron. La etiqueta
+  envolvente da nombre accesible igual que `htmlFor`, y añadir un `id`
+  redundante solo habría ensuciado el diff.
+
+Dos reglas que se respetaron sin excepción: **ningún `aria-label` contradice el
+texto visible** —todos los nombres salen de la etiqueta que ya se veía— y
+**ningún `aria-label` contiene datos personales**. El campo del nombre de la
+familia es el caso a vigilar: su `placeholder` interpola el nombre del titular,
+así que su `aria-label` es la cadena fija «Nombre de la familia».
+
+### Qué bajó, medido
+
+| Medición | Críticas antes | Después |
+|---|---|---|
+| `miembro-medications-dialogo` | 6 | **0** |
+| `miembro-vaccines-dialogo` | 4 | **0** |
+| `members-new` | 4 | **0** |
+| `miembro-exams-dialogo` · `miembro-orders-dialogo` | 3 | **0** |
+| `miembro-appts-dialogo` · `checkups` · `documents` · `orders-autorizacion` | 2 | **0** |
+| `miembro-orders-agendar` · `miembro-orders-soporte` | 1 | **0** |
+| **TOTAL** | **31** | **1** |
+
+Las graves (145) y las moderadas (24) **no se movieron ni un punto**, en ninguna
+de las 24 mediciones. Etiquetar campos no arregla el contraste ni el
+`meta-viewport`, y un número que hubiera bajado «de rebote» sería señal de que
+la medición no es de fiar.
+
+**La crítica que queda** es `button-name` en `/members/:id/documents`: un botón
+de borrado que solo lleva icono. No es un campo de formulario, así que queda
+fuera del alcance de C1.4; es el mismo trabajo que C1.2 hizo en las rutas que
+entonces se medían, sobre una ruta que aún no estaba cubierta.
+
+### La prueba
+
+`e2e/etiquetas-campos.e2e.ts` no lleva una lista de 102 nombres escrita a mano
+—envejecería mal y no vería un campo nuevo—. **Barre** cada pantalla y cada
+diálogo abierto, y de cada control visible exige dos cosas: que tenga nombre, y
+que **Playwright lo encuentre por ese nombre** con `getByLabel`, que implementa
+el cálculo de nombre accesible de la especificación. Ese segundo punto es lo que
+impide que la prueba se apruebe a sí misma: el nombre lo confirma un tercero.
+
+78 campos comprobados en 15 pantallas. Los que faltan hasta 102 son
+condicionales —aparecen solo con cierta frecuencia de dosis, cierto tipo de
+orden o cierta sesión— y quedan cubiertos por el inventario estático.
 
 ## Cómo funciona la línea base
 

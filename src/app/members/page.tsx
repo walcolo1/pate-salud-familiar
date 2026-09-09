@@ -117,6 +117,7 @@ export default function MembersPage() {
         </span>
         <input
           type="text"
+          aria-label="Buscar familiar por nombre"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar familiar por nombre..."

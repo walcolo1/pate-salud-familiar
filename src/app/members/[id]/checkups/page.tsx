@@ -171,8 +171,9 @@ export default function CheckupsPage() {
         <form onSubmit={handleCreate} className="flex flex-col gap-4">
           {/* Type */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Tipo de Chequeo</label>
+            <label htmlFor="control-tipo-de-chequeo" className="text-[10px] font-extrabold text-slate-700 uppercase">Tipo de Chequeo</label>
             <input
+              id="control-tipo-de-chequeo"
               type="text"
               required
               value={checkupType}
@@ -184,8 +185,9 @@ export default function CheckupsPage() {
 
           {/* Date */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha</label>
+            <label htmlFor="control-fecha" className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha</label>
             <input
+              id="control-fecha"
               type="date"
               required
               value={scheduledDate}
@@ -196,8 +198,9 @@ export default function CheckupsPage() {
 
           {/* Doctor */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Médico encargado (Opcional)</label>
+            <label htmlFor="control-medico-encargado-opcional" className="text-[10px] font-extrabold text-slate-700 uppercase">Médico encargado (Opcional)</label>
             <input
+              id="control-medico-encargado-opcional"
               type="text"
               value={doctorName}
               onChange={(e) => setDoctorName(e.target.value)}
@@ -208,8 +211,9 @@ export default function CheckupsPage() {
 
           {/* Status */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Estado del Control</label>
+            <label htmlFor="control-estado-del-control" className="text-[10px] font-extrabold text-slate-700 uppercase">Estado del Control</label>
             <select
+              id="control-estado-del-control"
               value={status}
               onChange={(e) => setStatus(e.target.value as any)}
               className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
@@ -221,8 +225,9 @@ export default function CheckupsPage() {
 
           {/* Results */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Resultados y Recomendaciones</label>
+            <label htmlFor="control-resultados-y-recomendaciones" className="text-[10px] font-extrabold text-slate-700 uppercase">Resultados y Recomendaciones</label>
             <textarea
+              id="control-resultados-y-recomendaciones"
               value={results}
               onChange={(e) => setResults(e.target.value)}
               placeholder="Escribe el reporte médico, indicaciones físicas, peso, talla, estado bucal..."

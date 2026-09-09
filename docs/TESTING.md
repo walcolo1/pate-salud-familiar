@@ -473,6 +473,7 @@ web/
 │   ├── axe-baseline.json         deuda de accesibilidad medida, solo puede bajar
 │   ├── accesibilidad.e2e.ts      24 mediciones: rutas en reposo y diálogos abiertos
 │   ├── confirmaciones-destructivas.e2e.ts
+│   ├── etiquetas-campos.e2e.ts   nombre accesible de los 102 campos
 │   ├── purga-almacenamiento.e2e.ts
 │   └── dialogo-cierre.e2e.ts
 ├── src/lib/*.test.ts             unitarias junto al módulo que prueban

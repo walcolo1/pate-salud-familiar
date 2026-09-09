@@ -666,8 +666,9 @@ export default function MedicationsPage() {
         <form onSubmit={handleCreate} className="flex flex-col gap-4">
           {/* Name */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Medicamento</label>
+            <label htmlFor="med-nombre-del-medicamento" className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Medicamento</label>
             <input
+              id="med-nombre-del-medicamento"
               type="text"
               required
               value={name}
@@ -679,8 +680,9 @@ export default function MedicationsPage() {
 
           {/* Dose */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Dosis a Tomar</label>
+            <label htmlFor="med-dosis-a-tomar" className="text-[10px] font-extrabold text-slate-700 uppercase">Dosis a Tomar</label>
             <input
+              id="med-dosis-a-tomar"
               type="text"
               required
               value={dose}
@@ -693,8 +695,9 @@ export default function MedicationsPage() {
           {/* Formula Quantity */}
           <div className="grid grid-cols-2 gap-3.5">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Cantidad Formulada</label>
+              <label htmlFor="med-cantidad-formulada" className="text-[10px] font-extrabold text-slate-700 uppercase">Cantidad Formulada</label>
               <input
+                id="med-cantidad-formulada"
                 type="number"
                 min={1}
                 required
@@ -705,8 +708,9 @@ export default function MedicationsPage() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Unidad</label>
+              <label htmlFor="med-unidad" className="text-[10px] font-extrabold text-slate-700 uppercase">Unidad</label>
               <select
+                id="med-unidad"
                 value={quantityUnit}
                 onChange={(e) => setQuantityUnit(e.target.value as QuantityUnit)}
                 className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
@@ -723,8 +727,9 @@ export default function MedicationsPage() {
           {/* Start Date & Duration */}
           <div className="grid grid-cols-2 gap-3.5">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha de Inicio</label>
+              <label htmlFor="med-fecha-de-inicio" className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha de Inicio</label>
               <input
+                id="med-fecha-de-inicio"
                 type="date"
                 required
                 value={startDate}
@@ -734,8 +739,9 @@ export default function MedicationsPage() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Duración (Días)</label>
+              <label htmlFor="med-duracion-dias" className="text-[10px] font-extrabold text-slate-700 uppercase">Duración (Días)</label>
               <input
+                id="med-duracion-dias"
                 type="number"
                 min={1}
                 required
@@ -748,8 +754,9 @@ export default function MedicationsPage() {
 
           {/* Frequency Selection */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Frecuencia de Tomas</label>
+            <label htmlFor="med-frecuencia-de-tomas" className="text-[10px] font-extrabold text-slate-700 uppercase">Frecuencia de Tomas</label>
             <select
+              id="med-frecuencia-de-tomas"
               value={frequencyType}
               onChange={(e) => setFrequencyType(e.target.value as FrequencyType)}
               className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
@@ -765,8 +772,9 @@ export default function MedicationsPage() {
           {/* Conditional Frequency UI */}
           {frequencyType === 'EVERY_X_HOURS' && (
             <div className="flex flex-col gap-1.5 p-3.5 bg-slate-50 rounded-xl">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Intervalo en Horas</label>
+              <label htmlFor="med-intervalo-en-horas" className="text-[10px] font-extrabold text-slate-700 uppercase">Intervalo en Horas</label>
               <input
+                id="med-intervalo-en-horas"
                 type="number"
                 min={1}
                 max={24}
@@ -782,10 +790,11 @@ export default function MedicationsPage() {
 
           {frequencyType === 'SPECIFIC_TIMES' && (
             <div className="flex flex-col gap-2.5 p-3.5 bg-slate-50 rounded-xl">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Configurar Horarios</label>
+              <label htmlFor="med-configurar-horarios" className="text-[10px] font-extrabold text-slate-700 uppercase">Configurar Horarios</label>
               
               <div className="flex gap-2">
                 <input
+                  id="med-configurar-horarios"
                   type="time"
                   value={newTimeInput}
                   onChange={(e) => setNewTimeInput(e.target.value)}
@@ -822,8 +831,9 @@ export default function MedicationsPage() {
 
           {/* Linked prescription document (Select) */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fórmula médica de soporte (Opcional)</label>
+            <label htmlFor="med-formula-medica-de-soporte-opcional" className="text-[10px] font-extrabold text-slate-700 uppercase">Fórmula médica de soporte (Opcional)</label>
             <select
+              id="med-formula-medica-de-soporte-opcional"
               value={documentId}
               onChange={(e) => setDocumentId(e.target.value)}
               className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
@@ -838,8 +848,9 @@ export default function MedicationsPage() {
           {/* Prescribed by Doctor & Instructions */}
           <div className="grid grid-cols-2 gap-3.5">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Médico que formuló</label>
+              <label htmlFor="med-medico-que-formulo" className="text-[10px] font-extrabold text-slate-700 uppercase">Médico que formuló</label>
               <input
+                id="med-medico-que-formulo"
                 type="text"
                 value={prescribedBy}
                 onChange={(e) => setPrescribedBy(e.target.value)}
@@ -849,8 +860,9 @@ export default function MedicationsPage() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Instrucciones de Toma</label>
+              <label htmlFor="med-instrucciones-de-toma" className="text-[10px] font-extrabold text-slate-700 uppercase">Instrucciones de Toma</label>
               <input
+                id="med-instrucciones-de-toma"
                 type="text"
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}

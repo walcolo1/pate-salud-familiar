@@ -369,8 +369,9 @@ export default function DocumentsPage() {
         <form onSubmit={handleUpload} className="flex flex-col gap-4">
           {/* File Selection */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Seleccionar Archivo (PDF, JPG, PNG)</label>
+            <label htmlFor="doc-seleccionar-archivo-pdf-jpg-png" className="text-[10px] font-extrabold text-slate-700 uppercase">Seleccionar Archivo (PDF, JPG, PNG)</label>
             <input
+              id="doc-seleccionar-archivo-pdf-jpg-png"
               type="file"
               required
               accept=".pdf,.png,.jpg,.jpeg"
@@ -388,8 +389,9 @@ export default function DocumentsPage() {
 
           {/* File Name */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Archivo en App</label>
+            <label htmlFor="doc-nombre-del-archivo-en-app" className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Archivo en App</label>
             <input
+              id="doc-nombre-del-archivo-en-app"
               type="text"
               required
               value={fileName}
@@ -401,8 +403,9 @@ export default function DocumentsPage() {
 
           {/* Document Type */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Tipo de Documento</label>
+            <label htmlFor="doc-tipo-de-documento" className="text-[10px] font-extrabold text-slate-700 uppercase">Tipo de Documento</label>
             <select
+              id="doc-tipo-de-documento"
               value={docType}
               onChange={(e) => setDocType(e.target.value as DocumentType)}
               className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
@@ -419,8 +422,9 @@ export default function DocumentsPage() {
 
           {/* Description */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Detalles / Indicaciones (Opcional)</label>
+            <label htmlFor="doc-detalles-indicaciones-opcional" className="text-[10px] font-extrabold text-slate-700 uppercase">Detalles / Indicaciones (Opcional)</label>
             <textarea
+              id="doc-detalles-indicaciones-opcional"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Vigente por 3 meses, control lipídico, etc."

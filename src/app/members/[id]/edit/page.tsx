@@ -321,8 +321,9 @@ export default function EditMemberPage() {
 
         {/* Full Name */}
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-extrabold text-slate-700">Nombre Completo</label>
+          <label htmlFor="editar-nombre-completo" className="text-xs font-extrabold text-slate-700">Nombre Completo</label>
           <input
+            id="editar-nombre-completo"
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
@@ -333,8 +334,9 @@ export default function EditMemberPage() {
 
         {/* Birth Date */}
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-extrabold text-slate-700">Fecha de Nacimiento</label>
+          <label htmlFor="editar-fecha-de-nacimiento" className="text-xs font-extrabold text-slate-700">Fecha de Nacimiento</label>
           <input
+            id="editar-fecha-de-nacimiento"
             type="date"
             value={birthDate}
             onChange={(e) => setBirthDate(e.target.value)}
@@ -345,8 +347,9 @@ export default function EditMemberPage() {
         {/* Document Type and Document Number */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-extrabold text-slate-700">Tipo de Documento</label>
+            <label htmlFor="editar-tipo-de-documento" className="text-xs font-extrabold text-slate-700">Tipo de Documento</label>
             <select
+              id="editar-tipo-de-documento"
               value={documentType}
               onChange={(e) => setDocumentType(e.target.value as any)}
               className="h-12 px-4.5 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-900 outline-none transition-all duration-200"
@@ -360,8 +363,9 @@ export default function EditMemberPage() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-extrabold text-slate-700">Número de Documento</label>
+            <label htmlFor="editar-numero-de-documento" className="text-xs font-extrabold text-slate-700">Número de Documento</label>
             <input
+              id="editar-numero-de-documento"
               type="text"
               value={documentNumber}
               onChange={(e) => setDocumentNumber(e.target.value)}
@@ -375,8 +379,9 @@ export default function EditMemberPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Relationship */}
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-extrabold text-slate-700">Parentesco</label>
+            <label htmlFor="editar-parentesco" className="text-xs font-extrabold text-slate-700">Parentesco</label>
             <select
+              id="editar-parentesco"
               value={relationship}
               onChange={(e) => setRelationship(e.target.value as Relationship)}
               className="h-12 px-4.5 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-900 outline-none transition-all duration-200"
@@ -393,8 +398,9 @@ export default function EditMemberPage() {
 
           {/* Blood Type */}
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-extrabold text-slate-700">Grupo Sanguíneo</label>
+            <label htmlFor="editar-grupo-sanguineo" className="text-xs font-extrabold text-slate-700">Grupo Sanguíneo</label>
             <select
+              id="editar-grupo-sanguineo"
               value={bloodType}
               onChange={(e) => setBloodType(e.target.value as BloodType | '')}
               className="h-12 px-4.5 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-900 outline-none transition-all duration-200"
@@ -418,8 +424,9 @@ export default function EditMemberPage() {
 
         {/* Email */}
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-extrabold text-slate-700">Correo Electrónico (Opcional)</label>
+          <label htmlFor="editar-correo-electronico-opcional" className="text-xs font-extrabold text-slate-700">Correo Electrónico (Opcional)</label>
           <input
+            id="editar-correo-electronico-opcional"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -452,8 +459,9 @@ export default function EditMemberPage() {
           <div className="p-4 bg-slate-50/50 border border-slate-100 rounded-2xl flex flex-col gap-4">
             {/* Permission Status */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-extrabold text-slate-700">Estado de Invitación</label>
+              <label htmlFor="editar-estado-de-invitacion" className="text-xs font-extrabold text-slate-700">Estado de Invitación</label>
               <select
+                id="editar-estado-de-invitacion"
                 value={permissionStatus}
                 onChange={(e) => setPermissionStatus(e.target.value as any)}
                 className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all duration-200"
@@ -496,8 +504,9 @@ export default function EditMemberPage() {
 
         {/* Notes */}
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-extrabold text-slate-700">Alertas o Notas Médicas (Opcional)</label>
+          <label htmlFor="editar-alertas-o-notas-medicas-opcional" className="text-xs font-extrabold text-slate-700">Alertas o Notas Médicas (Opcional)</label>
           <textarea
+            id="editar-alertas-o-notas-medicas-opcional"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Alergia a la penicilina, intolerancia a la lactosa, asma activa..."
