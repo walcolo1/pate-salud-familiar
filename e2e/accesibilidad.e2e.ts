@@ -18,10 +18,10 @@ import {
 } from './validar-accesibilidad';
 
 /**
- * E2E · Accesibilidad con axe-core (C1.1).
+ * E2E · Accesibilidad con axe-core (C1.1, ampliado en C1.3a).
  *
  * Recorre las rutas reales de la aplicación con una sesión abierta y mide las
- * violaciones de accesibilidad que un navegador puede detectar sola.
+ * violaciones de accesibilidad que un navegador puede detectar solo.
  *
  * QUÉ MIDE Y QUÉ NO
  * ─────────────────
@@ -36,6 +36,13 @@ import {
  * no tiene los fallos que una máquina sabe detectar, que es un suelo, no un
  * techo.
  *
+ * POR QUÉ SE ABREN LOS DIÁLOGOS
+ * ─────────────────────────────
+ * axe solo ve lo que está pintado. La mayor deuda del proyecto —los campos de
+ * formulario sin etiqueta— vive dentro de diálogos cerrados, así que medir la
+ * página en reposo daba cero y hacía invisible tanto la deuda como su arreglo.
+ * Cada subruta se analiza dos veces: en reposo y con su diálogo abierto.
+ *
  * MODO LÍNEA BASE
  * ───────────────
  * Con `AXE_ACTUALIZAR=1` no compara: reescribe `axe-baseline.json` con lo que
@@ -45,13 +52,30 @@ import {
 
 const ACTUALIZAR = process.env.AXE_ACTUALIZAR === '1';
 
-/** Las cinco rutas que ya cubre el arnés y que concentran la interfaz. */
-const RUTAS = [
+/** Rutas de primer nivel, sin diálogo que abrir. */
+const RUTAS: ReadonlyArray<{ nombre: string; url: string; espera?: string }> = [
   { nombre: 'dashboard', url: '/dashboard' },
   { nombre: 'members', url: '/members' },
   { nombre: 'settings', url: '/settings' },
   { nombre: 'appointments-import', url: '/appointments/import' },
   { nombre: 'reminders', url: '/reminders' },
+  { nombre: 'members-new', url: '/members/new' },
+  // /onboarding se pinta fuera del armazon de la aplicacion: no hay <main>.
+  { nombre: 'onboarding', url: '/onboarding', espera: 'body' },
+];
+
+/**
+ * Subrutas de la ficha del familiar. Cada una tiene un botón que abre el
+ * diálogo migrado en C1.3a; `abridor` es su texto visible.
+ */
+const SUBRUTAS = [
+  { nombre: 'miembro-appts', segmento: 'appts', abridor: 'Programar cita' },
+  { nombre: 'miembro-checkups', segmento: 'checkups', abridor: 'Registrar control' },
+  { nombre: 'miembro-documents', segmento: 'documents', abridor: 'Subir documento' },
+  { nombre: 'miembro-exams', segmento: 'exams', abridor: 'Registrar examen' },
+  { nombre: 'miembro-medications', segmento: 'medications', abridor: 'Registrar Medicamento' },
+  { nombre: 'miembro-orders', segmento: 'orders', abridor: 'Nueva Orden' },
+  { nombre: 'miembro-vaccines', segmento: 'vaccines', abridor: 'Registrar vacuna' },
 ] as const;
 
 /**
@@ -67,8 +91,50 @@ async function analizar(page: Page): Promise<ViolacionAxe[]> {
   return resultado.violations as unknown as ViolacionAxe[];
 }
 
+/** Identificador del primer familiar de la base de demostración. */
+async function primerFamiliar(page: Page): Promise<string> {
+  const id = await page.evaluate(() => {
+    const estado = JSON.parse(localStorage.getItem('pate-salud-state:demo') ?? '{}');
+    const vivos = (estado.members ?? []).filter((m: { deletedAt?: unknown }) => !m.deletedAt);
+    return vivos[0]?.id ?? null;
+  });
+  expect(id, 'la base de demostración debe traer al menos un familiar').toBeTruthy();
+  return id as string;
+}
+
+/** Registra el detalle por regla y, de las graves, el elemento concreto. */
+function informar(nombre: string, violaciones: ViolacionAxe[]) {
+  const detalle = detallePorRegla(violaciones);
+  if (detalle.length === 0) return;
+  console.log(`\n[a11y] ${nombre}:`);
+  for (const d of detalle) {
+    console.log(`  ${d.gravedad.padEnd(9)} ${String(d.nodos).padStart(3)} nodo(s)  ${d.regla}`);
+  }
+  for (const v of violaciones) {
+    if (v.impact !== 'critical' && v.impact !== 'serious') continue;
+    for (const nodo of (v.nodes ?? []) as Array<{ target?: string[]; html?: string }>) {
+      console.log(`    · ${v.id}  ${(nodo.target ?? []).join(' ')}`);
+    }
+  }
+}
+
 // Recuentos de esta ejecución, para el resumen final y el modo línea base.
 const medido: LineaBase = {};
+
+/** Mide una pantalla ya cargada y aplica la comparación con la línea base. */
+async function medirYComparar(page: Page, nombre: string) {
+  const violaciones = await analizar(page);
+  const recuento = contarPorGravedad(violaciones);
+  medido[nombre] = recuento;
+  informar(nombre, violaciones);
+
+  if (ACTUALIZAR) return;
+
+  const base = leerLineaBase();
+  const c = comparar(base[nombre], recuento);
+  if (c.veredicto === 'mejora') console.log(mensajeMejora(nombre, c));
+  expect(c.veredicto, mensajeRegresion(nombre, c)).not.toBe('REGRESION');
+}
 
 test.describe('C1 · accesibilidad', () => {
   test.beforeEach(async ({ page }) => {
@@ -82,47 +148,30 @@ test.describe('C1 · accesibilidad', () => {
       // Sin esperar a que la interfaz termine de pintar, axe mediría un
       // esqueleto de carga en vez de la pantalla real.
       await page.waitForLoadState('networkidle').catch(() => {});
+      await expect(page.locator(ruta.espera ?? 'main').first()).toBeVisible();
+
+      await medirYComparar(page, ruta.nombre);
+    });
+  }
+
+  for (const sub of SUBRUTAS) {
+    test(`A11Y · ${sub.nombre}`, async ({ page }) => {
+      const id = await primerFamiliar(page);
+      await page.goto(`/members/${id}/${sub.segmento}`);
+      await page.waitForLoadState('networkidle').catch(() => {});
       await expect(page.locator('main').first()).toBeVisible();
 
-      const violaciones = await analizar(page);
-      const recuento = contarPorGravedad(violaciones);
-      medido[ruta.nombre] = recuento;
+      // 1 · La pantalla en reposo.
+      await medirYComparar(page, sub.nombre);
 
-      // Detalle por regla: sin esto, el número dice que hay deuda pero no
-      // por dónde entrarle.
-      const detalle = detallePorRegla(violaciones);
-      if (detalle.length > 0) {
-        console.log(`\n[a11y] ${ruta.nombre}:`);
-        for (const d of detalle) {
-          console.log(`  ${d.gravedad.padEnd(9)} ${String(d.nodos).padStart(3)} nodo(s)  ${d.regla}`);
-        }
-      }
+      // 2 · Con el diálogo abierto, que es donde viven los formularios.
+      await page.getByRole('button', { name: sub.abridor }).first().click();
+      const dialogo = page.locator('dialog[open]');
+      await expect(dialogo, `no se abrió el diálogo de ${sub.nombre}`).toBeVisible({
+        timeout: 10_000,
+      });
 
-      // De las críticas y graves se imprime tambien QUE elemento falla: sin el
-      // selector, el recuento dice que hay deuda pero no por donde entrarle.
-      for (const v of violaciones) {
-        if (v.impact !== 'critical' && v.impact !== 'serious') continue;
-        for (const nodo of (v.nodes ?? []) as Array<{ target?: string[]; html?: string }>) {
-          const selector = (nodo.target ?? []).join(' ');
-          const html = (nodo.html ?? '').replace(/\s+/g, ' ').slice(0, 110);
-          console.log(`    · ${v.id}  ${selector}`);
-          console.log(`      ${html}`);
-        }
-      }
-
-      if (ACTUALIZAR) {
-        test.info().annotations.push({
-          type: 'linea-base',
-          description: `${ruta.nombre}: ${JSON.stringify(recuento)}`,
-        });
-        return;
-      }
-
-      const base = leerLineaBase();
-      const c = comparar(base[ruta.nombre], recuento);
-
-      if (c.veredicto === 'mejora') console.log(mensajeMejora(ruta.nombre, c));
-      expect(c.veredicto, mensajeRegresion(ruta.nombre, c)).not.toBe('REGRESION');
+      await medirYComparar(page, `${sub.nombre}-dialogo`);
     });
   }
 
@@ -139,9 +188,11 @@ test.describe('C1 · accesibilidad', () => {
       const linea = GRAVEDADES.map((g) => `${g.slice(0, 3)}:${String(r[g]).padStart(2)}`).join('  ');
       const delta = GRAVEDADES.reduce((s, g) => s + (r[g] - (b[g] ?? 0)), 0);
       const marca = delta === 0 ? '=' : delta < 0 ? `▼${-delta}` : `▲${delta}`;
-      console.log(`  ${nombre.padEnd(22)} ${linea}   ${marca}`);
+      console.log(`  ${nombre.padEnd(26)} ${linea}   ${marca}`);
     }
-    console.log(`  ${'TOTAL'.padEnd(22)} ${GRAVEDADES.map((g) => `${g.slice(0, 3)}:${String(total[g]).padStart(2)}`).join('  ')}`);
+    console.log(
+      `  ${'TOTAL'.padEnd(26)} ${GRAVEDADES.map((g) => `${g.slice(0, 3)}:${String(total[g]).padStart(2)}`).join('  ')}`,
+    );
 
     if (ACTUALIZAR) {
       const nueva: LineaBase = { ...medido, total: total as RecuentoPorGravedad };

@@ -1,6 +1,6 @@
 # Accesibilidad
 
-> Bloque C · Pasos C1.1 y C1.2 · Última actualización: **2026-09-08**
+> Bloque C · Pasos C1.1, C1.2 y C1.3a · Última actualización: **2026-09-08**
 
 ## Qué es axe-core y por qué se usa
 
@@ -45,11 +45,13 @@ Viven dentro de los 15 modales cerrados y en rutas que la línea base no
 recorre (`/members/new`, `/members/[id]/edit`, las siete subrutas de la ficha
 del familiar, `/onboarding`).
 
-**Consecuencia práctica:** el trabajo de C1.4 sobre los campos **no se verá
-reflejado en esta línea base** salvo que antes se amplíe la cobertura. La
-recomendación es hacerlo en C1.4: añadir las rutas con formularios visibles y
-abrir cada modal antes de analizar. Hasta entonces, la línea base mide una
-parte de la deuda, no toda.
+**Resuelto en C1.3a.** La cobertura se amplió a las siete subrutas de la ficha
+del familiar, `/members/new` y `/onboarding`, y **cada diálogo migrado se abre
+antes de analizar**. La deuda que estaba escondida salió a la luz: las
+violaciones críticas pasaron de 0 a 27, y las graves de 77 a 143. No es que
+haya empeorado nada; es que antes no se estaba mirando.
+
+Ahora el trabajo de C1.4 sobre los campos **sí** moverá los números.
 
 ## Cómo funciona la línea base
 
@@ -106,9 +108,54 @@ explicar por qué.
 | `/settings` | La pantalla más densa: conmutadores, formularios y diálogos |
 | `/appointments/import` | Formulario principal del Bloque B: área de texto y adjuntos |
 | `/reminders` | Listas con acciones y estados |
+| `/members/new` | Alta de familiar: el formulario más largo de la aplicación |
+| `/onboarding` | Primera pantalla que ve alguien nuevo |
+| `/members/:id/appts` · `checkups` · `documents` · `exams` · `medications` · `orders` · `vaccines` | Las siete subrutas de la ficha, **cada una medida dos veces**: en reposo y con su diálogo abierto |
 
 Todas requieren sesión, así que la suite entra por `entrarEnModoDemo()`: sin
 cuenta de Google, sin OAuth y sin red, igual que el resto del arnés.
+
+El identificador del familiar no está escrito a mano: se lee de la base de
+demostración, así que la suite no se rompe si cambian los datos de ejemplo.
+
+## El patrón de diálogo (C1.3a)
+
+Los formularios vivían en `<div className="fixed inset-0">`. Eso pinta algo que
+PARECE un diálogo pero no lo es: el foco sigue paseándose por la página de
+debajo, Escape no cierra, y un lector de pantalla anuncia el fondo como si
+estuviera disponible. Once formularios clínicos estaban así.
+
+**`src/components/ui/Dialog.tsx`** los sustituye. Usa el `<dialog>` nativo
+porque `showModal()` trae de fábrica lo que una implementación a mano suele
+fallar: foco atrapado, cierre con Escape, fondo inerte para la tecnología
+asistiva y devolución del foco al elemento que lo abrió. Cero dependencias.
+
+Una decisión que conviene explicar: **por defecto NO cierra al pulsar fuera**.
+Estos diálogos contienen formularios clínicos a medio rellenar, y perder media
+hora de datos por un clic descuidado en el fondo es peor que un clic de más en
+«Cancelar». Se puede activar por diálogo con `cerrarAlPulsarFuera`.
+
+`ConfirmDialog` (A6-F2) sigue existiendo aparte: resuelve preguntar y ofrecer
+opciones; `Dialog` envuelve contenido arbitrario. No se fusionan porque sus
+contratos son distintos.
+
+### Triaje de los 15 `fixed inset-0`
+
+| Clasificación | Cuántos | Qué se hizo |
+|---|---|---|
+| **Diálogo interactivo** | 11 | Migrar a `Dialog`. **8 hechos en C1.3a**, 3 en C1.3b |
+| **Capa de carga** | 2 | Se conservan: sincronización con Calendar (`appts`) y subida (`documents`). No son diálogos; solo necesitan `role="status"` |
+| **Ya correcto** | 1 | El bloqueo de sesión de la Navbar, con `role="dialog"` y `aria-modal` desde A6-F3 |
+| **Falso positivo** | 1 | `settings:1847` es un overlay de carga, no un modal |
+
+Migrados en C1.3a: Programar Nueva Cita, Registrar Control de Salud, Subir
+Documento Clínico, Resultados de Laboratorio, Registrar Examen Clínico,
+Registrar Nuevo Medicamento, Registrar Nueva Orden Médica y Registrar Vacuna.
+
+Pendientes para C1.3b: los tres de `orders` —autorización, agendar y adjuntar
+soporte—, que viven dentro de funciones inmediatas con título dinámico.
+
+---
 
 ## Estado tras C1.2
 

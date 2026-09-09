@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Dialog from '@/components/ui/Dialog';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
@@ -410,113 +411,111 @@ export default function AppointmentsPage() {
       </section>
 
       {/* Add Appointment Modal Backdrop */}
-      {showAddForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-          {/* Card */}
-          <div className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
-            <h3 className="font-extrabold text-base text-slate-800 mb-4.5">Programar Nueva Cita</h3>
-            
-            <form onSubmit={handleCreate} className="flex flex-col gap-4">
-              {/* Doctor */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Médico</label>
-                <input
-                  type="text"
-                  required
-                  value={doctorName}
-                  onChange={(e) => setDoctorName(e.target.value)}
-                  placeholder="Ej. Dr. Andrés Restrepo"
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
-                />
-              </div>
- 
-              {/* Specialty */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Especialidad</label>
-                <select
-                  value={specialty}
-                  onChange={(e) => setSpecialty(e.target.value)}
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                >
-                  <option value="Medicina General">Medicina General</option>
-                  <option value="Pediatría">Pediatría</option>
-                  <option value="Cardiología">Cardiología</option>
-                  <option value="Ginecología">Ginecología</option>
-                  <option value="Odontología">Odontología</option>
-                  <option value="Oftalmología">Oftalmología</option>
-                  <option value="Dermatología">Dermatología</option>
-                </select>
-              </div>
- 
-              {/* Date */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha y Hora</label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                />
-              </div>
- 
-              {/* Location */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Lugar de Consulta</label>
-                <input
-                  type="text"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Ej. Centro Médico Sura 100"
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
-                />
-              </div>
- 
-              {/* Reason */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Motivo / Síntomas</label>
-                <input
-                  type="text"
-                  required
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Ej. Fiebre persistente o chequeo general"
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
-                />
-              </div>
- 
-              {/* Notes */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Notas adicionales (Opcional)</label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Llevar ayunas de 8 horas, reportes previos..."
-                  className="h-16 p-3 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none resize-none transition-colors"
-                />
-              </div>
- 
-              {/* Actions */}
-              <div className="flex gap-2.5 mt-2.5">
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
-                >
-                  <Save className="h-4 w-4" />
-                  <span>Programar</span>
-                </button>
-              </div>
-            </form>
+      <Dialog
+        abierto={showAddForm}
+        titulo="Programar Nueva Cita"
+        onCerrar={() => setShowAddForm(false)}
+      >
+        
+        <form onSubmit={handleCreate} className="flex flex-col gap-4">
+          {/* Doctor */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Médico</label>
+            <input
+              type="text"
+              required
+              value={doctorName}
+              onChange={(e) => setDoctorName(e.target.value)}
+              placeholder="Ej. Dr. Andrés Restrepo"
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+            />
           </div>
-        </div>
-      )}
+ 
+          {/* Specialty */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Especialidad</label>
+            <select
+              value={specialty}
+              onChange={(e) => setSpecialty(e.target.value)}
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
+            >
+              <option value="Medicina General">Medicina General</option>
+              <option value="Pediatría">Pediatría</option>
+              <option value="Cardiología">Cardiología</option>
+              <option value="Ginecología">Ginecología</option>
+              <option value="Odontología">Odontología</option>
+              <option value="Oftalmología">Oftalmología</option>
+              <option value="Dermatología">Dermatología</option>
+            </select>
+          </div>
+ 
+          {/* Date */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha y Hora</label>
+            <input
+              type="datetime-local"
+              required
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
+            />
+          </div>
+ 
+          {/* Location */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Lugar de Consulta</label>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Ej. Centro Médico Sura 100"
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+            />
+          </div>
+ 
+          {/* Reason */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Motivo / Síntomas</label>
+            <input
+              type="text"
+              required
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Ej. Fiebre persistente o chequeo general"
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+            />
+          </div>
+ 
+          {/* Notes */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Notas adicionales (Opcional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Llevar ayunas de 8 horas, reportes previos..."
+              className="h-16 p-3 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none resize-none transition-colors"
+            />
+          </div>
+ 
+          {/* Actions */}
+          <div className="flex gap-2.5 mt-2.5">
+            <button
+              type="button"
+              onClick={() => setShowAddForm(false)}
+              className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
+            >
+              <Save className="h-4 w-4" />
+              <span>Programar</span>
+            </button>
+          </div>
+        </form>
+      </Dialog>
 
       {/* Calendar Sincronización Overlay */}
       {(calendarStatus === 'connecting' || calendarStatus === 'authorizing' || calendarStatus === 'sincronizando') && (

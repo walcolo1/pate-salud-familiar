@@ -17,6 +17,102 @@
     "moderate": 1,
     "minor": 0
   },
+  "members-new": {
+    "critical": 4,
+    "serious": 5,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-appts": {
+    "critical": 0,
+    "serious": 16,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-appts-dialogo": {
+    "critical": 2,
+    "serious": 1,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-checkups": {
+    "critical": 0,
+    "serious": 5,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-checkups-dialogo": {
+    "critical": 2,
+    "serious": 1,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-documents": {
+    "critical": 1,
+    "serious": 6,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-documents-dialogo": {
+    "critical": 2,
+    "serious": 1,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-exams": {
+    "critical": 0,
+    "serious": 7,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-exams-dialogo": {
+    "critical": 3,
+    "serious": 1,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-medications": {
+    "critical": 0,
+    "serious": 9,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-medications-dialogo": {
+    "critical": 6,
+    "serious": 0,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-orders": {
+    "critical": 0,
+    "serious": 5,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-orders-dialogo": {
+    "critical": 3,
+    "serious": 1,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-vaccines": {
+    "critical": 0,
+    "serious": 5,
+    "moderate": 1,
+    "minor": 0
+  },
+  "miembro-vaccines-dialogo": {
+    "critical": 4,
+    "serious": 1,
+    "moderate": 1,
+    "minor": 0
+  },
+  "onboarding": {
+    "critical": 0,
+    "serious": 2,
+    "moderate": 1,
+    "minor": 0
+  },
   "reminders": {
     "critical": 0,
     "serious": 13,
@@ -30,9 +126,9 @@
     "minor": 0
   },
   "total": {
-    "critical": 0,
-    "serious": 77,
-    "moderate": 5,
+    "critical": 27,
+    "serious": 143,
+    "moderate": 21,
     "minor": 0
   }
 }

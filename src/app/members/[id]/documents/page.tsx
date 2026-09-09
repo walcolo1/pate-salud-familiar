@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Dialog from '@/components/ui/Dialog';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
@@ -359,98 +360,96 @@ export default function DocumentsPage() {
       })()}
 
       {/* Add Document Modal */}
-      {showAddForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
-            <h3 className="font-extrabold text-base text-slate-800 mb-4.5">Subir Documento Clínico</h3>
-            
-            <form onSubmit={handleUpload} className="flex flex-col gap-4">
-              {/* File Selection */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Seleccionar Archivo (PDF, JPG, PNG)</label>
-                <input
-                  type="file"
-                  required
-                  accept=".pdf,.png,.jpg,.jpeg"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] || null;
-                    setSelectedFile(file);
-                    if (file) {
-                      const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-                      setFileName(baseName);
-                    }
-                  }}
-                  className="w-full text-xs font-semibold text-slate-800 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer border border-dashed border-slate-200 p-2 rounded-xl"
-                />
-              </div>
-
-              {/* File Name */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Archivo en App</label>
-                <input
-                  type="text"
-                  required
-                  value={fileName}
-                  onChange={(e) => setFileName(e.target.value)}
-                  placeholder="Ej. Receta_Losartan_Carlos"
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
-                />
-              </div>
-
-              {/* Document Type */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Tipo de Documento</label>
-                <select
-                  value={docType}
-                  onChange={(e) => setDocType(e.target.value as DocumentType)}
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                >
-                  <option value="PRESCRIPTION">Fórmula Médica (Receta)</option>
-                  <option value="LAB_RESULT">Resultado de Laboratorio</option>
-                  <option value="MEDICAL_ORDER">Orden Médica</option>
-                  <option value="CERTIFICATE">Certificado Clínico</option>
-                  <option value="PDF">Archivo PDF General</option>
-                  <option value="IMAGE">Imagen Médica (Radiografía, etc.)</option>
-                  <option value="OTHER">Otro</option>
-                </select>
-              </div>
-
-              {/* Description */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Detalles / Indicaciones (Opcional)</label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Vigente por 3 meses, control lipídico, etc."
-                  className="h-16 p-3 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none resize-none transition-colors"
-                />
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2.5 mt-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddForm(false);
-                    setSelectedFile(null);
-                    setFileName('');
-                  }}
-                  className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
-                >
-                  <Save className="h-4 w-4" />
-                  <span>Subir</span>
-                </button>
-              </div>
-            </form>
+      <Dialog
+        abierto={showAddForm}
+        titulo="Subir Documento Clínico"
+        onCerrar={() => setShowAddForm(false)}
+      >
+        
+        <form onSubmit={handleUpload} className="flex flex-col gap-4">
+          {/* File Selection */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Seleccionar Archivo (PDF, JPG, PNG)</label>
+            <input
+              type="file"
+              required
+              accept=".pdf,.png,.jpg,.jpeg"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                setSelectedFile(file);
+                if (file) {
+                  const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+                  setFileName(baseName);
+                }
+              }}
+              className="w-full text-xs font-semibold text-slate-800 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer border border-dashed border-slate-200 p-2 rounded-xl"
+            />
           </div>
-        </div>
-      )}
+
+          {/* File Name */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Archivo en App</label>
+            <input
+              type="text"
+              required
+              value={fileName}
+              onChange={(e) => setFileName(e.target.value)}
+              placeholder="Ej. Receta_Losartan_Carlos"
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+            />
+          </div>
+
+          {/* Document Type */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Tipo de Documento</label>
+            <select
+              value={docType}
+              onChange={(e) => setDocType(e.target.value as DocumentType)}
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
+            >
+              <option value="PRESCRIPTION">Fórmula Médica (Receta)</option>
+              <option value="LAB_RESULT">Resultado de Laboratorio</option>
+              <option value="MEDICAL_ORDER">Orden Médica</option>
+              <option value="CERTIFICATE">Certificado Clínico</option>
+              <option value="PDF">Archivo PDF General</option>
+              <option value="IMAGE">Imagen Médica (Radiografía, etc.)</option>
+              <option value="OTHER">Otro</option>
+            </select>
+          </div>
+
+          {/* Description */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Detalles / Indicaciones (Opcional)</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Vigente por 3 meses, control lipídico, etc."
+              className="h-16 p-3 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none resize-none transition-colors"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2.5 mt-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddForm(false);
+                setSelectedFile(null);
+                setFileName('');
+              }}
+              className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
+            >
+              <Save className="h-4 w-4" />
+              <span>Subir</span>
+            </button>
+          </div>
+        </form>      </Dialog>
 
     </div>
   );

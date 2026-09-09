@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Dialog from '@/components/ui/Dialog';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
@@ -161,94 +162,92 @@ export default function CheckupsPage() {
       </section>
 
       {/* Add Checkup Modal */}
-      {showAddForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
-            <h3 className="font-extrabold text-base text-slate-800 mb-4.5">Registrar Control de Salud</h3>
-            
-            <form onSubmit={handleCreate} className="flex flex-col gap-4">
-              {/* Type */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Tipo de Chequeo</label>
-                <input
-                  type="text"
-                  required
-                  value={checkupType}
-                  onChange={(e) => setCheckupType(e.target.value)}
-                  placeholder="Ej. Limpieza Dental, Control Pediátrico"
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
-                />
-              </div>
-
-              {/* Date */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha</label>
-                <input
-                  type="date"
-                  required
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                />
-              </div>
-
-              {/* Doctor */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Médico encargado (Opcional)</label>
-                <input
-                  type="text"
-                  value={doctorName}
-                  onChange={(e) => setDoctorName(e.target.value)}
-                  placeholder="Ej. Dra. Diana Restrepo"
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
-                />
-              </div>
-
-              {/* Status */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Estado del Control</label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as any)}
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                >
-                  <option value="SCHEDULED">Programado (Planificado)</option>
-                  <option value="COMPLETED">Completado (Realizado)</option>
-                </select>
-              </div>
-
-              {/* Results */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Resultados y Recomendaciones</label>
-                <textarea
-                  value={results}
-                  onChange={(e) => setResults(e.target.value)}
-                  placeholder="Escribe el reporte médico, indicaciones físicas, peso, talla, estado bucal..."
-                  className="h-20 p-3 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none resize-none transition-colors"
-                />
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2.5 mt-2.5">
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
-                >
-                  <Save className="h-4 w-4" />
-                  <span>Guardar</span>
-                </button>
-              </div>
-            </form>
+      <Dialog
+        abierto={showAddForm}
+        titulo="Registrar Control de Salud"
+        onCerrar={() => setShowAddForm(false)}
+      >
+        
+        <form onSubmit={handleCreate} className="flex flex-col gap-4">
+          {/* Type */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Tipo de Chequeo</label>
+            <input
+              type="text"
+              required
+              value={checkupType}
+              onChange={(e) => setCheckupType(e.target.value)}
+              placeholder="Ej. Limpieza Dental, Control Pediátrico"
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+            />
           </div>
-        </div>
-      )}
+
+          {/* Date */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha</label>
+            <input
+              type="date"
+              required
+              value={scheduledDate}
+              onChange={(e) => setScheduledDate(e.target.value)}
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
+            />
+          </div>
+
+          {/* Doctor */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Médico encargado (Opcional)</label>
+            <input
+              type="text"
+              value={doctorName}
+              onChange={(e) => setDoctorName(e.target.value)}
+              placeholder="Ej. Dra. Diana Restrepo"
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+            />
+          </div>
+
+          {/* Status */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Estado del Control</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as any)}
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
+            >
+              <option value="SCHEDULED">Programado (Planificado)</option>
+              <option value="COMPLETED">Completado (Realizado)</option>
+            </select>
+          </div>
+
+          {/* Results */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Resultados y Recomendaciones</label>
+            <textarea
+              value={results}
+              onChange={(e) => setResults(e.target.value)}
+              placeholder="Escribe el reporte médico, indicaciones físicas, peso, talla, estado bucal..."
+              className="h-20 p-3 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none resize-none transition-colors"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2.5 mt-2.5">
+            <button
+              type="button"
+              onClick={() => setShowAddForm(false)}
+              className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
+            >
+              <Save className="h-4 w-4" />
+              <span>Guardar</span>
+            </button>
+          </div>
+        </form>      </Dialog>
 
     </div>
   );

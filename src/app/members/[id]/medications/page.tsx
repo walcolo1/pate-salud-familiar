@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Dialog from '@/components/ui/Dialog';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
@@ -645,294 +646,292 @@ export default function MedicationsPage() {
       </section>
 
       {/* Add Medication Prescription Modal Backdrop */}
-      {showAddForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md max-h-[95vh] overflow-y-auto p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
-            <h3 className="font-extrabold text-base text-slate-800 mb-4">Registrar Nuevo Medicamento</h3>
-            
-            <form onSubmit={handleCreate} className="flex flex-col gap-4">
-              {/* Name */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Medicamento</label>
+      <Dialog
+        abierto={showAddForm}
+        titulo="Registrar Nuevo Medicamento"
+        onCerrar={() => setShowAddForm(false)}
+      >
+        
+        <form onSubmit={handleCreate} className="flex flex-col gap-4">
+          {/* Name */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Medicamento</label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ej. Acetaminofén o Losartán"
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+            />
+          </div>
+
+          {/* Dose */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Dosis a Tomar</label>
+            <input
+              type="text"
+              required
+              value={dose}
+              onChange={(e) => setDose(e.target.value)}
+              placeholder="Ej. 1 tableta de 500mg, 5ml, etc."
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+            />
+          </div>
+
+          {/* Formula Quantity */}
+          <div className="grid grid-cols-2 gap-3.5">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Cantidad Formulada</label>
+              <input
+                type="number"
+                min={1}
+                required
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)}
+                className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Unidad</label>
+              <select
+                value={quantityUnit}
+                onChange={(e) => setQuantityUnit(e.target.value as QuantityUnit)}
+                className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
+              >
+                <option value="tablets">Pastillas / Tabletas</option>
+                <option value="capsules">Cápsulas</option>
+                <option value="ml">Mililitros (ml)</option>
+                <option value="units">Unidades / Aplicación</option>
+                <option value="other">Otro</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Start Date & Duration */}
+          <div className="grid grid-cols-2 gap-3.5">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha de Inicio</label>
+              <input
+                type="date"
+                required
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Duración (Días)</label>
+              <input
+                type="number"
+                min={1}
+                required
+                value={durationDays}
+                onChange={(e) => setDurationDays(parseInt(e.target.value, 10) || 1)}
+                className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Frequency Selection */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Frecuencia de Tomas</label>
+            <select
+              value={frequencyType}
+              onChange={(e) => setFrequencyType(e.target.value as FrequencyType)}
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
+            >
+              <option value="ONCE_DAILY">Una vez al día (08:00)</option>
+              <option value="TWICE_DAILY">Dos veces al día (08:00, 20:00)</option>
+              <option value="THREE_TIMES_DAILY">Tres veces al día (08:00, 14:00, 20:00)</option>
+              <option value="EVERY_X_HOURS">Cada X horas</option>
+              <option value="SPECIFIC_TIMES">Horarios específicos personalizados</option>
+            </select>
+          </div>
+
+          {/* Conditional Frequency UI */}
+          {frequencyType === 'EVERY_X_HOURS' && (
+            <div className="flex flex-col gap-1.5 p-3.5 bg-slate-50 rounded-xl">
+              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Intervalo en Horas</label>
+              <input
+                type="number"
+                min={1}
+                max={24}
+                value={frequencyIntervalHours}
+                onChange={(e) => setFrequencyIntervalHours(parseInt(e.target.value, 10) || 8)}
+                className="h-10 px-3 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-lg text-xs font-semibold text-slate-900 outline-none transition-colors"
+              />
+              <span className="text-[9px] font-bold text-slate-400 leading-normal">
+                Se generará una toma cada {frequencyIntervalHours} horas empezando desde las 08:00 del primer día.
+              </span>
+            </div>
+          )}
+
+          {frequencyType === 'SPECIFIC_TIMES' && (
+            <div className="flex flex-col gap-2.5 p-3.5 bg-slate-50 rounded-xl">
+              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Configurar Horarios</label>
+              
+              <div className="flex gap-2">
                 <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ej. Acetaminofén o Losartán"
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+                  type="time"
+                  value={newTimeInput}
+                  onChange={(e) => setNewTimeInput(e.target.value)}
+                  className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none focus:border-teal-500 transition-colors"
                 />
-              </div>
-
-              {/* Dose */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Dosis a Tomar</label>
-                <input
-                  type="text"
-                  required
-                  value={dose}
-                  onChange={(e) => setDose(e.target.value)}
-                  placeholder="Ej. 1 tableta de 500mg, 5ml, etc."
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
-                />
-              </div>
-
-              {/* Formula Quantity */}
-              <div className="grid grid-cols-2 gap-3.5">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase">Cantidad Formulada</label>
-                  <input
-                    type="number"
-                    min={1}
-                    required
-                    value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)}
-                    className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase">Unidad</label>
-                  <select
-                    value={quantityUnit}
-                    onChange={(e) => setQuantityUnit(e.target.value as QuantityUnit)}
-                    className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                  >
-                    <option value="tablets">Pastillas / Tabletas</option>
-                    <option value="capsules">Cápsulas</option>
-                    <option value="ml">Mililitros (ml)</option>
-                    <option value="units">Unidades / Aplicación</option>
-                    <option value="other">Otro</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Start Date & Duration */}
-              <div className="grid grid-cols-2 gap-3.5">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha de Inicio</label>
-                  <input
-                    type="date"
-                    required
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase">Duración (Días)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    required
-                    value={durationDays}
-                    onChange={(e) => setDurationDays(parseInt(e.target.value, 10) || 1)}
-                    className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                  />
-                </div>
-              </div>
-
-              {/* Frequency Selection */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Frecuencia de Tomas</label>
-                <select
-                  value={frequencyType}
-                  onChange={(e) => setFrequencyType(e.target.value as FrequencyType)}
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                >
-                  <option value="ONCE_DAILY">Una vez al día (08:00)</option>
-                  <option value="TWICE_DAILY">Dos veces al día (08:00, 20:00)</option>
-                  <option value="THREE_TIMES_DAILY">Tres veces al día (08:00, 14:00, 20:00)</option>
-                  <option value="EVERY_X_HOURS">Cada X horas</option>
-                  <option value="SPECIFIC_TIMES">Horarios específicos personalizados</option>
-                </select>
-              </div>
-
-              {/* Conditional Frequency UI */}
-              {frequencyType === 'EVERY_X_HOURS' && (
-                <div className="flex flex-col gap-1.5 p-3.5 bg-slate-50 rounded-xl">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase">Intervalo en Horas</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={24}
-                    value={frequencyIntervalHours}
-                    onChange={(e) => setFrequencyIntervalHours(parseInt(e.target.value, 10) || 8)}
-                    className="h-10 px-3 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-lg text-xs font-semibold text-slate-900 outline-none transition-colors"
-                  />
-                  <span className="text-[9px] font-bold text-slate-400 leading-normal">
-                    Se generará una toma cada {frequencyIntervalHours} horas empezando desde las 08:00 del primer día.
-                  </span>
-                </div>
-              )}
-
-              {frequencyType === 'SPECIFIC_TIMES' && (
-                <div className="flex flex-col gap-2.5 p-3.5 bg-slate-50 rounded-xl">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase">Configurar Horarios</label>
-                  
-                  <div className="flex gap-2">
-                    <input
-                      type="time"
-                      value={newTimeInput}
-                      onChange={(e) => setNewTimeInput(e.target.value)}
-                      className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none focus:border-teal-500 transition-colors"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddTime}
-                      className="h-9 px-3 bg-slate-800 text-white font-extrabold text-[10px] rounded-lg"
-                    >
-                      Añadir Hora
-                    </button>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5 mt-1.5">
-                    {specificTimes.map(t => (
-                      <span 
-                        key={t}
-                        className="bg-white border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700 rounded-lg flex items-center gap-1.5"
-                      >
-                        <span>{t}</span>
-                        <button 
-                          type="button" 
-                          onClick={() => handleRemoveTime(t)}
-                          className="text-rose-500 font-bold text-[10px]"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Linked prescription document (Select) */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fórmula médica de soporte (Opcional)</label>
-                <select
-                  value={documentId}
-                  onChange={(e) => setDocumentId(e.target.value)}
-                  className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-                >
-                  <option value="">-- Selecciona un documento cargado --</option>
-                  {prescriptionDocs.map(doc => (
-                    <option key={doc.id} value={doc.id}>{doc.fileName} ({doc.uploadedAt.split('T')[0]})</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Prescribed by Doctor & Instructions */}
-              <div className="grid grid-cols-2 gap-3.5">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase">Médico que formuló</label>
-                  <input
-                    type="text"
-                    value={prescribedBy}
-                    onChange={(e) => setPrescribedBy(e.target.value)}
-                    placeholder="Ej. Dr. Juan Gómez"
-                    className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-extrabold text-slate-700 uppercase">Instrucciones de Toma</label>
-                  <input
-                    type="text"
-                    value={instructions}
-                    onChange={(e) => setInstructions(e.target.value)}
-                    placeholder="Ej. Tomar con el desayuno"
-                    className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
-                  />
-                </div>
-              </div>
-
-              {/* Google Calendar sync toggle */}
-              {calendarSyncEnabled && (
-                <div className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                  <input
-                    type="checkbox"
-                    id="syncToCalendarInput"
-                    checked={syncToCalendarInput}
-                    onChange={(e) => setSyncToCalendarInput(e.target.checked)}
-                    className="h-4.5 w-4.5 text-teal-600 border-slate-300 focus:ring-teal-500 rounded cursor-pointer"
-                  />
-                  <label htmlFor="syncToCalendarInput" className="text-xs font-bold text-slate-700 cursor-pointer">
-                    Sincronizar tomas individuales con Google Calendar
-                  </label>
-                </div>
-              )}
-
-              {/* Total generated doses count status */}
-              <div className="text-[11px] font-bold text-slate-500">
-                Se generarán <span className="text-teal-600 font-extrabold">{estimatedDoses}</span> recordatorios de toma.
-              </div>
-
-              {/* WARNING BANNERS */}
-              {showDurationWarning && (
-                <div className="bg-rose-50 border border-rose-200 p-4.5 rounded-2xl flex flex-col gap-2.5 text-xs text-rose-800">
-                  <div className="flex gap-2 items-center">
-                    <AlertTriangle className="h-5 w-5 text-rose-500 shrink-0" />
-                    <h5 className="font-extrabold">Advertencia: Duración Mayor a 180 Días</h5>
-                  </div>
-                  <p className="text-[11px] text-rose-700 leading-normal">
-                    Crear recordatorios para un tratamiento de más de 180 días generará una cantidad masiva de eventos ({estimatedDoses} tomas) y puede sobrecargar la base de datos de la aplicación.
-                  </p>
-                  <label className="flex items-center gap-2 font-black cursor-pointer text-slate-700 select-none bg-white p-2 rounded-lg border border-rose-100/50">
-                    <input
-                      type="checkbox"
-                      checked={durationConfirmed}
-                      onChange={(e) => setDurationConfirmed(e.target.checked)}
-                      className="h-4.5 w-4.5 text-rose-600 rounded"
-                    />
-                    <span>Confirmo que deseo continuar con {durationDays} días</span>
-                  </label>
-                </div>
-              )}
-
-              {showCalendarWarning && (
-                <div className="bg-amber-50 border border-amber-200 p-4.5 rounded-2xl flex flex-col gap-2 text-xs text-amber-800">
-                  <div className="flex gap-2 items-center">
-                    <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
-                    <h5 className="font-extrabold">Sincronización Mayor a 20 Eventos</h5>
-                  </div>
-                  <p className="text-[11px] text-amber-700 leading-normal">
-                    Se van a crear {estimatedDoses} eventos en tu Google Calendar. Te recomendamos desactivar la sincronización de calendario si no quieres saturar tu agenda de actividades diarias.
-                  </p>
-                </div>
-              )}
-
-              {/* MEDICAL DISCLAIMER DUPLICATE AT BOTTOM */}
-              <p className="text-[10px] text-slate-400 italic text-center font-semibold px-4">
-                "La app solo registra recordatorios según la información ingresada por el usuario. No reemplaza indicaciones médicas."
-              </p>
-
-              {/* Actions */}
-              <div className="flex gap-2.5 mt-2.5">
                 <button
                   type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors"
+                  onClick={handleAddTime}
+                  className="h-9 px-3 bg-slate-800 text-white font-extrabold text-[10px] rounded-lg"
                 >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={showDurationWarning && !durationConfirmed}
-                  className={`flex-1 h-11 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md transition-all duration-150 ${
-                    showDurationWarning && !durationConfirmed
-                      ? 'bg-slate-300 cursor-not-allowed shadow-none'
-                      : 'bg-teal-600 hover:bg-teal-700 active:bg-teal-800 shadow-teal-600/10'
-                  }`}
-                >
-                  <Save className="h-4 w-4" />
-                  <span>Guardar Prescripción</span>
+                  Añadir Hora
                 </button>
               </div>
-            </form>
+
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {specificTimes.map(t => (
+                  <span 
+                    key={t}
+                    className="bg-white border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700 rounded-lg flex items-center gap-1.5"
+                  >
+                    <span>{t}</span>
+                    <button 
+                      type="button" 
+                      onClick={() => handleRemoveTime(t)}
+                      className="text-rose-500 font-bold text-[10px]"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Linked prescription document (Select) */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-extrabold text-slate-700 uppercase">Fórmula médica de soporte (Opcional)</label>
+            <select
+              value={documentId}
+              onChange={(e) => setDocumentId(e.target.value)}
+              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
+            >
+              <option value="">-- Selecciona un documento cargado --</option>
+              {prescriptionDocs.map(doc => (
+                <option key={doc.id} value={doc.id}>{doc.fileName} ({doc.uploadedAt.split('T')[0]})</option>
+              ))}
+            </select>
           </div>
-        </div>
-      )}
+
+          {/* Prescribed by Doctor & Instructions */}
+          <div className="grid grid-cols-2 gap-3.5">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Médico que formuló</label>
+              <input
+                type="text"
+                value={prescribedBy}
+                onChange={(e) => setPrescribedBy(e.target.value)}
+                placeholder="Ej. Dr. Juan Gómez"
+                className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-extrabold text-slate-700 uppercase">Instrucciones de Toma</label>
+              <input
+                type="text"
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                placeholder="Ej. Tomar con el desayuno"
+                className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Google Calendar sync toggle */}
+          {calendarSyncEnabled && (
+            <div className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+              <input
+                type="checkbox"
+                id="syncToCalendarInput"
+                checked={syncToCalendarInput}
+                onChange={(e) => setSyncToCalendarInput(e.target.checked)}
+                className="h-4.5 w-4.5 text-teal-600 border-slate-300 focus:ring-teal-500 rounded cursor-pointer"
+              />
+              <label htmlFor="syncToCalendarInput" className="text-xs font-bold text-slate-700 cursor-pointer">
+                Sincronizar tomas individuales con Google Calendar
+              </label>
+            </div>
+          )}
+
+          {/* Total generated doses count status */}
+          <div className="text-[11px] font-bold text-slate-500">
+            Se generarán <span className="text-teal-600 font-extrabold">{estimatedDoses}</span> recordatorios de toma.
+          </div>
+
+          {/* WARNING BANNERS */}
+          {showDurationWarning && (
+            <div className="bg-rose-50 border border-rose-200 p-4.5 rounded-2xl flex flex-col gap-2.5 text-xs text-rose-800">
+              <div className="flex gap-2 items-center">
+                <AlertTriangle className="h-5 w-5 text-rose-500 shrink-0" />
+                <h5 className="font-extrabold">Advertencia: Duración Mayor a 180 Días</h5>
+              </div>
+              <p className="text-[11px] text-rose-700 leading-normal">
+                Crear recordatorios para un tratamiento de más de 180 días generará una cantidad masiva de eventos ({estimatedDoses} tomas) y puede sobrecargar la base de datos de la aplicación.
+              </p>
+              <label className="flex items-center gap-2 font-black cursor-pointer text-slate-700 select-none bg-white p-2 rounded-lg border border-rose-100/50">
+                <input
+                  type="checkbox"
+                  checked={durationConfirmed}
+                  onChange={(e) => setDurationConfirmed(e.target.checked)}
+                  className="h-4.5 w-4.5 text-rose-600 rounded"
+                />
+                <span>Confirmo que deseo continuar con {durationDays} días</span>
+              </label>
+            </div>
+          )}
+
+          {showCalendarWarning && (
+            <div className="bg-amber-50 border border-amber-200 p-4.5 rounded-2xl flex flex-col gap-2 text-xs text-amber-800">
+              <div className="flex gap-2 items-center">
+                <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+                <h5 className="font-extrabold">Sincronización Mayor a 20 Eventos</h5>
+              </div>
+              <p className="text-[11px] text-amber-700 leading-normal">
+                Se van a crear {estimatedDoses} eventos en tu Google Calendar. Te recomendamos desactivar la sincronización de calendario si no quieres saturar tu agenda de actividades diarias.
+              </p>
+            </div>
+          )}
+
+          {/* MEDICAL DISCLAIMER DUPLICATE AT BOTTOM */}
+          <p className="text-[10px] text-slate-400 italic text-center font-semibold px-4">
+            "La app solo registra recordatorios según la información ingresada por el usuario. No reemplaza indicaciones médicas."
+          </p>
+
+          {/* Actions */}
+          <div className="flex gap-2.5 mt-2.5">
+            <button
+              type="button"
+              onClick={() => setShowAddForm(false)}
+              className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={showDurationWarning && !durationConfirmed}
+              className={`flex-1 h-11 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md transition-all duration-150 ${
+                showDurationWarning && !durationConfirmed
+                  ? 'bg-slate-300 cursor-not-allowed shadow-none'
+                  : 'bg-teal-600 hover:bg-teal-700 active:bg-teal-800 shadow-teal-600/10'
+              }`}
+            >
+              <Save className="h-4 w-4" />
+              <span>Guardar Prescripción</span>
+            </button>
+          </div>
+        </form>      </Dialog>
 
     </div>
   );
