@@ -4,11 +4,9 @@ import React, { useEffect } from 'react';
 import EstadoError from '@/components/ui/EstadoError';
 import EstadoVacio from '@/components/ui/EstadoVacio';
 import EstadoCarga from '@/components/ui/EstadoCarga';
-import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
-  ArrowLeft, 
   Clock, 
   Calendar, 
   Activity, 
@@ -78,17 +76,6 @@ export default function HistoryPage() {
   return (
     <div className="flex flex-col gap-6 select-none pb-12">
       
-      {/* Navigation Header */}
-      <section className="flex justify-between items-center">
-        <Link 
-          href={`/members/${id}`} 
-          className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Volver al perfil</span>
-        </Link>
-        <h2 className="text-sm font-black text-slate-800 tracking-wide uppercase">Historial Clínico</h2>
-      </section>
 
       {/* Header Info */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">

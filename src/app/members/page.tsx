@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { descripcionEdad } from '@/lib/edad';
 import EstadoVacio from '@/components/ui/EstadoVacio';
 import EstadoCarga from '@/components/ui/EstadoCarga';
 import Link from 'next/link';
@@ -71,17 +72,6 @@ export default function MembersPage() {
   }
 
   // Calculate age helper
-  const calculateAge = (birthDateStr: string) => {
-    const today = new Date();
-    const birthDate = new Date(birthDateStr);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age;
-  };
-
   const filteredMembers = members.filter(m => {
     const matchesSearch = m.fullName.toLowerCase().includes(search.toLowerCase());
     if (!matchesSearch) return false;
@@ -159,7 +149,7 @@ export default function MembersPage() {
           </div>
         ) : (
           filteredMembers.map((member) => {
-            const age = calculateAge(member.birthDate);
+            const edad = descripcionEdad(member.birthDate);
             return (
               <Link
                 key={member.id}
@@ -198,7 +188,7 @@ export default function MembersPage() {
                     )}
                   </div>
                   <p className="text-xs text-slate-500 font-bold mb-1.5">
-                    {relationshipMap[member.relationship]} · {age} {age === 1 ? 'año' : 'años'}
+                    {relationshipMap[member.relationship]}{edad ? ` · ${edad}` : ''}
                   </p>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {member.bloodType && member.bloodType !== 'UNKNOWN' && (

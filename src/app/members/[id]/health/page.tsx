@@ -3,11 +3,9 @@
 import React, { useEffect } from 'react';
 import EstadoError from '@/components/ui/EstadoError';
 import EstadoCarga from '@/components/ui/EstadoCarga';
-import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
-  ArrowLeft, 
   ShieldAlert, 
   Heart, 
   Activity, 
@@ -52,17 +50,6 @@ export default function HealthProfilePage() {
   return (
     <div className="flex flex-col gap-6 select-none pb-12">
       
-      {/* Navigation Header */}
-      <section className="flex justify-between items-center">
-        <Link 
-          href={`/members/${id}`} 
-          className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Volver al perfil</span>
-        </Link>
-        <h2 className="text-sm font-black text-slate-800 tracking-wide uppercase">Ficha Médica</h2>
-      </section>
 
       {/* Member summary block */}
       <section className="bg-gradient-to-r from-slate-800 to-slate-700 p-5 rounded-3xl text-white shadow-md">

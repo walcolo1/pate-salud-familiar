@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
+import { descripcionEdad } from '@/lib/edad';
 import EstadoError from '@/components/ui/EstadoError';
 import EstadoCarga from '@/components/ui/EstadoCarga';
 import Link from 'next/link';
@@ -101,17 +102,6 @@ export default function MemberDetailPage() {
   }
 
   // Calculate age helper
-  const calculateAge = (birthDateStr: string) => {
-    const today = new Date();
-    const birthDate = new Date(birthDateStr);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age;
-  };
-
   // Helper to format document type and number visually
   const formatDocument = (type: string, number: string) => {
     if (!type || !number) return '';
@@ -131,7 +121,7 @@ export default function MemberDetailPage() {
     return `${count} documentos`;
   };
 
-  const age = calculateAge(member.birthDate);
+  const edad = descripcionEdad(member.birthDate);
 
   // Stats for badges
   const nextAppt = appointments
@@ -291,7 +281,7 @@ export default function MemberDetailPage() {
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5 text-xs font-semibold text-slate-500">
             <span>{relationshipMap[member.relationship]}</span>
             <span>·</span>
-            <span>{age} {age === 1 ? 'año' : 'años'} ({member.birthDate})</span>
+            <span>{edad ?? 'Edad no registrada'} ({member.birthDate})</span>
             {member.bloodType && member.bloodType !== 'UNKNOWN' && (
               <>
                 <span>·</span>

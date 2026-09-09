@@ -4,12 +4,10 @@ import React, { useState, useEffect } from 'react';
 import EstadoError from '@/components/ui/EstadoError';
 import EstadoVacio from '@/components/ui/EstadoVacio';
 import EstadoCarga from '@/components/ui/EstadoCarga';
-import Link from 'next/link';
 import Dialog from '@/components/ui/Dialog';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
-  ArrowLeft, 
   Plus, 
   Calendar, 
   MapPin, 
@@ -92,14 +90,7 @@ export default function VaccinesPage() {
     <div className="flex flex-col gap-6 select-none pb-12">
       
       {/* Navigation Header */}
-      <section className="flex justify-between items-center">
-        <Link 
-          href={`/members/${id}`} 
-          className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Volver al perfil</span>
-        </Link>
+      <section className="flex justify-end items-center">
         <button
           onClick={() => setShowAddForm(true)}
           className="flex items-center gap-2 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md active:translate-y-0.5 transition-all duration-200"
