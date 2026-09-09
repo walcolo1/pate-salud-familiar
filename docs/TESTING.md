@@ -531,6 +531,7 @@ web/
 │   ├── agenda-unificada.e2e.ts   los tres orígenes en una sola vista
 │   ├── notificaciones-locales.e2e.ts avisos sin datos clínicos
 │   ├── ficha-familiar.e2e.ts     navegación y coherencia de las 9 secciones
+│   ├── recordatorios-recurrentes.e2e.ts pautas, tope e historial intacto
 │   ├── purga-almacenamiento.e2e.ts
 │   └── dialogo-cierre.e2e.ts
 ├── src/lib/*.test.ts             unitarias junto al módulo que prueban

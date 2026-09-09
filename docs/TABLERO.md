@@ -74,6 +74,7 @@ los dos. Sí quedó verificado que **no aparecen en el consentimiento inicial**.
 | C3.1 · Agenda unificada (citas, dosis, controles) | **cerrado** |
 | C3.2 · Avisos locales sin PHI (con limitación conocida) | **cerrado** |
 | C3.3 · Ficha del familiar coherente (9 secciones) | **cerrado** |
+| C3.4 · Pautas de medicación recurrentes | **cerrado** |
 
 ---
 

@@ -51,6 +51,13 @@ import {
   mockTasks 
 } from '../data/mockData';
 import { MENSAJE_ILEGIBLE } from '../lib/lecturaExpediente';
+import {
+  generarDosis,
+  reprogramarDosis,
+  type ContextoDosis,
+  type Pauta,
+  type ResultadoReprogramacion,
+} from '../lib/pautaMedicacion';
 import { loadAppStateDetallado } from '../data/persistence';
 import { loadAppState, saveAppState, clearAppState, exportDataAsJSON, getActiveUser, setActiveUser, SavedAppState } from '../data/persistence';
 import {
@@ -402,6 +409,8 @@ interface AppContextProps {
   deleteMedicationPrescription: (id: string) => void;
   markDoseReminder: (reminderId: string, status: DoseReminderStatus, takenAt?: string | null) => void;
   generateDoseReminders: (prescription: MedicationPrescription) => MedicationDoseReminder[];
+  /** C3.4 · Cambia la pauta conservando el historial de tomas. */
+  editarPautaMedicacion: (id: string, pauta: Pauta) => ResultadoReprogramacion | null;
 
   // Member document repair
   repairMemberDocuments: () => Promise<void>;
@@ -3485,89 +3494,68 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  /**
+   * C3.4 · El cálculo vive en `lib/pautaMedicacion`, con pruebas.
+   *
+   * Aquí quedaba mezclado con la sesión y los metadatos de sincronización, sin
+   * tope de tomas y con identificadores construidos con `Date.now()` más azar:
+   * dentro de un mismo bucle `Date.now()` no cambia, así que 400 tomas chocaban
+   * de identificador con una probabilidad altísima. Ahora son deterministas.
+   */
   const generateDoseReminders = (prescription: MedicationPrescription): MedicationDoseReminder[] => {
-    const list: MedicationDoseReminder[] = [];
-    const startDate = new Date(prescription.startDate + 'T08:00:00');
-    const endDate = new Date(prescription.endDate + 'T23:59:59');
-    
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      return [];
-    }
+    return generarDosis(prescription, contextoDeDosis(prescription)).dosis;
+  };
 
-    const email = user?.email || 'titular@correo.com';
-    const uid = user?.googleId || user?.id || 'unknown';
+  /** Datos que acompañan a cada toma y no dependen de la pauta. */
+  const contextoDeDosis = (prescription: MedicationPrescription): ContextoDosis => ({
+    prescriptionId: prescription.id,
+    memberId: prescription.memberId,
+    medicationName: prescription.name,
+    dose: prescription.dose,
+    creadoEn: new Date().toISOString(),
+    syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC',
+    ownerEmail: user?.email || null,
+    ownerGoogleId: user?.googleId || user?.id || null,
+    sourceDeviceId: deviceId || null,
+  });
+
+  /**
+   * C3.4 · Cambia la pauta de un tratamiento SIN destruir lo ya ocurrido.
+   *
+   * Regenerar sin más borraba las tomas anteriores, incluidas las que ya
+   * estaban tomadas o falladas: eso falsifica el historial clínico. Aquí solo
+   * se sustituye lo que todavía no ha llegado.
+   */
+  const editarPautaMedicacion = (id: string, pauta: Pauta): ResultadoReprogramacion | null => {
+    const prescripcion = medicationPrescriptions.find((m) => m.id === id);
+    if (!prescripcion) return null;
+
+    const actualizada: MedicationPrescription = { ...prescripcion, ...pauta };
+    const resultado = reprogramarDosis(
+      pauta,
+      contextoDeDosis(actualizada),
+      medicationDoseReminders,
+      new Date(),
+    );
+
     const nowIso = new Date().toISOString();
+    setMedicationPrescriptions((prev) =>
+      prev.map((m) =>
+        m.id === id
+          ? { ...actualizada, updatedAt: nowIso, syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC' }
+          : m,
+      ),
+    );
 
-    const addDose = (time: Date) => {
-      const year = time.getFullYear();
-      const month = String(time.getMonth() + 1).padStart(2, '0');
-      const day = String(time.getDate()).padStart(2, '0');
-      const hours = String(time.getHours()).padStart(2, '0');
-      const minutes = String(time.getMinutes()).padStart(2, '0');
-      const scheduledAt = `${year}-${month}-${day}T${hours}:${minutes}`;
+    // Las de otros tratamientos se quedan como estaban; de este, solo lo que
+    // ya forma parte del historial más lo que genera la pauta nueva.
+    setMedicationDoseReminders((prev) => [
+      ...prev.filter((d) => d.prescriptionId !== id),
+      ...resultado.conservadas,
+      ...resultado.dosis,
+    ]);
 
-      list.push({
-        id: `dose-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
-        prescriptionId: prescription.id,
-        memberId: prescription.memberId,
-        medicationName: prescription.name,
-        dose: prescription.dose,
-        scheduledAt,
-        status: 'PENDING',
-        createdAt: nowIso,
-        updatedAt: nowIso,
-        syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC',
-        ownerEmail: email,
-        ownerGoogleId: uid,
-        sourceDeviceId: deviceId || null
-      });
-    };
-
-    if (prescription.frequencyType === 'EVERY_X_HOURS' && prescription.frequencyIntervalHours) {
-      const intervalMs = prescription.frequencyIntervalHours * 60 * 60 * 1000;
-      let current = new Date(startDate.getTime());
-      while (current.getTime() <= endDate.getTime()) {
-        addDose(new Date(current.getTime()));
-        current = new Date(current.getTime() + intervalMs);
-      }
-    } else if (prescription.frequencyType === 'SPECIFIC_TIMES' && prescription.specificTimes) {
-      const currentDay = new Date(startDate.getTime());
-      while (currentDay.getTime() <= endDate.getTime()) {
-        prescription.specificTimes.forEach(tStr => {
-          const [hStr, mStr] = tStr.split(':');
-          const timeVal = new Date(currentDay.getTime());
-          timeVal.setHours(parseInt(hStr, 10), parseInt(mStr, 10), 0, 0);
-          if (timeVal.getTime() >= startDate.getTime() && timeVal.getTime() <= endDate.getTime()) {
-            addDose(timeVal);
-          }
-        });
-        currentDay.setDate(currentDay.getDate() + 1);
-      }
-    } else {
-      let times: string[] = ['08:00'];
-      if (prescription.frequencyType === 'TWICE_DAILY') {
-        times = ['08:00', '20:00'];
-      } else if (prescription.frequencyType === 'THREE_TIMES_DAILY') {
-        times = ['08:00', '14:00', '20:00'];
-      } else if (prescription.frequencyType === 'ONCE_DAILY') {
-        times = ['08:00'];
-      }
-      
-      const currentDay = new Date(startDate.getTime());
-      while (currentDay.getTime() <= endDate.getTime()) {
-        times.forEach(tStr => {
-          const [hStr, mStr] = tStr.split(':');
-          const timeVal = new Date(currentDay.getTime());
-          timeVal.setHours(parseInt(hStr, 10), parseInt(mStr, 10), 0, 0);
-          if (timeVal.getTime() >= startDate.getTime() && timeVal.getTime() <= endDate.getTime()) {
-            addDose(timeVal);
-          }
-        });
-        currentDay.setDate(currentDay.getDate() + 1);
-      }
-    }
-
-    return list;
+    return resultado;
   };
 
   const addMedicalOrder = (order: Omit<MedicalOrder, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => {
@@ -7003,6 +6991,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deleteMedicationPrescription,
       markDoseReminder,
       generateDoseReminders,
+      editarPautaMedicacion,
 
       // Capa Operacional Google-Native Foundation Values Expose
       databaseSpreadsheetId,

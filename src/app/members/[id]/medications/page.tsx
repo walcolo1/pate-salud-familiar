@@ -5,6 +5,7 @@ import EstadoError from '@/components/ui/EstadoError';
 import EstadoVacio from '@/components/ui/EstadoVacio';
 import EstadoCarga from '@/components/ui/EstadoCarga';
 import Dialog from '@/components/ui/Dialog';
+import EditarPauta from '@/components/miembros/EditarPauta';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { useConfirmacion } from '@/context/Confirmacion';
@@ -28,7 +29,8 @@ import {
   Trash2,
   AlertCircle,
   TrendingUp,
-  FileCheck
+  FileCheck,
+  CalendarClock
 } from 'lucide-react';
 import { MedicationPrescription, MedicationDoseReminder, DoseReminderStatus, PrescriptionStatus, FrequencyType, QuantityUnit } from '@/domain/models';
 
@@ -62,6 +64,7 @@ export default function MedicationsPage() {
     updateMedicationPrescription, 
     deleteMedicationPrescription,
     markDoseReminder,
+    editarPautaMedicacion,
     isLoading,
     calendarSyncEnabled,
     calendarStatus
@@ -69,6 +72,8 @@ export default function MedicationsPage() {
   const confirmar = useConfirmacion();
 
   const [activeTab, setActiveTab] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
+  // C3.4 · Tratamiento cuya pauta se está editando.
+  const [pautaEnEdicion, setPautaEnEdicion] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   
   // Form State
@@ -540,6 +545,13 @@ export default function MedicationsPage() {
                   {/* Actions row */}
                   <div className="flex gap-2 justify-end mt-1">
                     <button
+                      onClick={() => setPautaEnEdicion(prescription.id)}
+                      className="px-3.5 h-8.5 text-[10px] font-extrabold text-slate-700 bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-xl transition-colors flex items-center gap-1"
+                    >
+                      <CalendarClock className="h-3.5 w-3.5" />
+                      Editar pauta
+                    </button>
+                    <button
                       onClick={() => updateMedicationPrescription(prescription.id, { status: 'SUSPENDED' })}
                       className="px-3.5 h-8.5 text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-600/10 hover:bg-amber-100 rounded-xl transition-colors flex items-center gap-1"
                     >
@@ -647,6 +659,16 @@ export default function MedicationsPage() {
           )
         )}
       </section>
+
+      <EditarPauta
+        prescripcion={medicationPrescriptions.find((m) => m.id === pautaEnEdicion) ?? null}
+        dosis={medicationDoseReminders}
+        onCerrar={() => setPautaEnEdicion(null)}
+        onGuardar={(id, pauta) => {
+          editarPautaMedicacion(id, pauta);
+          setPautaEnEdicion(null);
+        }}
+      />
 
       {/* Add Medication Prescription Modal Backdrop */}
       <Dialog
