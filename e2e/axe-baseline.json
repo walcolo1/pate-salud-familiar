@@ -1,4 +1,10 @@
 {
+  "agenda": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
   "appointments-import": {
     "critical": 0,
     "serious": 0,

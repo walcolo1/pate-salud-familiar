@@ -8,6 +8,7 @@ import {
   Home, 
   Users, 
   Bell, 
+  CalendarDays,
   Settings, 
   Activity, 
   CloudCheck, 
@@ -140,6 +141,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
   const navItems = [
     { label: 'Inicio', href: '/dashboard', icon: Home },
     { label: 'Familia', href: '/members', icon: Users },
+    { label: 'Agenda', href: '/agenda', icon: CalendarDays },
     { label: 'Alertas', href: '/reminders', icon: Bell },
     { label: 'Ajustes', href: '/settings', icon: Settings },
   ];

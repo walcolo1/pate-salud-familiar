@@ -59,6 +59,7 @@ const RUTAS: ReadonlyArray<{ nombre: string; url: string; espera?: string }> = [
   { nombre: 'settings', url: '/settings' },
   { nombre: 'appointments-import', url: '/appointments/import' },
   { nombre: 'reminders', url: '/reminders' },
+  { nombre: 'agenda', url: '/agenda' },
   { nombre: 'members-new', url: '/members/new' },
   // /onboarding se pinta fuera del armazon de la aplicacion: no hay <main>.
   { nombre: 'onboarding', url: '/onboarding', espera: 'body' },
