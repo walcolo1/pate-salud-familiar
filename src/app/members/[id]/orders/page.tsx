@@ -252,19 +252,19 @@ export default function MedicalOrdersPage() {
   const getStatusBadge = (status: MedicalOrderStatus) => {
     switch (status) {
       case 'PENDING_AUTHORIZATION':
-        return <span className="text-[10px] font-extrabold bg-amber-50 text-amber-600 px-2.5 py-0.5 rounded-full border border-amber-600/10 shrink-0">Pendiente EPS</span>;
+        return <span className="text-[10px] font-extrabold bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full border border-amber-600/10 shrink-0">Pendiente EPS</span>;
       case 'AUTHORIZED':
-        return <span className="text-[10px] font-extrabold bg-teal-50 text-teal-600 px-2.5 py-0.5 rounded-full border border-teal-600/10 shrink-0">Autorizada</span>;
+        return <span className="text-[10px] font-extrabold bg-teal-50 text-teal-700 px-2.5 py-0.5 rounded-full border border-teal-600/10 shrink-0">Autorizada</span>;
       case 'DENIED':
-        return <span className="text-[10px] font-extrabold bg-rose-50 text-rose-600 px-2.5 py-0.5 rounded-full border border-rose-600/10 shrink-0">Negada</span>;
+        return <span className="text-[10px] font-extrabold bg-rose-50 text-rose-700 px-2.5 py-0.5 rounded-full border border-rose-600/10 shrink-0">Negada</span>;
       case 'APPOINTMENT_PENDING':
         return <span className="text-[10px] font-extrabold bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full border border-blue-600/10 shrink-0">Pendiente Agendar</span>;
       case 'APPOINTMENT_SCHEDULED':
         return <span className="text-[10px] font-extrabold bg-purple-50 text-purple-600 px-2.5 py-0.5 rounded-full border border-purple-600/10 shrink-0">Cita Agendada</span>;
       case 'COMPLETED':
-        return <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-600 px-2.5 py-0.5 rounded-full border border-emerald-600/10 shrink-0">Cerrada / Atendida</span>;
+        return <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-600/10 shrink-0">Cerrada / Atendida</span>;
       case 'CANCELLED':
-        return <span className="text-[10px] font-extrabold bg-slate-50 text-slate-400 px-2.5 py-0.5 rounded-full border border-slate-200 shrink-0">Cancelada</span>;
+        return <span className="text-[10px] font-extrabold bg-slate-50 text-slate-500 px-2.5 py-0.5 rounded-full border border-slate-200 shrink-0">Cancelada</span>;
       default:
         return null;
     }
@@ -274,13 +274,13 @@ export default function MedicalOrdersPage() {
     const status = order.syncStatus || 'PENDING_SYNC';
     if (status === 'SYNCED') {
       return (
-        <span className="text-[9px] font-extrabold bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full border border-teal-600/10 uppercase">
+        <span className="text-[9px] font-extrabold bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-600/10 uppercase">
           ✓ Sheets
         </span>
       );
     }
     return (
-      <span className="text-[9px] font-extrabold bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-600/10 uppercase animate-pulse">
+      <span className="text-[9px] font-extrabold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-600/10 uppercase">
         Pendiente Sheets
       </span>
     );
@@ -300,7 +300,7 @@ export default function MedicalOrdersPage() {
         </Link>
         <button
           onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md active:translate-y-0.5 transition-all duration-200"
+          className="flex items-center gap-2 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md active:translate-y-0.5 transition-all duration-200"
         >
           <Plus className="h-4 w-4" />
           <span>Nueva Orden</span>
@@ -310,7 +310,7 @@ export default function MedicalOrdersPage() {
       {/* Header Info */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <h3 className="font-extrabold text-slate-800 text-base leading-tight mb-1">Órdenes y Autorizaciones de {member.fullName.split(' ')[0]}</h3>
-        <p className="text-xs font-semibold text-slate-400">Administra órdenes médicas, trámites de EPS y agendamiento de citas.</p>
+        <p className="text-xs font-semibold text-slate-500">Administra órdenes médicas, trámites de EPS y agendamiento de citas.</p>
       </section>
 
       {/* Filters row */}
@@ -342,7 +342,7 @@ export default function MedicalOrdersPage() {
           <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center flex flex-col items-center justify-center gap-3">
             <ClipboardList className="h-10 w-10 text-slate-300" />
             <p className="text-sm font-bold text-slate-800">No hay órdenes registradas</p>
-            <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+            <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
               Registra tus órdenes de citas con especialistas, laboratorios o terapias y lleva control del estado de tu trámite.
             </p>
           </div>
@@ -358,9 +358,9 @@ export default function MedicalOrdersPage() {
                   <div>
                     <h4 className="text-sm font-extrabold text-slate-800 leading-tight mb-0.5">{order.title}</h4>
                     <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                      <span className="text-[10px] text-slate-400 font-bold">{orderTypeMap[order.orderType]}</span>
+                      <span className="text-[10px] text-slate-500 font-bold">{orderTypeMap[order.orderType]}</span>
                       <span className="text-slate-300 text-[10px]">·</span>
-                      <span className="text-[10px] text-slate-400 font-semibold">Emitida: {new Date(order.issuedAt).toLocaleDateString('es-CO')}</span>
+                      <span className="text-[10px] text-slate-500 font-semibold">Emitida: {new Date(order.issuedAt).toLocaleDateString('es-CO')}</span>
                       {!isFirebaseBackend && (
                         <>
                           <span className="text-slate-300 text-[10px]">·</span>
@@ -378,26 +378,26 @@ export default function MedicalOrdersPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-500 font-semibold">
                   {order.doctorName && (
                     <div>
-                      <span className="text-[9px] font-extrabold text-slate-400 block uppercase leading-none mb-1">Médico Emisor</span>
+                      <span className="text-[9px] font-extrabold text-slate-500 block uppercase leading-none mb-1">Médico Emisor</span>
                       <span>{order.doctorName} {order.specialty && `(${order.specialty})`}</span>
                     </div>
                   )}
                   {order.epsOrProvider && (
                     <div>
-                      <span className="text-[9px] font-extrabold text-slate-400 block uppercase leading-none mb-1">EPS / Aseguradora</span>
+                      <span className="text-[9px] font-extrabold text-slate-500 block uppercase leading-none mb-1">EPS / Aseguradora</span>
                       <span>{order.epsOrProvider}</span>
                     </div>
                   )}
                   {order.ipsOrClinic && (
                     <div>
-                      <span className="text-[9px] font-extrabold text-slate-400 block uppercase leading-none mb-1">IPS / Centro Clínico</span>
+                      <span className="text-[9px] font-extrabold text-slate-500 block uppercase leading-none mb-1">IPS / Centro Clínico</span>
                       <span>{order.ipsOrClinic}</span>
                     </div>
                   )}
                   {order.expiresAt && (
                     <div>
-                      <span className="text-[9px] font-extrabold text-slate-400 block uppercase leading-none mb-1">Fecha Vence</span>
-                      <span className={new Date(order.expiresAt).getTime() < Date.now() ? 'text-rose-600 font-extrabold' : ''}>
+                      <span className="text-[9px] font-extrabold text-slate-500 block uppercase leading-none mb-1">Fecha Vence</span>
+                      <span className={new Date(order.expiresAt).getTime() < Date.now() ? 'text-rose-700 font-extrabold' : ''}>
                         {new Date(order.expiresAt).toLocaleDateString('es-CO')}
                       </span>
                     </div>
@@ -406,7 +406,7 @@ export default function MedicalOrdersPage() {
 
                 {order.notes && (
                   <div className="p-3 bg-slate-50/50 rounded-xl">
-                    <span className="text-[9px] text-slate-400 font-extrabold block leading-none mb-1 uppercase">Indicaciones / Observaciones</span>
+                    <span className="text-[9px] text-slate-500 font-extrabold block leading-none mb-1 uppercase">Indicaciones / Observaciones</span>
                     <p className="text-xs text-slate-500 italic">{order.notes}</p>
                   </div>
                 )}
@@ -416,9 +416,9 @@ export default function MedicalOrdersPage() {
                   <div className="bg-slate-50/50 border border-slate-100/50 p-4.5 rounded-2xl flex flex-col gap-2.5">
                     <div className="flex items-center gap-2">
                       {order.authorizationStatus === 'AUTHORIZED' ? (
-                        <ShieldCheck className="h-4.5 w-4.5 text-teal-600 shrink-0" />
+                        <ShieldCheck className="h-4.5 w-4.5 text-teal-700 shrink-0" />
                       ) : order.authorizationStatus === 'DENIED' ? (
-                        <ShieldAlert className="h-4.5 w-4.5 text-rose-600 shrink-0" />
+                        <ShieldAlert className="h-4.5 w-4.5 text-rose-700 shrink-0" />
                       ) : (
                         <Shield className="h-4.5 w-4.5 text-amber-500 shrink-0" />
                       )}
@@ -427,12 +427,12 @@ export default function MedicalOrdersPage() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-[11px] font-semibold text-slate-500">
                       <div>
-                        <span className="text-[9px] text-slate-400 font-extrabold block uppercase leading-none mb-1">Número de Autorización</span>
+                        <span className="text-[9px] text-slate-500 font-extrabold block uppercase leading-none mb-1">Número de Autorización</span>
                         <span>{order.authorizationNumber || 'Pendiente de registrar'}</span>
                       </div>
                       {order.authorizationDate && (
                         <div>
-                          <span className="text-[9px] text-slate-400 font-extrabold block uppercase leading-none mb-1">Fecha de Aprobación</span>
+                          <span className="text-[9px] text-slate-500 font-extrabold block uppercase leading-none mb-1">Fecha de Aprobación</span>
                           <span>{new Date(order.authorizationDate).toLocaleDateString('es-CO')}</span>
                         </div>
                       )}
@@ -468,12 +468,12 @@ export default function MedicalOrdersPage() {
                 {/* Document Attached Panel */}
                 <div className="bg-slate-50/30 p-4.5 rounded-2xl border border-slate-100/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-teal-50 text-teal-600 rounded-xl">
+                    <div className="p-2.5 bg-teal-50 text-teal-700 rounded-xl">
                       <FileText className="h-4.5 w-4.5" />
                     </div>
                     <div>
                       <h6 className="text-xs font-extrabold text-slate-800">Documento Adjunto (PDF / Foto)</h6>
-                      <p className="text-[10px] text-slate-400 font-semibold leading-tight mt-0.5">
+                      <p className="text-[10px] text-slate-500 font-semibold leading-tight mt-0.5">
                         {document ? `${document.fileName}` : 'No hay documento adjuntado a esta orden.'}
                       </p>
                     </div>
@@ -485,7 +485,7 @@ export default function MedicalOrdersPage() {
                         href={document.driveUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="h-9 px-3.5 hover:bg-teal-50 text-slate-500 hover:text-teal-600 border border-slate-200/60 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1"
+                        className="h-9 px-3.5 hover:bg-teal-50 text-slate-500 hover:text-teal-700 border border-slate-200/60 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1"
                       >
                         <span>Ver Documento</span>
                         <ExternalLink className="h-3.5 w-3.5" />
@@ -512,7 +512,7 @@ export default function MedicalOrdersPage() {
                         setApptReason(`Consulta/Procedimiento de orden: ${order.title}`);
                         setShowScheduleFormId(order.id);
                       }}
-                      className="px-4 h-9.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 active:translate-y-0.5 transition-all duration-200"
+                      className="px-4 h-9.5 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 active:translate-y-0.5 transition-all duration-200"
                     >
                       <Calendar className="h-4 w-4" />
                       <span>Agendar Cita Médica</span>
@@ -646,7 +646,7 @@ export default function MedicalOrdersPage() {
               id="requiresAuthorization"
               checked={requiresAuthorization}
               onChange={(e) => setRequiresAuthorization(e.target.checked)}
-              className="h-4.5 w-4.5 text-teal-600 border-slate-300 focus:ring-teal-500 rounded cursor-pointer"
+              className="h-4.5 w-4.5 text-teal-700 border-slate-300 focus:ring-teal-500 rounded cursor-pointer"
             />
             <label htmlFor="requiresAuthorization" className="text-xs font-bold text-slate-700 cursor-pointer">
               Esta orden requiere trámite de autorización en EPS
@@ -704,7 +704,7 @@ export default function MedicalOrdersPage() {
             </button>
             <button
               type="submit"
-              className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
+              className="flex-1 h-11 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
             >
               <Save className="h-4 w-4" />
               <span>Guardar Orden</span>
@@ -786,7 +786,7 @@ export default function MedicalOrdersPage() {
                   onClick={() => handleAuthorizationSubmit(order)}
                   className={`flex-1 h-11 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md transition-colors ${
                     authStatus === 'AUTHORIZED'
-                      ? 'bg-teal-600 hover:bg-teal-700 text-white shadow-teal-600/10'
+                      ? 'bg-teal-700 hover:bg-teal-800 text-white shadow-teal-600/10'
                       : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/10'
                   }`}
                 >
@@ -895,7 +895,7 @@ export default function MedicalOrdersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
+                  className="flex-1 h-11 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
                 >
                   <Calendar className="h-4 w-4" />
                   <span>Programar Cita</span>
@@ -930,7 +930,7 @@ export default function MedicalOrdersPage() {
             </div>
 
             {isUploading && (
-              <div className="flex items-center gap-2 text-xs font-bold text-teal-600 p-2.5 bg-teal-50 rounded-xl">
+              <div className="flex items-center gap-2 text-xs font-bold text-teal-700 p-2.5 bg-teal-50 rounded-xl">
                 <Loader2 className="h-4 w-4 animate-spin shrink-0" />
                 <span>Subiendo y guardando documento en Google Drive...</span>
               </div>
@@ -951,7 +951,7 @@ export default function MedicalOrdersPage() {
               <button
                 type="submit"
                 disabled={isUploading || !selectedFile}
-                className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors disabled:opacity-50"
+                className="flex-1 h-11 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors disabled:opacity-50"
               >
                 <Upload className="h-4 w-4" />
                 <span>Subir Soporte</span>

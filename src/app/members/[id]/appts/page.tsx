@@ -111,13 +111,13 @@ export default function AppointmentsPage() {
   const getStatusBadge = (status: HealthEventStatus) => {
     switch (status) {
       case 'SCHEDULED':
-        return <span className="text-[10px] font-extrabold bg-teal-50 text-teal-600 px-2.5 py-0.5 rounded-full border border-teal-600/10">Programada</span>;
+        return <span className="text-[10px] font-extrabold bg-teal-50 text-teal-700 px-2.5 py-0.5 rounded-full border border-teal-600/10">Programada</span>;
       case 'COMPLETED':
-        return <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-600 px-2.5 py-0.5 rounded-full border border-emerald-600/10">Completada</span>;
+        return <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-600/10">Completada</span>;
       case 'OVERDUE':
-        return <span className="text-[10px] font-extrabold bg-rose-50 text-rose-600 px-2.5 py-0.5 rounded-full border border-rose-600/10">Vencida</span>;
+        return <span className="text-[10px] font-extrabold bg-rose-50 text-rose-700 px-2.5 py-0.5 rounded-full border border-rose-600/10">Vencida</span>;
       case 'CANCELLED':
-        return <span className="text-[10px] font-extrabold bg-slate-50 text-slate-400 px-2.5 py-0.5 rounded-full border border-slate-200">Cancelada</span>;
+        return <span className="text-[10px] font-extrabold bg-slate-50 text-slate-500 px-2.5 py-0.5 rounded-full border border-slate-200">Cancelada</span>;
       default:
         return null;
     }
@@ -128,26 +128,26 @@ export default function AppointmentsPage() {
     switch (status) {
       case 'SYNCED':
         return (
-          <span className="text-[9px] font-extrabold bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full border border-teal-600/10 uppercase">
+          <span className="text-[9px] font-extrabold bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-600/10 uppercase">
             ✓ Nube Sheets
           </span>
         );
       case 'PENDING_SYNC':
         return (
-          <span className="text-[9px] font-extrabold bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-600/10 uppercase animate-pulse">
+          <span className="text-[9px] font-extrabold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-600/10 uppercase">
             Pendiente Sheets
           </span>
         );
       case 'SYNC_ERROR':
         return (
-          <span className="text-[9px] font-extrabold bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full border border-rose-600/10 uppercase">
+          <span className="text-[9px] font-extrabold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full border border-rose-600/10 uppercase">
             Error Sheets
           </span>
         );
       case 'LOCAL_ONLY':
       default:
         return (
-          <span className="text-[9px] font-extrabold bg-slate-50 text-slate-400 px-2 py-0.5 rounded-full border border-slate-200 uppercase">
+          <span className="text-[9px] font-extrabold bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full border border-slate-200 uppercase">
             Local Only
           </span>
         );
@@ -159,27 +159,27 @@ export default function AppointmentsPage() {
     switch (status) {
       case 'SYNCED':
         return (
-          <span className="text-[9px] font-extrabold bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full border border-teal-600/10 uppercase">
+          <span className="text-[9px] font-extrabold bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-600/10 uppercase">
             ✓ Calendar
           </span>
         );
       case 'PENDING_CALENDAR_SYNC':
       case 'PENDING_SYNC':
         return (
-          <span className="text-[9px] font-extrabold bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-600/10 uppercase animate-pulse">
+          <span className="text-[9px] font-extrabold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-600/10 uppercase">
             Pendiente Calendar
           </span>
         );
       case 'SYNC_ERROR':
         return (
-          <span className="text-[9px] font-extrabold bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full border border-rose-600/10 uppercase">
+          <span className="text-[9px] font-extrabold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full border border-rose-600/10 uppercase">
             Error Calendar
           </span>
         );
       case 'LOCAL_ONLY':
       default:
         return (
-          <span className="text-[9px] font-extrabold bg-slate-50 text-slate-400 px-2 py-0.5 rounded-full border border-slate-200 uppercase">
+          <span className="text-[9px] font-extrabold bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full border border-slate-200 uppercase">
             Local Only
           </span>
         );
@@ -200,7 +200,7 @@ export default function AppointmentsPage() {
         </Link>
         <button
           onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md active:translate-y-0.5 transition-all duration-200"
+          className="flex items-center gap-2 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md active:translate-y-0.5 transition-all duration-200"
         >
           <Plus className="h-4 w-4" />
           <span>Programar cita</span>
@@ -210,7 +210,7 @@ export default function AppointmentsPage() {
       {/* Header Info */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <h3 className="font-extrabold text-slate-800 text-base leading-tight mb-1">Citas Médicas de {member.fullName.split(' ')[0]}</h3>
-        <p className="text-xs font-semibold text-slate-400">Historial y agenda de consultas con especialistas.</p>
+        <p className="text-xs font-semibold text-slate-500">Historial y agenda de consultas con especialistas.</p>
       </section>
 
       {/* Filters row */}
@@ -241,7 +241,7 @@ export default function AppointmentsPage() {
           <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center flex flex-col items-center justify-center gap-3">
             <Calendar className="h-10 w-10 text-slate-300" />
             <p className="text-sm font-bold text-slate-800">No hay citas médicas</p>
-            <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+            <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
               No se encontraron citas correspondientes al filtro seleccionado.
             </p>
           </div>
@@ -255,7 +255,7 @@ export default function AppointmentsPage() {
                 <div>
                   <h4 className="text-sm font-extrabold text-slate-800 leading-tight mb-0.5">{appt.doctorName}</h4>
                   <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                    <span className="text-[10px] text-slate-400 font-bold">{appt.specialty}</span>
+                    <span className="text-[10px] text-slate-500 font-bold">{appt.specialty}</span>
                     {!isFirebaseBackend && (
                       <>
                         <span className="text-slate-300 text-[10px]">·</span>
@@ -274,12 +274,12 @@ export default function AppointmentsPage() {
               {/* Time and location */}
               <div className="flex flex-col gap-2.5">
                 <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                  <Clock className="h-4 w-4 text-teal-600" />
+                  <Clock className="h-4 w-4 text-teal-700" />
                   <span>Programada: {new Date(appt.scheduledAt).toLocaleString('es-CO', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
                 {appt.status === 'COMPLETED' && appt.completedAt && (
                   <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                    <CheckCircle className="h-4 w-4 text-emerald-600 animate-pulse" />
+                    <CheckCircle className="h-4 w-4 text-emerald-700 animate-pulse" />
                     <span>Realizada el: {new Date(appt.completedAt).toLocaleString('es-CO', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                 )}
@@ -291,12 +291,12 @@ export default function AppointmentsPage() {
                 )}
                 {/* Retention warnings */}
                 {appt.status === 'COMPLETED' && (
-                  <p className="text-[9px] text-slate-400 font-bold px-1 italic">
+                  <p className="text-[9px] text-slate-500 font-bold px-1 italic">
                     ℹ Política de retención: Esta cita será depurada el {new Date(new Date(appt.completedAt || appt.scheduledAt).getTime() + 2 * 365 * 24 * 60 * 60 * 1000).toLocaleDateString('es-CO')}.
                   </p>
                 )}
                 {appt.status === 'SCHEDULED' && (
-                  <p className="text-[9px] text-slate-400 font-bold px-1 italic">
+                  <p className="text-[9px] text-slate-500 font-bold px-1 italic">
                     ℹ Política de retención: Si no se marca como completada, se depurará el {new Date(new Date(appt.scheduledAt).getTime() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('es-CO')}.
                   </p>
                 )}
@@ -304,12 +304,12 @@ export default function AppointmentsPage() {
 
               {/* Reason */}
               <div className="p-3 bg-slate-50/50 rounded-xl">
-                <span className="text-[9px] text-slate-400 font-extrabold block leading-none mb-1 uppercase">Motivo de consulta</span>
+                <span className="text-[9px] text-slate-500 font-extrabold block leading-none mb-1 uppercase">Motivo de consulta</span>
                 <p className="text-xs text-slate-600 font-semibold">{appt.reason}</p>
                 {appt.notes && (
                   <>
                     <hr className="border-slate-100 my-2" />
-                    <span className="text-[9px] text-slate-400 font-extrabold block leading-none mb-1 uppercase">Indicaciones / Preparación</span>
+                    <span className="text-[9px] text-slate-500 font-extrabold block leading-none mb-1 uppercase">Indicaciones / Preparación</span>
                     <p className="text-xs text-slate-500 font-semibold italic">{appt.notes}</p>
                   </>
                 )}
@@ -342,27 +342,27 @@ export default function AppointmentsPage() {
                     {/* Google Sheets Sync Info */}
                     {!isFirebaseBackend && (
                       <div className="flex items-center gap-1.5 text-slate-500">
-                        <span className="font-extrabold text-[10px] uppercase text-slate-400">Base de Datos:</span>
+                        <span className="font-extrabold text-[10px] uppercase text-slate-500">Base de Datos:</span>
                         {appt.syncStatus === 'SYNCED' ? (
-                          <span className="text-teal-600">✓ Sincronizado en la Base Operacional</span>
+                          <span className="text-teal-700">✓ Sincronizado en la Base Operacional</span>
                         ) : appt.syncStatus === 'SYNC_ERROR' ? (
-                          <span className="text-rose-600 font-semibold">Error al sincronizar con Sheets</span>
+                          <span className="text-rose-700 font-semibold">Error al sincronizar con Sheets</span>
                         ) : (
-                          <span className="text-amber-600 animate-pulse">Pendiente de sincronizar</span>
+                          <span className="text-amber-700">Pendiente de sincronizar</span>
                         )}
                       </div>
                     )}
                     {/* Google Calendar Sync Info */}
                     <div className="flex items-center gap-1.5 text-slate-500">
-                      <span className="font-extrabold text-[10px] uppercase text-slate-400">Google Calendar:</span>
+                      <span className="font-extrabold text-[10px] uppercase text-slate-500">Google Calendar:</span>
                       {appt.calendarSyncStatus === 'SYNCED' ? (
-                        <span className="text-teal-600">✓ Evento creado</span>
+                        <span className="text-teal-700">✓ Evento creado</span>
                       ) : appt.calendarSyncStatus === 'SYNC_ERROR' ? (
-                        <span className="text-rose-600 font-semibold truncate max-w-[200px]" title={appt.calendarError || ''}>
+                        <span className="text-rose-700 font-semibold truncate max-w-[200px]" title={appt.calendarError || ''}>
                           {appt.calendarError || 'Error de sincronización'}
                         </span>
                       ) : (
-                        <span className="text-amber-600 animate-pulse">Pendiente de crear evento</span>
+                        <span className="text-amber-700">Pendiente de crear evento</span>
                       )}
                     </div>
                   </div>
@@ -386,7 +386,7 @@ export default function AppointmentsPage() {
                     {appt.calendarSyncStatus !== 'SYNCED' && (
                       <button
                         onClick={() => syncAppointmentToCalendar(appt.id, undefined, true)}
-                        className="text-[10px] font-black text-rose-600 hover:text-rose-700 bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-100 transition-colors"
+                        className="text-[10px] font-black text-rose-700 hover:text-rose-700 bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-100 transition-colors"
                       >
                         Reintentar Calendar
                       </button>
@@ -396,7 +396,7 @@ export default function AppointmentsPage() {
                         href={appt.googleCalendarHtmlLink}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[10px] font-black text-teal-600 hover:text-teal-700 bg-teal-50 px-2.5 py-1.5 rounded-lg border border-teal-100 flex items-center gap-1 transition-colors"
+                        className="text-[10px] font-black text-teal-700 hover:text-teal-800 bg-teal-50 px-2.5 py-1.5 rounded-lg border border-teal-100 flex items-center gap-1 transition-colors"
                       >
                         <span>Abrir en Calendar</span>
                         <ExternalLink className="h-3.5 w-3.5" />
@@ -514,7 +514,7 @@ export default function AppointmentsPage() {
             </button>
             <button
               type="submit"
-              className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
+              className="flex-1 h-11 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
             >
               <Save className="h-4 w-4" />
               <span>Programar</span>
@@ -527,14 +527,14 @@ export default function AppointmentsPage() {
       {(calendarStatus === 'connecting' || calendarStatus === 'authorizing' || calendarStatus === 'sincronizando') && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl flex flex-col items-center gap-5 text-center">
-            <Loader2 className="h-10 w-10 text-teal-600 animate-spin" />
+            <Loader2 className="h-10 w-10 text-teal-700 animate-spin" />
             <div>
               <h4 className="text-sm font-extrabold text-slate-800 mb-1">
                 {calendarStatus === 'connecting' ? 'Conectando con Google Calendar' :
                  calendarStatus === 'authorizing' ? 'Esperando autorización' :
                  'Sincronizando cita...'}
               </h4>
-              <p className="text-xs text-slate-400 px-2 leading-relaxed">
+              <p className="text-xs text-slate-500 px-2 leading-relaxed">
                 {calendarStatus === 'authorizing' 
                   ? 'Por favor, concede permisos en la ventana de Google...' 
                   : 'Registrando el evento con alertas automáticas (1 día y 3 horas antes)...'}

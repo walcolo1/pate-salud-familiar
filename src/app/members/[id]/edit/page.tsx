@@ -126,7 +126,7 @@ export default function EditMemberPage() {
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 text-center select-none">
         <ShieldAlert className="h-12 w-12 text-rose-500" />
         <h3 className="font-extrabold text-slate-800 text-lg">Miembro no encontrado</h3>
-        <Link href="/members" className="text-sm font-bold text-teal-600 hover:underline">
+        <Link href="/members" className="text-sm font-bold text-teal-700 hover:underline">
           Volver a la lista de familiares
         </Link>
       </div>
@@ -261,7 +261,7 @@ export default function EditMemberPage() {
         
         {/* Error notification */}
         {error && (
-          <div className="flex gap-2.5 p-3.5 bg-rose-50 border border-rose-100 rounded-xl text-xs text-rose-600 font-semibold items-center">
+          <div className="flex gap-2.5 p-3.5 bg-rose-50 border border-rose-100 rounded-xl text-xs text-rose-700 font-semibold items-center">
             <ShieldAlert className="h-4.5 w-4.5" />
             <span>{error}</span>
           </div>
@@ -292,7 +292,7 @@ export default function EditMemberPage() {
             </label>
           </div>
           <div className="flex gap-2 text-[10px] font-bold">
-            <label className="cursor-pointer text-teal-600 hover:text-teal-700 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-100 transition-colors">
+            <label className="cursor-pointer text-teal-700 hover:text-teal-800 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-100 transition-colors">
               Subir imagen
               <input 
                 type="file" 
@@ -309,14 +309,14 @@ export default function EditMemberPage() {
                   setAvatarPreview(null);
                   setIsAvatarDeleted(true);
                 }} 
-                className="text-rose-600 hover:text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 flex items-center gap-1 transition-colors"
+                className="text-rose-700 hover:text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 flex items-center gap-1 transition-colors"
               >
                 <Trash2 className="h-3 w-3" />
                 Eliminar
               </button>
             )}
           </div>
-          <span className="text-[10px] text-slate-400 font-semibold leading-none">Formatos soportados: JPG, PNG · Máximo 2MB</span>
+          <span className="text-[10px] text-slate-500 font-semibold leading-none">Formatos soportados: JPG, PNG · Máximo 2MB</span>
         </div>
 
         {/* Full Name */}
@@ -440,13 +440,13 @@ export default function EditMemberPage() {
           <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
             <div>
               <h5 className="text-xs font-extrabold text-slate-800 leading-tight mb-0.5">Habilitar acceso al portal</h5>
-              <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">Permite iniciar sesión con este correo y ver su expediente</p>
+              <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">Permite iniciar sesión con este correo y ver su expediente</p>
             </div>
             <button 
               type="button"
               onClick={() => setCanAccessPortal(!canAccessPortal)}
               className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none ${
-                canAccessPortal ? 'bg-teal-600 flex justify-end' : 'bg-slate-200 flex justify-start'
+                canAccessPortal ? 'bg-teal-700 flex justify-end' : 'bg-slate-200 flex justify-start'
               }`}
             >
               <span className="w-4.5 h-4.5 rounded-full bg-white shadow" />
@@ -492,7 +492,7 @@ export default function EditMemberPage() {
                       type="checkbox"
                       checked={perm.checked}
                       onChange={(e) => perm.setter(e.target.checked)}
-                      className="rounded border-slate-300 text-teal-600 focus:ring-teal-500/20 h-4.5 w-4.5 cursor-pointer accent-teal-600"
+                      className="rounded border-slate-300 text-teal-700 focus:ring-teal-500/20 h-4.5 w-4.5 cursor-pointer accent-teal-600"
                     />
                     <span>{perm.label}</span>
                   </label>
@@ -516,7 +516,7 @@ export default function EditMemberPage() {
 
         <button
           type="submit"
-          className="flex items-center justify-center gap-2 w-full h-13 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold rounded-2xl shadow-md shadow-teal-600/10 active:translate-y-0.5 transition-all duration-200"
+          className="flex items-center justify-center gap-2 w-full h-13 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold rounded-2xl shadow-md shadow-teal-600/10 active:translate-y-0.5 transition-all duration-200"
         >
           <Save className="h-4.5 w-4.5" />
           <span>Guardar Cambios</span>

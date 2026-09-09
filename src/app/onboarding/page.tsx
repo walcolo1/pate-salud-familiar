@@ -52,7 +52,7 @@ export default function OnboardingPage() {
       <div className="flex justify-end">
         <button 
           onClick={() => router.push('/login')}
-          className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
+          className="text-sm font-bold text-slate-500 hover:text-slate-600 transition-colors"
         >
           Saltar tutorial
         </button>
@@ -84,7 +84,7 @@ export default function OnboardingPage() {
             <span 
               key={index} 
               className={`h-2.5 rounded-full transition-all duration-300 ${
-                index === currentStep ? 'w-8 bg-teal-600' : 'w-2.5 bg-slate-200'
+                index === currentStep ? 'w-8 bg-teal-700' : 'w-2.5 bg-slate-200'
               }`}
             />
           ))}
@@ -93,7 +93,7 @@ export default function OnboardingPage() {
         {/* Action Button */}
         <button
           onClick={handleNext}
-          className="flex items-center justify-center gap-2 w-full h-14 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold rounded-2xl shadow-lg shadow-teal-600/10 active:translate-y-0.5 transition-all duration-200"
+          className="flex items-center justify-center gap-2 w-full h-14 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold rounded-2xl shadow-lg shadow-teal-600/10 active:translate-y-0.5 transition-all duration-200"
         >
           <span>{currentStep === steps.length - 1 ? 'Empezar ahora' : 'Siguiente paso'}</span>
           {currentStep === steps.length - 1 ? (

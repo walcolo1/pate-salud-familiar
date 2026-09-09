@@ -43,7 +43,7 @@ export default function HealthProfilePage() {
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 text-center select-none">
         <ShieldAlert className="h-12 w-12 text-rose-500" />
         <h3 className="font-extrabold text-slate-800 text-lg">Perfil de salud no encontrado</h3>
-        <Link href="/members" className="text-sm font-bold text-teal-600 hover:underline">
+        <Link href="/members" className="text-sm font-bold text-teal-700 hover:underline">
           Volver a la lista de familiares
         </Link>
       </div>
@@ -75,17 +75,17 @@ export default function HealthProfilePage() {
 
       {/* Allergies Card */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-3">
-        <div className="flex items-center gap-2.5 text-rose-600">
+        <div className="flex items-center gap-2.5 text-rose-700">
           <AlertTriangle className="h-5 w-5" />
           <h4 className="font-extrabold text-xs tracking-wide uppercase">Alergias</h4>
         </div>
         <hr className="border-slate-50" />
         {profile.allergies.length === 0 ? (
-          <p className="text-xs text-slate-400 font-semibold">No se reportan alergias conocidas.</p>
+          <p className="text-xs text-slate-500 font-semibold">No se reportan alergias conocidas.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {profile.allergies.map((allergy, i) => (
-              <span key={i} className="text-xs font-extrabold bg-rose-50 text-rose-600 px-3 py-1.5 rounded-xl border border-rose-100">
+              <span key={i} className="text-xs font-extrabold bg-rose-50 text-rose-700 px-3 py-1.5 rounded-xl border border-rose-100">
                 ⚠️ {allergy}
               </span>
             ))}
@@ -101,11 +101,11 @@ export default function HealthProfilePage() {
         </div>
         <hr className="border-slate-50" />
         {profile.chronicConditions.length === 0 ? (
-          <p className="text-xs text-slate-400 font-semibold">No se reportan condiciones médicas crónicas.</p>
+          <p className="text-xs text-slate-500 font-semibold">No se reportan condiciones médicas crónicas.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {profile.chronicConditions.map((cond, i) => (
-              <span key={i} className="text-xs font-extrabold bg-amber-50 text-amber-600 px-3 py-1.5 rounded-xl border border-amber-100">
+              <span key={i} className="text-xs font-extrabold bg-amber-50 text-amber-700 px-3 py-1.5 rounded-xl border border-amber-100">
                 {cond}
               </span>
             ))}
@@ -115,13 +115,13 @@ export default function HealthProfilePage() {
 
       {/* Current Medications */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-3">
-        <div className="flex items-center gap-2.5 text-teal-600">
+        <div className="flex items-center gap-2.5 text-teal-700">
           <Activity className="h-5 w-5" />
           <h4 className="font-extrabold text-xs tracking-wide uppercase">Medicamentos Actuales</h4>
         </div>
         <hr className="border-slate-50" />
         {profile.currentMedications.length === 0 ? (
-          <p className="text-xs text-slate-400 font-semibold">No consume medicamentos de rutina actualmente.</p>
+          <p className="text-xs text-slate-500 font-semibold">No consume medicamentos de rutina actualmente.</p>
         ) : (
           <div className="flex flex-col gap-2">
             {profile.currentMedications.map((med, i) => (
@@ -144,7 +144,7 @@ export default function HealthProfilePage() {
             <User className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-[10px] text-slate-400 font-bold block leading-none mb-1">Médico de cabecera</span>
+            <span className="text-[10px] text-slate-500 font-bold block leading-none mb-1">Médico de cabecera</span>
             <p className="text-xs font-extrabold text-slate-700">{profile.primaryDoctor || 'No asignado'}</p>
           </div>
         </div>
@@ -155,7 +155,7 @@ export default function HealthProfilePage() {
             <Activity className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-[10px] text-slate-400 font-bold block leading-none mb-1">Entidad de Salud (EPS)</span>
+            <span className="text-[10px] text-slate-500 font-bold block leading-none mb-1">Entidad de Salud (EPS)</span>
             <p className="text-xs font-extrabold text-slate-700">{profile.insuranceInfo || 'No asignada'}</p>
           </div>
         </div>
@@ -166,7 +166,7 @@ export default function HealthProfilePage() {
             <Phone className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-[10px] text-slate-400 font-bold block leading-none mb-1">Contacto de Emergencia</span>
+            <span className="text-[10px] text-slate-500 font-bold block leading-none mb-1">Contacto de Emergencia</span>
             <p className="text-xs font-extrabold text-slate-700">{profile.emergencyContact || 'No asignado'}</p>
           </div>
         </div>

@@ -262,12 +262,12 @@ export default function AppointmentsImportPage() {
       {/* Header Info */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="p-2 hover:bg-slate-50 text-slate-600 rounded-xl transition-colors">
+          <Link href="/dashboard" aria-label="Volver al panel" className="p-2 hover:bg-slate-50 text-slate-600 rounded-xl transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
             <h2 className="text-2xl font-black text-slate-800 leading-tight">Importar una cita</h2>
-            <p className="text-xs font-semibold text-slate-400">Pega el texto del correo de tu EPS o adjunta el documento.</p>
+            <p className="text-xs font-semibold text-slate-500">Pega el texto del correo de tu EPS o adjunta el documento.</p>
           </div>
         </div>
         <Link href="/settings" className="p-2.5 hover:bg-slate-50 text-slate-500 hover:text-slate-800 rounded-xl transition-all shadow-sm border border-slate-100 flex items-center gap-1.5 text-xs font-bold bg-white">
@@ -289,7 +289,7 @@ export default function AppointmentsImportPage() {
       <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
         <div className="flex flex-col gap-1">
           <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Pega el correo o adjunta el documento</h4>
-          <p className="text-[10px] text-slate-400 font-semibold">
+          <p className="text-[10px] text-slate-500 font-semibold">
             Copia el texto del mensaje que te envió la EPS. Se reconocerán paciente, fecha, hora, médico, especialidad y lugar.
           </p>
         </div>
@@ -306,14 +306,14 @@ export default function AppointmentsImportPage() {
 
         {avisoAdjunto && (
           <div id="aviso-adjunto" className="p-3.5 bg-amber-50 border border-amber-100 rounded-2xl text-amber-800 text-[11px] leading-relaxed font-semibold flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <AlertTriangle className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
             <span>{avisoAdjunto}</span>
           </div>
         )}
 
         {errorAdjunto && (
           <div id="error-adjunto" className="p-3.5 bg-rose-50 border border-rose-100 rounded-2xl text-rose-700 text-[11px] leading-relaxed font-bold flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+            <AlertTriangle className="h-4 w-4 text-rose-700 shrink-0 mt-0.5" />
             <span>{errorAdjunto}</span>
           </div>
         )}
@@ -357,7 +357,7 @@ export default function AppointmentsImportPage() {
 
         {resultado && (
           <div id="resultado-borrador" className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-800 text-[11px] leading-relaxed font-semibold flex items-start gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+            <CheckCircle2 className="h-4 w-4 text-emerald-700 shrink-0 mt-0.5" />
             <span>{resultado}</span>
           </div>
         )}
@@ -368,7 +368,7 @@ export default function AppointmentsImportPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex flex-col gap-1">
             <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Citas médicas detectadas</h4>
-            <p className="text-[10px] text-slate-400 font-semibold">Revisa y aprueba las sugerencias para registrarlas en tu expediente familiar.</p>
+            <p className="text-[10px] text-slate-500 font-semibold">Revisa y aprueba las sugerencias para registrarlas en tu expediente familiar.</p>
           </div>
 
           {/* Selector de filtro */}
@@ -376,7 +376,7 @@ export default function AppointmentsImportPage() {
             <button
               onClick={() => setFilterStatus('PENDING_REVIEW')}
               className={`px-3 py-1.5 rounded-lg text-[10px] font-black leading-none transition-all ${
-                filterStatus === 'PENDING_REVIEW' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-700'
+                filterStatus === 'PENDING_REVIEW' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               Pendientes
@@ -384,7 +384,7 @@ export default function AppointmentsImportPage() {
             <button
               onClick={() => setFilterStatus('IMPORTED')}
               className={`px-3 py-1.5 rounded-lg text-[10px] font-black leading-none transition-all ${
-                filterStatus === 'IMPORTED' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-700'
+                filterStatus === 'IMPORTED' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               Importadas
@@ -392,7 +392,7 @@ export default function AppointmentsImportPage() {
             <button
               onClick={() => setFilterStatus('DUPLICATE')}
               className={`px-3 py-1.5 rounded-lg text-[10px] font-black leading-none transition-all ${
-                filterStatus === 'DUPLICATE' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-700'
+                filterStatus === 'DUPLICATE' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               Duplicadas
@@ -400,7 +400,7 @@ export default function AppointmentsImportPage() {
             <button
               onClick={() => setFilterStatus('IGNORED')}
               className={`px-3 py-1.5 rounded-lg text-[10px] font-black leading-none transition-all ${
-                filterStatus === 'IGNORED' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-700'
+                filterStatus === 'IGNORED' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               Ignoradas
@@ -415,7 +415,7 @@ export default function AppointmentsImportPage() {
           {/* Info banner for IGNORED tab */}
           {filterStatus === 'IGNORED' && filteredCandidates.length === 0 && (
             <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-800 text-[10px] font-semibold leading-relaxed flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <AlertCircle className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
               <div>
                 <span className="font-bold block text-xs mb-0.5">Sin citas ignoradas aún</span>
                 <p>Cuando el filtro <strong>&quot;Solo citas futuras&quot;</strong> está activo, las citas detectadas cuya fecha ya pasó se ignoran automáticamente y aparecerán aquí. Puedes activar este filtro en <strong>Configuración → Escaneo automático</strong>.</p>
@@ -429,7 +429,7 @@ export default function AppointmentsImportPage() {
             </div>
           )}
           {filteredCandidates.length === 0 && filterStatus !== 'IGNORED' ? (
-            <div className="text-center py-10 text-slate-400 text-xs font-semibold">
+            <div className="text-center py-10 text-slate-500 text-xs font-semibold">
               No hay borradores en esta pestaña. Pega el texto de un correo arriba y presiona &quot;Crear borrador&quot;.
             </div>
           ) : (
@@ -454,7 +454,7 @@ export default function AppointmentsImportPage() {
                     {/* Confidencia badge */}
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] text-slate-400 font-bold">Confianza de extracción:</span>
+                        <span className="text-[9px] text-slate-500 font-bold">Confianza de extracción:</span>
                         <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase leading-none ${
                           cand.confidence === 'HIGH' ? 'bg-emerald-100 text-emerald-800' :
                           cand.confidence === 'MEDIUM' ? 'bg-amber-100 text-amber-800' :
@@ -464,20 +464,20 @@ export default function AppointmentsImportPage() {
                            cand.confidence === 'MEDIUM' ? 'Media' : 'Baja'}
                         </span>
                       </div>
-                      <span className="text-[9.5px] text-slate-400 font-medium">Recibido: {new Date(cand.receivedAt).toLocaleDateString('es-CO')}</span>
+                      <span className="text-[9.5px] text-slate-500 font-medium">Recibido: {new Date(cand.receivedAt).toLocaleDateString('es-CO')}</span>
                     </div>
 
                     {/* Email info summary */}
                     <div className="bg-white p-3 rounded-2xl border border-slate-100 flex flex-col gap-1">
                       <p className="text-slate-800 font-extrabold text-[11.5px] leading-tight truncate">{cand.subject}</p>
-                      <p className="text-[9.5px] text-slate-400 font-bold">De: {cand.sourceEmail}</p>
+                      <p className="text-[9.5px] text-slate-500 font-bold">De: {cand.sourceEmail}</p>
                       <p className="text-[10px] text-slate-500 font-medium italic mt-1 leading-normal">&quot;{cand.rawSnippet}&quot;</p>
                     </div>
 
                     {/* Alertas de Validación */}
                     {!hasPatientMatched && editingCandidateId !== cand.id && cand.status === 'PENDING_REVIEW' && (
                       <div className="bg-rose-50 border border-rose-100 rounded-xl p-3 text-rose-700 text-[10px] leading-relaxed flex items-start gap-2">
-                        <AlertTriangle className="h-4.5 w-4.5 text-rose-600 shrink-0 mt-0.5" />
+                        <AlertTriangle className="h-4.5 w-4.5 text-rose-700 shrink-0 mt-0.5" />
                         <div>
                           <span className="font-bold text-rose-950 block text-[10.5px]">Paciente no detectado o ambiguo</span>
                           <p>Por seguridad, debes presionar &quot;Editar Detalles&quot; y asociar esta cita a un familiar de tu grupo antes de poder importarla.</p>
@@ -487,7 +487,7 @@ export default function AppointmentsImportPage() {
 
                     {isLowConfidence && editingCandidateId !== cand.id && cand.status === 'PENDING_REVIEW' && (
                       <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-amber-700 text-[10px] leading-relaxed flex items-start gap-2">
-                        <AlertTriangle className="h-4.5 w-4.5 text-amber-600 shrink-0 mt-0.5" />
+                        <AlertTriangle className="h-4.5 w-4.5 text-amber-700 shrink-0 mt-0.5" />
                         <div>
                           <span className="font-bold text-amber-950 block text-[10.5px]">Confianza baja detectada</span>
                           <p>Algunos campos de la cita (fecha, hora o médico) no pudieron ser extraídos con precisión. Presiona &quot;Editar Detalles&quot; para corregirlos e importarla.</p>
@@ -499,51 +499,51 @@ export default function AppointmentsImportPage() {
                     {editingCandidateId !== cand.id ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
                         <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-slate-400 shrink-0" />
+                          <User className="h-4 w-4 text-slate-500 shrink-0" />
                           <div>
-                            <span className="text-[8.5px] text-slate-400 uppercase font-bold block leading-none mb-0.5">Paciente</span>
-                            <span className={`text-xs font-black ${hasPatientMatched ? 'text-teal-700' : 'text-slate-400'}`}>
+                            <span className="text-[8.5px] text-slate-500 uppercase font-bold block leading-none mb-0.5">Paciente</span>
+                            <span className={`text-xs font-black ${hasPatientMatched ? 'text-teal-700' : 'text-slate-500'}`}>
                               {cand.detectedPatientName || 'No detectado'}
                             </span>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
+                          <Calendar className="h-4 w-4 text-slate-500 shrink-0" />
                           <div>
-                            <span className="text-[8.5px] text-slate-400 uppercase font-bold block leading-none mb-0.5">Fecha</span>
+                            <span className="text-[8.5px] text-slate-500 uppercase font-bold block leading-none mb-0.5">Fecha</span>
                             <span className="text-xs font-black text-slate-700">{cand.detectedDate || 'No detectada'}</span>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-slate-400 shrink-0" />
+                          <Clock className="h-4 w-4 text-slate-500 shrink-0" />
                           <div>
-                            <span className="text-[8.5px] text-slate-400 uppercase font-bold block leading-none mb-0.5">Hora</span>
+                            <span className="text-[8.5px] text-slate-500 uppercase font-bold block leading-none mb-0.5">Hora</span>
                             <span className="text-xs font-black text-slate-700">{cand.detectedTime || 'No detectada'}</span>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <Activity className="h-4 w-4 text-slate-400 shrink-0" />
+                          <Activity className="h-4 w-4 text-slate-500 shrink-0" />
                           <div>
-                            <span className="text-[8.5px] text-slate-400 uppercase font-bold block leading-none mb-0.5">Especialidad</span>
+                            <span className="text-[8.5px] text-slate-500 uppercase font-bold block leading-none mb-0.5">Especialidad</span>
                             <span className="text-xs font-black text-slate-700">{cand.detectedSpecialty || 'Medicina General'}</span>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-slate-400 shrink-0" />
+                          <User className="h-4 w-4 text-slate-500 shrink-0" />
                           <div>
-                            <span className="text-[8.5px] text-slate-400 uppercase font-bold block leading-none mb-0.5">Médico</span>
+                            <span className="text-[8.5px] text-slate-500 uppercase font-bold block leading-none mb-0.5">Médico</span>
                             <span className="text-xs font-black text-slate-700">{cand.detectedDoctor || 'Médico'}</span>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
+                          <MapPin className="h-4 w-4 text-slate-500 shrink-0" />
                           <div>
-                            <span className="text-[8.5px] text-slate-400 uppercase font-bold block leading-none mb-0.5">Ubicación</span>
+                            <span className="text-[8.5px] text-slate-500 uppercase font-bold block leading-none mb-0.5">Ubicación</span>
                             <span className="text-xs font-black text-slate-700">{cand.detectedLocation || 'Consultorio'}</span>
                           </div>
                         </div>
@@ -557,7 +557,7 @@ export default function AppointmentsImportPage() {
                           
                           {/* Selector de Miembro */}
                           <div className="flex flex-col gap-1">
-                            <label htmlFor="imp-familiar-paciente" className="text-[8.5px] text-slate-400 uppercase font-bold">Familiar Paciente</label>
+                            <label htmlFor="imp-familiar-paciente" className="text-[8.5px] text-slate-500 uppercase font-bold">Familiar Paciente</label>
                             <select
                               id="imp-familiar-paciente"
                               value={editMemberId}
@@ -578,7 +578,7 @@ export default function AppointmentsImportPage() {
                           </div>
 
                           <div className="flex flex-col gap-1">
-                            <label htmlFor="imp-fecha" className="text-[8.5px] text-slate-400 uppercase font-bold">Fecha</label>
+                            <label htmlFor="imp-fecha" className="text-[8.5px] text-slate-500 uppercase font-bold">Fecha</label>
                             <input
                               id="imp-fecha"
                               type="date"
@@ -589,7 +589,7 @@ export default function AppointmentsImportPage() {
                           </div>
 
                           <div className="flex flex-col gap-1">
-                            <label htmlFor="imp-hora" className="text-[8.5px] text-slate-400 uppercase font-bold">Hora</label>
+                            <label htmlFor="imp-hora" className="text-[8.5px] text-slate-500 uppercase font-bold">Hora</label>
                             <input
                               id="imp-hora"
                               type="time"
@@ -600,7 +600,7 @@ export default function AppointmentsImportPage() {
                           </div>
 
                           <div className="flex flex-col gap-1">
-                            <label htmlFor="imp-especialidad" className="text-[8.5px] text-slate-400 uppercase font-bold">Especialidad</label>
+                            <label htmlFor="imp-especialidad" className="text-[8.5px] text-slate-500 uppercase font-bold">Especialidad</label>
                             <input
                               id="imp-especialidad"
                               type="text"
@@ -611,7 +611,7 @@ export default function AppointmentsImportPage() {
                           </div>
 
                           <div className="flex flex-col gap-1">
-                            <label htmlFor="imp-medico" className="text-[8.5px] text-slate-400 uppercase font-bold">Médico</label>
+                            <label htmlFor="imp-medico" className="text-[8.5px] text-slate-500 uppercase font-bold">Médico</label>
                             <input
                               id="imp-medico"
                               type="text"
@@ -622,7 +622,7 @@ export default function AppointmentsImportPage() {
                           </div>
 
                           <div className="flex flex-col gap-1">
-                            <label htmlFor="imp-ubicacion" className="text-[8.5px] text-slate-400 uppercase font-bold">Ubicación</label>
+                            <label htmlFor="imp-ubicacion" className="text-[8.5px] text-slate-500 uppercase font-bold">Ubicación</label>
                             <input
                               id="imp-ubicacion"
                               type="text"
@@ -665,7 +665,7 @@ export default function AppointmentsImportPage() {
                           ) : null}
                           <button
                             onClick={() => handleIgnore(cand.id)}
-                            className="py-2 px-3.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 rounded-xl font-bold text-[10px] transition-colors"
+                            className="py-2 px-3.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-100 rounded-xl font-bold text-[10px] transition-colors"
                           >
                             Ignorar sugerencia
                           </button>
@@ -674,7 +674,7 @@ export default function AppointmentsImportPage() {
                         <button
                           onClick={() => handleImport(cand)}
                           disabled={isImportDisabled}
-                          className="py-2 px-4.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 disabled:border-transparent text-white rounded-xl font-black text-[10.5px] transition-all flex items-center gap-1 leading-none shadow-sm"
+                          className="py-2 px-4.5 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 disabled:bg-slate-200 disabled:text-slate-400 disabled:border-transparent text-white rounded-xl font-black text-[10.5px] transition-all flex items-center gap-1 leading-none shadow-sm"
                         >
                           <Check className="h-3.5 w-3.5" />
                           <span>Importar Cita Médica</span>
@@ -684,21 +684,21 @@ export default function AppointmentsImportPage() {
 
                     {cand.status === 'IMPORTED' && (
                       <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-emerald-700 text-[10px] leading-relaxed flex items-center gap-2 mt-1">
-                        <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
+                        <CheckCircle2 className="h-4.5 w-4.5 text-emerald-700 shrink-0" />
                         <span>Esta cita ya ha sido importada exitosamente en el expediente médico.</span>
                       </div>
                     )}
 
                     {cand.status === 'DUPLICATE' && (
                       <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-amber-700 text-[10px] leading-relaxed flex items-center gap-2 mt-1">
-                        <AlertTriangle className="h-4.5 w-4.5 text-amber-600 shrink-0" />
+                        <AlertTriangle className="h-4.5 w-4.5 text-amber-700 shrink-0" />
                         <span>Sugerencia duplicada: Ya existe una cita idéntica en el expediente.</span>
                       </div>
                     )}
 
                     {cand.status === 'IGNORED' && (
                       <div className="bg-slate-200/50 border border-slate-300/40 rounded-xl p-3 text-slate-500 text-[10px] leading-relaxed flex items-center gap-2 mt-1">
-                        <X className="h-4 w-4 text-slate-400 shrink-0" />
+                        <X className="h-4 w-4 text-slate-500 shrink-0" />
                         <span>Sugerencia descartada.</span>
                       </div>
                     )}

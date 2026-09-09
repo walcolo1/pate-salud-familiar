@@ -128,7 +128,7 @@ export default function ExamsPage() {
         </Link>
         <button
           onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md active:translate-y-0.5 transition-all duration-200"
+          className="flex items-center gap-2 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md active:translate-y-0.5 transition-all duration-200"
         >
           <Plus className="h-4 w-4" />
           <span>Registrar examen</span>
@@ -138,7 +138,7 @@ export default function ExamsPage() {
       {/* Header Info */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <h3 className="font-extrabold text-slate-800 text-base leading-tight mb-1">Exámenes de {member.fullName.split(' ')[0]}</h3>
-        <p className="text-xs font-semibold text-slate-400">Resultados de laboratorio clínico y análisis diagnósticos.</p>
+        <p className="text-xs font-semibold text-slate-500">Resultados de laboratorio clínico y análisis diagnósticos.</p>
       </section>
 
       {/* Exams List */}
@@ -147,7 +147,7 @@ export default function ExamsPage() {
           <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center flex flex-col items-center justify-center gap-3">
             <Beaker className="h-10 w-10 text-slate-300 animate-pulse" />
             <p className="text-sm font-bold text-slate-800">Sin exámenes clínicos</p>
-            <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+            <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
               Registra hemogramas, lipidogramas u otros análisis de laboratorio para ver las métricas de salud.
             </p>
           </div>
@@ -165,12 +165,12 @@ export default function ExamsPage() {
                 <div className="flex justify-between items-start">
                   <div>
                     <h4 className="text-sm font-extrabold text-slate-800 group-hover:text-teal-600 transition-colors leading-tight mb-0.5">{exam.examName}</h4>
-                    <span className="text-[10px] text-slate-400 font-bold">{exam.orderedBy} · {exam.laboratory || 'Lab'}</span>
+                    <span className="text-[10px] text-slate-500 font-bold">{exam.orderedBy} · {exam.laboratory || 'Lab'}</span>
                   </div>
                   {hasAlert ? (
-                    <span className="text-[9px] font-extrabold bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full border border-rose-100 uppercase animate-pulse">Alerta</span>
+                    <span className="text-[9px] font-extrabold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full border border-rose-100 uppercase">Alerta</span>
                   ) : (
-                    <span className="text-[9px] font-extrabold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-600/10 uppercase">Estable</span>
+                    <span className="text-[9px] font-extrabold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-600/10 uppercase">Estable</span>
                   )}
                 </div>
 
@@ -179,10 +179,10 @@ export default function ExamsPage() {
                 {/* Details summary */}
                 <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-teal-600" />
+                    <Calendar className="h-4 w-4 text-teal-700" />
                     <span>Realizado: {new Date(exam.orderedDate).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                   </div>
-                  <span className="text-[10px] font-extrabold text-teal-600 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                  <span className="text-[10px] font-extrabold text-teal-700 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
                     Ver valores <Info className="h-3.5 w-3.5" />
                   </span>
                 </div>
@@ -206,7 +206,7 @@ export default function ExamsPage() {
 
         <div className="flex flex-col gap-3 mb-6">
           {currentResults.length === 0 ? (
-            <p className="text-xs text-slate-400 font-semibold text-center py-4">No se capturaron métricas individuales.</p>
+            <p className="text-xs text-slate-500 font-semibold text-center py-4">No se capturaron métricas individuales.</p>
           ) : (
             currentResults.map((res) => (
               <div 
@@ -219,14 +219,14 @@ export default function ExamsPage() {
               >
                 <div>
                   <h5 className="text-xs font-bold leading-tight">{res.parameterName}</h5>
-                  <span className="text-[9px] text-slate-400 font-bold block">Ref: {res.referenceRange}</span>
+                  <span className="text-[9px] text-slate-500 font-bold block">Ref: {res.referenceRange}</span>
                 </div>
                 <div className="text-right">
-                  <span className={`text-sm font-black block ${res.isAbnormal ? 'text-rose-600 font-black' : 'text-slate-800'}`}>
+                  <span className={`text-sm font-black block ${res.isAbnormal ? 'text-rose-700 font-black' : 'text-slate-800'}`}>
                     {res.value} <span className="text-[10px] font-normal">{res.unit}</span>
                   </span>
                   {res.isAbnormal && (
-                    <span className="text-[8px] font-extrabold bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded uppercase">Anormal</span>
+                    <span className="text-[8px] font-extrabold bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded uppercase">Anormal</span>
                   )}
                 </div>
               </div>
@@ -343,7 +343,7 @@ export default function ExamsPage() {
             </button>
             <button
               type="submit"
-              className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
+              className="flex-1 h-11 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
             >
               <Save className="h-4 w-4" />
               <span>Guardar</span>

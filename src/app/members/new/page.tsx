@@ -158,7 +158,7 @@ export default function NewMemberPage() {
         
         {/* Error notification */}
         {error && (
-          <div className="flex gap-2.5 p-3.5 bg-rose-50 border border-rose-100 rounded-xl text-xs text-rose-600 font-semibold items-center">
+          <div className="flex gap-2.5 p-3.5 bg-rose-50 border border-rose-100 rounded-xl text-xs text-rose-700 font-semibold items-center">
             <ShieldAlert className="h-4.5 w-4.5" />
             <span>{error}</span>
           </div>
@@ -189,7 +189,7 @@ export default function NewMemberPage() {
             </label>
           </div>
           <div className="flex gap-2 text-[10px] font-bold">
-            <label className="cursor-pointer text-teal-600 hover:text-teal-700 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-100 transition-colors">
+            <label className="cursor-pointer text-teal-700 hover:text-teal-800 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-100 transition-colors">
               Subir imagen
               <input 
                 type="file" 
@@ -205,14 +205,14 @@ export default function NewMemberPage() {
                   setAvatarFile(null);
                   setAvatarPreview(null);
                 }} 
-                className="text-rose-600 hover:text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 flex items-center gap-1 transition-colors"
+                className="text-rose-700 hover:text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 flex items-center gap-1 transition-colors"
               >
                 <Trash2 className="h-3 w-3" />
                 Eliminar
               </button>
             )}
           </div>
-          <span className="text-[10px] text-slate-400 font-semibold leading-none">Formatos soportados: JPG, PNG · Máximo 2MB</span>
+          <span className="text-[10px] text-slate-500 font-semibold leading-none">Formatos soportados: JPG, PNG · Máximo 2MB</span>
         </div>
 
         {/* Full Name */}
@@ -328,7 +328,7 @@ export default function NewMemberPage() {
 
         <button
           type="submit"
-          className="flex items-center justify-center gap-2 w-full h-13 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold rounded-2xl shadow-md shadow-teal-600/10 active:translate-y-0.5 transition-all duration-200"
+          className="flex items-center justify-center gap-2 w-full h-13 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold rounded-2xl shadow-md shadow-teal-600/10 active:translate-y-0.5 transition-all duration-200"
         >
           <Save className="h-4.5 w-4.5" />
           <span>Guardar Familiar</span>

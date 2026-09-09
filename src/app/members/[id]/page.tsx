@@ -94,7 +94,7 @@ export default function MemberDetailPage() {
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 text-center select-none">
         <ShieldAlert className="h-12 w-12 text-rose-500" />
         <h3 className="font-extrabold text-slate-800 text-lg">Miembro no encontrado</h3>
-        <Link href="/members" className="text-sm font-bold text-teal-600 hover:underline">
+        <Link href="/members" className="text-sm font-bold text-teal-700 hover:underline">
           Volver a la lista de familiares
         </Link>
       </div>
@@ -154,7 +154,7 @@ export default function MemberDetailPage() {
       description: 'Alergias, medicamentos y condiciones crónicas',
       href: `/members/${id}/health`,
       icon: Heart,
-      color: 'bg-emerald-50 text-emerald-600 border-emerald-100/50',
+      color: 'bg-emerald-50 text-emerald-700 border-emerald-100/50',
       badge: null
     },
     {
@@ -164,7 +164,7 @@ export default function MemberDetailPage() {
         : 'Ver historial de citas y programar',
       href: `/members/${id}/appts`,
       icon: Calendar,
-      color: 'bg-teal-50 text-teal-600 border-teal-100/50',
+      color: 'bg-teal-50 text-teal-700 border-teal-100/50',
       badge: nextAppt ? 'Programada' : null,
       badgeColor: 'bg-teal-100 text-teal-700'
     },
@@ -208,7 +208,7 @@ export default function MemberDetailPage() {
       description: 'Trámites de EPS, órdenes médicas y autorizaciones',
       href: `/members/${id}/orders`,
       icon: ClipboardList,
-      color: 'bg-amber-50 text-amber-600 border-amber-100/50',
+      color: 'bg-amber-50 text-amber-700 border-amber-100/50',
       badge: pendingOrders > 0 ? `${pendingOrders} pendiente` : null,
       badgeColor: 'bg-amber-100 text-amber-700 font-bold'
     },
@@ -217,7 +217,7 @@ export default function MemberDetailPage() {
       description: 'Control de tratamientos, tomas diarias y recordatorios',
       href: `/members/${id}/medications`,
       icon: Pill,
-      color: 'bg-rose-50 text-rose-600 border-rose-100/50',
+      color: 'bg-rose-50 text-rose-700 border-rose-100/50',
       badge: activePrescriptions > 0 ? `${activePrescriptions} activo` : null,
       badgeColor: 'bg-rose-100 text-rose-700 font-bold'
     },
@@ -284,19 +284,19 @@ export default function MemberDetailPage() {
                 Inactivo
               </span>
             ) : (
-              <span className="text-[9px] font-extrabold bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded-full uppercase leading-none">
+              <span className="text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full uppercase leading-none">
                 Activo
               </span>
             )}
           </div>
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5 text-xs font-semibold text-slate-400">
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5 text-xs font-semibold text-slate-500">
             <span>{relationshipMap[member.relationship]}</span>
             <span>·</span>
             <span>{age} {age === 1 ? 'año' : 'años'} ({member.birthDate})</span>
             {member.bloodType && member.bloodType !== 'UNKNOWN' && (
               <>
                 <span>·</span>
-                <span className="text-teal-600 font-extrabold uppercase">RH {bloodTypeMap[member.bloodType]}</span>
+                <span className="text-teal-700 font-extrabold uppercase">RH {bloodTypeMap[member.bloodType]}</span>
               </>
             )}
             {member.documentType && member.documentNumber && (
@@ -347,7 +347,7 @@ export default function MemberDetailPage() {
               {/* Text */}
               <div className="flex-1 min-w-0">
                 <h4 className="text-xs font-extrabold text-slate-800 mb-0.5 leading-none">{cat.title}</h4>
-                <p className="text-[10px] text-slate-400 font-semibold truncate leading-tight">{cat.description}</p>
+                <p className="text-[10px] text-slate-500 font-semibold truncate leading-tight">{cat.description}</p>
               </div>
 
               {/* Optional badge */}
@@ -372,13 +372,13 @@ export default function MemberDetailPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-xs font-extrabold text-slate-800 mb-0.5">Estado del acceso</h4>
-                <p className="text-[10px] text-slate-400 font-semibold">{member.email}</p>
+                <p className="text-[10px] text-slate-500 font-semibold">{member.email}</p>
               </div>
               <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border uppercase leading-none ${
-                member.permissionStatus === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                member.permissionStatus === 'INVITED' ? 'bg-blue-50 text-blue-600 border-blue-100 animate-pulse' :
-                member.permissionStatus === 'REVOKED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                'bg-slate-50 text-slate-400 border-slate-200'
+                member.permissionStatus === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                member.permissionStatus === 'INVITED' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                member.permissionStatus === 'REVOKED' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                'bg-slate-50 text-slate-500 border-slate-200'
               }`}>
                 {member.permissionStatus === 'ACTIVE' ? 'Activo' :
                  member.permissionStatus === 'INVITED' ? 'Invitado' :
@@ -488,10 +488,10 @@ export default function MemberDetailPage() {
               <>
                 <div className="flex flex-col gap-1 bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
                   <h4 className="text-xs font-extrabold text-slate-700">Canal de seguridad habilitado</h4>
-                  <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">
+                  <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
                     Correo destino: <strong className="text-slate-600">{member.email}</strong>
                   </p>
-                  <p className="text-[9px] text-teal-600 font-bold mt-1 leading-normal">
+                  <p className="text-[9px] text-teal-700 font-bold mt-1 leading-normal">
                     ℹ Solo se compartirá información de este miembro. No se comparte la base familiar completa por seguridad.
                   </p>
                 </div>
@@ -504,7 +504,7 @@ export default function MemberDetailPage() {
                       alert(`Error: ${err.message}`);
                     }
                   }}
-                  className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors text-center"
+                  className="w-full py-2.5 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors text-center"
                 >
                   Crear y compartir Reporte Clínico (Sheets)
                 </button>
@@ -520,7 +520,7 @@ export default function MemberDetailPage() {
                           <div key={rep.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex items-center justify-between gap-3">
                             <div className="flex flex-col gap-0.5 min-w-0">
                               <span className="text-[10px] font-extrabold text-slate-800 truncate">Reporte {rep.memberName}</span>
-                              <span className="text-[9px] text-slate-400 font-bold">
+                              <span className="text-[9px] text-slate-500 font-bold">
                                 Compartido: {new Date(rep.sharedAt).toLocaleDateString('es-CO')}
                               </span>
                               <span className={`inline-block w-fit text-[8px] font-black px-1.5 py-0.5 rounded uppercase mt-1 leading-none ${
@@ -536,7 +536,7 @@ export default function MemberDetailPage() {
                                     href={rep.spreadsheetUrl}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="bg-white border border-slate-200 text-slate-600 hover:text-teal-600 p-2 rounded-xl text-[9px] font-black hover:bg-teal-50 transition-colors"
+                                    className="bg-white border border-slate-200 text-slate-600 hover:text-teal-700 p-2 rounded-xl text-[9px] font-black hover:bg-teal-50 transition-colors"
                                   >
                                     Abrir
                                   </a>
@@ -548,7 +548,7 @@ export default function MemberDetailPage() {
                                         alert(`Error al revocar: ${err.message}`);
                                       }
                                     }}
-                                    className="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 p-2 rounded-xl text-[9px] font-black transition-colors"
+                                    className="bg-rose-50 border border-rose-100 text-rose-700 hover:bg-rose-100 p-2 rounded-xl text-[9px] font-black transition-colors"
                                   >
                                     Revocar
                                   </button>
@@ -574,7 +574,7 @@ export default function MemberDetailPage() {
                       <div key={doc.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex items-center justify-between gap-3">
                         <div className="flex flex-col gap-0.5 min-w-0">
                           <span className="text-[10px] font-extrabold text-slate-800 truncate">{doc.fileName}</span>
-                          <span className="text-[9px] text-slate-400 font-semibold truncate">
+                          <span className="text-[9px] text-slate-500 font-semibold truncate">
                             Compartido con: {doc.sharedWithEmail}
                           </span>
                         </div>
@@ -586,7 +586,7 @@ export default function MemberDetailPage() {
                               alert(`Error al revocar: ${err.message}`);
                             }
                           }}
-                          className="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 p-2 rounded-xl text-[9px] font-black shrink-0 transition-colors"
+                          className="bg-rose-50 border border-rose-100 text-rose-700 hover:bg-rose-100 p-2 rounded-xl text-[9px] font-black shrink-0 transition-colors"
                         >
                           Revocar
                         </button>

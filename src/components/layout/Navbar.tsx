@@ -154,7 +154,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
         <div className="flex flex-col gap-8">
           {/* Logo Branding */}
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-teal-600 text-white rounded-xl shadow-md shadow-teal-600/20">
+            <div className="p-2.5 bg-teal-700 text-white rounded-xl shadow-md shadow-teal-600/20">
               <Activity className="h-6 w-6" />
             </div>
             <div>
@@ -166,7 +166,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
           {/* Sync status */}
           <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
             <span className="text-xs text-slate-500 font-semibold">Copia en Drive</span>
-            <div className="flex items-center gap-1.5 text-xs text-teal-600 font-bold">
+            <div className="flex items-center gap-1.5 text-xs text-teal-700 font-bold">
               <span className={`h-2 w-2 rounded-full ${driveSyncEnabled ? 'bg-teal-500 animate-pulse' : 'bg-slate-400'}`} />
               {driveSyncEnabled ? 'Activo' : 'Pausado'}
             </div>
@@ -187,7 +187,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
-                  <Icon className={`h-5 w-5 ${active ? 'text-teal-700' : 'text-slate-400'}`} />
+                  <Icon className={`h-5 w-5 ${active ? 'text-teal-700' : 'text-slate-500'}`} />
                   {item.label}
                 </Link>
               );
@@ -203,7 +203,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
             </div>
             <div className="truncate">
               <p className="text-xs font-bold text-slate-900 truncate leading-none mb-1">{user.displayName}</p>
-              <p className="text-[10px] text-slate-400 truncate leading-none">{user.email}</p>
+              <p className="text-[10px] text-slate-500 truncate leading-none">{user.email}</p>
             </div>
           </div>
           <button 
@@ -221,14 +221,14 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
         {/* Mobile top navigation header */}
         <header className="md:hidden flex items-center justify-between px-6 py-4 bg-white border-b border-slate-100 select-none">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-teal-600 text-white rounded-lg">
+            <div className="p-1.5 bg-teal-700 text-white rounded-lg">
               <Activity className="h-4 w-4" />
             </div>
             <span className="font-extrabold text-sm text-slate-900 leading-none">Paté Salud</span>
           </div>
           <div className="flex items-center gap-2">
             <span className={`h-2.5 w-2.5 rounded-full ${driveSyncEnabled ? 'bg-teal-500' : 'bg-slate-400'}`} />
-            <span className="text-[10px] text-slate-400 font-bold">{driveSyncEnabled ? 'Drive Synced' : 'Offline'}</span>
+            <span className="text-[10px] text-slate-500 font-bold">{driveSyncEnabled ? 'Drive Synced' : 'Offline'}</span>
           </div>
         </header>
 
@@ -248,10 +248,10 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
               key={item.href}
               href={item.href}
               className={`flex flex-col items-center justify-center w-16 h-full gap-1 transition-all duration-200 ${
-                active ? 'text-teal-600 font-bold' : 'text-slate-400'
+                active ? 'text-teal-700 font-bold' : 'text-slate-500'
               }`}
             >
-              <Icon className={`h-5 w-5 ${active ? 'text-teal-600 scale-105' : 'text-slate-400'}`} />
+              <Icon className={`h-5 w-5 ${active ? 'text-teal-700 scale-105' : 'text-slate-500'}`} />
               <span className="text-[10px] tracking-wide font-medium">{item.label}</span>
             </Link>
           );
@@ -265,11 +265,11 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
         role="dialog"
         aria-modal="true"
         aria-label="Sesión bloqueada"
-        className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6 p-6"
+        className="foco-claro fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6 p-6"
       >
         <div className="bg-white rounded-3xl p-8 max-w-sm w-full flex flex-col items-center gap-5 shadow-2xl text-center">
           <div className="h-16 w-16 rounded-full bg-teal-50 flex items-center justify-center border-2 border-teal-100">
-            <Lock className="h-8 w-8 text-teal-600" />
+            <Lock className="h-8 w-8 text-teal-700" />
           </div>
           <div>
             <h2 className="text-lg font-extrabold text-slate-900 mb-1">Sesión bloqueada</h2>
@@ -307,7 +307,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
             <button
               id="btn-session-relogin"
               onClick={() => { window.location.replace('/login'); }}
-              className="w-full h-12 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold rounded-2xl transition-all shadow-md shadow-teal-600/20"
+              className="w-full h-12 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold rounded-2xl transition-all shadow-md shadow-teal-600/20"
             >
               Iniciar sesión de nuevo
             </button>
@@ -316,7 +316,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
               id="btn-session-unlock"
               onClick={() => { void unlockSession(); }}
               disabled={estadoBloqueo === 'restaurando'}
-              className="w-full h-12 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold rounded-2xl transition-all shadow-md shadow-teal-600/20 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full h-12 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold rounded-2xl transition-all shadow-md shadow-teal-600/20 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               Volver al expediente
             </button>
@@ -324,7 +324,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
           <button
             id="btn-session-signout"
             onClick={() => solicitarCierreDeSesion()}
-            className="text-xs text-slate-400 hover:text-slate-600 font-semibold underline"
+            className="text-xs text-slate-500 hover:text-slate-600 font-semibold underline"
           >
             Cerrar sesión
           </button>

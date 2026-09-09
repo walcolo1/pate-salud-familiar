@@ -130,7 +130,7 @@ export default function Dialog({
               {titulo}
             </h2>
             {descripcion && (
-              <p id={idDescripcion} className="text-xs font-semibold text-slate-400">
+              <p id={idDescripcion} className="text-xs font-semibold text-slate-500">
                 {descripcion}
               </p>
             )}
@@ -141,7 +141,7 @@ export default function Dialog({
               type="button"
               onClick={onCerrar}
               aria-label={`Cerrar ${titulo}`}
-              className="-mr-1 -mt-1 shrink-0 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              className="-mr-1 -mt-1 shrink-0 rounded-xl p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
             >
               <svg
                 aria-hidden="true"

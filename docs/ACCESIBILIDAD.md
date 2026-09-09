@@ -1,6 +1,6 @@
 # Accesibilidad
 
-> Bloque C · Pasos C1.1, C1.2, C1.3a, C1.3b y C1.4 · Última actualización: **2026-09-08**
+> Bloque C · Pasos C1.1 a C1.5 · Última actualización: **2026-09-08**
 
 ## Qué es axe-core y por qué se usa
 
@@ -138,6 +138,109 @@ impide que la prueba se apruebe a sí misma: el nombre lo confirma un tercero.
 78 campos comprobados en 15 pantallas. Los que faltan hasta 102 son
 condicionales —aparecen solo con cierta frecuencia de dosis, cierto tipo de
 orden o cierta sesión— y quedan cubiertos por el inventario estático.
+
+## Contraste, foco y teclado (C1.5)
+
+### Las 145 graves eran cinco colores
+
+El diagnóstico por pares de color deshizo el número: de las 145 violaciones
+graves, **135 venían de cinco utilidades de Tailwind** repetidas por toda la
+aplicación. No había que revisar 145 sitios, había que cambiar cinco colores.
+
+| Utilidad | Antes | Ratio | Después | Ratio | Sustituciones |
+|---|---|---|---|---|---|
+| `text-slate-400` | `#90a1b9` | 2,4–2,6 | `text-slate-500` `#62748e` | 4,6–4,8 | 233 |
+| `text-teal-600` | `#009689` | 3,3–3,7 | `text-teal-700` `#00786f` | 4,9–5,4 | 76 |
+| `bg-teal-600` (texto blanco) | `#009689` | 3,67 | `bg-teal-700` `#00786f` | 5,36 | 48 |
+| `text-rose-600` | `#ec003f` | 4,1–4,5 | `text-rose-700` `#c70036` | 5,5–6,0 | 53 |
+| `text-amber-600` | `#e17100` | 2,9–3,2 | `text-amber-700` `#bb4d00` | 4,6–5,0 | 36 |
+| `text-emerald-600` | `#009966` | 3,3–3,7 | `text-emerald-700` `#007a55` | 4,9–5,4 | 22 |
+
+Al subir el fondo `bg-teal-600` un peldaño, `hover` y `active` suben con él
+(74 sustituciones más), porque si no la escala de interacción se aplana y el
+botón deja de responder visualmente al ratón. **548 sustituciones en 22
+archivos**, todas token a token: `shadow-teal-600/20` y `border-teal-600/10`
+no se tocaron, que son sombras y bordes, no texto.
+
+Los `placeholder:text-slate-400` **se quedaron como estaban**. axe no mide el
+marcador de posición, y oscurecerlo lo acerca al texto real ya escrito, que es
+justo la confusión que un marcador no debe provocar.
+
+### Los diez nodos que no eran culpa de la paleta
+
+Tras el cambio quedaban cinco nodos con colores raros —`#d69569`, `#dd6485`—
+que no están en ninguna paleta. Eran textos con `animate-pulse`: axe los medía
+**a mitad del parpadeo**, con la opacidad a medio camino, y un `amber-700`
+sobre blanco caía a 2,4:1.
+
+No es un artefacto de la medición: un texto que se atenúa dos veces por segundo
+es ilegible en el valle, lo mida quien lo mida. Se quitó `animate-pulse` de los
+**13 elementos que llevan texto** y se conservó en los iconos y los puntos de
+estado, donde no hay nada que leer. Un caso aparte: `text-amber-700/90` daba
+4,14:1, y le sobraba el 90 %.
+
+### `meta-viewport`: 24 → 0
+
+El layout raíz declaraba `maximumScale: 1` y `userScalable: false`. Bloquear el
+zoom en una aplicación de salud familiar deja fuera justo a parte de su
+público, y WCAG 1.4.4 lo prohíbe. Ahora `maximumScale: 5` y `userScalable: true`.
+Era una moderada por medición: 24 de golpe.
+
+### Foco visible
+
+88 `outline-none` repartidos por los formularios y **cero** reglas de
+`:focus-visible` en todo el proyecto. Los campos dibujaban su anillo de color;
+botones, enlaces y tarjetas se quedaban con lo que trajera el navegador, y allí
+donde `outline-none` ganaba, con nada.
+
+`globals.css` cierra el asunto de una vez:
+
+```css
+*:focus-visible {
+  outline: 2px solid #00786f; /* teal-700: 5,36:1 sobre blanco */
+  outline-offset: 2px;
+}
+.foco-claro *:focus-visible { outline-color: #ffffff; }
+```
+
+La regla va **después** de las utilidades de Tailwind, así que con la misma
+especificidad gana ella y devuelve el contorno. Es `:focus-visible` y no
+`:focus` a propósito: quien pulsa con el ratón no ve el anillo, quien navega
+con teclado sí. `.foco-claro` es para el fondo oscuro de la navegación
+desplegada, donde el teal no se distingue.
+
+### Lo que respondía al ratón y no al teclado
+
+Las tarjetas de recordatorio y de tarea recibían el clic desde un `<div>`. Sin
+`tabIndex` no recibían el foco y sin `onKeyDown` no había manera de marcar una
+toma como hecha sin ratón: **no era incómodo, era imposible**.
+
+- **Recordatorio** → `role="checkbox"` + `aria-checked`, porque alterna entre
+  hecho y pendiente. Enter y Espacio lo cambian; el Espacio hace
+  `preventDefault()` para que no desplace la página bajo el dedo.
+- **Tarea de seguimiento** → `role="button"`, porque completarla no tiene
+  vuelta. Una tarea ya completada sale del recorrido del tabulador
+  (`tabIndex={-1}`): ya no hace nada al pulsarla.
+
+Ninguno lleva `aria-label`: el nombre accesible sale del contenido de la propia
+tarjeta, así que no se duplica ni un dato clínico en un atributo.
+
+`e2e/teclado-navegacion.e2e.ts` fija las cuatro cosas, y la cuarta es la que
+impide que esto vuelva: **barre cada pantalla buscando cualquier elemento que
+responda al clic y no al teclado** —cursor de mano, sin ser enfocable, sin rol
+ni `tabindex`— y falla nombrándolo.
+
+### El resultado
+
+**0 violaciones de axe en las 24 mediciones**, en las cuatro gravedades. La
+línea base pasó a ser todo ceros, así que a partir de aquí la puerta no tolera
+ni una: cualquier violación nueva, en cualquier ruta o diálogo cubierto, deja
+`test:all` en rojo.
+
+Sigue siendo **un suelo, no un techo**. Que axe no encuentre nada no dice que
+el orden de tabulación tenga sentido, ni que un formulario clínico se pueda
+completar de principio a fin con lector de pantalla. Eso sigue en `TESTING.md`
+como validación manual.
 
 ## Cómo funciona la línea base
 

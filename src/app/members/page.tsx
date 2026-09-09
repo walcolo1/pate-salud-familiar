@@ -99,11 +99,11 @@ export default function MembersPage() {
       <section className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-black text-slate-800 leading-tight">Mi Familia</h2>
-          <p className="text-xs font-semibold text-slate-400">Gestiona los expedientes de tu hogar.</p>
+          <p className="text-xs font-semibold text-slate-500">Gestiona los expedientes de tu hogar.</p>
         </div>
         <Link
           href="/members/new"
-          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs px-4.5 py-3 rounded-2xl shadow-md shadow-teal-600/10 active:translate-y-0.5 transition-all duration-200"
+          className="flex items-center gap-2 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs px-4.5 py-3 rounded-2xl shadow-md shadow-teal-600/10 active:translate-y-0.5 transition-all duration-200"
         >
           <Plus className="h-4 w-4" />
           <span>Agregar</span>
@@ -112,7 +112,7 @@ export default function MembersPage() {
 
       {/* Search Bar */}
       <section className="relative">
-        <span className="absolute left-4.5 top-1/2 -translate-y-1/2 text-slate-400">
+        <span className="absolute left-4.5 top-1/2 -translate-y-1/2 text-slate-500">
           <Search className="h-4.5 w-4.5" />
         </span>
         <input
@@ -152,7 +152,7 @@ export default function MembersPage() {
           <div className="col-span-full bg-white p-10 rounded-3xl border border-slate-100 text-center flex flex-col items-center justify-center gap-3">
             <User className="h-10 w-10 text-slate-300" />
             <p className="text-sm font-bold text-slate-800">No se encontraron familiares</p>
-            <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+            <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
               Prueba buscando con otro nombre o agrega un nuevo familiar con el botón de la parte superior.
             </p>
           </div>
@@ -196,7 +196,7 @@ export default function MembersPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-400 font-bold mb-1.5">
+                  <p className="text-xs text-slate-500 font-bold mb-1.5">
                     {relationshipMap[member.relationship]} · {age} {age === 1 ? 'año' : 'años'}
                   </p>
                   <div className="flex flex-wrap items-center gap-1.5">

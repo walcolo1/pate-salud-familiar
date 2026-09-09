@@ -43,7 +43,7 @@ export interface ConfirmDialogProps {
 
 const CLASES_TONO: Record<TonoOpcion, string> = {
   primario:
-    'bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold shadow-md shadow-teal-600/20',
+    'bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold shadow-md shadow-teal-600/20',
   peligro:
     'bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-extrabold shadow-md shadow-red-600/20',
   neutro:

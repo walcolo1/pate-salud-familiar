@@ -329,7 +329,7 @@ export default function SettingsPage() {
       {/* Header Info */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <h2 className="text-2xl font-black text-slate-800 leading-tight">Configuración</h2>
-        <p className="text-xs font-semibold text-slate-400">Administra tus servicios conectados, respaldos y cuenta.</p>
+        <p className="text-xs font-semibold text-slate-500">Administra tus servicios conectados, respaldos y cuenta.</p>
       </section>
 
       {/* User profile card */}
@@ -348,19 +348,19 @@ export default function SettingsPage() {
         )}
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-extrabold text-slate-800 leading-none mb-1.5">{user.displayName}</h3>
-          <p className="text-[11px] text-slate-400 font-bold truncate leading-none mb-2">{user.email}</p>
+          <p className="text-[11px] text-slate-500 font-bold truncate leading-none mb-2">{user.email}</p>
           <div className="flex flex-wrap gap-1.5 items-center">
             {user.provider === 'google' ? (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-blue-50 text-blue-600 border border-blue-100">
                 Google Conectado
               </span>
             ) : (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-50 text-amber-600 border border-amber-100">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-50 text-amber-700 border border-amber-100">
                 Sesión Demo local
               </span>
             )}
             {user.loggedAt && (
-              <span className="text-[8px] text-slate-400 font-bold leading-none">
+              <span className="text-[8px] text-slate-500 font-bold leading-none">
                 Conectado: {new Date(user.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
@@ -376,7 +376,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Importación de citas</h4>
-              <p className="text-[10px] text-slate-400 font-semibold">
+              <p className="text-[10px] text-slate-500 font-semibold">
                 Pega el texto del correo de tu EPS o adjunta el documento. La aplicación no lee tu correo.
               </p>
             </div>
@@ -387,7 +387,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <span id="etiqueta-solo-futuras" className="font-extrabold text-slate-700 block text-xs mb-0.5">Solo importar citas futuras</span>
-              <p className="text-[10px] text-slate-400">Marca como ignoradas las citas cuya fecha ya pasó.</p>
+              <p className="text-[10px] text-slate-500">Marca como ignoradas las citas cuya fecha ya pasó.</p>
             </div>
             <button
               id="btn-toggle-future-only"
@@ -397,7 +397,7 @@ export default function SettingsPage() {
               aria-labelledby="etiqueta-solo-futuras"
               onClick={() => setGmailOnlyFutureAppointments(!gmailOnlyFutureAppointments)}
               className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
-                gmailOnlyFutureAppointments ? 'bg-teal-600 justify-end' : 'bg-slate-200 justify-start'
+                gmailOnlyFutureAppointments ? 'bg-teal-700 justify-end' : 'bg-slate-200 justify-start'
               }`}
             >
               <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
@@ -406,9 +406,9 @@ export default function SettingsPage() {
 
           <div className="border-t border-slate-100/70 pt-3.5 flex items-center justify-between">
             <div className="flex flex-col">
-              <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Pendientes de revisión</span>
+              <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Pendientes de revisión</span>
               <span className={`font-extrabold text-xs ${
-                appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length > 0 ? 'text-amber-600' : 'text-emerald-600'
+                appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length > 0 ? 'text-amber-700' : 'text-emerald-700'
               }`}>
                 {appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length} borradores
               </span>
@@ -432,20 +432,20 @@ export default function SettingsPage() {
             <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-teal-50 text-teal-600 rounded-xl">
+                  <div className="p-2 bg-teal-50 text-teal-700 rounded-xl">
                     <Settings className="h-5 w-5" />
                   </div>
                   <div>
                     <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Diagnóstico de Sincronización</h4>
-                    <p className="text-[10px] text-slate-400 font-semibold">Estado en tiempo real de tu base Google-native.</p>
+                    <p className="text-[10px] text-slate-500 font-semibold">Estado en tiempo real de tu base Google-native.</p>
                   </div>
                 </div>
                 <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full border uppercase leading-none ${
-                  needsGoogleAuth ? 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse' :
-                  opSyncStatus === 'synced' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                  opSyncStatus === 'syncing' ? 'bg-blue-50 text-blue-600 border-blue-100 animate-pulse' :
-                  opSyncStatus === 'error' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                  'bg-slate-50 text-slate-400 border-slate-200'
+                  needsGoogleAuth ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                  opSyncStatus === 'synced' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                  opSyncStatus === 'syncing' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                  opSyncStatus === 'error' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                  'bg-slate-50 text-slate-500 border-slate-200'
                 }`}>
                   {needsGoogleAuth ? 'Autenticación Requerida' :
                     opSyncStatus === 'synced' ? 'Sincronizado' :
@@ -460,7 +460,7 @@ export default function SettingsPage() {
               {needsGoogleAuth && (
                 <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-3 font-semibold text-[10px] text-amber-800 leading-relaxed shadow-sm">
                   <div className="flex items-start gap-2.5">
-                    <AlertCircle className="h-4.5 w-4.5 text-amber-600 shrink-0 mt-0.5" />
+                    <AlertCircle className="h-4.5 w-4.5 text-amber-700 shrink-0 mt-0.5" />
                     <div>
                       <span className="font-bold text-amber-950 block text-[11px] mb-0.5">Necesitamos permiso para sincronizar tus datos</span>
                       <p>Por políticas de Google, requerimos tu consentimiento explícito para guardar tus datos en Sheets y Drive. Si no autorizas, tus cambios se guardarán localmente como pendientes.</p>
@@ -482,7 +482,7 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3.5 gap-x-6">
                   
                   <div className="flex flex-col">
-                    <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Estado de Conexión</span>
+                    <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Estado de Conexión</span>
                     <div className="flex items-center gap-1.5 font-extrabold text-slate-700">
                       <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
                       <span>Conectado con Google ({user.email})</span>
@@ -490,7 +490,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="flex flex-col">
-                    <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Base Google-Native</span>
+                    <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Base Google-Native</span>
                     <div className="flex items-center gap-1.5 font-extrabold text-slate-700">
                       {databaseSpreadsheetId ? (
                         <>
@@ -507,30 +507,30 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
-                    <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Última Sincronización</span>
+                    <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Última Sincronización</span>
                     <span className="font-extrabold text-slate-700">{lastSyncAt ? new Date(lastSyncAt).toLocaleString('es-CO') : 'Nunca'}</span>
                   </div>
 
                   <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
-                    <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Cambios locales pendientes</span>
-                    <span className={`font-black ${pendingSyncCount > 0 ? 'text-amber-600' : 'text-slate-700'}`}>
+                    <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Cambios locales pendientes</span>
+                    <span className={`font-black ${pendingSyncCount > 0 ? 'text-amber-700' : 'text-slate-700'}`}>
                       {pendingSyncCount} {pendingSyncCount === 1 ? 'cambio' : 'cambios'}
                     </span>
                   </div>
 
                   <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
-                    <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Último Pull (Descarga)</span>
+                    <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Último Pull (Descarga)</span>
                     <span className="font-extrabold text-slate-700">{lastPullAt ? new Date(lastPullAt).toLocaleString('es-CO') : 'Nunca'}</span>
                   </div>
 
                   <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
-                    <span className="text-slate-400 font-bold uppercase text-[9px] leading-none mb-1">Último Push (Subida)</span>
+                    <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Último Push (Subida)</span>
                     <span className="font-extrabold text-slate-700">{lastPushAt ? new Date(lastPushAt).toLocaleString('es-CO') : 'Nunca'}</span>
                   </div>
                 </div>
 
                 {opSyncError && (
-                  <div className="bg-rose-50 p-3 rounded-xl border border-rose-100/60 text-rose-600 text-[10px] flex flex-col gap-1 font-semibold leading-relaxed">
+                  <div className="bg-rose-50 p-3 rounded-xl border border-rose-100/60 text-rose-700 text-[10px] flex flex-col gap-1 font-semibold leading-relaxed">
                     <strong className="text-rose-700">Último error registrado:</strong>
                     <p>{opSyncError}</p>
                   </div>
@@ -540,14 +540,14 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between border-t border-slate-100/70 pt-3.5 mt-1.5">
                   <div>
                     <span className="font-extrabold text-slate-700 block text-xs mb-0.5">Sincronización Automática en Fondo</span>
-                    <p className="text-[10px] text-slate-400 font-semibold">Sube cambios de forma silenciosa tras 4 segundos de inactividad.</p>
+                    <p className="text-[10px] text-slate-500 font-semibold">Sube cambios de forma silenciosa tras 4 segundos de inactividad.</p>
                   </div>
                   <button 
                     id="btn-toggle-auto-sync"
                     type="button"
                     onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
                     className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
-                      autoSyncEnabled ? 'bg-teal-600 justify-end' : 'bg-slate-200 justify-start'
+                      autoSyncEnabled ? 'bg-teal-700 justify-end' : 'bg-slate-200 justify-start'
                     }`}
                   >
                     <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
@@ -561,26 +561,26 @@ export default function SettingsPage() {
           <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-teal-50 text-teal-600 rounded-xl">
+                <div className="p-2 bg-teal-50 text-teal-700 rounded-xl">
                   <Database className="h-5 w-5" />
                 </div>
                 <div>
                   <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Diagnóstico y Salud de Datos</h4>
-                  <p className="text-[10px] text-slate-400 font-semibold">Resumen de registros locales e integridad de la información.</p>
+                  <p className="text-[10px] text-slate-500 font-semibold">Resumen de registros locales e integridad de la información.</p>
                 </div>
               </div>
               
               {integrityReport ? (
                 <span className={`text-[10px] font-black px-3 py-1 rounded-full border uppercase leading-none ${
-                  integrityReport.status === 'ok' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                  integrityReport.status === 'warnings' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                  'bg-rose-50 text-rose-600 border-rose-100'
+                  integrityReport.status === 'ok' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                  integrityReport.status === 'warnings' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                  'bg-rose-50 text-rose-700 border-rose-100'
                 }`}>
                   Integridad: {integrityReport.status === 'ok' ? 'Correcto' :
                                integrityReport.status === 'warnings' ? 'Advertencias' : 'Errores'}
                 </span>
               ) : (
-                <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-slate-50 text-slate-400 border border-slate-200 uppercase leading-none">
+                <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-slate-50 text-slate-500 border border-slate-200 uppercase leading-none">
                   Sin verificar
                 </span>
               )}
@@ -590,39 +590,39 @@ export default function SettingsPage() {
 
             {/* Grid de Cantidades */}
             <div>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide block mb-3">Registros en memoria local</span>
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide block mb-3">Registros en memoria local</span>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Miembros</span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Miembros</span>
                   <div className="mt-1 flex items-baseline gap-1.5">
                     <span className="text-lg font-black text-slate-800 leading-none">{totalMembers}</span>
-                    <span className="text-[8px] font-semibold text-slate-400 leading-none">({activeMembers} act / {inactiveMembers} inact)</span>
+                    <span className="text-[8px] font-semibold text-slate-500 leading-none">({activeMembers} act / {inactiveMembers} inact)</span>
                   </div>
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Citas médicas</span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Citas médicas</span>
                   <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalAppointments}</span>
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Documentos clínicos</span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Documentos clínicos</span>
                   <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalDocs}</span>
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Órdenes Médicas</span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Órdenes Médicas</span>
                   <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalOrders}</span>
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Medicamentos</span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Medicamentos</span>
                   <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalMeds}</span>
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">Tomas pendientes hoy</span>
-                  <span className={`text-lg font-black leading-none mt-1 ${pendingDoses > 0 ? 'text-teal-600' : 'text-slate-850'}`}>{pendingDoses}</span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Tomas pendientes hoy</span>
+                  <span className={`text-lg font-black leading-none mt-1 ${pendingDoses > 0 ? 'text-teal-700' : 'text-slate-850'}`}>{pendingDoses}</span>
                 </div>
               </div>
             </div>
@@ -645,7 +645,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex justify-between border-b border-slate-200/40 pb-2">
                     <span>Cambios pendientes locales:</span>
-                    <span className={`font-black ${pendingSyncCount > 0 ? 'text-amber-600' : 'text-slate-700'}`}>{pendingSyncCount}</span>
+                    <span className={`font-black ${pendingSyncCount > 0 ? 'text-amber-700' : 'text-slate-700'}`}>{pendingSyncCount}</span>
                   </div>
                   <div className="flex justify-between pb-1">
                     <span>ID de Hoja Operacional:</span>
@@ -658,7 +658,7 @@ export default function SettingsPage() {
                     href={databaseSpreadsheetUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-1 py-2 px-3 bg-white border border-slate-200 hover:border-teal-500 hover:text-teal-600 text-slate-700 font-extrabold text-[10px] rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                    className="mt-1 py-2 px-3 bg-white border border-slate-200 hover:border-teal-500 hover:text-teal-700 text-slate-700 font-extrabold text-[10px] rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                   >
                     <FileSpreadsheet className="h-3.5 w-3.5" />
                     <span>Abrir hoja operacional actual</span>
@@ -681,7 +681,7 @@ export default function SettingsPage() {
                   }, 600);
                 }}
                 disabled={isCheckingIntegrity}
-                className="w-full h-10 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-75"
+                className="w-full h-10 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-75"
               >
                 {isCheckingIntegrity ? (
                   <>
@@ -705,9 +705,9 @@ export default function SettingsPage() {
                 }`}>
                   <div className="flex items-center gap-2">
                     {integrityReport.status === 'ok' ? (
-                      <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 flex-shrink-0" />
+                      <CheckCircle2 className="h-4.5 w-4.5 text-emerald-700 flex-shrink-0" />
                     ) : (
-                      <AlertCircle className="h-4.5 w-4.5 text-amber-600 flex-shrink-0" />
+                      <AlertCircle className="h-4.5 w-4.5 text-amber-700 flex-shrink-0" />
                     )}
                     <span className="font-bold text-[11px] block">
                       {integrityReport.status === 'ok' && '¡Excelente! No se encontraron problemas de consistencia en tus datos.'}
@@ -719,7 +719,7 @@ export default function SettingsPage() {
                   {integrityReport.errors.length > 0 && (
                     <div className="mt-1 flex flex-col gap-1">
                       <span className="font-bold text-[9px] uppercase text-rose-700">Errores:</span>
-                      <ul className="list-disc pl-4 space-y-1 text-rose-600 text-[9.5px]">
+                      <ul className="list-disc pl-4 space-y-1 text-rose-700 text-[9.5px]">
                         {integrityReport.errors.map((err: string, idx: number) => (
                           <li key={idx}>{err}</li>
                         ))}
@@ -730,7 +730,7 @@ export default function SettingsPage() {
                   {integrityReport.warnings.length > 0 && (
                     <div className="mt-1 flex flex-col gap-1">
                       <span className="font-bold text-[9px] uppercase text-amber-700">Advertencias:</span>
-                      <ul className="list-disc pl-4 space-y-1 text-amber-600 text-[9.5px]">
+                      <ul className="list-disc pl-4 space-y-1 text-amber-700 text-[9.5px]">
                         {integrityReport.warnings.map((warn: string, idx: number) => (
                           <li key={idx}>{warn}</li>
                         ))}
@@ -738,7 +738,7 @@ export default function SettingsPage() {
                     </div>
                   )}
                   
-                  <div className="text-[8px] text-slate-400 font-bold border-t border-slate-200/30 pt-2 mt-1">
+                  <div className="text-[8px] text-slate-500 font-bold border-t border-slate-200/30 pt-2 mt-1">
                     Verificado el: {new Date(integrityReport.checkedAt).toLocaleString('es-CO')}
                   </div>
                 </div>
@@ -754,7 +754,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Permisos de Servicios</h4>
-                <p className="text-[10px] text-slate-400 font-semibold">Verifica el estado individual de consentimiento de las APIs de Google.</p>
+                <p className="text-[10px] text-slate-500 font-semibold">Verifica el estado individual de consentimiento de las APIs de Google.</p>
               </div>
             </div>
 
@@ -769,12 +769,12 @@ export default function SettingsPage() {
                     <Cloud className="h-5 w-5 text-blue-600" />
                     <div>
                       <span className="font-extrabold text-slate-800 block text-xs mb-0.5">Google Drive (Carpeta de la App)</span>
-                      <span className="text-[9px] text-slate-400 block leading-none">Guardado seguro de PDFs y documentos clínicos</span>
+                      <span className="text-[9px] text-slate-500 block leading-none">Guardado seguro de PDFs y documentos clínicos</span>
                     </div>
                   </div>
                   <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
-                    driveStatus === 'connected' || driveStatus === 'subido' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                    driveStatus === 'error' ? 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse' :
+                    driveStatus === 'connected' || driveStatus === 'subido' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                    driveStatus === 'error' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
                     'bg-slate-200 text-slate-500'
                   }`}>
                     {driveStatus === 'connected' || driveStatus === 'subido' ? 'Autorizado' :
@@ -788,7 +788,7 @@ export default function SettingsPage() {
                 )}
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-100/60 pt-2.5 mt-1">
-                  <span className="text-[9px] text-slate-400 font-bold">Último token: {lastDriveAuthTime ? new Date(lastDriveAuthTime).toLocaleTimeString() : 'N/A'}</span>
+                  <span className="text-[9px] text-slate-500 font-bold">Último token: {lastDriveAuthTime ? new Date(lastDriveAuthTime).toLocaleTimeString() : 'N/A'}</span>
                   <button
                     id="btn-reconnect-drive"
                     onClick={() => connectDrive()}
@@ -803,15 +803,15 @@ export default function SettingsPage() {
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-teal-600" />
+                    <Calendar className="h-5 w-5 text-teal-700" />
                     <div>
                       <span className="font-extrabold text-slate-800 block text-xs mb-0.5">Google Calendar</span>
-                      <span className="text-[9px] text-slate-400 block leading-none">Agendamiento y sincronización de citas médicas</span>
+                      <span className="text-[9px] text-slate-500 block leading-none">Agendamiento y sincronización de citas médicas</span>
                     </div>
                   </div>
                   <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
-                    calendarStatus === 'connected' || calendarStatus === 'sincronizado' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                    calendarStatus === 'error' ? 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse' :
+                    calendarStatus === 'connected' || calendarStatus === 'sincronizado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                    calendarStatus === 'error' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
                     'bg-slate-200 text-slate-500'
                   }`}>
                     {calendarStatus === 'connected' || calendarStatus === 'sincronizado' ? 'Autorizado' :
@@ -825,7 +825,7 @@ export default function SettingsPage() {
                 )}
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-100/60 pt-2.5 mt-1">
-                  <span className="text-[9px] text-slate-400 font-bold">Último token: {lastCalendarAuthTime ? new Date(lastCalendarAuthTime).toLocaleTimeString() : 'N/A'}</span>
+                  <span className="text-[9px] text-slate-500 font-bold">Último token: {lastCalendarAuthTime ? new Date(lastCalendarAuthTime).toLocaleTimeString() : 'N/A'}</span>
                   <button
                     id="btn-reconnect-calendar"
                     onClick={() => connectCalendar()}
@@ -841,15 +841,15 @@ export default function SettingsPage() {
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+                      <FileSpreadsheet className="h-5 w-5 text-emerald-700" />
                       <div>
                         <span className="font-extrabold text-slate-800 block text-xs mb-0.5">Google Sheets (Base y Exportación)</span>
-                        <span className="text-[9px] text-slate-400 block leading-none">Guardado de tablas operacionales y reportes familiares</span>
+                        <span className="text-[9px] text-slate-500 block leading-none">Guardado de tablas operacionales y reportes familiares</span>
                       </div>
                     </div>
                     <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
-                      sheetsStatus === 'connected' || sheetsStatus === 'exportado' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                      sheetsStatus === 'error' ? 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse' :
+                      sheetsStatus === 'connected' || sheetsStatus === 'exportado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                      sheetsStatus === 'error' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
                       'bg-slate-200 text-slate-500'
                     }`}>
                       {sheetsStatus === 'connected' || sheetsStatus === 'exportado' ? 'Autorizado' :
@@ -863,7 +863,7 @@ export default function SettingsPage() {
                   )}
 
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-100/60 pt-2.5 mt-1">
-                    <span className="text-[9px] text-slate-400 font-bold">Último token: {lastSheetsAuthTime ? new Date(lastSheetsAuthTime).toLocaleTimeString() : 'N/A'}</span>
+                    <span className="text-[9px] text-slate-500 font-bold">Último token: {lastSheetsAuthTime ? new Date(lastSheetsAuthTime).toLocaleTimeString() : 'N/A'}</span>
                     <button
                       id="btn-reconnect-sheets"
                       onClick={() => connectSheets()}
@@ -882,12 +882,12 @@ export default function SettingsPage() {
           {isFirebaseBackend && currentUserRole === 'FAMILY_ADMIN' && (
             <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-teal-50 text-teal-600 rounded-xl">
+                <div className="p-2 bg-teal-50 text-teal-700 rounded-xl">
                   <Mail className="h-5 w-5" />
                 </div>
                 <div>
                   <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Invitaciones Familiares</h4>
-                  <p className="text-[10px] text-slate-400 font-semibold">Invita a miembros de tu familia para darles acceso a la aplicación.</p>
+                  <p className="text-[10px] text-slate-500 font-semibold">Invita a miembros de tu familia para darles acceso a la aplicación.</p>
                 </div>
               </div>
 
@@ -898,7 +898,7 @@ export default function SettingsPage() {
                 <span className="font-bold text-slate-800 dark:text-slate-200 text-[11px] block leading-none">Invitar a un familiar</span>
                 
                 {inviteError && (
-                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 font-semibold text-[10px] flex items-center gap-2">
+                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-700 font-semibold text-[10px] flex items-center gap-2">
                     <AlertCircle className="h-4 w-4 shrink-0" />
                     <span>{inviteError}</span>
                   </div>
@@ -913,7 +913,7 @@ export default function SettingsPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="flex flex-col gap-1.5">
-                    <label htmlFor="ajustes-correo-electronico" className="text-[10px] text-slate-400 uppercase font-black tracking-wider px-1">Correo Electrónico</label>
+                    <label htmlFor="ajustes-correo-electronico" className="text-[10px] text-slate-500 uppercase font-black tracking-wider px-1">Correo Electrónico</label>
                     <input
                       id="ajustes-correo-electronico"
                       type="email"
@@ -926,7 +926,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label htmlFor="ajustes-asociar-a-familiar" className="text-[10px] text-slate-400 uppercase font-black tracking-wider px-1">Asociar a Familiar</label>
+                    <label htmlFor="ajustes-asociar-a-familiar" className="text-[10px] text-slate-500 uppercase font-black tracking-wider px-1">Asociar a Familiar</label>
                     <select
                       id="ajustes-asociar-a-familiar"
                       required
@@ -942,7 +942,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label htmlFor="ajustes-rol-de-acceso" className="text-[10px] text-slate-400 uppercase font-black tracking-wider px-1">Rol de Acceso</label>
+                    <label htmlFor="ajustes-rol-de-acceso" className="text-[10px] text-slate-500 uppercase font-black tracking-wider px-1">Rol de Acceso</label>
                     <select
                       id="ajustes-rol-de-acceso"
                       required
@@ -961,7 +961,7 @@ export default function SettingsPage() {
                   <button
                     type="submit"
                     disabled={isSendingInvite}
-                    className="h-10 px-5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-teal-300 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer border-none"
+                    className="h-10 px-5 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 disabled:bg-teal-300 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer border-none"
                   >
                     {isSendingInvite ? (
                       <>
@@ -983,7 +983,7 @@ export default function SettingsPage() {
                 <span className="font-extrabold text-slate-800 text-xs tracking-wide uppercase px-1">Invitaciones Enviadas ({invitations.length})</span>
                 
                 {invitations.length === 0 ? (
-                  <p className="text-[10px] text-slate-400 font-semibold px-1 py-1">No se han enviado invitaciones en esta familia.</p>
+                  <p className="text-[10px] text-slate-500 font-semibold px-1 py-1">No se han enviado invitaciones en esta familia.</p>
                 ) : (
                   <div className="flex flex-col gap-2.5">
                     {invitations.map((inv) => {
@@ -999,7 +999,7 @@ export default function SettingsPage() {
                         >
                           <div className="flex flex-col gap-1 min-w-0">
                             <span className="font-extrabold text-slate-800 block text-xs truncate">{inv.invitedEmail}</span>
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px] text-slate-400 mt-1">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px] text-slate-500 mt-1">
                               <span>Familiar: <strong className="text-slate-600 font-bold">{associatedMember}</strong></span>
                               <span>·</span>
                               <span>Rol: <strong className="text-slate-650 font-bold uppercase">{inv.role}</strong></span>
@@ -1008,8 +1008,8 @@ export default function SettingsPage() {
 
                           <div className="flex items-center gap-3.5 shrink-0 self-end sm:self-center">
                             <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
-                              isAccepted ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                              isPending ? 'bg-amber-50 text-amber-600 border border-amber-100 animate-pulse' :
+                              isAccepted ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                              isPending ? 'bg-amber-50 text-amber-700 border border-amber-100' :
                               'bg-slate-200 text-slate-500 border border-slate-300'
                             }`}>
                               {isAccepted ? 'Aceptada' : isPending ? 'Pendiente' : isRevoked ? 'Revocada' : 'Expirada'}
@@ -1019,7 +1019,7 @@ export default function SettingsPage() {
                               <button
                                 onClick={() => handleRevokeInvite(inv.id)}
                                 disabled={revokingInviteId === inv.id}
-                                className="p-2 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer border-none bg-transparent"
+                                className="p-2 hover:bg-rose-50 text-slate-500 hover:text-rose-700 rounded-lg transition-colors cursor-pointer border-none bg-transparent"
                                 title="Revocar Invitación"
                               >
                                 {revokingInviteId === inv.id ? (
@@ -1048,7 +1048,7 @@ export default function SettingsPage() {
                   <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">
                     {isFirebaseBackend ? "Conexión de Servicios de Google" : "Acciones Manuales de Respaldo"}
                   </h4>
-                  <p className="text-[10px] text-slate-400 font-semibold">
+                  <p className="text-[10px] text-slate-500 font-semibold">
                     {isFirebaseBackend 
                       ? "Administra la conexión con tu cuenta de Google para Drive y Calendar."
                       : "Ejecuta operaciones de respaldo secundarias para resolver conflictos."}
@@ -1065,13 +1065,13 @@ export default function SettingsPage() {
                   <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                     <div>
                       <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Sincronizar ahora</span>
-                      <p className="text-[9px] text-slate-400 leading-normal mb-2">Descarga cambios de la nube y sube tus cambios pendientes.</p>
+                      <p className="text-[9px] text-slate-500 leading-normal mb-2">Descarga cambios de la nube y sube tus cambios pendientes.</p>
                     </div>
                     <button
                       id="btn-sync-now"
                       onClick={() => syncNow()}
                       disabled={opSyncStatus === 'syncing' || needsGoogleAuth}
-                      className="py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 w-full text-[10px]"
+                      className="py-2.5 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 w-full text-[10px]"
                     >
                       {opSyncStatus === 'syncing' ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
@@ -1087,7 +1087,7 @@ export default function SettingsPage() {
                 <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                   <div>
                     <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reconectar Google</span>
-                    <p className="text-[9px] text-slate-400 leading-normal mb-2">
+                    <p className="text-[9px] text-slate-500 leading-normal mb-2">
                       {isFirebaseBackend 
                         ? "Renueva los permisos de Google Drive y Calendar si expiran."
                         : "Solicita y renueva el token global abriendo la ventana de Google."}
@@ -1108,7 +1108,7 @@ export default function SettingsPage() {
                   <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                     <div>
                       <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reparar base Google-native</span>
-                      <p className="text-[9px] text-slate-400 leading-normal mb-2">Reconstruye pestañas dañadas en Sheets y fuerza la subida local.</p>
+                      <p className="text-[9px] text-slate-500 leading-normal mb-2">Reconstruye pestañas dañadas en Sheets y fuerza la subida local.</p>
                     </div>
                     <button
                       id="btn-repair-database"
@@ -1131,7 +1131,7 @@ export default function SettingsPage() {
                   <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                     <div>
                       <span className="font-extrabold text-amber-800 block text-[11px] mb-0.5">Reparar documentos de miembros</span>
-                      <p className="text-[9px] text-amber-600 leading-normal mb-2">Detecta y restaura números de documento que hayan desaparecido al sincronizar con Google Sheets.</p>
+                      <p className="text-[9px] text-amber-700 leading-normal mb-2">Detecta y restaura números de documento que hayan desaparecido al sincronizar con Google Sheets.</p>
                     </div>
                     <button
                       id="btn-repair-member-docs"
@@ -1158,7 +1158,7 @@ export default function SettingsPage() {
                   <div className="p-3 bg-teal-50 border border-teal-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                     <div>
                       <span className="font-extrabold text-teal-800 block text-[11px] mb-0.5">Actualizar desde Google</span>
-                      <p className="text-[9px] text-teal-600 leading-normal mb-2">Exporta un backup JSON local, hace pull y fusiona de forma segura sin borrar documentos.</p>
+                      <p className="text-[9px] text-teal-700 leading-normal mb-2">Exporta un backup JSON local, hace pull y fusiona de forma segura sin borrar documentos.</p>
                     </div>
                     <button
                       id="btn-update-device-from-google"
@@ -1173,7 +1173,7 @@ export default function SettingsPage() {
                         }
                       }}
                       disabled={opSyncStatus === 'syncing' || isUpdatingDevice || !databaseSpreadsheetId}
-                      className="py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
+                      className="py-2.5 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
                     >
                       {isUpdatingDevice ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
@@ -1190,7 +1190,7 @@ export default function SettingsPage() {
                   <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                     <div>
                       <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Crear base si no existe</span>
-                      <p className="text-[9px] text-slate-400 leading-normal mb-2">Crea una base en blanco en tu Drive si no tienes ninguna.</p>
+                      <p className="text-[9px] text-slate-500 leading-normal mb-2">Crea una base en blanco en tu Drive si no tienes ninguna.</p>
                     </div>
                     <button
                       id="btn-create-database"
@@ -1208,7 +1208,7 @@ export default function SettingsPage() {
                   <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                     <div>
                       <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Cargar desde Google</span>
-                      <p className="text-[9px] text-slate-400 leading-normal mb-2">Sobrescribe el estado local con la versión de Google Sheets.</p>
+                      <p className="text-[9px] text-slate-500 leading-normal mb-2">Sobrescribe el estado local con la versión de Google Sheets.</p>
                     </div>
                     <button
                       id="btn-pull-google"
@@ -1226,7 +1226,7 @@ export default function SettingsPage() {
                   <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                     <div>
                       <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Subir cambios locales</span>
-                      <p className="text-[9px] text-slate-400 leading-normal mb-2">Sube todos tus datos locales actuales a Google Sheets.</p>
+                      <p className="text-[9px] text-slate-500 leading-normal mb-2">Sube todos tus datos locales actuales a Google Sheets.</p>
                     </div>
                     <button
                       id="btn-push-google"
@@ -1292,15 +1292,15 @@ export default function SettingsPage() {
           <div className="flex flex-col gap-3">
             <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide px-1">Reportes Clínicos Compartidos (Sheets)</span>
             {sharedReports.length === 0 ? (
-              <p className="text-[10px] text-slate-400 font-semibold italic px-1">No hay reportes de cálculo Sheets compartidos actualmente.</p>
+              <p className="text-[10px] text-slate-500 font-semibold italic px-1">No hay reportes de cálculo Sheets compartidos actualmente.</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {sharedReports.map((rep) => (
                   <div key={rep.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-semibold text-[10px]">
                     <div className="flex-1 min-w-0">
                       <p className="font-extrabold text-slate-800">Reporte para {rep.memberName}</p>
-                      <p className="text-[9px] text-slate-400">Destinatario: {rep.sharedWithEmail}</p>
-                      <p className="text-[8px] text-slate-400 font-bold">Fecha: {new Date(rep.sharedAt).toLocaleDateString('es-CO')}</p>
+                      <p className="text-[9px] text-slate-500">Destinatario: {rep.sharedWithEmail}</p>
+                      <p className="text-[8px] text-slate-500 font-bold">Fecha: {new Date(rep.sharedAt).toLocaleDateString('es-CO')}</p>
                       <span className={`inline-block w-fit text-[8px] font-black px-1.5 py-0.5 rounded uppercase mt-1 leading-none ${
                         rep.shareStatus === 'SHARED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                       }`}>
@@ -1313,7 +1313,7 @@ export default function SettingsPage() {
                           href={rep.spreadsheetUrl} 
                           target="_blank" 
                           rel="noreferrer"
-                          className="bg-white border border-slate-200 text-slate-700 hover:text-teal-600 px-3 py-1.5 rounded-xl font-bold transition-all text-center flex items-center justify-center animate-none"
+                          className="bg-white border border-slate-200 text-slate-700 hover:text-teal-700 px-3 py-1.5 rounded-xl font-bold transition-all text-center flex items-center justify-center animate-none"
                         >
                           Abrir
                         </a>
@@ -1325,7 +1325,7 @@ export default function SettingsPage() {
                               alert(`Error al revocar: ${err.message}`);
                             }
                           }}
-                          className="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 px-3 py-1.5 rounded-xl font-bold transition-all text-center"
+                          className="bg-rose-50 border border-rose-100 text-rose-700 hover:bg-rose-100 px-3 py-1.5 rounded-xl font-bold transition-all text-center"
                         >
                           Revocar
                         </button>
@@ -1342,7 +1342,7 @@ export default function SettingsPage() {
         <div className="flex flex-col gap-3 mt-2">
           <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide px-1">Documentos Clínicos Compartidos (Drive)</span>
           {documents.filter(d => d.shareStatus === 'SHARED').length === 0 ? (
-            <p className="text-[10px] text-slate-400 font-semibold italic px-1">No hay PDFs o imágenes compartidos actualmente.</p>
+            <p className="text-[10px] text-slate-500 font-semibold italic px-1">No hay PDFs o imágenes compartidos actualmente.</p>
           ) : (
             <div className="flex flex-col gap-2">
               {documents
@@ -1351,8 +1351,8 @@ export default function SettingsPage() {
                   <div key={doc.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-semibold text-[10px]">
                     <div className="flex-1 min-w-0">
                       <p className="font-extrabold text-slate-800 truncate">{doc.fileName}</p>
-                      <p className="text-[9px] text-slate-400">Destinatario: {doc.sharedWithEmail}</p>
-                      <p className="text-[8px] text-slate-400 font-bold">Fecha carga: {new Date(doc.uploadedAt).toLocaleDateString('es-CO')}</p>
+                      <p className="text-[9px] text-slate-500">Destinatario: {doc.sharedWithEmail}</p>
+                      <p className="text-[8px] text-slate-500 font-bold">Fecha carga: {new Date(doc.uploadedAt).toLocaleDateString('es-CO')}</p>
                     </div>
                     <div className="flex gap-2 shrink-0">
                       {doc.driveUrl && (
@@ -1360,7 +1360,7 @@ export default function SettingsPage() {
                           href={doc.driveUrl} 
                           target="_blank" 
                           rel="noreferrer"
-                          className="bg-white border border-slate-200 text-slate-700 hover:text-teal-600 px-3 py-1.5 rounded-xl font-bold transition-all text-center flex items-center justify-center animate-none"
+                          className="bg-white border border-slate-200 text-slate-700 hover:text-teal-700 px-3 py-1.5 rounded-xl font-bold transition-all text-center flex items-center justify-center animate-none"
                         >
                           Abrir
                         </a>
@@ -1373,7 +1373,7 @@ export default function SettingsPage() {
                             alert(`Error al revocar: ${err.message}`);
                           }
                         }}
-                        className="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 px-3 py-1.5 rounded-xl font-bold transition-all text-center"
+                        className="bg-rose-50 border border-rose-100 text-rose-700 hover:bg-rose-100 px-3 py-1.5 rounded-xl font-bold transition-all text-center"
                       >
                         Revocar
                       </button>
@@ -1425,12 +1425,12 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={() => avisar('Correo de simulación establecido.')}
-                className="h-10 px-4 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl transition-colors shrink-0"
+                className="h-10 px-4 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl transition-colors shrink-0"
               >
                 Aplicar
               </button>
             </div>
-            <p className="text-[8px] text-slate-400 mt-0.5">
+            <p className="text-[8px] text-slate-500 mt-0.5">
               Si el correo coincide con un miembro activo que tiene habilitado el acceso, la app limitará su vista y permisos automáticamente al guardar los cambios o recargar la pestaña.
             </p>
           </div>
@@ -1444,12 +1444,12 @@ export default function SettingsPage() {
         
         <div className="flex flex-col gap-3">
           <div className="flex items-start gap-3">
-            <div className="p-2 bg-rose-50 text-rose-600 rounded-xl shrink-0 mt-0.5">
+            <div className="p-2 bg-rose-50 text-rose-700 rounded-xl shrink-0 mt-0.5">
               <Clock className="h-4.5 w-4.5" />
             </div>
             <div>
               <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Políticas de Depuración de Citas</h5>
-              <div className="text-[10px] text-slate-400 font-semibold leading-normal mt-1 space-y-1">
+              <div className="text-[10px] text-slate-500 font-semibold leading-normal mt-1 space-y-1">
                 <p>• Citas completadas: Depuradas 2 años después de finalizar.</p>
                 <p>• Citas no completadas: Depuradas 1 año después del agendamiento.</p>
               </div>
@@ -1459,20 +1459,20 @@ export default function SettingsPage() {
           {/* Metrics list */}
           <div className="grid grid-cols-3 gap-2.5 mt-1 select-none">
             <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
-              <span className="text-[8px] font-extrabold text-slate-400 uppercase leading-none">Citas Activas</span>
+              <span className="text-[8px] font-extrabold text-slate-500 uppercase leading-none">Citas Activas</span>
               <strong className="text-sm font-black text-slate-700 leading-none mt-1">{activeApptsCount}</strong>
             </div>
             <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
-              <span className="text-[8px] font-extrabold text-slate-400 uppercase leading-none">Depuradas</span>
+              <span className="text-[8px] font-extrabold text-slate-500 uppercase leading-none">Depuradas</span>
               <strong className="text-sm font-black text-slate-700 leading-none mt-1">{purgedApptsCount}</strong>
             </div>
             <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
-              <span className="text-[8px] font-extrabold text-slate-400 uppercase leading-none">Elegibles</span>
-              <strong className={`text-sm font-black leading-none mt-1 ${eligibleCount > 0 ? 'text-amber-600 animate-pulse' : 'text-slate-700'}`}>{eligibleCount}</strong>
+              <span className="text-[8px] font-extrabold text-slate-500 uppercase leading-none">Elegibles</span>
+              <strong className={`text-sm font-black leading-none mt-1 ${eligibleCount > 0 ? 'text-amber-700' : 'text-slate-700'}`}>{eligibleCount}</strong>
             </div>
           </div>
 
-          <p className="text-[9px] font-semibold leading-relaxed text-amber-600 bg-amber-50 p-2.5 rounded-xl border border-amber-100/60">
+          <p className="text-[9px] font-semibold leading-relaxed text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-100/60">
             {isFirebaseBackend ? (
               <span>⚠ Advertencia: La depuración de citas realiza un borrado lógico ocultando los registros del expediente. Los eventos en tu Google Calendar y archivos asociados en Drive <strong>no</strong> se borrarán. Te recomendamos exportar a JSON antes de depurar.</span>
             ) : (
@@ -1499,12 +1499,12 @@ export default function SettingsPage() {
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3.5">
-            <div className="p-2.5 bg-teal-50 text-teal-600 rounded-xl shrink-0">
+            <div className="p-2.5 bg-teal-50 text-teal-700 rounded-xl shrink-0">
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
               <h5 className="text-xs font-extrabold text-slate-800 leading-tight mb-0.5">Soporte Offline y PWA Activo</h5>
-              <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">
+              <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
                 Esta aplicación está lista para instalarse en tu celular o computador y abrirse sin conexión a Internet.
               </p>
             </div>
@@ -1518,7 +1518,7 @@ export default function SettingsPage() {
             <p>
               • <strong>Cómo instalar:</strong> Abre el menú de opciones de tu navegador (Chrome, Safari, Edge) y presiona <strong>&quot;Instalar aplicación&quot;</strong> o <strong>&quot;Agregar a la pantalla de inicio&quot;</strong>.
             </p>
-            <p className="text-amber-600 font-bold bg-amber-50 p-2 rounded-lg border border-amber-100/55">
+            <p className="text-amber-700 font-bold bg-amber-50 p-2 rounded-lg border border-amber-100/55">
               ⚠ Importante: Los datos clínicos ingresados se guardan localmente en este navegador. Si cambias de dispositivo o borras la caché, la información se perderá.
             </p>
             <p>
@@ -1541,7 +1541,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Copia de Seguridad</h5>
-              <p className="text-[10px] text-slate-400 font-semibold leading-none mt-1">Exporta o importa el expediente clínico familiar en JSON</p>
+              <p className="text-[10px] text-slate-500 font-semibold leading-none mt-1">Exporta o importa el expediente clínico familiar en JSON</p>
             </div>
           </div>
           
@@ -1585,7 +1585,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Almacenamiento Local</h5>
-              <p className="text-[10px] text-slate-400 font-semibold leading-none mt-1">Restaura la demostración o limpia los datos locales</p>
+              <p className="text-[10px] text-slate-500 font-semibold leading-none mt-1">Restaura la demostración o limpia los datos locales</p>
             </div>
           </div>
           
@@ -1697,7 +1697,7 @@ export default function SettingsPage() {
             <ShieldCheck className="h-5 w-5 text-slate-500" />
             <span className="text-xs font-extrabold">Políticas de Privacidad y Disclaimer</span>
           </div>
-          {showLegal ? <ChevronUp className="h-4.5 w-4.5 text-slate-400" /> : <ChevronDown className="h-4.5 w-4.5 text-slate-400" />}
+          {showLegal ? <ChevronUp className="h-4.5 w-4.5 text-slate-500" /> : <ChevronDown className="h-4.5 w-4.5 text-slate-500" />}
         </button>
 
         {showLegal && (
@@ -1785,7 +1785,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p id="etiqueta-autolock" className="text-[11px] font-extrabold text-slate-800">Bloqueo por inactividad</p>
-              <p className="text-[9px] text-slate-400 leading-normal">Bloquea la sesión automáticamente si el usuario no interactúa.</p>
+              <p className="text-[9px] text-slate-500 leading-normal">Bloquea la sesión automáticamente si el usuario no interactúa.</p>
             </div>
             <button
               id="btn-toggle-autolock"
@@ -1800,7 +1800,7 @@ export default function SettingsPage() {
           </div>
           {autoLockEnabled && (
             <div className="flex items-center gap-2 pl-1">
-              <Timer className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+              <Timer className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
               <label htmlFor="autolock-minutes" className="text-[10px] font-semibold text-slate-500 flex-shrink-0">Minutos de inactividad:</label>
               <input
                 id="autolock-minutes"
@@ -1811,7 +1811,7 @@ export default function SettingsPage() {
                 onChange={e => setAutoLockMinutes(Math.max(1, parseInt(e.target.value) || 15))}
                 className="w-16 px-2 py-1 text-[10px] font-bold border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-400"
               />
-              <span className="text-[9px] text-slate-400 font-semibold">min</span>
+              <span className="text-[9px] text-slate-500 font-semibold">min</span>
             </div>
           )}
         </div>
@@ -1823,7 +1823,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p id="etiqueta-nightlock" className="text-[11px] font-extrabold text-slate-800">Cierre lógico nocturno</p>
-              <p className="text-[9px] text-slate-400 leading-normal">Bloquea automáticamente la sesión durante una ventana horaria configurada.</p>
+              <p className="text-[9px] text-slate-500 leading-normal">Bloquea automáticamente la sesión durante una ventana horaria configurada.</p>
             </div>
             <button
               id="btn-toggle-nightlock"
@@ -1839,7 +1839,7 @@ export default function SettingsPage() {
           {nightLockEnabled && (
             <div className="flex flex-col gap-2 pl-1">
               <div className="flex items-center gap-2">
-                <Clock className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                <Clock className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
                 <label htmlFor="nightlock-start" className="text-[10px] font-semibold text-slate-500 w-20 flex-shrink-0">Inicio bloqueo:</label>
                 <input
                   id="nightlock-start"
@@ -1850,7 +1850,7 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <Clock className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                <Clock className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
                 <label htmlFor="nightlock-end" className="text-[10px] font-semibold text-slate-500 w-20 flex-shrink-0">Fin bloqueo:</label>
                 <input
                   id="nightlock-end"
@@ -1892,9 +1892,9 @@ export default function SettingsPage() {
       {(isExporting || sheetsStatus === 'exportando') && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
           <div className="bg-white p-6 rounded-3xl shadow-xl flex flex-col items-center gap-3 border border-slate-100 max-w-xs text-center">
-            <Loader2 className="h-10 w-10 text-emerald-600 animate-spin" />
+            <Loader2 className="h-10 w-10 text-emerald-700 animate-spin" />
             <h4 className="text-sm font-extrabold text-slate-800">Exportando expediente clínico</h4>
-            <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">
+            <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
               Estamos creando tu libro de cálculo en Google Sheets y aplicando estilos y formatos. Por favor, no cierres la aplicación.
             </p>
           </div>

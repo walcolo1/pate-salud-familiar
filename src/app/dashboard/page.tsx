@@ -114,12 +114,12 @@ export default function DashboardPage() {
       <div className="min-h-[75vh] flex flex-col items-center justify-center p-4 text-slate-700">
         <div className="w-full max-w-lg bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-xl shadow-slate-100/40 flex flex-col gap-6">
           <div className="flex flex-col items-center text-center gap-2 select-none">
-            <div className="h-14 w-14 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center border border-teal-100 shadow-sm animate-pulse">
+            <div className="h-14 w-14 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-100 shadow-sm animate-pulse">
               <Mail className="h-7 w-7" />
             </div>
             <div>
               <h2 className="text-xl font-black text-slate-800 leading-tight">Acceso Familiar Pendiente</h2>
-              <p className="text-xs text-slate-400 font-semibold tracking-wider uppercase mt-1">Paté Salud Familiar</p>
+              <p className="text-xs text-slate-500 font-semibold tracking-wider uppercase mt-1">Paté Salud Familiar</p>
             </div>
             <p className="text-sm text-slate-500 font-medium max-w-xs mt-1">
               Hola, <strong>{user.displayName.split(' ')[0]}</strong>. No estás conectado a ninguna familia. Revisa tus invitaciones pendientes o crea una nueva.
@@ -132,7 +132,7 @@ export default function DashboardPage() {
               <button
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="text-xs font-bold text-teal-600 hover:text-teal-700 disabled:text-slate-400 flex items-center gap-1.5 cursor-pointer bg-transparent border-none"
+                className="text-xs font-bold text-teal-700 hover:text-teal-800 disabled:text-slate-400 flex items-center gap-1.5 cursor-pointer bg-transparent border-none"
               >
                 <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
                 <span>Actualizar</span>
@@ -140,7 +140,7 @@ export default function DashboardPage() {
             </div>
 
             {acceptError && (
-              <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-xl text-xs font-bold text-rose-600 flex items-start gap-2">
+              <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-xl text-xs font-bold text-rose-700 flex items-start gap-2">
                 <AlertCircle className="h-4.5 w-4.5 shrink-0 mt-0.5" />
                 <span>{acceptError}</span>
               </div>
@@ -149,7 +149,7 @@ export default function DashboardPage() {
             {pendingInvitations.length === 0 ? (
               <div className="p-6 bg-slate-50 border border-slate-100 rounded-2xl text-center flex flex-col items-center justify-center gap-1.5">
                 <p className="text-xs font-bold text-slate-800">No se encontraron invitaciones</p>
-                <p className="text-[10px] text-slate-400 leading-normal max-w-xs">
+                <p className="text-[10px] text-slate-500 leading-normal max-w-xs">
                   Pídele al Titular de tu familia que te envíe una invitación usando tu correo electrónico registrado: <code className="bg-slate-200/60 p-0.5 px-1 rounded font-mono text-slate-600 font-bold">{user.email}</code>.
                 </p>
               </div>
@@ -164,14 +164,14 @@ export default function DashboardPage() {
                       <p className="text-xs font-bold text-slate-850 truncate leading-none mb-1">
                         Invitado por {inv.createdBy}
                       </p>
-                      <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                      <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-1">
                         Rol asignado: <strong className="text-teal-700 font-bold uppercase">{inv.role}</strong>
                       </span>
                     </div>
                     <button
                       onClick={() => handleAcceptInvite(inv.familyId, inv.id)}
                       disabled={acceptingInviteId !== null}
-                      className="bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:bg-teal-300 text-white font-extrabold text-xs h-10 px-5 rounded-xl shadow-md shadow-teal-900/10 transition-colors flex items-center justify-center gap-1.5 cursor-pointer border-none"
+                      className="bg-teal-700 hover:bg-teal-800 active:bg-teal-900 disabled:bg-teal-300 text-white font-extrabold text-xs h-10 px-5 rounded-xl shadow-md shadow-teal-900/10 transition-colors flex items-center justify-center gap-1.5 cursor-pointer border-none"
                     >
                       {acceptingInviteId === inv.id ? (
                         <>
@@ -197,11 +197,11 @@ export default function DashboardPage() {
           <form onSubmit={handleCreateFamily} className="flex flex-col gap-3.5">
             <div className="flex flex-col gap-1">
               <span className="font-extrabold text-slate-800 text-xs tracking-wide uppercase px-1">¿Prefieres iniciar tu propia familia?</span>
-              <p className="text-[10px] text-slate-400 font-semibold px-1">Se creará un grupo nuevo del cual serás el Administrador principal.</p>
+              <p className="text-[10px] text-slate-500 font-semibold px-1">Se creará un grupo nuevo del cual serás el Administrador principal.</p>
             </div>
 
             {familyError && (
-              <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-xl text-xs font-bold text-rose-600 flex items-start gap-2">
+              <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-xl text-xs font-bold text-rose-700 flex items-start gap-2">
                 <AlertCircle className="h-4.5 w-4.5 shrink-0 mt-0.5" />
                 <span>{familyError}</span>
               </div>
@@ -485,7 +485,7 @@ export default function DashboardPage() {
       <section className="flex flex-col gap-3">
         <div className="flex justify-between items-center px-1">
           <h3 className="font-extrabold text-slate-800 text-sm tracking-wide uppercase">Mi Familia ({activeMembers.length})</h3>
-          <Link href="/members" className="text-xs font-bold text-teal-600 hover:text-teal-700 flex items-center gap-1">
+          <Link href="/members" className="text-xs font-bold text-teal-700 hover:text-teal-800 flex items-center gap-1">
             <span>Ver todos</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
@@ -495,14 +495,14 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3.5 overflow-x-auto pb-2 scrollbar-none w-full">
           {activeMembers.length === 0 ? (
             <div className="flex-1 bg-white p-6 rounded-2xl border border-slate-100 text-center flex flex-col items-center justify-center gap-2 shadow-sm">
-              <div className="h-12 w-12 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center border border-slate-100">
+              <div className="h-12 w-12 rounded-full bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100">
                 <Users className="h-5 w-5" />
               </div>
               <p className="text-xs font-bold text-slate-800">Aún no tienes miembros registrados</p>
-              <p className="text-[10px] text-slate-400">Comienza agregando a tu primer familiar para gestionar sus expedientes.</p>
+              <p className="text-[10px] text-slate-500">Comienza agregando a tu primer familiar para gestionar sus expedientes.</p>
               <Link
                 href="/members/new"
-                className="mt-2 inline-flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs px-4.5 py-2 rounded-xl shadow-md shadow-teal-900/10 transition-colors duration-200"
+                className="mt-2 inline-flex items-center gap-1.5 bg-teal-700 hover:bg-teal-800 text-white font-extrabold text-xs px-4.5 py-2 rounded-xl shadow-md shadow-teal-900/10 transition-colors duration-200"
               >
                 <Plus className="h-4 w-4" />
                 <span>Agregar primer familiar</span>
@@ -537,13 +537,13 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-center w-full min-w-0">
                     <p className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[90px] mx-auto">{member.fullName.split(' ')[0]}</p>
-                    <span className="text-[9px] text-slate-400 font-semibold">{member.relationship === 'SELF' ? 'Tú' : member.relationship === 'CHILD' ? 'Hijo/a' : 'Cónyuge'}</span>
+                    <span className="text-[9px] text-slate-500 font-semibold">{member.relationship === 'SELF' ? 'Tú' : member.relationship === 'CHILD' ? 'Hijo/a' : 'Cónyuge'}</span>
                     {member.documentType && member.documentNumber && (
-                      <p className="text-[9px] text-teal-600 font-extrabold mt-0.5 truncate max-w-[95px] mx-auto leading-none">
+                      <p className="text-[9px] text-teal-700 font-extrabold mt-0.5 truncate max-w-[95px] mx-auto leading-none">
                         {formatDocument(member.documentType, member.documentNumber)}
                       </p>
                     )}
-                    <p className="text-[8px] text-slate-400 font-bold mt-0.5 truncate max-w-[95px] mx-auto leading-none">
+                    <p className="text-[8px] text-slate-500 font-bold mt-0.5 truncate max-w-[95px] mx-auto leading-none">
                       {formatDocumentCount(getMemberDocCount(member.id))}
                     </p>
                   </div>
@@ -555,10 +555,10 @@ export default function DashboardPage() {
                 href="/members/new"
                 className="flex flex-col items-center justify-center gap-2 bg-slate-100/50 hover:bg-slate-100 p-4 rounded-2xl min-w-[110px] min-h-[118px] border border-dashed border-slate-200 transition-all duration-200 active:scale-95 shrink-0"
               >
-                <div className="h-10 w-10 rounded-full bg-white text-teal-600 flex items-center justify-center border border-slate-200">
+                <div className="h-10 w-10 rounded-full bg-white text-teal-700 flex items-center justify-center border border-slate-200">
                   <Plus className="h-5 w-5" />
                 </div>
-                <span className="text-[10px] font-bold text-teal-600">Añadir</span>
+                <span className="text-[10px] font-bold text-teal-700">Añadir</span>
               </Link>
             </>
           )}
@@ -571,12 +571,12 @@ export default function DashboardPage() {
           href="/members"
           className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200"
         >
-          <div className="p-3 bg-teal-50 text-teal-600 rounded-xl">
+          <div className="p-3 bg-teal-50 text-teal-700 rounded-xl">
             <Users className="h-5 w-5" />
           </div>
           <div>
             <h4 className="text-xs font-extrabold text-slate-800 leading-tight">Familiares</h4>
-            <span className="text-[10px] text-slate-400 font-semibold">Fichas y perfiles</span>
+            <span className="text-[10px] text-slate-500 font-semibold">Fichas y perfiles</span>
           </div>
         </Link>
 
@@ -584,12 +584,12 @@ export default function DashboardPage() {
           href="/reminders"
           className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200"
         >
-          <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
+          <div className="p-3 bg-rose-50 text-rose-700 rounded-xl">
             <Bell className="h-5 w-5" />
           </div>
           <div>
             <h4 className="text-xs font-extrabold text-slate-800 leading-tight">Recordatorios</h4>
-            <span className="text-[10px] text-slate-400 font-semibold">Alarmas y tareas</span>
+            <span className="text-[10px] text-slate-500 font-semibold">Alarmas y tareas</span>
           </div>
         </Link>
 
@@ -601,7 +601,7 @@ export default function DashboardPage() {
           >
             {/* Pulse badge */}
             <div className="relative shrink-0">
-              <div className="p-3 bg-amber-100 text-amber-600 rounded-xl">
+              <div className="p-3 bg-amber-100 text-amber-700 rounded-xl">
                 <Mail className="h-5 w-5" />
               </div>
               <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white text-[9px] font-black leading-none shadow">
@@ -610,7 +610,7 @@ export default function DashboardPage() {
             </div>
             <div className="min-w-0 flex-1">
               <h4 className="text-xs font-extrabold text-amber-800 leading-tight">Citas para importar</h4>
-              <span className="text-[10px] text-amber-600 font-semibold block truncate">
+              <span className="text-[10px] text-amber-700 font-semibold block truncate">
                 {pendingCandidatesCount} borrador{pendingCandidatesCount !== 1 ? 'es' : ''} por revisar
               </span>
             </div>
@@ -626,7 +626,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <h4 className="text-xs font-extrabold text-slate-800 leading-tight">Importar citas</h4>
-              <span className="text-[10px] text-slate-400 font-semibold">Pegar o adjuntar</span>
+              <span className="text-[10px] text-slate-500 font-semibold">Pegar o adjuntar</span>
             </div>
           </Link>
         )}
@@ -643,7 +643,7 @@ export default function DashboardPage() {
               <div className="bg-white p-6 rounded-2xl border border-slate-100 text-center flex flex-col items-center justify-center gap-2">
                 <Calendar className="h-8 w-8 text-slate-300" />
                 <p className="text-xs font-bold text-slate-800">No hay citas programadas</p>
-                <p className="text-[10px] text-slate-400">Todo está al día en la agenda médica.</p>
+                <p className="text-[10px] text-slate-500">Todo está al día en la agenda médica.</p>
               </div>
             ) : (
               upcomingAppts.map((appt) => {
@@ -653,16 +653,16 @@ export default function DashboardPage() {
                     key={appt.id}
                     className="flex items-start gap-3.5 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm"
                   >
-                    <div className="p-2.5 bg-teal-50 text-teal-600 rounded-xl mt-0.5">
+                    <div className="p-2.5 bg-teal-50 text-teal-700 rounded-xl mt-0.5">
                       <Calendar className="h-5 w-5" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-0.5">
                         <h4 className="text-xs font-extrabold text-slate-800 leading-tight truncate">{appt.doctorName}</h4>
-                        <span className="text-[9px] font-extrabold bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full uppercase">{patient}</span>
+                        <span className="text-[9px] font-extrabold bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full uppercase">{patient}</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 font-bold mb-1.5">{appt.specialty} · {appt.location}</p>
-                      <div className="flex items-center gap-1 text-[10px] text-teal-600 font-extrabold">
+                      <p className="text-[10px] text-slate-500 font-bold mb-1.5">{appt.specialty} · {appt.location}</p>
+                      <div className="flex items-center gap-1 text-[10px] text-teal-700 font-extrabold">
                         <Clock className="h-3.5 w-3.5" />
                         <span>{formatDate(appt.scheduledAt)}</span>
                       </div>
@@ -682,14 +682,14 @@ export default function DashboardPage() {
               <div className="bg-white p-6 rounded-2xl border border-slate-100 text-center flex flex-col items-center justify-center gap-2">
                 <AlertCircle className="h-8 w-8 text-slate-300" />
                 <p className="text-xs font-bold text-slate-800">Sin alertas pendientes</p>
-                <p className="text-[10px] text-slate-400">No hay alarmas vencidas, trámites ni tomas urgentes.</p>
+                <p className="text-[10px] text-slate-500">No hay alarmas vencidas, trámites ni tomas urgentes.</p>
               </div>
             ) : (
               dashboardAlerts.slice(0, 5).map((alert) => {
                 const getAlertIcon = (iconType: string, severity: string) => {
-                  const style = severity === 'error' ? 'bg-rose-50 text-rose-600' :
-                                severity === 'warning' ? 'bg-amber-50 text-amber-600' :
-                                'bg-teal-50 text-teal-600';
+                  const style = severity === 'error' ? 'bg-rose-50 text-rose-700' :
+                                severity === 'warning' ? 'bg-amber-50 text-amber-700' :
+                                'bg-teal-50 text-teal-700';
                   
                   switch (iconType) {
                     case 'order':
@@ -728,12 +728,12 @@ export default function DashboardPage() {
                       <div className="flex justify-between items-start mb-0.5">
                         <h4 className="text-xs font-extrabold text-slate-800 leading-tight truncate">{alert.title}</h4>
                         <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full ${
-                          alert.severity === 'error' ? 'bg-rose-100 text-rose-600' :
+                          alert.severity === 'error' ? 'bg-rose-100 text-rose-700' :
                           alert.severity === 'warning' ? 'bg-amber-100 text-amber-700' :
                           'bg-teal-100 text-teal-700'
                         }`}>{alert.memberName}</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 font-bold leading-tight">{alert.description}</p>
+                      <p className="text-[10px] text-slate-500 font-bold leading-tight">{alert.description}</p>
                     </div>
                   </Link>
                 );

@@ -95,7 +95,7 @@ export default function CheckupsPage() {
         </Link>
         <button
           onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md active:translate-y-0.5 transition-all duration-200"
+          className="flex items-center gap-2 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md active:translate-y-0.5 transition-all duration-200"
         >
           <Plus className="h-4 w-4" />
           <span>Registrar control</span>
@@ -105,7 +105,7 @@ export default function CheckupsPage() {
       {/* Header Info */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <h3 className="font-extrabold text-slate-800 text-base leading-tight mb-1">Controles Periódicos de {member.fullName.split(' ')[0]}</h3>
-        <p className="text-xs font-semibold text-slate-400">Controles preventivos, físicos y chequeos de rutina.</p>
+        <p className="text-xs font-semibold text-slate-500">Controles preventivos, físicos y chequeos de rutina.</p>
       </section>
 
       {/* Checkups List */}
@@ -114,7 +114,7 @@ export default function CheckupsPage() {
           <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center flex flex-col items-center justify-center gap-3">
             <HeartPulse className="h-10 w-10 text-slate-300 animate-pulse" />
             <p className="text-sm font-bold text-slate-800">Sin controles registrados</p>
-            <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+            <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
               Agrega chequeos odontológicos, pediátricos o controles generales con el botón de programar.
             </p>
           </div>
@@ -127,9 +127,9 @@ export default function CheckupsPage() {
               <div className="flex justify-between items-start">
                 <h4 className="text-sm font-extrabold text-slate-800 leading-tight">{chk.checkupType}</h4>
                 {chk.status === 'COMPLETED' ? (
-                  <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-600 px-2.5 py-0.5 rounded-full border border-emerald-600/10">Realizado</span>
+                  <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-600/10">Realizado</span>
                 ) : (
-                  <span className="text-[10px] font-extrabold bg-teal-50 text-teal-600 px-2.5 py-0.5 rounded-full border border-teal-600/10">Programado</span>
+                  <span className="text-[10px] font-extrabold bg-teal-50 text-teal-700 px-2.5 py-0.5 rounded-full border border-teal-600/10">Programado</span>
                 )}
               </div>
 
@@ -138,7 +138,7 @@ export default function CheckupsPage() {
               {/* Time and Doctor */}
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs font-semibold text-slate-500">
                 <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-teal-600" />
+                  <Clock className="h-4 w-4 text-teal-700" />
                   <span>{new Date(chk.scheduledDate).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                 </div>
                 {chk.doctorName && (
@@ -152,7 +152,7 @@ export default function CheckupsPage() {
               {/* Results */}
               {chk.results && (
                 <div className="p-3 bg-slate-50/50 rounded-xl">
-                  <span className="text-[9px] text-slate-400 font-extrabold block leading-none mb-1 uppercase">Resultados y Hallazgos</span>
+                  <span className="text-[9px] text-slate-500 font-extrabold block leading-none mb-1 uppercase">Resultados y Hallazgos</span>
                   <p className="text-xs text-slate-600 font-semibold leading-relaxed">{chk.results}</p>
                 </div>
               )}
@@ -246,7 +246,7 @@ export default function CheckupsPage() {
             </button>
             <button
               type="submit"
-              className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
+              className="flex-1 h-11 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
             >
               <Save className="h-4 w-4" />
               <span>Guardar</span>

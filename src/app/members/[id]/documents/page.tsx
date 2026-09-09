@@ -197,7 +197,7 @@ export default function DocumentsPage() {
         </Link>
         <button
           onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md active:translate-y-0.5 transition-all duration-200"
+          className="flex items-center gap-2 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md active:translate-y-0.5 transition-all duration-200"
         >
           <Plus className="h-4 w-4" />
           <span>Subir documento</span>
@@ -207,7 +207,7 @@ export default function DocumentsPage() {
       {/* Header Info */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <h3 className="font-extrabold text-slate-800 text-base leading-tight mb-1">Documentos de {member.fullName.split(' ')[0]}</h3>
-        <p className="text-xs font-semibold text-slate-400">Recetas, reportes y fórmulas clínicas guardadas de forma segura.</p>
+        <p className="text-xs font-semibold text-slate-500">Recetas, reportes y fórmulas clínicas guardadas de forma segura.</p>
       </section>
 
       {/* Documents List */}
@@ -216,7 +216,7 @@ export default function DocumentsPage() {
           <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center flex flex-col items-center justify-center gap-3">
             <FileText className="h-10 w-10 text-slate-300 animate-pulse" />
             <p className="text-sm font-bold text-slate-800">No hay documentos guardados</p>
-            <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+            <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
               Sube fórmulas de medicamentos o reportes de laboratorio. Se guardarán de forma privada en tu espacio de Google Drive.
             </p>
           </div>
@@ -227,14 +227,14 @@ export default function DocumentsPage() {
               className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4 group"
             >
               {/* Doc Icon */}
-              <div className="p-3 bg-teal-50 text-teal-600 rounded-xl shrink-0">
+              <div className="p-3 bg-teal-50 text-teal-700 rounded-xl shrink-0">
                 <FileText className="h-5 w-5" />
               </div>
 
               {/* Title & info */}
               <div className="flex-1 min-w-0">
                 <h4 className="text-xs font-extrabold text-slate-800 truncate mb-0.5">{doc.fileName}</h4>
-                <p className="text-[10px] text-slate-400 font-bold mb-1">
+                <p className="text-[10px] text-slate-500 font-bold mb-1">
                   {docTypeMap[doc.documentType]} · {new Date(doc.uploadedAt).toLocaleDateString('es-CO')}
                   {doc.fileSize && ` · ${Math.round(doc.fileSize / 1024)} KB`}
                   {doc.mimeType && ` · ${doc.mimeType.split('/').pop()?.toUpperCase()}`}
@@ -249,8 +249,8 @@ export default function DocumentsPage() {
                 <div className="flex items-center gap-1 mr-1">
                   {doc.syncStatus === 'SYNCED' ? (
                     <>
-                      <Cloud className="h-4 w-4 text-teal-600" />
-                      <span className="text-[9px] font-bold text-teal-600">Drive</span>
+                      <Cloud className="h-4 w-4 text-teal-700" />
+                      <span className="text-[9px] font-bold text-teal-700">Drive</span>
                     </>
                   ) : doc.syncStatus === 'SYNC_ERROR' ? (
                     <>
@@ -259,8 +259,8 @@ export default function DocumentsPage() {
                     </>
                   ) : (
                     <>
-                      <Cloud className="h-4 w-4 text-slate-400" />
-                      <span className="text-[9px] font-bold text-slate-400">Local</span>
+                      <Cloud className="h-4 w-4 text-slate-500" />
+                      <span className="text-[9px] font-bold text-slate-500">Local</span>
                     </>
                   )}
                 </div>
@@ -274,7 +274,7 @@ export default function DocumentsPage() {
                         </span>
                         <button
                           onClick={() => revokeDocumentShare(doc.id)}
-                          className="text-[9px] font-black text-rose-600 hover:text-rose-800 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-xl transition-all duration-200"
+                          className="text-[9px] font-black text-rose-700 hover:text-rose-800 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-xl transition-all duration-200"
                           title={`Revocar acceso a ${doc.sharedWithEmail}`}
                         >
                           Revocar
@@ -283,7 +283,7 @@ export default function DocumentsPage() {
                     ) : (
                       <button
                         onClick={() => shareDocumentWithMember(doc.id, member.email!)}
-                        className="text-[9px] font-black text-teal-600 hover:text-teal-800 bg-teal-50 border border-teal-100 px-2.5 py-0.5 rounded-xl transition-all duration-200"
+                        className="text-[9px] font-black text-teal-700 hover:text-teal-800 bg-teal-50 border border-teal-100 px-2.5 py-0.5 rounded-xl transition-all duration-200"
                       >
                         Compartir
                       </button>
@@ -296,7 +296,7 @@ export default function DocumentsPage() {
                     href={doc.driveUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="p-2 hover:bg-teal-50 text-slate-400 hover:text-teal-600 rounded-xl transition-all duration-200"
+                    className="p-2 hover:bg-teal-50 text-slate-500 hover:text-teal-700 rounded-xl transition-all duration-200"
                     title="Abrir en Google Drive"
                   >
                     <ExternalLink className="h-4.5 w-4.5" />
@@ -305,7 +305,8 @@ export default function DocumentsPage() {
 
                 <button 
                   onClick={() => deleteDocument(doc.id)}
-                  className="p-2 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-xl transition-all duration-200"
+                  aria-label={`Eliminar documento ${doc.fileName}`}
+                  className="p-2 hover:bg-rose-50 text-slate-500 hover:text-rose-500 rounded-xl transition-all duration-200"
                 >
                   <Trash2 className="h-4.5 w-4.5" />
                 </button>
@@ -322,10 +323,10 @@ export default function DocumentsPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
             <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl flex flex-col items-center gap-5 text-center">
               {info.isPending && (
-                <Loader2 className="h-10 w-10 text-teal-600 animate-spin" />
+                <Loader2 className="h-10 w-10 text-teal-700 animate-spin" />
               )}
               {info.isSuccess && (
-                <CheckCircle2 className="h-12 w-12 text-teal-600" />
+                <CheckCircle2 className="h-12 w-12 text-teal-700" />
               )}
               {info.isError && (
                 <AlertCircle className="h-12 w-12 text-rose-500" />
@@ -333,14 +334,14 @@ export default function DocumentsPage() {
               
               <div>
                 <h4 className="text-sm font-extrabold text-slate-800 mb-1">{info.title}</h4>
-                <p className="text-xs text-slate-400 px-2 leading-relaxed">{info.description}</p>
+                <p className="text-xs text-slate-500 px-2 leading-relaxed">{info.description}</p>
                 {info.isError && driveError && (
-                  <p className="text-[10px] text-slate-400 bg-slate-50 p-2 rounded-xl mt-2 font-mono break-all max-h-24 overflow-y-auto">
+                  <p className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-xl mt-2 font-mono break-all max-h-24 overflow-y-auto">
                     {driveError}
                   </p>
                 )}
                 {info.isError && (
-                  <p className="text-[9px] text-amber-600 font-bold mt-2">
+                  <p className="text-[9px] text-amber-700 font-bold mt-2">
                     ⚠ Nota: El documento se guardó localmente como respaldo.
                   </p>
                 )}
@@ -447,7 +448,7 @@ export default function DocumentsPage() {
             </button>
             <button
               type="submit"
-              className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
+              className="flex-1 h-11 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
             >
               <Save className="h-4 w-4" />
               <span>Subir</span>

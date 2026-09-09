@@ -39,8 +39,11 @@ export const viewport: Viewport = {
   themeColor: "#0d9488", // teal-600
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false
+  // C1.5 · Bloquear el zoom (maximumScale: 1, userScalable: false) deja fuera
+  // a quien necesita ampliar para leer, que en una aplicación de salud
+  // familiar es exactamente parte del público. WCAG 1.4.4 lo prohíbe.
+  maximumScale: 5,
+  userScalable: true
 };
 
 export default function RootLayout({

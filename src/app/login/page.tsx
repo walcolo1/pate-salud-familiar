@@ -114,7 +114,7 @@ export default function LoginPage() {
               className="w-full min-h-12 flex justify-center scale-100 hover:scale-102 active:scale-98 transition-all duration-200" 
             />
             {localLoading && (
-              <div className="flex items-center gap-2 text-xs font-semibold text-teal-200/80 animate-pulse">
+              <div className="flex items-center gap-2 text-xs font-semibold text-teal-200/80">
                 <div className="h-4.5 w-4.5 border-2 border-teal-300 border-t-transparent rounded-full animate-spin" />
                 <span>Iniciando sesión con Google...</span>
               </div>

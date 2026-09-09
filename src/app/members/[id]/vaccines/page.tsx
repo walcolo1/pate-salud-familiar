@@ -98,7 +98,7 @@ export default function VaccinesPage() {
         </Link>
         <button
           onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md active:translate-y-0.5 transition-all duration-200"
+          className="flex items-center gap-2 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-md active:translate-y-0.5 transition-all duration-200"
         >
           <Plus className="h-4 w-4" />
           <span>Registrar vacuna</span>
@@ -108,7 +108,7 @@ export default function VaccinesPage() {
       {/* Header Info */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <h3 className="font-extrabold text-slate-800 text-base leading-tight mb-1">Esquema de Vacunación de {member.fullName.split(' ')[0]}</h3>
-        <p className="text-xs font-semibold text-slate-400">Cartilla digital de inmunización, dosificaciones y refuerzos.</p>
+        <p className="text-xs font-semibold text-slate-500">Cartilla digital de inmunización, dosificaciones y refuerzos.</p>
       </section>
 
       {/* Vaccines List */}
@@ -117,7 +117,7 @@ export default function VaccinesPage() {
           <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center flex flex-col items-center justify-center gap-3">
             <Syringe className="h-10 w-10 text-slate-300 animate-bounce" />
             <p className="text-sm font-bold text-slate-800">Sin dosis registradas</p>
-            <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+            <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
               Registra vacunas de control o refuerzos aplicados con el botón superior.
             </p>
           </div>
@@ -130,12 +130,12 @@ export default function VaccinesPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <h4 className="text-sm font-extrabold text-slate-800 leading-tight mb-0.5">{vac.vaccineName}</h4>
-                  <span className="text-[10px] text-teal-600 font-extrabold bg-teal-50 px-2 py-0.5 rounded-full border border-teal-600/10">Dosis {vac.doseNumber}</span>
+                  <span className="text-[10px] text-teal-700 font-extrabold bg-teal-50 px-2 py-0.5 rounded-full border border-teal-600/10">Dosis {vac.doseNumber}</span>
                 </div>
                 {vac.status === 'COMPLETED' ? (
-                  <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-600 px-2.5 py-0.5 rounded-full border border-emerald-600/10">Aplicada</span>
+                  <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-600/10">Aplicada</span>
                 ) : (
-                  <span className="text-[10px] font-extrabold bg-rose-50 text-rose-600 px-2.5 py-0.5 rounded-full border border-rose-600/10">Pendiente</span>
+                  <span className="text-[10px] font-extrabold bg-rose-50 text-rose-700 px-2.5 py-0.5 rounded-full border border-rose-600/10">Pendiente</span>
                 )}
               </div>
 
@@ -144,7 +144,7 @@ export default function VaccinesPage() {
               {/* Date and Place */}
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs font-semibold text-slate-500">
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-teal-600" />
+                  <Calendar className="h-4 w-4 text-teal-700" />
                   <span>Aplicada: {new Date(vac.dateApplied).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                 </div>
                 {vac.institution && (
@@ -286,7 +286,7 @@ export default function VaccinesPage() {
             </button>
             <button
               type="submit"
-              className="flex-1 h-11 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
+              className="flex-1 h-11 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
             >
               <Save className="h-4 w-4" />
               <span>Guardar</span>

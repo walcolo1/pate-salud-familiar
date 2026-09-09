@@ -55,7 +55,7 @@ export default function HistoryPage() {
   const getEventMeta = (type: HistoryEventType) => {
     switch (type) {
       case 'APPOINTMENT':
-        return { icon: Calendar, color: 'bg-teal-50 text-teal-600 border-teal-100' };
+        return { icon: Calendar, color: 'bg-teal-50 text-teal-700 border-teal-100' };
       case 'CHECKUP':
         return { icon: Activity, color: 'bg-orange-50 text-orange-600 border-orange-100' };
       case 'VACCINE':
@@ -65,7 +65,7 @@ export default function HistoryPage() {
       case 'DOCUMENT':
         return { icon: FileText, color: 'bg-cyan-50 text-cyan-600 border-cyan-100' };
       case 'REMINDER':
-        return { icon: Bell, color: 'bg-amber-50 text-amber-600 border-amber-100' };
+        return { icon: Bell, color: 'bg-amber-50 text-amber-700 border-amber-100' };
       default:
         return { icon: Info, color: 'bg-slate-50 text-slate-500 border-slate-200' };
     }
@@ -89,7 +89,7 @@ export default function HistoryPage() {
       {/* Header Info */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <h3 className="font-extrabold text-slate-800 text-base leading-tight mb-1">Línea de Tiempo de {member.fullName.split(' ')[0]}</h3>
-        <p className="text-xs font-semibold text-slate-400">Consolidado cronológico de todos los sucesos médicos.</p>
+        <p className="text-xs font-semibold text-slate-500">Consolidado cronológico de todos los sucesos médicos.</p>
       </section>
 
       {/* Timeline Section */}
@@ -102,7 +102,7 @@ export default function HistoryPage() {
           <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center flex flex-col items-center justify-center gap-3 ml-2">
             <Clock className="h-10 w-10 text-slate-300 animate-pulse" />
             <p className="text-sm font-bold text-slate-800">Historial vacío</p>
-            <p className="text-xs text-slate-400 max-w-xs">No se registran eventos cronológicos para este familiar.</p>
+            <p className="text-xs text-slate-500 max-w-xs">No se registran eventos cronológicos para este familiar.</p>
           </div>
         ) : (
           memberHistory.map((event) => {
@@ -116,7 +116,7 @@ export default function HistoryPage() {
               >
                 {/* Timeline node dot */}
                 <span className="absolute -left-9 top-6 h-5 w-5 rounded-full bg-slate-200 border-4 border-slate-50 flex items-center justify-center z-10">
-                  <span className="h-2 w-2 rounded-full bg-teal-600" />
+                  <span className="h-2 w-2 rounded-full bg-teal-700" />
                 </span>
 
                 {/* Left side info */}
@@ -134,7 +134,7 @@ export default function HistoryPage() {
                 </div>
 
                 {/* Right side Date */}
-                <div className="text-xs font-extrabold text-teal-600 self-end sm:self-center shrink-0">
+                <div className="text-xs font-extrabold text-teal-700 self-end sm:self-center shrink-0">
                   {new Date(event.eventDate).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </div>
               </div>

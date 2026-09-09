@@ -24,3 +24,28 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   C1.5 · Foco visible en todo lo que se puede enfocar.
+
+   La aplicación tenía 88 `outline-none` repartidos por los formularios y cero
+   reglas de `:focus-visible`. Los campos dibujaban su anillo de color al
+   enfocarse, pero botones, enlaces y tarjetas se quedaban con lo que trajera
+   el navegador, y allí donde `outline-none` ganaba, con nada: navegando con
+   Tab no se sabía dónde se estaba.
+
+   Esta regla va DESPUÉS de las utilidades de Tailwind, así que con la misma
+   especificidad gana ella y devuelve el contorno. Se usa `:focus-visible` y no
+   `:focus` a propósito: quien pulsa con el ratón no ve el anillo, quien navega
+   con teclado sí.
+   ─────────────────────────────────────────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid #00786f; /* teal-700: 5.36:1 sobre blanco */
+  outline-offset: 2px;
+}
+
+/* En el fondo oscuro del bloqueo de sesión y de la navegación desplegada, el
+   teal no se ve. Ahí el contorno es blanco. */
+.foco-claro *:focus-visible {
+  outline-color: #ffffff;
+}

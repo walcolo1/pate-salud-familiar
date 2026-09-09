@@ -91,7 +91,7 @@ export default function OnboardingSetupPage() {
                   <Database className="h-5 w-5 text-teal-400 shrink-0 mt-0.5" />
                   <div>
                     <h4 className="text-xs font-extrabold text-white">Google Drive y Sheets</h4>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Se crea una base de datos tabular 100% privada donde tus recetas, citas e historial clínico se resguardan de forma segura.</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Se crea una base de datos tabular 100% privada donde tus recetas, citas e historial clínico se resguardan de forma segura.</p>
                   </div>
                 </div>
                 
@@ -99,7 +99,7 @@ export default function OnboardingSetupPage() {
                   <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
                   <div>
                     <h4 className="text-xs font-extrabold text-white">Google Calendar</h4>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Tus citas médicas familiares se registran automáticamente en tu Google Calendar para recibir alarmas preventivas.</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Tus citas médicas familiares se registran automáticamente en tu Google Calendar para recibir alarmas preventivas.</p>
                   </div>
                 </div>
               </div>
@@ -126,7 +126,7 @@ export default function OnboardingSetupPage() {
               <h3 className="font-extrabold text-white text-base">
                 {syncInitStatus === 'checking' ? 'Buscando base de datos...' : 'Configurando servicios...'}
               </h3>
-              <p className="text-xs text-slate-400 max-w-xs leading-relaxed px-4">
+              <p className="text-xs text-slate-500 max-w-xs leading-relaxed px-4">
                 {syncInitMessage || 'Por favor concede los permisos solicitados en la ventana emergente de Google...'}
               </p>
             </div>
@@ -139,7 +139,7 @@ export default function OnboardingSetupPage() {
             
             <div className="flex flex-col gap-1.5">
               <h3 className="font-extrabold text-white text-base">¡Configuración Exitosa! 🎉</h3>
-              <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+              <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
                 Tu expediente clínico se ha sincronizado correctamente. Todo está listo para que empieces.
               </p>
             </div>
@@ -168,13 +168,13 @@ export default function OnboardingSetupPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setSetupStep('idle')}
-                className="flex-1 h-12 border border-slate-800 hover:bg-slate-800 font-extrabold text-xs text-slate-400 rounded-xl transition-colors"
+                className="flex-1 h-12 border border-slate-800 hover:bg-slate-800 font-extrabold text-xs text-slate-500 rounded-xl transition-colors"
               >
                 Volver
               </button>
               <button
                 onClick={handleConfigure}
-                className="flex-1 h-12 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors"
+                className="flex-1 h-12 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors"
               >
                 Reintentar
               </button>
