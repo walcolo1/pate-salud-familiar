@@ -262,6 +262,58 @@ Se ejecutan antes del **corte final de Firebase en el bloque G**.
 2. Pulsar *Cerrar Sesión* mientras está en curso.
 3. **Criterio:** aparece *"Guardando cambios"* con **solo** dos opciones —*Esperar a que termine* y *Cancelar cierre de sesión*—, sin ninguna forma de abortar la sincronización. Al terminar, el cierre continúa solo si no quedan pendientes.
 
+### 6.12 · Avisos locales en un dispositivo real (C3.2)
+
+*El arnés cubre todo lo que puede cubrirse en un navegador sin cabeza: que el
+Service Worker se registra, que el permiso solo se pide al pulsar, que el
+temporizador se arma, que el texto no lleva datos clínicos y que marcar la toma
+como hecha lo cancela. Lo que **no** puede cubrir es el cuadro real del
+navegador ni la notificación que pinta el sistema operativo.*
+
+**Por qué hay evidencia simulada aquí.** Chromium sin cabeza arranca con las
+notificaciones **denegadas**, y `context.grantPermissions(['notifications'])`
+no cambia lo que devuelve `Notification.permission` —se comprobó: sigue
+diciendo «denied»—. Las pruebas N1–N4 sustituyen **solo** esa respuesta del
+navegador; todo lo demás es el código de producción.
+
+> **Fecha de ejecución:** *pendiente*
+> **Dispositivo:** *pendiente* (conviene un móvil con la PWA instalada)
+
+- [ ] 1 · Abrir `/reminders` en un navegador donde no se haya decidido el
+      permiso. Debe verse la tarjeta que **explica antes de pedir**, con las
+      tres advertencias: sin datos clínicos, sin servidor, y solo con la
+      aplicación abierta.
+- [ ] 2 · Comprobar que **no ha aparecido ningún cuadro del navegador** hasta
+      aquí.
+- [ ] 3 · Pulsar «Activar avisos». Ahora sí debe aparecer el cuadro del
+      navegador. Conceder.
+- [ ] 4 · Registrar un medicamento cuya próxima toma caiga dentro de los
+      próximos minutos.
+- [ ] 5 · Dejar la aplicación abierta y esperar. **La notificación debe decir
+      «Es hora de una toma de medicamento»** y nada más: ni el nombre del
+      medicamento, ni la dosis, ni de quién es.
+- [ ] 6 · Pulsar la notificación. Debe **traer al frente la ventana que ya
+      estaba abierta**, no abrir una segunda.
+- [ ] 7 · Marcar la toma como hecha y comprobar que **no vuelve a sonar**.
+- [ ] 8 · Denegar el permiso desde los ajustes del navegador y recargar: debe
+      verse la tarjeta de «Avisos bloqueados» explicando cómo revertirlo.
+
+#### Limitación conocida, y por qué
+
+Con la aplicación **cerrada** no suena nada. No es un descuido: hoy no existe
+forma de programar un aviso local diferido desde una PWA sin servidor.
+
+| Vía | Por qué no |
+|---|---|
+| `TimestampTrigger` (Notification Triggers) | Fue una prueba de origen de Chrome y **nunca llegó a versión estable**. Se detectaría si algún día apareciera |
+| Web Push | Exige **un servidor con claves VAPID**. El proyecto no tiene backend propio, y montarlo solo para esto contradice el Bloque E |
+| Periodic Background Sync | Solo Chromium, con la PWA instalada, y **el navegador decide cuándo**: el mínimo real ronda las doce horas. Para una toma a las 08:00 no sirve |
+
+La interfaz lo dice en voz alta en la propia tarjeta de permiso, para que nadie
+retire la alarma de su teléfono confiando en esto.
+
+---
+
 ### 6.11 · Consentimiento OAuth completamente limpio
 
 *Pendiente. La validación B5 se ejecutó sobre una sesión que **ya tenía permisos
@@ -477,6 +529,7 @@ web/
 │   ├── teclado-navegacion.e2e.ts foco visible y operación sin ratón
 │   ├── estados-carga-error.e2e.ts carga, vacío y expediente ilegible
 │   ├── agenda-unificada.e2e.ts   los tres orígenes en una sola vista
+│   ├── notificaciones-locales.e2e.ts avisos sin datos clínicos
 │   ├── purga-almacenamiento.e2e.ts
 │   └── dialogo-cierre.e2e.ts
 ├── src/lib/*.test.ts             unitarias junto al módulo que prueban

@@ -1069,12 +1069,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       }
 
-      // Registro del Service Worker para soporte PWA y Offline
+      // Registro del Service Worker para soporte PWA y Offline.
+      //
+      // C3.2 · Esto estaba dentro de `addEventListener('load')` a secas, y ese
+      // evento YA HA OCURRIDO cuando React monta y llega hasta aquí. El oyente
+      // se colgaba de un evento que no iba a volver a dispararse, así que el
+      // Service Worker no se registraba nunca: ni la caché de la PWA ni, ahora,
+      // los avisos. Se comprobó en el arnés: cero registros. Si la carga ya
+      // terminó se registra en el acto; si no, se espera al evento.
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+        const registrar = () => {
+          navigator.serviceWorker
+            .register('/sw.js')
             .catch((err) => console.error('Error al registrar el Service Worker:', err));
-        });
+        };
+        if (document.readyState === 'complete') registrar();
+        else window.addEventListener('load', registrar, { once: true });
       }
     } catch (e) {
       // C2 · Antes esto terminaba aquí: el fallo iba a la consola y la

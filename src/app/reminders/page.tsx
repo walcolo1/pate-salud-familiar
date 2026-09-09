@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import EstadoVacio from '@/components/ui/EstadoVacio';
+import PermisoAvisos from '@/components/notificaciones/PermisoAvisos';
 import EstadoCarga from '@/components/ui/EstadoCarga';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
@@ -83,6 +84,8 @@ export default function RemindersPage() {
         <h2 className="text-2xl font-black text-slate-800 leading-tight">Recordatorios y Alertas</h2>
         <p className="text-xs font-semibold text-slate-500">Control de alertas horarias médicas y checklist de cuidados del hogar.</p>
       </section>
+
+      <PermisoAvisos />
 
       {/* Tabs */}
       <section className="flex border-b border-slate-200">

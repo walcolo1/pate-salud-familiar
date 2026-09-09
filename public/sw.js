@@ -100,3 +100,38 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C3.2 · Avisos locales
+//
+// La notificacion la crea la pagina con registration.showNotification(); aqui
+// solo se atiende el clic. Se hace en el Service Worker y no en la pagina
+// porque el clic puede llegar cuando la pestaña ya no existe.
+//
+// El cuerpo del aviso NUNCA lleva datos clinicos: eso se decide y se prueba en
+// src/lib/avisosLocales.ts. Aqui tampoco se lee nada del expediente.
+// ═══════════════════════════════════════════════════════════════════════════
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  // El destino viaja en `data.url`. Si no viene, la lista de recordatorios.
+  const destino = new URL(event.notification.data?.url || '/reminders', self.location.origin).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientes) => {
+      // Si la aplicacion ya esta abierta se reutiliza esa ventana: abrir una
+      // segunda deja dos copias del expediente vivas a la vez.
+      for (const cliente of clientes) {
+        if (new URL(cliente.url).origin !== self.location.origin) continue;
+        if ('focus' in cliente) {
+          if ('navigate' in cliente && cliente.url !== destino) {
+            return cliente.navigate(destino).then((c) => (c || cliente).focus());
+          }
+          return cliente.focus();
+        }
+      }
+      return self.clients.openWindow ? self.clients.openWindow(destino) : undefined;
+    }),
+  );
+});

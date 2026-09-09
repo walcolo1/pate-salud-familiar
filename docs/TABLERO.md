@@ -72,6 +72,7 @@ los dos. Sí quedó verificado que **no aparecen en el consentimiento inicial**.
 | C1.5 · Foco visible, teclado, contraste AA y zoom | **cerrado** |
 | C2 · Estados de carga, vacío y error unificados | **cerrado** |
 | C3.1 · Agenda unificada (citas, dosis, controles) | **cerrado** |
+| C3.2 · Avisos locales sin PHI (con limitación conocida) | **cerrado** |
 
 ---
 
