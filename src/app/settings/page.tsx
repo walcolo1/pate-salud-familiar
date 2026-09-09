@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import EstadoCarga from '@/components/ui/EstadoCarga';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { useConfirmacion } from '@/context/Confirmacion';
@@ -241,9 +242,7 @@ export default function SettingsPage() {
 
   if (isLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="h-10 w-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <EstadoCarga mensaje="Cargando tu expediente…" />
     );
   }
 

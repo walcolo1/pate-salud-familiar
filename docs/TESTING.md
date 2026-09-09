@@ -475,6 +475,7 @@ web/
 │   ├── confirmaciones-destructivas.e2e.ts
 │   ├── etiquetas-campos.e2e.ts   nombre accesible de los 102 campos
 │   ├── teclado-navegacion.e2e.ts foco visible y operación sin ratón
+│   ├── estados-carga-error.e2e.ts carga, vacío y expediente ilegible
 │   ├── purga-almacenamiento.e2e.ts
 │   └── dialogo-cierre.e2e.ts
 ├── src/lib/*.test.ts             unitarias junto al módulo que prueban

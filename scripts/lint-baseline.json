@@ -13,7 +13,7 @@
   "src/app/members/page.tsx": 1,
   "src/app/onboarding/setup/page.tsx": 1,
   "src/app/settings/page.tsx": 14,
-  "src/context/AppContext.tsx": 75,
+  "src/context/AppContext.tsx": 72,
   "src/lib/analizadorCitaTexto.ts": 3,
   "src/lib/googleTokenManager.ts": 3
 }

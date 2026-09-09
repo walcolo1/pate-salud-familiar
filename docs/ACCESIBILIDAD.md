@@ -1,6 +1,6 @@
 # Accesibilidad
 
-> Bloque C · Pasos C1.1 a C1.5 · Última actualización: **2026-09-08**
+> Bloque C · Pasos C1.1 a C1.5 y C2 · Última actualización: **2026-09-09**
 
 ## Qué es axe-core y por qué se usa
 
@@ -241,6 +241,87 @@ Sigue siendo **un suelo, no un techo**. Que axe no encuentre nada no dice que
 el orden de tabulación tenga sentido, ni que un formulario clínico se pueda
 completar de principio a fin con lector de pantalla. Eso sigue en `TESTING.md`
 como validación manual.
+
+# Estados de carga, vacío y error (C2)
+
+## El inventario, y lo que encontró
+
+| Estado | Cómo estaba |
+|---|---|
+| **Carga** | El mismo círculo girando **copiado en 19 pantallas**. Sin `role`, sin texto, sin nada que anunciar: con lector de pantalla la aplicación se quedaba muda mientras cargaba |
+| **Vacío** | **14 cajas** con la misma idea y ninguna igual: distintos rellenos, tamaños de texto y tratamientos del icono. **Una sola de las catorce ofrecía qué hacer** |
+| **«No encontrado»** | **11 pantallas** con un `<h3>` suelto en mitad de la nada. Ocho de ellas, sin explicación y sin forma de volver |
+| **Error de carga** | **No existía.** Ni un solo estado de error en toda la aplicación |
+
+## Lo que apareció al buscar el estado de error
+
+No es que faltara la pantalla: es que **la aplicación no podía saber que había
+fallado**. `loadAppState` devolvía `null` en dos casos muy distintos —«no hay
+nada guardado» y «no se pudo leer»— y la interfaz recibía el mismo `null` para
+ambos. Con el expediente dañado, el panel decía:
+
+> Aún no tienes miembros registrados
+
+...con el historial clínico completo intacto en el navegador, sin abrir. Es el
+peor mensaje posible: **afirma que todo está en orden**, así que nadie va a
+reintentar ni a restaurar una copia.
+
+Y había algo peor en el mismo sitio. Ante un fallo de lectura, la función
+ejecutaba:
+
+```ts
+window.localStorage.removeItem(key);   // ← el expediente, borrado
+```
+
+Un byte corrupto, una cuota llena o un almacenamiento bloqueado por el
+navegador bastaban para **destruir el expediente de una familia** sin preguntar,
+sin avisar y sin dejar rastro.
+
+### Lo que se hizo
+
+`src/lib/lecturaExpediente.ts` sustituye ese `null` ambiguo por una respuesta
+que dice cuál de las tres cosas pasó:
+
+```ts
+{ estado: 'VACIO' }                          // expediente nuevo, no es un fallo
+{ estado: 'OK'; datos }
+{ estado: 'ILEGIBLE'; motivo }               // JSON roto, no es objeto, faltan campos, o el almacén falló
+```
+
+Y **no borra nada, nunca**. El original se queda donde está —para que
+reintentar signifique algo— y además se guarda una copia bajo
+`pate:cuarentena:<clave>`, que es de lo único que se puede tirar para rescatar
+los datos a mano. La primera copia no se pisa: si el expediente se sigue
+escribiendo sobre sí mismo tras el fallo, la más antigua es la que más
+probabilidades tiene de estar completa.
+
+15 pruebas unitarias cubren el módulo, y dos de ellas existen solo para vigilar
+que el expediente ilegible **sigue ahí** después de intentar leerlo.
+
+## Los tres componentes
+
+| Componente | Cuándo | Qué garantiza |
+|---|---|---|
+| `ui/EstadoCarga` | Se está esperando | `role="status"` con **texto**, no solo un círculo. El giro es `aria-hidden` y se detiene con `motion-reduce` |
+| `ui/EstadoError` | Algo falló | `role="alert"`, y siempre tres cosas: qué pasó, qué **no** pasó, y qué se puede hacer ahora |
+| `ui/EstadoVacio` | No hay nada todavía | Sin `role="alert"` y sin colores de alarma: un expediente nuevo es normal. `accion` es opcional pero está en el contrato para que su ausencia se note al escribirla |
+
+`layout/PuertaExpediente` es el único sitio donde se comprueba el error de
+carga. Ponerlo en las 19 rutas habría multiplicado por 19 la ocasión de
+olvidarlo en la ruta 20.
+
+## Dos decisiones que conviene explicar
+
+**El error de «familiar no encontrado» no ofrece reintentar.** Volver a mirar
+la misma lista da el mismo resultado. Ofrece la única salida real —la lista de
+familiares— y dice lo que sí se sabe: que el expediente **sí** se pudo abrir.
+Cuando el fallo es de carga, quien lo anuncia es `PuertaExpediente`, y esa
+pantalla ni siquiera llega a pintarse.
+
+**Tres estados vacíos se quedaron sin acción, a propósito.** El historial
+clínico se deriva de lo demás; las alarmas y las tareas nacen de las citas y
+los medicamentos. Poner ahí un botón habría sido inventarse una salida que no
+lleva a ningún sitio, que es justo el defecto que este paso venía a corregir.
 
 ## Cómo funciona la línea base
 

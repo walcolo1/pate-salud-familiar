@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import EstadoVacio from '@/components/ui/EstadoVacio';
+import EstadoCarga from '@/components/ui/EstadoCarga';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { useConfirmacion } from '@/context/Confirmacion';
@@ -23,7 +25,8 @@ import {
   Filter,
   CheckCircle2,
   Edit2,
-  Upload
+  Upload,
+  Inbox
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -78,9 +81,7 @@ export default function AppointmentsImportPage() {
 
   if (isLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="h-10 w-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <EstadoCarga mensaje="Cargando tu expediente…" />
     );
   }
 
@@ -429,9 +430,11 @@ export default function AppointmentsImportPage() {
             </div>
           )}
           {filteredCandidates.length === 0 && filterStatus !== 'IGNORED' ? (
-            <div className="text-center py-10 text-slate-500 text-xs font-semibold">
-              No hay borradores en esta pestaña. Pega el texto de un correo arriba y presiona &quot;Crear borrador&quot;.
-            </div>
+            <EstadoVacio
+              icono={Inbox}
+              titulo="No hay borradores en esta pestaña"
+              descripcion="Pega arriba el texto del correo de tu EPS, o adjunta el PDF, y presiona «Crear borrador»."
+            />
           ) : (
             <div className="flex flex-col gap-4">
               {filteredCandidates.map((cand) => {

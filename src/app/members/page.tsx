@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import EstadoVacio from '@/components/ui/EstadoVacio';
+import EstadoCarga from '@/components/ui/EstadoCarga';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
@@ -64,9 +66,7 @@ export default function MembersPage() {
 
   if (isLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="h-10 w-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <EstadoCarga mensaje="Cargando tu expediente…" />
     );
   }
 
@@ -149,12 +149,13 @@ export default function MembersPage() {
       {/* Grid of members */}
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {filteredMembers.length === 0 ? (
-          <div className="col-span-full bg-white p-10 rounded-3xl border border-slate-100 text-center flex flex-col items-center justify-center gap-3">
-            <User className="h-10 w-10 text-slate-300" />
-            <p className="text-sm font-bold text-slate-800">No se encontraron familiares</p>
-            <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
-              Prueba buscando con otro nombre o agrega un nuevo familiar con el botón de la parte superior.
-            </p>
+          <div className="col-span-full">
+            <EstadoVacio
+              icono={User}
+              titulo="No se encontraron familiares"
+              descripcion="Prueba con otro nombre, o agrega a alguien nuevo."
+              accion={{ tipo: 'enlace', etiqueta: 'Agregar familiar', href: '/members/new' }}
+            />
           </div>
         ) : (
           filteredMembers.map((member) => {

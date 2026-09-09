@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import EstadoVacio from '@/components/ui/EstadoVacio';
+import EstadoCarga from '@/components/ui/EstadoCarga';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
@@ -102,9 +104,7 @@ export default function DashboardPage() {
 
   if (isLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="h-10 w-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <EstadoCarga mensaje="Cargando tu expediente…" />
     );
   }
 
@@ -494,19 +494,14 @@ export default function DashboardPage() {
         {/* Members row */}
         <div className="flex items-center gap-3.5 overflow-x-auto pb-2 scrollbar-none w-full">
           {activeMembers.length === 0 ? (
-            <div className="flex-1 bg-white p-6 rounded-2xl border border-slate-100 text-center flex flex-col items-center justify-center gap-2 shadow-sm">
-              <div className="h-12 w-12 rounded-full bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100">
-                <Users className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">Aún no tienes miembros registrados</p>
-              <p className="text-[10px] text-slate-500">Comienza agregando a tu primer familiar para gestionar sus expedientes.</p>
-              <Link
-                href="/members/new"
-                className="mt-2 inline-flex items-center gap-1.5 bg-teal-700 hover:bg-teal-800 text-white font-extrabold text-xs px-4.5 py-2 rounded-xl shadow-md shadow-teal-900/10 transition-colors duration-200"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Agregar primer familiar</span>
-              </Link>
+            <div className="flex-1">
+              <EstadoVacio
+                variante="compacto"
+                icono={Users}
+                titulo="Aún no tienes familiares registrados"
+                descripcion="Empieza por el primero para poder guardar sus citas, vacunas y documentos."
+                accion={{ tipo: 'enlace', etiqueta: 'Agregar primer familiar', href: '/members/new' }}
+              />
             </div>
           ) : (
             <>
@@ -640,11 +635,13 @@ export default function DashboardPage() {
           <h3 className="font-extrabold text-slate-800 text-sm tracking-wide uppercase px-1">Próximas Citas</h3>
           <div className="flex flex-col gap-3">
             {upcomingAppts.length === 0 ? (
-              <div className="bg-white p-6 rounded-2xl border border-slate-100 text-center flex flex-col items-center justify-center gap-2">
-                <Calendar className="h-8 w-8 text-slate-300" />
-                <p className="text-xs font-bold text-slate-800">No hay citas programadas</p>
-                <p className="text-[10px] text-slate-500">Todo está al día en la agenda médica.</p>
-              </div>
+              <EstadoVacio
+                variante="compacto"
+                icono={Calendar}
+                titulo="No hay citas programadas"
+                descripcion="Las citas se agendan desde la ficha de cada familiar."
+                accion={{ tipo: 'enlace', etiqueta: 'Ver familiares', href: '/members' }}
+              />
             ) : (
               upcomingAppts.map((appt) => {
                 const patient = members.find(m => m.id === appt.memberId)?.fullName.split(' ')[0] || 'Familiar';
@@ -679,11 +676,12 @@ export default function DashboardPage() {
           <h3 className="font-extrabold text-slate-800 text-sm tracking-wide uppercase px-1">Alertas Activas</h3>
           <div className="flex flex-col gap-3">
             {dashboardAlerts.length === 0 ? (
-              <div className="bg-white p-6 rounded-2xl border border-slate-100 text-center flex flex-col items-center justify-center gap-2">
-                <AlertCircle className="h-8 w-8 text-slate-300" />
-                <p className="text-xs font-bold text-slate-800">Sin alertas pendientes</p>
-                <p className="text-[10px] text-slate-500">No hay alarmas vencidas, trámites ni tomas urgentes.</p>
-              </div>
+              <EstadoVacio
+                variante="compacto"
+                icono={AlertCircle}
+                titulo="Sin alertas pendientes"
+                descripcion="No hay alarmas vencidas, trámites ni tomas urgentes."
+              />
             ) : (
               dashboardAlerts.slice(0, 5).map((alert) => {
                 const getAlertIcon = (iconType: string, severity: string) => {

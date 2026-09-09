@@ -25,6 +25,7 @@ import {
   nombreExportacion,
   sobreExportacion,
 } from '../lib/origenDatos';
+import { leerExpediente, type ResultadoLectura } from '../lib/lecturaExpediente';
 
 export interface SavedAppState {
   schemaVersion: number;
@@ -151,40 +152,32 @@ export function saveAppState(state: Omit<SavedAppState, 'schemaVersion' | 'orige
  * Carga el estado de la aplicación desde el LocalStorage.
  * Valida la existencia, el versionamiento y maneja la corrupción de datos.
  */
-export function loadAppState(userEmailOrId?: string | null): SavedAppState | null {
-  if (typeof window === 'undefined') return null;
-  
+export function loadAppStateDetallado(userEmailOrId?: string | null): ResultadoLectura {
   const key = getStorageKey(userEmailOrId);
-  try {
-    const serialized = window.localStorage.getItem(key);
-    if (!serialized) return null;
-    
-    const parsed = JSON.parse(serialized) as SavedAppState;
-    
-    // Validación de integridad y migración
-    if (!parsed || typeof parsed !== 'object') {
-      console.warn('El estado guardado no es un objeto válido. Descartando...');
-      return null;
+  const resultado = leerExpediente(key);
+
+  if (resultado.estado === 'OK') {
+    const datos = resultado.datos as unknown as SavedAppState;
+    if (datos.schemaVersion !== CURRENT_SCHEMA_VERSION) {
+      console.warn(
+        `Discrepancia de version del esquema (leido ${datos.schemaVersion}, esperado ${CURRENT_SCHEMA_VERSION}). Se intentara cargar de todas formas.`,
+      );
     }
-    
-    if (parsed.schemaVersion !== CURRENT_SCHEMA_VERSION) {
-      console.warn(`Discrepancia de versión del esquema (Leído: ${parsed.schemaVersion}, Esperado: ${CURRENT_SCHEMA_VERSION}).`);
-    }
-    
-    // Validamos que contenga las propiedades mínimas para evitar errores de ejecución
-    if (!Array.isArray(parsed.members) || !Array.isArray(parsed.appointments)) {
-      console.error('Faltan propiedades críticas en el estado guardado. Datos corruptos.');
-      return null;
-    }
-    
-    return parsed;
-  } catch (error) {
-    console.error('Error al leer de LocalStorage o datos corruptos:', error);
-    try {
-      window.localStorage.removeItem(key);
-    } catch (_) {}
-    return null;
   }
+
+  return resultado;
+}
+
+/**
+ * Carga el estado, o `null` si no hay nada guardado o no se pudo leer.
+ *
+ * C2 · Se conserva para las llamadas que solo quieren los datos. Quien
+ * necesite distinguir «no hay expediente» de «no se pudo abrir» —y la interfaz
+ * lo necesita— debe usar `loadAppStateDetallado`.
+ */
+export function loadAppState(userEmailOrId?: string | null): SavedAppState | null {
+  const resultado = loadAppStateDetallado(userEmailOrId);
+  return resultado.estado === 'OK' ? (resultado.datos as unknown as SavedAppState) : null;
 }
 
 /**

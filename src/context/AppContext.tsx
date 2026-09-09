@@ -50,6 +50,8 @@ import {
   mockReminders, 
   mockTasks 
 } from '../data/mockData';
+import { MENSAJE_ILEGIBLE } from '../lib/lecturaExpediente';
+import { loadAppStateDetallado } from '../data/persistence';
 import { loadAppState, saveAppState, clearAppState, exportDataAsJSON, getActiveUser, setActiveUser, SavedAppState } from '../data/persistence';
 import {
   leerPreferencias,
@@ -159,7 +161,7 @@ export const mergeMemberSafely = (localMember: FamilyMember, remoteMember: Famil
   const remoteUpdate = remoteMember.updatedAt ? new Date(remoteMember.updatedAt).getTime() : 0;
 
   // Determinar cuál es el base (última escritura gana)
-  let baseMember = remoteUpdate > localUpdate ? { ...remoteMember } : { ...localMember };
+  const baseMember = remoteUpdate > localUpdate ? { ...remoteMember } : { ...localMember };
 
   // Manejar eliminación lógica de forma explícita
   const localDeleted = !!localMember.deletedAt || localMember.status === 'DELETED';
@@ -253,6 +255,15 @@ interface AppContextProps {
   driveSyncEnabled: boolean;
   calendarSyncEnabled: boolean;
   isLoading: boolean;
+  /**
+   * C2 · Por qué NO se pudo abrir el expediente guardado, si es que pasó.
+   *
+   * `null` significa que la carga fue bien, no que no haya datos: un
+   * expediente vacío es un caso normal y se distingue por `members.length`.
+   */
+  errorCarga: string | null;
+  /** Vuelve a intentar la carga inicial que falló. */
+  reintentarCarga: () => void;
   
   // Google Drive specific states
   driveAccessToken: string | null;
@@ -455,6 +466,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [user, setUser] = useState<UserAccount | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
+  // Cambiar este número vuelve a disparar el efecto de carga inicial.
+  const [intentoCarga, setIntentoCarga] = useState(0);
   const [firebaseAuthReady, setFirebaseAuthReady] = useState<boolean>(false);
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [healthProfiles, setHealthProfiles] = useState<Record<string, HealthProfile>>({});
@@ -810,7 +824,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       
       if (activeUser) {
         const userEmailOrId = activeUser === 'demo' ? 'demo' : (activeUser.googleId || activeUser.email);
-        const savedState = loadAppState(userEmailOrId);
+        const lectura = loadAppStateDetallado(userEmailOrId);
+        // C2 · Un expediente ilegible NO es un expediente vacío. Antes ambos
+        // llegaban aquí como `null` y la pantalla decía «aún no tienes
+        // miembros registrados» sobre un historial clínico intacto y sin abrir.
+        if (lectura.estado === 'ILEGIBLE') {
+          setErrorCarga(MENSAJE_ILEGIBLE[lectura.motivo]);
+          setIsLoading(false);
+          return;
+        }
+        const savedState = lectura.estado === 'OK' ? (lectura.datos as unknown as SavedAppState) : null;
         
         if (savedState) {
           if (activeUser === 'demo') {
@@ -1054,11 +1077,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       }
     } catch (e) {
+      // C2 · Antes esto terminaba aquí: el fallo iba a la consola y la
+      // aplicación seguía como si el expediente estuviera vacío.
       console.error('Error al cargar la persistencia local:', e);
+      setErrorCarga(
+        'No se pudo abrir el expediente guardado en este dispositivo. No se ha borrado nada.',
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [purgaDiferidaPendiente, bloqueoArranqueResuelto]);
+  }, [purgaDiferidaPendiente, bloqueoArranqueResuelto, intentoCarga]);
+
+  /** C2 · Reintenta la carga inicial desde cero. */
+  const reintentarCarga = useCallback(() => {
+    setErrorCarga(null);
+    setIsLoading(true);
+    setIntentoCarga((n) => n + 1);
+  }, []);
 
   // ── A6-F1 · Persistencia de preferencias ─────────────────────────────────
   // Clave propia, por dispositivo. Es lo único —junto al deviceId— que
@@ -2026,7 +2061,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         firebaseInvitationsUnsubRef.current = null;
       }
     };
-  }, [familyId, user, currentUserFamilyAccess, purgaDiferidaPendiente, sessionLocked]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [familyId, user, currentUserFamilyAccess, purgaDiferidaPendiente, sessionLocked]);  
 
   // ── FIREBASE: Watch user's family access records (Phase A) ──────────────────
   useEffect(() => {
@@ -2138,7 +2173,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         console.error('[AppContext] firebasePersist setup error:', err);
       });
     },
-    [user], // eslint-disable-line react-hooks/exhaustive-deps
+    [user],  
   );
 
   // ── FIREBASE: Family Invitations & Access Actions ─────────────────────────
@@ -4776,7 +4811,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setOpSyncStatus('syncing');
       
       // 1. Verificar si ya existe pate-salud-config.json en appDataFolder
-      let configId = await findConfigInAppData(token);
+      const configId = await findConfigInAppData(token);
       let sheetId = databaseSpreadsheetId;
       let sheetUrl = databaseSpreadsheetUrl;
       let remoteConfig: any = null;
@@ -5706,7 +5741,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setOpSyncStatus('syncing');
       setOpSyncError(null);
 
-      let configId = await findConfigInAppData(token);
+      const configId = await findConfigInAppData(token);
       let sheetId = databaseSpreadsheetId;
       let sheetUrl = databaseSpreadsheetUrl;
 
@@ -6874,6 +6909,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       driveSyncEnabled,
       calendarSyncEnabled,
       isLoading,
+      errorCarga,
+      reintentarCarga,
       firebaseAuthReady,
       familyId,
       

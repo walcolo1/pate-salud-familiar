@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import EstadoCarga from '@/components/ui/EstadoCarga';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
@@ -57,8 +58,8 @@ export default function OnboardingSetupPage() {
 
   if (isLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <div className="h-10 w-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100">
+        <EstadoCarga variante="bloque" mensaje="Preparando la configuración inicial…" />
       </div>
     );
   }

@@ -70,6 +70,7 @@ los dos. Sí quedó verificado que **no aparecen en el consentimiento inicial**.
 | C1.3b · 3 diálogos de órdenes, 18 `confirm` y 23 `alert` sustituidos | **cerrado** |
 | C1.4 · Etiquetas de los campos de formulario | **cerrado** |
 | C1.5 · Foco visible, teclado, contraste AA y zoom | **cerrado** |
+| C2 · Estados de carga, vacío y error unificados | **cerrado** |
 
 ---
 

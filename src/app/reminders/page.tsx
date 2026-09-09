@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import EstadoVacio from '@/components/ui/EstadoVacio';
+import EstadoCarga from '@/components/ui/EstadoCarga';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
@@ -37,9 +39,7 @@ export default function RemindersPage() {
 
   if (isLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="h-10 w-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <EstadoCarga mensaje="Cargando tu expediente…" />
     );
   }
 
@@ -112,11 +112,11 @@ export default function RemindersPage() {
       {activeTab === 0 && (
         <section className="flex flex-col gap-3.5">
           {reminders.length === 0 ? (
-            <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center flex flex-col items-center justify-center gap-3">
-              <Bell className="h-10 w-10 text-slate-300 animate-pulse" />
-              <p className="text-sm font-bold text-slate-800">No hay alarmas activas</p>
-              <p className="text-xs text-slate-500">Todo tu calendario familiar está libre por ahora.</p>
-            </div>
+            <EstadoVacio
+              icono={Bell}
+              titulo="No hay alarmas activas"
+              descripcion="Todo tu calendario familiar está libre por ahora."
+            />
           ) : (
             reminders.map((rem) => {
               const patient = getPatientName(rem.memberId);
@@ -188,11 +188,11 @@ export default function RemindersPage() {
       {activeTab === 1 && (
         <section className="flex flex-col gap-3.5">
           {tasks.length === 0 ? (
-            <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center flex flex-col items-center justify-center gap-3">
-              <ClipboardList className="h-10 w-10 text-slate-300 animate-pulse" />
-              <p className="text-sm font-bold text-slate-800">No hay tareas pendientes</p>
-              <p className="text-xs text-slate-500">Todo el checklist médico diario está limpio.</p>
-            </div>
+            <EstadoVacio
+              icono={ClipboardList}
+              titulo="No hay tareas pendientes"
+              descripcion="Todo el checklist médico diario está limpio."
+            />
           ) : (
             tasks.map((task) => {
               const patient = getPatientName(task.memberId);

@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useEffect } from 'react';
+import EstadoError from '@/components/ui/EstadoError';
+import EstadoVacio from '@/components/ui/EstadoVacio';
+import EstadoCarga from '@/components/ui/EstadoCarga';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
@@ -32,9 +35,7 @@ export default function HistoryPage() {
 
   if (isLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="h-10 w-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <EstadoCarga mensaje="Cargando tu expediente…" />
     );
   }
 
@@ -42,9 +43,12 @@ export default function HistoryPage() {
 
   if (!member) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 text-center">
-        <h3 className="font-extrabold text-slate-800 text-lg">Familiar no encontrado</h3>
-      </div>
+      <EstadoError
+        variante="bloque"
+        titulo="Familiar no encontrado"
+        mensaje="Tu expediente se abrió correctamente, pero no hay ningún familiar con ese identificador. Puede que se haya eliminado, o que el enlace esté mal."
+        accionSecundaria={{ etiqueta: 'Volver a la lista de familiares', href: '/members' }}
+      />
     );
   }
 
@@ -99,11 +103,11 @@ export default function HistoryPage() {
         <div className="absolute left-3 top-2 bottom-2 w-0.5 bg-slate-200" />
 
         {memberHistory.length === 0 ? (
-          <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center flex flex-col items-center justify-center gap-3 ml-2">
-            <Clock className="h-10 w-10 text-slate-300 animate-pulse" />
-            <p className="text-sm font-bold text-slate-800">Historial vacío</p>
-            <p className="text-xs text-slate-500 max-w-xs">No se registran eventos cronológicos para este familiar.</p>
-          </div>
+          <EstadoVacio
+            icono={Clock}
+            titulo="Historial vacío"
+            descripcion="No se registran eventos cronológicos para este familiar."
+          />
         ) : (
           memberHistory.map((event) => {
             const meta = getEventMeta(event.eventType);

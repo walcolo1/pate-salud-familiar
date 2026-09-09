@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect } from 'react';
+import EstadoError from '@/components/ui/EstadoError';
+import EstadoCarga from '@/components/ui/EstadoCarga';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
@@ -29,9 +31,7 @@ export default function HealthProfilePage() {
 
   if (isLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="h-10 w-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <EstadoCarga mensaje="Cargando tu expediente…" />
     );
   }
 
@@ -40,13 +40,12 @@ export default function HealthProfilePage() {
 
   if (!member || !profile) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 text-center select-none">
-        <ShieldAlert className="h-12 w-12 text-rose-500" />
-        <h3 className="font-extrabold text-slate-800 text-lg">Perfil de salud no encontrado</h3>
-        <Link href="/members" className="text-sm font-bold text-teal-700 hover:underline">
-          Volver a la lista de familiares
-        </Link>
-      </div>
+      <EstadoError
+        variante="bloque"
+        titulo="Perfil de salud no encontrado"
+        mensaje="Tu expediente se abrió correctamente, pero no hay ningún familiar con ese identificador. Puede que se haya eliminado, o que el enlace esté mal."
+        accionSecundaria={{ etiqueta: 'Volver a la lista de familiares', href: '/members' }}
+      />
     );
   }
 

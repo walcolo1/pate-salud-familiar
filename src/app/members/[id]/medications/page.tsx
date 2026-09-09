@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import EstadoError from '@/components/ui/EstadoError';
+import EstadoVacio from '@/components/ui/EstadoVacio';
+import EstadoCarga from '@/components/ui/EstadoCarga';
 import Link from 'next/link';
 import Dialog from '@/components/ui/Dialog';
 import { useRouter, useParams } from 'next/navigation';
@@ -98,9 +101,7 @@ export default function MedicationsPage() {
 
   if (isLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="h-10 w-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <EstadoCarga mensaje="Cargando tu expediente…" />
     );
   }
 
@@ -108,9 +109,12 @@ export default function MedicationsPage() {
 
   if (!member) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 text-center">
-        <h3 className="font-extrabold text-slate-800 text-lg">Familiar no encontrado</h3>
-      </div>
+      <EstadoError
+        variante="bloque"
+        titulo="Familiar no encontrado"
+        mensaje="Tu expediente se abrió correctamente, pero no hay ningún familiar con ese identificador. Puede que se haya eliminado, o que el enlace esté mal."
+        accionSecundaria={{ etiqueta: 'Volver a la lista de familiares', href: '/members' }}
+      />
     );
   }
 
@@ -437,13 +441,12 @@ export default function MedicationsPage() {
       <section className="flex flex-col gap-4">
         {activeTab === 'ACTIVE' ? (
           activePrescriptions.length === 0 ? (
-            <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center flex flex-col items-center justify-center gap-3">
-              <Activity className="h-10 w-10 text-slate-300" />
-              <p className="text-sm font-bold text-slate-800">No hay medicamentos activos</p>
-              <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
-                Registra tus prescripciones para calcular automáticamente tus tomas y recibir alertas de recordatorio.
-              </p>
-            </div>
+            <EstadoVacio
+              icono={Activity}
+              titulo="No hay medicamentos activos"
+              descripcion="Registra tus prescripciones para calcular automáticamente tus tomas y recibir alertas de recordatorio."
+              accion={{ tipo: 'boton', etiqueta: 'Registrar medicamento', onClick: () => setShowAddForm(true) }}
+            />
           ) : (
             activePrescriptions.map((prescription) => {
               const stats = getPrescriptionStats(prescription.id);
@@ -581,13 +584,11 @@ export default function MedicationsPage() {
           )
         ) : (
           inactivePrescriptions.length === 0 ? (
-            <div className="bg-white p-10 rounded-3xl border border-slate-100 text-center flex flex-col items-center justify-center gap-3">
-              <History className="h-10 w-10 text-slate-300" />
-              <p className="text-sm font-bold text-slate-800">No hay historial inactivo</p>
-              <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
-                Aquí aparecerán los tratamientos que hayas marcado como finalizados, suspendidos o cancelados.
-              </p>
-            </div>
+            <EstadoVacio
+              icono={History}
+              titulo="No hay historial inactivo"
+              descripcion="Aquí aparecerán los tratamientos que hayas marcado como finalizados, suspendidos o cancelados."
+            />
           ) : (
             inactivePrescriptions.map((prescription) => {
               const stats = getPrescriptionStats(prescription.id);

@@ -5,6 +5,7 @@ import { AppProvider } from "@/context/AppContext";
 import { ConfirmacionProvider } from "@/context/Confirmacion";
 import { AvisosProvider } from "@/context/Avisos";
 import Navbar from "@/components/layout/Navbar";
+import PuertaExpediente from "@/components/layout/PuertaExpediente";
 import Script from "next/script";
 
 const geistSans = Geist({
@@ -61,7 +62,7 @@ export default function RootLayout({
           <ConfirmacionProvider>
             <AppProvider>
               <Navbar>
-                {children}
+                <PuertaExpediente>{children}</PuertaExpediente>
               </Navbar>
             </AppProvider>
           </ConfirmacionProvider>
