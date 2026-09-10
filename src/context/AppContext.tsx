@@ -52,6 +52,15 @@ import {
 } from '../data/mockData';
 import { MENSAJE_ILEGIBLE } from '../lib/lecturaExpediente';
 import {
+  validarMascota,
+  type BorradorMascota,
+  type MedicalHistoryEntry as EntradaHistorialVet,
+  type Pet,
+  type VaccineEntry as VacunaMascota,
+  type Validacion,
+  type WeightEntry as PesoMascota,
+} from '../domain/mascotas';
+import {
   generarDosis,
   reprogramarDosis,
   type ContextoDosis,
@@ -400,6 +409,18 @@ interface AppContextProps {
   medicalOrders: MedicalOrder[];
   medicationPrescriptions: MedicationPrescription[];
   medicationDoseReminders: MedicationDoseReminder[];
+
+  // ── Bloque D · Mascotas ──────────────────────────────────────────────────
+  pets: Pet[];
+  petWeights: PesoMascota[];
+  petVaccines: VacunaMascota[];
+  petHistory: EntradaHistorialVet[];
+  /** Crea una mascota. Devuelve la validación: si no es válida, no crea nada. */
+  addPet: (borrador: BorradorMascota) => Validacion;
+  /** Edita los datos básicos. No toca pesos, vacunas ni historial. */
+  updatePet: (id: string, cambios: BorradorMascota) => Validacion;
+  /** Marca activa o inactiva. NUNCA borra: el historial se conserva. */
+  setPetActiva: (id: string, activa: boolean) => void;
   addMedicalOrder: (order: Omit<MedicalOrder, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => void;
   updateMedicalOrder: (id: string, fields: Partial<MedicalOrder>) => void;
   deleteMedicalOrder: (id: string) => void;
@@ -493,6 +514,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [medicalOrders, setMedicalOrders] = useState<MedicalOrder[]>([]);
   const [medicationPrescriptions, setMedicationPrescriptions] = useState<MedicationPrescription[]>([]);
   const [medicationDoseReminders, setMedicationDoseReminders] = useState<MedicationDoseReminder[]>([]);
+  // Bloque D · Mascotas.
+  const [pets, setPets] = useState<Pet[]>([]);
+  const [petWeights, setPetWeights] = useState<PesoMascota[]>([]);
+  const [petVaccines, setPetVaccines] = useState<VacunaMascota[]>([]);
+  const [petHistory, setPetHistory] = useState<EntradaHistorialVet[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<FamilyInvitation[]>([]);
   const [invitations, setInvitations] = useState<FamilyInvitation[]>([]);
 
@@ -881,6 +907,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setMedicalOrders(savedState.medicalOrders || []);
           setMedicationPrescriptions(savedState.medicationPrescriptions || []);
           setMedicationDoseReminders(savedState.medicationDoseReminders || []);
+          // Bloque D · Mascotas.
+          setPets(savedState.pets || []);
+          setPetWeights(savedState.petWeights || []);
+          setPetVaccines(savedState.petVaccines || []);
+          setPetHistory(savedState.petHistory || []);
           setSharedReports(savedState.sharedReports || []);
           setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
           setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
@@ -1194,7 +1225,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       gmailOnlyFutureAppointments,
       medicalOrders,
       medicationPrescriptions,
-      medicationDoseReminders
+      medicationDoseReminders,
+      pets,
+      petWeights,
+      petVaccines,
+      petHistory
     }, userEmailOrId);
   }, [
     user,
@@ -1232,6 +1267,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     medicalOrders,
     medicationPrescriptions,
     medicationDoseReminders,
+    pets,
+    petWeights,
+    petVaccines,
+    petHistory,
     isLoading
   ]);
 
@@ -1567,6 +1606,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setMedicalOrders(savedState.medicalOrders || []);
         setMedicationPrescriptions(savedState.medicationPrescriptions || []);
         setMedicationDoseReminders(savedState.medicationDoseReminders || []);
+          // Bloque D · Mascotas.
+          setPets(savedState.pets || []);
+          setPetWeights(savedState.petWeights || []);
+          setPetVaccines(savedState.petVaccines || []);
+          setPetHistory(savedState.petHistory || []);
         setSharedReports(savedState.sharedReports || []);
         setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
         setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
@@ -1694,6 +1738,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setMedicalOrders(savedState.medicalOrders || []);
         setMedicationPrescriptions(savedState.medicationPrescriptions || []);
         setMedicationDoseReminders(savedState.medicationDoseReminders || []);
+          // Bloque D · Mascotas.
+          setPets(savedState.pets || []);
+          setPetWeights(savedState.petWeights || []);
+          setPetVaccines(savedState.petVaccines || []);
+          setPetHistory(savedState.petHistory || []);
         setSharedReports(savedState.sharedReports || []);
         setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
         setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
@@ -3558,6 +3607,115 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return resultado;
   };
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // Bloque D · Mascotas
+  //
+  // La validación vive en `domain/mascotas` y se ejecuta AQUÍ, no en el
+  // formulario: por esta puerta también entran los datos de un respaldo
+  // restaurado y, en el Bloque G, los de Firestore.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /** Metadatos comunes a cualquier cosa que se cree en el expediente. */
+  const marcasDeCreacion = () => {
+    const nowIso = new Date().toISOString();
+    return {
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      deletedAt: null,
+      syncStatus: (isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC') as Pet['syncStatus'],
+      ownerEmail: user?.email || null,
+      ownerGoogleId: user?.googleId || user?.id || null,
+      sourceDeviceId: deviceId || null,
+    };
+  };
+
+  const addPet = (borrador: BorradorMascota): Validacion => {
+    const validacion = validarMascota(borrador);
+    if (!validacion.valido) return validacion;
+
+    const nueva: Pet = {
+      id: `pet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      familyId: familyId || 'local',
+      memberId: borrador.memberId as string,
+      nombre: (borrador.nombre as string).trim(),
+      especie: borrador.especie!,
+      raza: borrador.raza?.trim() || null,
+      fechaNacimiento: borrador.fechaNacimiento || null,
+      sexo: borrador.sexo!,
+      pesoActualKg: borrador.pesoActualKg ?? null,
+      pesoIdealKg: borrador.pesoIdealKg ?? null,
+      activo: true,
+      notas: borrador.notas?.trim() || null,
+      ...marcasDeCreacion(),
+    };
+
+    setPets((prev) => [...prev, nueva]);
+    return { valido: true };
+  };
+
+  const updatePet = (id: string, cambios: BorradorMascota): Validacion => {
+    const actual = pets.find((p) => p.id === id);
+    if (!actual) {
+      return { valido: false, problemas: [{ campo: 'id', mensaje: 'La mascota ya no existe.' }] };
+    }
+
+    // Se valida la mascota RESULTANTE, no solo los campos que llegan: un
+    // cambio parcial puede dejar el conjunto en un estado imposible.
+    const resultante: BorradorMascota = {
+      nombre: cambios.nombre ?? actual.nombre,
+      especie: cambios.especie ?? actual.especie,
+      raza: cambios.raza ?? actual.raza,
+      fechaNacimiento: cambios.fechaNacimiento ?? actual.fechaNacimiento,
+      sexo: cambios.sexo ?? actual.sexo,
+      pesoActualKg: cambios.pesoActualKg ?? actual.pesoActualKg,
+      pesoIdealKg: cambios.pesoIdealKg ?? actual.pesoIdealKg,
+      memberId: cambios.memberId ?? actual.memberId,
+      notas: cambios.notas ?? actual.notas,
+    };
+
+    const validacion = validarMascota(resultante);
+    if (!validacion.valido) return validacion;
+
+    setPets((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              ...resultante,
+              nombre: (resultante.nombre as string).trim(),
+              raza: resultante.raza?.trim() || null,
+              notas: resultante.notas?.trim() || null,
+              updatedAt: new Date().toISOString(),
+              syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC',
+            }
+          : p,
+      ),
+    );
+    return { valido: true };
+  };
+
+  /**
+   * Marca activa o inactiva.
+   *
+   * No hay borrado. Un animal que ya no está sigue teniendo un historial
+   * clínico que puede hacer falta —para el veterinario del siguiente, o para
+   * la propia familia— y borrarlo no devuelve nada a cambio.
+   */
+  const setPetActiva = (id: string, activa: boolean) => {
+    setPets((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              activo: activa,
+              updatedAt: new Date().toISOString(),
+              syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC',
+            }
+          : p,
+      ),
+    );
+  };
+
   const addMedicalOrder = (order: Omit<MedicalOrder, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => {
     const newId = `ord-${Date.now()}`;
     const nowIso = new Date().toISOString();
@@ -4581,7 +4739,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       sharedReports,
       medicalOrders,
       medicationPrescriptions,
-      medicationDoseReminders
+      medicationDoseReminders,
+      pets,
+      petWeights,
+      petVaccines,
+      petHistory
     });
   };
 
@@ -4614,6 +4776,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (Array.isArray(data.medicalOrders)) setMedicalOrders(data.medicalOrders);
       if (Array.isArray(data.medicationPrescriptions)) setMedicationPrescriptions(data.medicationPrescriptions);
       if (Array.isArray(data.medicationDoseReminders)) setMedicationDoseReminders(data.medicationDoseReminders);
+      // Bloque D · Un respaldo que no restaura las mascotas es una trampa:
+      // se descubre cuando ya no están.
+      if (Array.isArray(data.pets)) setPets(data.pets);
+      if (Array.isArray(data.petWeights)) setPetWeights(data.petWeights);
+      if (Array.isArray(data.petVaccines)) setPetVaccines(data.petVaccines);
+      if (Array.isArray(data.petHistory)) setPetHistory(data.petHistory);
       if (Array.isArray(data.sharedReports)) setSharedReports(data.sharedReports);
       if (Array.isArray(data.emailSources)) setEmailSources(data.emailSources);
       if (Array.isArray(data.appointmentCandidates)) setAppointmentCandidates(data.appointmentCandidates);
@@ -6573,6 +6741,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMedicationDoseReminders([]);
     setAppointmentCandidates([]);
     setSharedReports([]);
+    // Bloque D · Sin esto, los datos de las mascotas sobreviven al bloqueo de
+    // sesión, que es exactamente lo que A6-F3 vino a impedir.
+    setPets([]);
+    setPetWeights([]);
+    setPetVaccines([]);
+    setPetHistory([]);
   };
 
   /**
@@ -6982,6 +7156,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       medicalOrders: exposedMedicalOrders,
       medicationPrescriptions: exposedMedicationPrescriptions,
       medicationDoseReminders: exposedMedicationDoseReminders,
+      pets,
+      petWeights,
+      petVaccines,
+      petHistory,
+      addPet,
+      updatePet,
+      setPetActiva,
       addMedicalOrder,
       updateMedicalOrder,
       deleteMedicalOrder,

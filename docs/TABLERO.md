@@ -79,6 +79,17 @@ los dos. Sí quedó verificado que **no aparecen en el consentimiento inicial**.
 
 ---
 
+## Bloque D · Mascotas y veterinario — **EN CURSO**
+
+| Paso | Estado |
+|---|---|
+| D1 · Modelo de datos, CRUD y pantalla de mascotas | **cerrado** |
+| D2 · Controles de peso (gráfica y alertas) | pendiente |
+| D3 · Vacunación (calendario y recordatorios) | pendiente |
+| D4 · Historial clínico veterinario | pendiente |
+
+---
+
 ## Bloques posteriores
 
 | Bloque | Contenido | Estado |

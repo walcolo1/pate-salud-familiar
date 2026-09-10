@@ -71,9 +71,14 @@ export default function LayoutFichaFamiliar({ children }: { children: React.Reac
           </span>
 
           <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-black text-slate-800 truncate leading-tight">
+            {/*
+              <h2> y no <h1>: la barra de navegación ya pinta el <h1> de la
+              aplicación en todas las páginas, y dos encabezados de nivel uno
+              rompen la navegación por encabezados del lector de pantalla.
+            */}
+            <h2 className="text-sm font-black text-slate-800 truncate leading-tight">
               {familiar.fullName}
-            </h1>
+            </h2>
             <p className="text-[10px] font-bold text-slate-500 leading-none mt-1">
               {edad ?? 'Edad no registrada'}
               {familiar.bloodType ? ` · ${familiar.bloodType.replace('_POSITIVE', '+').replace('_NEGATIVE', '−')}` : ''}

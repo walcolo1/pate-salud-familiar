@@ -85,7 +85,7 @@ test.describe('C3.3 · ficha del familiar', () => {
       await expect(page.locator('main').first()).toBeVisible();
 
       await expect(
-        page.getByRole('heading', { name: nombre, level: 1 }),
+        page.getByRole('heading', { name: nombre, level: 2 }),
         `en «${etiqueta}» no se ve de quién es el expediente`,
       ).toBeVisible();
 

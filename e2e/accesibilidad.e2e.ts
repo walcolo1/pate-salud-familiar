@@ -77,6 +77,7 @@ const SUBRUTAS = [
   { nombre: 'miembro-medications', segmento: 'medications', abridor: 'Registrar Medicamento' },
   { nombre: 'miembro-orders', segmento: 'orders', abridor: 'Nueva Orden' },
   { nombre: 'miembro-vaccines', segmento: 'vaccines', abridor: 'Registrar vacuna' },
+  { nombre: 'miembro-pets', segmento: 'pets', abridor: 'Registrar mascota' },
 ] as const;
 
 /**

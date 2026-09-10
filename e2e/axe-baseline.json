@@ -119,6 +119,18 @@
     "moderate": 0,
     "minor": 0
   },
+  "miembro-pets": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
+  "miembro-pets-dialogo": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
   "miembro-vaccines": {
     "critical": 0,
     "serious": 0,

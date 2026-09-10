@@ -459,6 +459,64 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // ═══════════════════════════════════════════════════════════════════
+      // BLOCK D · PETS
+      //
+      // Pets live UNDER /families/{familyId}, not at the root of the database.
+      // Rooting them would create a second, incompatible schema: root-level
+      // documents cannot reuse getAccess(familyId), so every pet rule would
+      // need its own owner-lookup tree, and family-scoped listing — the way
+      // every other collection here is queried — would stop working.
+      //
+      // Every subdocument carries a DENORMALIZED memberId. Firestore rules
+      // cannot get() the parent pet on a list query without paying a read per
+      // document, and on collection queries that pattern breaks listing
+      // outright. Denormalizing memberId keeps the same guards the human
+      // record already uses, at zero extra reads.
+      //
+      // Access follows the pet's responsible member: a CAREGIVER assigned to
+      // that member sees that member's pets and no others. No new role logic.
+      // ═══════════════════════════════════════════════════════════════════
+
+      // ── Pets  (/families/{familyId}/pets/{petId}) ─────────────────────────
+      match /pets/{petId} {
+        allow read:   if canReadMember(familyId, resource.data.memberId);
+        allow create: if canWriteAppointment(familyId, request.resource.data.memberId)
+                      && hasDeletedAtNull();
+        allow update: if canWriteAppointment(familyId, resource.data.memberId);
+
+        // A pet is retired by setting activo=false, never deleted: its
+        // clinical history may still be needed after the animal is gone.
+        allow delete: if false;
+
+        // ── Weight log  (…/pets/{petId}/weights/{weightId}) ───────────────
+        match /weights/{weightId} {
+          allow read:   if canReadMember(familyId, resource.data.memberId);
+          allow create: if canWriteAppointment(familyId, request.resource.data.memberId)
+                        && hasDeletedAtNull();
+          allow update: if canWriteAppointment(familyId, resource.data.memberId);
+          allow delete: if false;
+        }
+
+        // ── Vaccines  (…/pets/{petId}/vaccines/{vaccineId}) ───────────────
+        match /vaccines/{vaccineId} {
+          allow read:   if canReadMember(familyId, resource.data.memberId);
+          allow create: if canWriteAppointment(familyId, request.resource.data.memberId)
+                        && hasDeletedAtNull();
+          allow update: if canWriteAppointment(familyId, resource.data.memberId);
+          allow delete: if false;
+        }
+
+        // ── Vet history  (…/pets/{petId}/medicalHistory/{entryId}) ────────
+        match /medicalHistory/{entryId} {
+          allow read:   if canReadMember(familyId, resource.data.memberId);
+          allow create: if canWriteAppointment(familyId, request.resource.data.memberId)
+                        && hasDeletedAtNull();
+          allow update: if canWriteAppointment(familyId, resource.data.memberId);
+          allow delete: if false;
+        }
+      }
+
       // ── Gmail Sources  (/families/{familyId}/gmailSources/{sourceId}) ─────
       // Family-level config; not tied to a specific member.
       match /gmailSources/{sourceId} {

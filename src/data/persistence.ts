@@ -26,6 +26,12 @@ import {
   sobreExportacion,
 } from '../lib/origenDatos';
 import { leerExpediente, type ResultadoLectura } from '../lib/lecturaExpediente';
+import type {
+  MedicalHistoryEntry,
+  Pet,
+  VaccineEntry,
+  WeightEntry,
+} from '../domain/mascotas';
 
 export interface SavedAppState {
   schemaVersion: number;
@@ -75,6 +81,18 @@ export interface SavedAppState {
   medicalOrders?: MedicalOrder[];
   medicationPrescriptions?: MedicationPrescription[];
   medicationDoseReminders?: MedicationDoseReminder[];
+  /**
+   * Bloque D · Mascotas.
+   *
+   * Se guardan como listas planas, igual que el resto del expediente, aunque
+   * en Firestore sean subcolecciones: el mapeo lo hace el Bloque G. Guardarlas
+   * anidadas aquí obligaría a reescribir el autoguardado, que trabaja sobre
+   * listas, a cambio de nada.
+   */
+  pets?: Pet[];
+  petWeights?: WeightEntry[];
+  petVaccines?: VaccineEntry[];
+  petHistory?: MedicalHistoryEntry[];
 }
 
 const ACTIVE_USER_KEY = 'pate_salud_active_user';

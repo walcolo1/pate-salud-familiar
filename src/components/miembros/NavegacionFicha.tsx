@@ -24,6 +24,7 @@ import {
   FileText,
   Heart,
   HeartPulse,
+  PawPrint,
   Pill,
   Syringe,
   User,
@@ -40,6 +41,7 @@ export const SECCIONES_FICHA = [
   { segmento: 'orders', etiqueta: 'Órdenes', icono: ClipboardList },
   { segmento: 'medications', etiqueta: 'Medicamentos', icono: Pill },
   { segmento: 'history', etiqueta: 'Historial', icono: Clock },
+  { segmento: 'pets', etiqueta: 'Mascotas', icono: PawPrint },
 ] as const;
 
 export default function NavegacionFicha({

@@ -677,6 +677,7 @@ web/
 │   ├── notificaciones-locales.e2e.ts avisos sin datos clínicos
 │   ├── ficha-familiar.e2e.ts     navegación y coherencia de las 9 secciones
 │   ├── recordatorios-recurrentes.e2e.ts pautas, tope e historial intacto
+│   ├── mascotas.e2e.ts          alta, validación e inactivación (Bloque D)
 │   ├── purga-almacenamiento.e2e.ts
 │   └── dialogo-cierre.e2e.ts
 ├── src/lib/*.test.ts             unitarias junto al módulo que prueban
