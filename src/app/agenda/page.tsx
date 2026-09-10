@@ -40,6 +40,7 @@ import {
   Pill,
   Stethoscope,
   HeartPulse,
+  Syringe,
 } from 'lucide-react';
 
 type Vista = 'mes' | 'semana';
@@ -48,12 +49,14 @@ const ICONO: Record<TipoEvento, typeof Pill> = {
   cita: Stethoscope,
   dosis: Pill,
   control: HeartPulse,
+  'vacuna-mascota': Syringe,
 };
 
 const ETIQUETA_TIPO: Record<TipoEvento, string> = {
   cita: 'Cita',
   dosis: 'Toma',
   control: 'Control',
+  'vacuna-mascota': 'Vacuna mascota',
 };
 
 /** Colores por estado. Todos con contraste AA sobre su propio fondo (C1.5). */
@@ -87,7 +90,16 @@ function tituloDeDia(dia: string): string {
 
 export default function AgendaPage() {
   const router = useRouter();
-  const { user, isLoading, members, appointments, checkups, medicationDoseReminders } = useApp();
+  const {
+    user,
+    isLoading,
+    members,
+    appointments,
+    checkups,
+    medicationDoseReminders,
+    pets,
+    petVaccines,
+  } = useApp();
 
   const [vista, setVista] = useState<Vista>('mes');
   // El ancla es un día cualquiera dentro del periodo que se está mirando.
@@ -110,10 +122,13 @@ export default function AgendaPage() {
           citas: appointments ?? [],
           dosis: medicationDoseReminders ?? [],
           controles: checkups ?? [],
+          // D3 · Los refuerzos de vacuna de las mascotas, en la misma agenda.
+          vacunasMascota: petVaccines ?? [],
+          mascotas: pets ?? [],
         },
         familiares,
       ),
-    [appointments, medicationDoseReminders, checkups, familiares],
+    [appointments, medicationDoseReminders, checkups, petVaccines, pets, familiares],
   );
 
   const fechaAncla = aFecha(ancla);
@@ -159,7 +174,7 @@ export default function AgendaPage() {
           <div>
             <h2 className="text-lg font-black text-slate-800 leading-tight">Agenda</h2>
             <p className="text-[10px] text-slate-500 font-semibold leading-none mt-1">
-              Citas, tomas de medicamento y controles, todo junto
+              Citas, tomas, controles y refuerzos de vacuna, todo junto
             </p>
           </div>
         </div>
@@ -277,7 +292,11 @@ export default function AgendaPage() {
                   return (
                     <li key={e.id}>
                       <Link
-                        href={`/members/${e.familiarId}`}
+                        href={
+                          e.tipo === 'vacuna-mascota' && e.metadatos.mascotaId
+                            ? `/members/${e.familiarId}/pets/${e.metadatos.mascotaId}/vacunas`
+                            : `/members/${e.familiarId}`
+                        }
                         className="flex items-start gap-3 rounded-2xl border border-slate-100 p-3 hover:bg-slate-50 transition-colors"
                       >
                         <span

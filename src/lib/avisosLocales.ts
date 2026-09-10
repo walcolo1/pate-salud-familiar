@@ -38,7 +38,7 @@
  * interfaz lo dice en voz alta en vez de prometer algo que no cumple.
  */
 
-export type TipoAviso = 'medicacion' | 'cita' | 'control' | 'otro';
+export type TipoAviso = 'medicacion' | 'cita' | 'control' | 'vacuna-mascota' | 'otro';
 
 /** Cuánto se adelanta el aviso al evento. */
 export const ANTELACION_MS = 0;
@@ -58,6 +58,14 @@ export const CUERPO_AVISO: Record<TipoAviso, string> = {
   medicacion: 'Es hora de una toma de medicamento.',
   cita: 'Tienes una cita médica próxima.',
   control: 'Tienes un control de salud programado.',
+  // D3 · Sin el nombre del animal, y no por pudor.
+  //
+  // Un nombre de mascota en una pantalla bloqueada identifica un hogar tan
+  // bien como el de una persona: quien lo lea en el autobús sabe de quién es
+  // ese teléfono. Pero la razón de fondo es otra: «sin interpolación» es una
+  // regla que una prueba puede comprobar, y «sin datos sensibles, salvo los
+  // de mascotas» no lo es. La frontera se mantiene donde se puede vigilar.
+  'vacuna-mascota': 'Toca revacunar a una mascota.',
   otro: 'Tienes un recordatorio pendiente.',
 };
 

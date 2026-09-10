@@ -283,6 +283,7 @@ export function validarPeso(
 
 export function validarVacunaMascota(
   entrada: Partial<Pick<VaccineEntry, 'vacuna' | 'fecha' | 'proximaDosis' | 'petId'>>,
+  ahora: Date = new Date(),
 ): Validacion {
   const problemas: ProblemaValidacion[] = [];
 
@@ -292,16 +293,28 @@ export function validarVacunaMascota(
   if (!(entrada.vacuna ?? '').trim()) {
     problemas.push({ campo: 'vacuna', mensaje: 'Indica qué vacuna se aplicó.' });
   }
+
+  // Se registra lo que YA se puso. Una vacuna con fecha de la semana que viene
+  // no es un registro, es un plan, y un plan mal guardado aquí acabaría
+  // contando como puesta.
   if (!esFechaISO(entrada.fecha)) {
     problemas.push({ campo: 'fecha', mensaje: 'Indica la fecha de aplicación.' });
+  } else if (entrada.fecha! > hoyLocal(ahora)) {
+    problemas.push({
+      campo: 'fecha',
+      mensaje: 'La fecha de aplicación no puede estar en el futuro. Para lo que viene, usa el refuerzo.',
+    });
   }
+
   if (entrada.proximaDosis) {
     if (!esFechaISO(entrada.proximaDosis)) {
       problemas.push({ campo: 'proximaDosis', mensaje: 'La fecha no tiene el formato esperado.' });
-    } else if (esFechaISO(entrada.fecha) && entrada.proximaDosis < entrada.fecha!) {
+    } else if (esFechaISO(entrada.fecha) && entrada.proximaDosis <= entrada.fecha!) {
+      // Estrictamente posterior: un refuerzo el mismo día que la dosis es un
+      // error de captura, no una pauta.
       problemas.push({
         campo: 'proximaDosis',
-        mensaje: 'El refuerzo no puede ser anterior a la dosis aplicada.',
+        mensaje: 'El refuerzo tiene que ser posterior a la dosis aplicada.',
       });
     }
   }

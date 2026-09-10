@@ -37,8 +37,9 @@ import type {
   MedicationDoseReminder,
   PeriodicCheckup,
 } from '../domain/models';
+import type { Pet, VaccineEntry } from '../domain/mascotas';
 
-export type TipoEvento = 'cita' | 'dosis' | 'control';
+export type TipoEvento = 'cita' | 'dosis' | 'control' | 'vacuna-mascota';
 
 /** Estado común. Traduce los dos catálogos de origen a uno solo. */
 export type EstadoEvento = 'pendiente' | 'hecho' | 'cancelado' | 'vencido';
@@ -189,12 +190,58 @@ export function normalizarControl(
   };
 }
 
+/**
+ * D3 · El refuerzo de una vacuna de mascota.
+ *
+ * El evento de agenda es la **próxima dosis**, no la ya aplicada: en una
+ * agenda solo tiene sentido lo que está por venir. Las que no tienen refuerzo
+ * pactado no producen ningún evento.
+ *
+ * El estado se traduce al MISMO catálogo que el resto —`pendiente` o
+ * `vencido`— en vez de abrir un cuarto. Una agenda con cuatro vocabularios de
+ * estado es una agenda que nadie puede filtrar.
+ */
+export function normalizarVacunaMascota(
+  vacuna: VaccineEntry,
+  mascotas: Pet[],
+  familiares: FamiliarMinimo[],
+  hoy: string,
+): EventoCalendario | null {
+  const fecha = vacuna.proximaDosis;
+  if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return null;
+
+  const mascota = (mascotas ?? []).find((m) => m.id === vacuna.petId);
+
+  return {
+    id: `vacuna-mascota:${vacuna.id}`,
+    tipo: 'vacuna-mascota',
+    fecha,
+    // Un refuerzo se pacta por día, no por hora.
+    hora: null,
+    estado: fecha < hoy ? 'vencido' : 'pendiente',
+    familiarId: vacuna.memberId,
+    familiarNombre: nombreDe(vacuna.memberId, familiares),
+    titulo: vacuna.vacuna || 'Refuerzo de vacuna',
+    detalle: mascota?.nombre ?? 'Mascota',
+    metadatos: {
+      mascota: mascota?.nombre ?? null,
+      mascotaId: vacuna.petId,
+      vacuna: vacuna.vacuna || null,
+      laboratorio: vacuna.laboratorio ?? null,
+    },
+  };
+}
+
 const vivo = (x: Borrable) => !x.deletedAt;
 
 export interface OrigenesAgenda {
   citas: MedicalAppointment[];
   dosis: MedicationDoseReminder[];
   controles: PeriodicCheckup[];
+  /** D3 · Refuerzos de vacunas de mascotas. */
+  vacunasMascota?: VaccineEntry[];
+  /** Para poner nombre a la mascota de cada refuerzo. */
+  mascotas?: Pet[];
 }
 
 /**
@@ -207,11 +254,16 @@ export interface OrigenesAgenda {
 export function construirAgenda(
   origenes: OrigenesAgenda,
   familiares: FamiliarMinimo[],
+  hoy: string = aTexto(new Date()),
 ): EventoCalendario[] {
   const eventos = [
     ...(origenes.citas ?? []).filter(vivo).map((c) => normalizarCita(c, familiares)),
     ...(origenes.dosis ?? []).filter(vivo).map((d) => normalizarDosis(d, familiares)),
     ...(origenes.controles ?? []).filter(vivo).map((k) => normalizarControl(k, familiares)),
+    ...(origenes.vacunasMascota ?? [])
+      .filter(vivo)
+      .map((v) => normalizarVacunaMascota(v, origenes.mascotas ?? [], familiares, hoy))
+      .filter((e): e is EventoCalendario => e !== null),
   ].filter((e) => e.fecha !== '');
 
   return eventos.sort((a, b) => {

@@ -29,6 +29,18 @@
     "moderate": 0,
     "minor": 0
   },
+  "mascota-vacunas": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
+  "mascota-vacunas-dialogo": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
   "members": {
     "critical": 0,
     "serious": 0,

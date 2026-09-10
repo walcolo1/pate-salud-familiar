@@ -283,6 +283,56 @@ test.describe('C1 · accesibilidad', () => {
     await medirYComparar(page, 'mascota-peso-dialogo');
   });
 
+  /** La cartilla de vacunas de una mascota (D3), con y sin diálogo. */
+  test('A11Y · mascota-vacunas', async ({ page }) => {
+    const id = await primerFamiliar(page);
+    await page.evaluate((memberId) => {
+      const clave = 'pate-salud-state:demo';
+      const e = JSON.parse(localStorage.getItem(clave) ?? '{}');
+      const ahora = new Date().toISOString();
+      const dd = (n: number) => String(n).padStart(2, '0');
+      const fecha = (dias: number) => {
+        const d = new Date(Date.now() + dias * 86_400_000);
+        return `${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}`;
+      };
+
+      e.pets = [
+        {
+          id: 'pet-a11y-vac',
+          familyId: 'local',
+          memberId,
+          nombre: 'MASCOTA-A11Y-VAC',
+          especie: 'GATO',
+          sexo: 'HEMBRA',
+          activo: true,
+          createdAt: ahora,
+          updatedAt: ahora,
+          deletedAt: null,
+        },
+      ];
+      // Una de cada estado, para que el color y sus etiquetas se midan todos.
+      e.petVaccines = [
+        { id: 'va1', petId: 'pet-a11y-vac', memberId, vacuna: 'Al dia', fecha: fecha(-40), proximaDosis: fecha(200), laboratorio: null, lote: null, veterinario: null, createdAt: ahora, updatedAt: ahora, deletedAt: null },
+        { id: 'va2', petId: 'pet-a11y-vac', memberId, vacuna: 'Proxima', fecha: fecha(-300), proximaDosis: fecha(10), laboratorio: 'Lab sintetico', lote: 'L-1', veterinario: null, createdAt: ahora, updatedAt: ahora, deletedAt: null },
+        { id: 'va3', petId: 'pet-a11y-vac', memberId, vacuna: 'Vencida', fecha: fecha(-400), proximaDosis: fecha(-15), laboratorio: null, lote: null, veterinario: null, createdAt: ahora, updatedAt: ahora, deletedAt: null },
+        { id: 'va4', petId: 'pet-a11y-vac', memberId, vacuna: 'Sin refuerzo', fecha: fecha(-10), proximaDosis: null, laboratorio: null, lote: null, veterinario: null, createdAt: ahora, updatedAt: ahora, deletedAt: null },
+      ];
+      localStorage.setItem(clave, JSON.stringify(e));
+    }, id);
+
+    await page.goto(`/members/${id}/pets/pet-a11y-vac/vacunas`);
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await expect(page.locator('main').first()).toBeVisible();
+
+    await medirYComparar(page, 'mascota-vacunas');
+
+    await page.getByRole('button', { name: 'Registrar vacuna' }).first().click();
+    const dialogoVacuna = page.locator('dialog[open]');
+    await expect(dialogoVacuna, 'no se abrió el diálogo de vacuna').toBeVisible({ timeout: 10_000 });
+
+    await medirYComparar(page, 'mascota-vacunas-dialogo');
+  });
+
   test.afterAll(() => {
     if (Object.keys(medido).length === 0) return;
 

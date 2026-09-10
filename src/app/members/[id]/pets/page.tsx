@@ -21,14 +21,15 @@ import FormularioMascota from '@/components/miembros/FormularioMascota';
 import { useConfirmacion } from '@/context/Confirmacion';
 import { NOMBRE_ESPECIE, NOMBRE_SEXO, mascotasDe, type Pet } from '@/domain/mascotas';
 import { descripcionEdad } from '@/lib/edad';
+import { vacunasPendientes } from '@/lib/vacunasMascota';
 import Link from 'next/link';
-import { PawPrint, Plus, Pencil, Power, Scale } from 'lucide-react';
+import { PawPrint, Plus, Pencil, Power, Scale, Syringe } from 'lucide-react';
 
 export default function PetsPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params?.id ?? '';
-  const { user, isLoading, members, pets, addPet, updatePet, setPetActiva } = useApp();
+  const { user, isLoading, members, pets, petVaccines, addPet, updatePet, setPetActiva } = useApp();
   const confirmar = useConfirmacion();
 
   const [formularioAbierto, setFormularioAbierto] = useState(false);
@@ -117,6 +118,12 @@ export default function PetsPage() {
         ) : (
           lista.map((mascota) => {
             const edad = mascota.fechaNacimiento ? descripcionEdad(mascota.fechaNacimiento) : null;
+            // Vacunas vencidas o a punto: la insignia lleva número Y el enlace
+            // lo dice en su nombre accesible, porque un punto de color no se
+            // oye.
+            const pendientes = vacunasPendientes(
+              (petVaccines ?? []).filter((v) => v.petId === mascota.id),
+            ).length;
             return (
               <article
                 key={mascota.id}
@@ -172,6 +179,23 @@ export default function PetsPage() {
                   >
                     <Scale aria-hidden="true" className="h-3.5 w-3.5" />
                     Peso
+                  </Link>
+                  <Link
+                    href={`/members/${id}/pets/${mascota.id}/vacunas`}
+                    aria-label={
+                      pendientes > 0
+                        ? `Ver las vacunas de ${mascota.nombre}: ${pendientes} por revisar`
+                        : `Ver las vacunas de ${mascota.nombre}`
+                    }
+                    className="px-3.5 h-8.5 text-[10px] font-extrabold text-teal-700 bg-teal-50 border border-teal-100 hover:bg-teal-100 rounded-xl transition-colors flex items-center gap-1"
+                  >
+                    <Syringe aria-hidden="true" className="h-3.5 w-3.5" />
+                    Vacunas
+                    {pendientes > 0 && (
+                      <span className="ml-0.5 px-1.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
+                        {pendientes}
+                      </span>
+                    )}
                   </Link>
                   <button
                     onClick={() => abrirEdicion(mascota)}

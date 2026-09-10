@@ -54,6 +54,7 @@ import { MENSAJE_ILEGIBLE } from '../lib/lecturaExpediente';
 import {
   validarMascota,
   validarPeso,
+  validarVacunaMascota,
   type BorradorMascota,
   type MedicalHistoryEntry as EntradaHistorialVet,
   type Pet,
@@ -427,6 +428,16 @@ interface AppContextProps {
    * guarda nada.
    */
   addPetWeight: (entrada: { petId: string; fecha: string; pesoKg: number; nota?: string | null }) => Validacion;
+  /** D3 · Registra una vacuna aplicada, con su refuerzo opcional. */
+  addPetVaccine: (entrada: {
+    petId: string;
+    vacuna: string;
+    fecha: string;
+    proximaDosis?: string | null;
+    laboratorio?: string | null;
+    lote?: string | null;
+    veterinario?: string | null;
+  }) => Validacion;
   addMedicalOrder: (order: Omit<MedicalOrder, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => void;
   updateMedicalOrder: (id: string, fields: Partial<MedicalOrder>) => void;
   deleteMedicalOrder: (id: string) => void;
@@ -3775,6 +3786,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ),
     );
 
+    return { valido: true };
+  };
+
+  /**
+   * D3 · Registra una vacuna aplicada.
+   *
+   * El estado —al día, próxima, vencida— NO se guarda: se calcula a partir de
+   * las dos fechas en `lib/vacunasMascota`. Un estado guardado que nadie
+   * refresca miente en cuanto pasa la medianoche.
+   */
+  const addPetVaccine = (entrada: {
+    petId: string;
+    vacuna: string;
+    fecha: string;
+    proximaDosis?: string | null;
+    laboratorio?: string | null;
+    lote?: string | null;
+    veterinario?: string | null;
+  }): Validacion => {
+    const validacion = validarVacunaMascota(entrada);
+    if (!validacion.valido) return validacion;
+
+    const mascota = pets.find((p) => p.id === entrada.petId);
+    if (!mascota) {
+      return { valido: false, problemas: [{ campo: 'petId', mensaje: 'La mascota ya no existe.' }] };
+    }
+
+    const nueva: VacunaMascota = {
+      id: `vacpet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      petId: entrada.petId,
+      // Denormalizado: es lo que usan las reglas de Firestore sin releer el
+      // documento padre.
+      memberId: mascota.memberId,
+      vacuna: entrada.vacuna.trim(),
+      fecha: entrada.fecha,
+      proximaDosis: entrada.proximaDosis || null,
+      laboratorio: entrada.laboratorio?.trim() || null,
+      lote: entrada.lote?.trim() || null,
+      veterinario: entrada.veterinario?.trim() || null,
+      ...marcasDeCreacion(),
+    };
+
+    setPetVaccines((prev) => [...prev, nueva]);
     return { valido: true };
   };
 
@@ -7226,6 +7280,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updatePet,
       setPetActiva,
       addPetWeight,
+      addPetVaccine,
       addMedicalOrder,
       updateMedicalOrder,
       deleteMedicalOrder,

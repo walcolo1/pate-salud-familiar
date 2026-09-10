@@ -679,6 +679,7 @@ web/
 │   ├── recordatorios-recurrentes.e2e.ts pautas, tope e historial intacto
 │   ├── mascotas.e2e.ts          alta, validación e inactivación (Bloque D)
 │   ├── peso-mascota.e2e.ts      gráfica legible sin verla y alertas
+│   ├── vacunas-mascota.e2e.ts   estado calculado, agenda y aviso sin nombre
 │   ├── purga-almacenamiento.e2e.ts
 │   └── dialogo-cierre.e2e.ts
 ├── src/lib/*.test.ts             unitarias junto al módulo que prueban

@@ -163,26 +163,36 @@ describe('validarVacunaMascota', () => {
   const base = { petId: 'p1', vacuna: 'VACUNA-SINTETICA', fecha: '2026-09-01' };
 
   it('acepta lo mínimo', () => {
-    expect(validarVacunaMascota(base).valido).toBe(true);
+    expect(validarVacunaMascota(base, AHORA).valido).toBe(true);
   });
 
-  it('el refuerzo no puede ser anterior a la dosis aplicada', () => {
-    const v = validarVacunaMascota({ ...base, proximaDosis: '2026-08-01' });
+  it('el refuerzo tiene que ser POSTERIOR a la dosis aplicada', () => {
+    const v = validarVacunaMascota({ ...base, proximaDosis: '2026-08-01' }, AHORA);
     expect(v.valido).toBe(false);
     expect(primerProblema(v)?.campo).toBe('proximaDosis');
   });
 
-  it('el mismo día sí vale', () => {
-    expect(validarVacunaMascota({ ...base, proximaDosis: '2026-09-01' }).valido).toBe(true);
+  it('el mismo día NO vale: es un error de captura, no una pauta', () => {
+    expect(validarVacunaMascota({ ...base, proximaDosis: '2026-09-01' }, AHORA).valido).toBe(false);
+  });
+
+  it('un refuerzo un día después sí vale', () => {
+    expect(validarVacunaMascota({ ...base, proximaDosis: '2026-09-02' }, AHORA).valido).toBe(true);
   });
 
   it('una vacuna del pasado es legítima: se registra lo que ya se puso', () => {
-    expect(validarVacunaMascota({ ...base, fecha: '2019-01-01' }).valido).toBe(true);
+    expect(validarVacunaMascota({ ...base, fecha: '2019-01-01' }, AHORA).valido).toBe(true);
+  });
+
+  it('una vacuna con fecha futura NO: eso es un plan, no un registro', () => {
+    const v = validarVacunaMascota({ ...base, fecha: '2027-01-01' }, AHORA);
+    expect(v.valido).toBe(false);
+    expect(primerProblema(v)?.campo).toBe('fecha');
   });
 
   it('exige nombre de vacuna y fecha', () => {
-    expect(validarVacunaMascota({ ...base, vacuna: '  ' }).valido).toBe(false);
-    expect(validarVacunaMascota({ ...base, fecha: '' }).valido).toBe(false);
+    expect(validarVacunaMascota({ ...base, vacuna: '  ' }, AHORA).valido).toBe(false);
+    expect(validarVacunaMascota({ ...base, fecha: '' }, AHORA).valido).toBe(false);
   });
 });
 

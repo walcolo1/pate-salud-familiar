@@ -56,7 +56,7 @@ async function mostrarAviso(aviso: AvisoProgramable) {
 }
 
 export default function AvisosDeRecordatorios() {
-  const { reminders, medicationDoseReminders } = useApp();
+  const { reminders, medicationDoseReminders, petVaccines } = useApp();
   const programador = useRef<ProgramadorAvisos | null>(null);
 
   const programables = useMemo<RecordatorioProgramable[]>(() => {
@@ -85,8 +85,21 @@ export default function AvisosDeRecordatorios() {
         resuelto: d.status !== 'PENDING',
       }));
 
-    return [...deRecordatorios, ...deTomas];
-  }, [reminders, medicationDoseReminders]);
+    // D3 · Refuerzos de vacunas de mascotas. Solo los que tienen fecha
+    // pactada: sin refuerzo no hay nada que recordar.
+    const deVacunas = (petVaccines ?? [])
+      .filter((v) => !v.deletedAt && v.proximaDosis)
+      .map((v) => ({
+        id: `vacpet:${v.id}`,
+        cuando: v.proximaDosis as string,
+        tipo: 'vacuna-mascota' as const,
+        // Una vacuna no se «marca como hecha»: se registra la siguiente, y
+        // entonces esta deja de ser la última. Mientras tanto, sigue avisando.
+        resuelto: false,
+      }));
+
+    return [...deRecordatorios, ...deTomas, ...deVacunas];
+  }, [reminders, medicationDoseReminders, petVaccines]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

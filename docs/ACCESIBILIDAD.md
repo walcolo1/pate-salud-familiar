@@ -677,6 +677,28 @@ decidió y por qué.
 | **`animate-pulse` fuera de los textos** | Un texto que se atenúa dos veces por segundo es ilegible en el valle, lo mida quien lo mida. Se conserva en iconos y puntos de estado |
 | **El indicador de un recordatorio es `<span aria-hidden>`** | No tiene manejador propio: quien responde al clic es la tarjeta entera. Como `<button>` se anunciaba como un control que no hacía nada |
 | **Un expediente ilegible no se borra** | Se conserva el original y una copia en `pate:cuarentena:`. Reintentar solo significa algo si los datos siguen ahí |
+| **El aviso de revacunar no dice el nombre del animal** (D3) | Ver abajo |
+
+## El nombre de la mascota tampoco va en un aviso (D3)
+
+El plan de D3 dejaba la decisión abierta: una mascota no es un dato clínico
+humano, así que ¿por qué no decir «Toca revacunar a Nube»?
+
+**Se mantiene el patrón genérico**, por dos razones y la segunda pesa más:
+
+1. Un nombre de mascota en una pantalla bloqueada **identifica un hogar** casi
+   tan bien como el de una persona. Quien lo lea por encima del hombro en un
+   autobús sabe de quién es ese teléfono.
+2. Y sobre todo: **«sin interpolación en el cuerpo del aviso» es una regla que
+   una prueba puede comprobar.** «Sin datos sensibles, salvo los de mascotas»
+   no lo es: exige criterio en cada caso, y el criterio se cansa. La frontera
+   se mantiene donde se puede vigilar, y hay pruebas que la vigilan
+   (`PROHIBIDO_EN_AVISOS`).
+
+El clic sigue llevando a `/reminders`, como fijó C3.2: un enlace directo a
+`/members/<id>/pets/<id>` identificaría a la familia desde la propia
+notificación. Dentro de la aplicación, en cambio, el evento de agenda **sí**
+lleva a la cartilla de esa mascota: ahí ya se ha pasado el bloqueo de sesión.
 
 ---
 
