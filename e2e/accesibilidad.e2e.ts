@@ -228,6 +228,61 @@ test.describe('C1 · accesibilidad', () => {
     await abrirYMedir('Agendar Cita Médica', 'miembro-orders-agendar');
   });
 
+  /**
+   * La pantalla de peso de una mascota (D2).
+   *
+   * No cabe en `SUBRUTAS`: la ruta lleva el identificador de la mascota, y la
+   * gráfica solo aparece si hay pesajes. Se siembra una mascota con serie y se
+   * mide dos veces, como el resto: en reposo y con el diálogo abierto.
+   */
+  test('A11Y · mascota-peso', async ({ page }) => {
+    const id = await primerFamiliar(page);
+    await page.evaluate((memberId) => {
+      const clave = 'pate-salud-state:demo';
+      const e = JSON.parse(localStorage.getItem(clave) ?? '{}');
+      const ahora = new Date().toISOString();
+      const dd = (n: number) => String(n).padStart(2, '0');
+      const fecha = (dias: number) => {
+        const d = new Date(Date.now() - dias * 86_400_000);
+        return `${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}`;
+      };
+
+      e.pets = [
+        {
+          id: 'pet-a11y',
+          familyId: 'local',
+          memberId,
+          nombre: 'MASCOTA-A11Y',
+          especie: 'PERRO',
+          sexo: 'MACHO',
+          activo: true,
+          pesoIdealKg: 12,
+          pesoActualKg: 14,
+          createdAt: ahora,
+          updatedAt: ahora,
+          deletedAt: null,
+        },
+      ];
+      e.petWeights = [
+        { id: 'w-a11y-1', petId: 'pet-a11y', memberId, fecha: fecha(20), pesoKg: 12.5, nota: null, createdAt: ahora, updatedAt: ahora, deletedAt: null },
+        { id: 'w-a11y-2', petId: 'pet-a11y', memberId, fecha: fecha(1), pesoKg: 14, nota: 'Nota sintetica', createdAt: ahora, updatedAt: ahora, deletedAt: null },
+      ];
+      localStorage.setItem(clave, JSON.stringify(e));
+    }, id);
+
+    await page.goto(`/members/${id}/pets/pet-a11y/peso`);
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await expect(page.locator('main').first()).toBeVisible();
+
+    await medirYComparar(page, 'mascota-peso');
+
+    await page.getByRole('button', { name: 'Registrar peso' }).first().click();
+    const dialogo = page.locator('dialog[open]');
+    await expect(dialogo, 'no se abrió el diálogo de peso').toBeVisible({ timeout: 10_000 });
+
+    await medirYComparar(page, 'mascota-peso-dialogo');
+  });
+
   test.afterAll(() => {
     if (Object.keys(medido).length === 0) return;
 

@@ -53,6 +53,7 @@ import {
 import { MENSAJE_ILEGIBLE } from '../lib/lecturaExpediente';
 import {
   validarMascota,
+  validarPeso,
   type BorradorMascota,
   type MedicalHistoryEntry as EntradaHistorialVet,
   type Pet,
@@ -421,6 +422,11 @@ interface AppContextProps {
   updatePet: (id: string, cambios: BorradorMascota) => Validacion;
   /** Marca activa o inactiva. NUNCA borra: el historial se conserva. */
   setPetActiva: (id: string, activa: boolean) => void;
+  /**
+   * D2 · Registra un pesaje. Devuelve la validación: si no es válida, no se
+   * guarda nada.
+   */
+  addPetWeight: (entrada: { petId: string; fecha: string; pesoKg: number; nota?: string | null }) => Validacion;
   addMedicalOrder: (order: Omit<MedicalOrder, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => void;
   updateMedicalOrder: (id: string, fields: Partial<MedicalOrder>) => void;
   deleteMedicalOrder: (id: string) => void;
@@ -3714,6 +3720,62 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           : p,
       ),
     );
+  };
+
+  /**
+   * D2 · Registra un pesaje y refresca el peso actual de la mascota.
+   *
+   * `pesoActualKg` es un REFLEJO del pesaje más reciente, no una fuente
+   * aparte. Se recalcula sobre la serie completa —no se asigna el peso que
+   * acaba de entrar— porque nada impide registrar hoy un pesaje de la semana
+   * pasada, y ese no es el peso actual de nadie.
+   */
+  const addPetWeight = (entrada: {
+    petId: string;
+    fecha: string;
+    pesoKg: number;
+    nota?: string | null;
+  }): Validacion => {
+    const validacion = validarPeso(entrada);
+    if (!validacion.valido) return validacion;
+
+    const mascota = pets.find((p) => p.id === entrada.petId);
+    if (!mascota) {
+      return { valido: false, problemas: [{ campo: 'petId', mensaje: 'La mascota ya no existe.' }] };
+    }
+
+    const nuevo: PesoMascota = {
+      id: `peso-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      petId: entrada.petId,
+      // Denormalizado desde la mascota: es lo que usan las reglas de Firestore
+      // para decidir quién puede leerlo, sin releer el documento padre.
+      memberId: mascota.memberId,
+      fecha: entrada.fecha,
+      pesoKg: entrada.pesoKg,
+      nota: entrada.nota?.trim() || null,
+      ...marcasDeCreacion(),
+    };
+
+    const serie = [...petWeights.filter((p) => p.petId === entrada.petId && !p.deletedAt), nuevo].sort(
+      (a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0),
+    );
+    const masReciente = serie[serie.length - 1];
+
+    setPetWeights((prev) => [...prev, nuevo]);
+    setPets((prev) =>
+      prev.map((p) =>
+        p.id === entrada.petId
+          ? {
+              ...p,
+              pesoActualKg: masReciente.pesoKg,
+              updatedAt: new Date().toISOString(),
+              syncStatus: isFirebaseBackend ? 'SYNCED' : 'PENDING_SYNC',
+            }
+          : p,
+      ),
+    );
+
+    return { valido: true };
   };
 
   const addMedicalOrder = (order: Omit<MedicalOrder, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => {
@@ -7163,6 +7225,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addPet,
       updatePet,
       setPetActiva,
+      addPetWeight,
       addMedicalOrder,
       updateMedicalOrder,
       deleteMedicalOrder,

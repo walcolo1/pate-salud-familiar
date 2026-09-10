@@ -21,7 +21,8 @@ import FormularioMascota from '@/components/miembros/FormularioMascota';
 import { useConfirmacion } from '@/context/Confirmacion';
 import { NOMBRE_ESPECIE, NOMBRE_SEXO, mascotasDe, type Pet } from '@/domain/mascotas';
 import { descripcionEdad } from '@/lib/edad';
-import { PawPrint, Plus, Pencil, Power } from 'lucide-react';
+import Link from 'next/link';
+import { PawPrint, Plus, Pencil, Power, Scale } from 'lucide-react';
 
 export default function PetsPage() {
   const router = useRouter();
@@ -163,7 +164,15 @@ export default function PetsPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-2 justify-end">
+                <div className="flex gap-2 justify-end flex-wrap">
+                  <Link
+                    href={`/members/${id}/pets/${mascota.id}/peso`}
+                    aria-label={`Ver el peso de ${mascota.nombre}`}
+                    className="px-3.5 h-8.5 text-[10px] font-extrabold text-teal-700 bg-teal-50 border border-teal-100 hover:bg-teal-100 rounded-xl transition-colors flex items-center gap-1"
+                  >
+                    <Scale aria-hidden="true" className="h-3.5 w-3.5" />
+                    Peso
+                  </Link>
                   <button
                     onClick={() => abrirEdicion(mascota)}
                     className="px-3.5 h-8.5 text-[10px] font-extrabold text-slate-700 bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-xl transition-colors flex items-center gap-1"
