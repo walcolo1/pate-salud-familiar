@@ -679,6 +679,8 @@ decidió y por qué.
 | **Un expediente ilegible no se borra** | Se conserva el original y una copia en `pate:cuarentena:`. Reintentar solo significa algo si los datos siguen ahí |
 | **El aviso de revacunar no dice el nombre del animal** (D3) | Ver abajo |
 | **El botón de cerrar de `Dialog` se llama «Cerrar», sin el título** (D4) | Ver abajo |
+| **El historial veterinario no entra en la agenda ni genera avisos** (D4) | Registra lo que ya pasó. La agenda mira hacia delante, y una consulta de hace dos años ahí solo enterraría lo que está por venir. Es también lo que mantiene `TipoEvento` en cuatro valores |
+| **Filtrar sin resultados no ofrece «registrar»** (D4) | «No tienes historial» y «no tienes nada de este tipo» son dos situaciones distintas. En la segunda, la salida es quitar el filtro |
 
 ## El nombre de la mascota tampoco va en un aviso (D3)
 
@@ -751,6 +753,55 @@ N8 va aparte a propósito. Los diálogos de N6 y N7 no tenían la colisión ni
 antes del cambio: sin N8, la regla pasaría sin mirar nada. Con el nombre
 anterior, las tres fallan.
 
+---
+
+## Un estado vacío no siempre significa lo mismo (D4)
+
+La pantalla de historial tiene **dos** estados vacíos, y no se pueden fundir en
+uno:
+
+| Situación | Qué dice | Qué ofrece |
+|---|---|---|
+| No hay ninguna atención | «Aún no hay atenciones registradas» | Registrar la primera |
+| Hay atenciones, pero ninguna del tipo filtrado | «Ninguna atención de ese tipo» | **Ver todas** |
+
+Enseñar «registra la primera» a quien acaba de filtrar por «Cirugía» le está
+diciendo que su historial está vacío cuando no lo está, y el botón le empuja a
+inventar una entrada en vez de deshacer el filtro. Un estado vacío tiene que
+ofrecer la salida real de esa situación, no la del caso general.
+
+Por lo mismo, el selector de filtro **no existe** mientras no haya nada que
+filtrar: un control que no puede cambiar nada es una parada más para quien
+navega con teclado.
+
+## Lo que ya pasó no se recuerda (D4)
+
+El historial no crea eventos de agenda ni programa avisos. No es una omisión:
+
+- Una consulta de hace dos años en la agenda solo serviría para enterrar lo
+  que está por venir. La agenda mira hacia delante.
+- Y como no hay nada que avisar, no hay ningún cuerpo de notificación nuevo que
+  pudiera llevar un diagnóstico a una pantalla bloqueada.
+
+Lo vigilan dos pruebas, una a cada altura: `historialVet.test.ts` comprueba que
+`CUERPO_AVISO` sigue teniendo exactamente cinco entradas —si algún día aparece
+un aviso de historial, falla antes que un usuario con el móvil bloqueado—, y
+**H7** en `historial-veterinario.e2e.ts` registra una atención con un
+diagnóstico reconocible y comprueba que no aparece ni en `/agenda` ni en el
+cuerpo de ninguna notificación.
+
+## Una fecha rota no borra el registro (D4)
+
+`validarHistorialVet` no deja entrar una fecha mal formada por el formulario,
+pero el formulario no es la única puerta: también entra por la restauración de
+un respaldo. Una entrada así **no se descarta ni se coloca en un día
+inventado**: va al final, en un grupo propio titulado «Sin fecha reconocible», y
+su tarjeta lo dice. Perder una cirugía porque su fecha venía rota sería peor que
+enseñarla sin fecha. Es la misma decisión que con un expediente ilegible en C2:
+conservar y avisar, nunca borrar.
+
+---
+
 # Puerta de C9
 
 *Lo que hay que volver a comprobar antes de dar el Bloque C por bueno en la
@@ -769,6 +820,7 @@ médicas aportan tres diálogos más:
 | `/members/new` | 1 |
 | `/members/:id/appts` · `checkups` · `documents` · `exams` · `medications` · `orders` · `vaccines` | 14 (7 en reposo + 7 con diálogo) |
 | `/members/:id/orders` → autorización, agendar y adjuntar soporte | 3 |
+| `/members/:id/pets/:petId/historial` | 2 (en reposo + con diálogo) |
 
 **Nota sobre el listado del plan:** no existe ninguna ruta `/appointments`. La
 agenda unificada está en **`/agenda`** y `/appointments/import` es la
@@ -796,6 +848,7 @@ que este mismo documento acaba de dar por buenos.
 | Teclado y foco | `teclado-navegacion.e2e.ts` (4) |
 | Nombres accesibles | `etiquetas-campos.e2e.ts` (4) · `nombres-accesibles.e2e.ts` (10) |
 | Estados de carga, vacío y error | `estados-carga-error.e2e.ts` (6) |
+| Historial veterinario | `historial-veterinario.e2e.ts` (9) |
 | Confirmaciones irreversibles | `confirmaciones-destructivas.e2e.ts` (3) |
 | Lector de pantalla | **Manual**: `TESTING.md` §6.12 |
 

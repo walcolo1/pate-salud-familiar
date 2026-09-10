@@ -333,6 +333,69 @@ test.describe('C1 · accesibilidad', () => {
     await medirYComparar(page, 'mascota-vacunas-dialogo');
   });
 
+  /** El historial veterinario de una mascota (D4), con y sin diálogo. */
+  test('A11Y · mascota-historial', async ({ page }) => {
+    const id = await primerFamiliar(page);
+    await page.evaluate((memberId) => {
+      const clave = 'pate-salud-state:demo';
+      const e = JSON.parse(localStorage.getItem(clave) ?? '{}');
+      const ahora = new Date().toISOString();
+      const dd = (n: number) => String(n).padStart(2, '0');
+      const fecha = (dias: number) => {
+        const d = new Date(Date.now() - dias * 86_400_000);
+        return `${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}`;
+      };
+
+      e.pets = [
+        {
+          id: 'pet-a11y-hist',
+          familyId: 'local',
+          memberId,
+          nombre: 'MASCOTA-A11Y-HIST',
+          especie: 'PERRO',
+          sexo: 'MACHO',
+          activo: true,
+          createdAt: ahora,
+          updatedAt: ahora,
+          deletedAt: null,
+        },
+      ];
+      // Varios tipos y varios años, para que se midan todas las insignias de
+      // color y más de un encabezado de grupo.
+      const base = {
+        petId: 'pet-a11y-hist',
+        memberId,
+        tratamiento: 'Tratamiento sintetico',
+        veterinario: 'Clinica sintetica',
+        documentoId: null,
+        createdAt: ahora,
+        updatedAt: ahora,
+        deletedAt: null,
+      };
+      e.petHistory = [
+        { ...base, id: 'ha1', fecha: fecha(10), tipo: 'CONSULTA', diagnostico: 'Diagnostico A' },
+        { ...base, id: 'ha2', fecha: fecha(120), tipo: 'URGENCIA', diagnostico: 'Diagnostico B' },
+        { ...base, id: 'ha3', fecha: fecha(500), tipo: 'CIRUGIA', diagnostico: 'Diagnostico C' },
+        { ...base, id: 'ha4', fecha: fecha(700), tipo: 'REVISION', diagnostico: 'Diagnostico D' },
+      ];
+      localStorage.setItem(clave, JSON.stringify(e));
+    }, id);
+
+    await page.goto(`/members/${id}/pets/pet-a11y-hist/historial`);
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await expect(page.locator('main').first()).toBeVisible();
+
+    await medirYComparar(page, 'mascota-historial');
+
+    await page.getByRole('button', { name: 'Registrar atención' }).first().click();
+    const dialogoHistorial = page.locator('dialog[open]');
+    await expect(dialogoHistorial, 'no se abrió el diálogo de historial').toBeVisible({
+      timeout: 10_000,
+    });
+
+    await medirYComparar(page, 'mascota-historial-dialogo');
+  });
+
   test.afterAll(() => {
     if (Object.keys(medido).length === 0) return;
 

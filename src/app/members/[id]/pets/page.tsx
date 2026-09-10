@@ -23,7 +23,7 @@ import { NOMBRE_ESPECIE, NOMBRE_SEXO, mascotasDe, type Pet } from '@/domain/masc
 import { descripcionEdad } from '@/lib/edad';
 import { vacunasPendientes } from '@/lib/vacunasMascota';
 import Link from 'next/link';
-import { PawPrint, Plus, Pencil, Power, Scale, Syringe } from 'lucide-react';
+import { PawPrint, Plus, Pencil, Power, Scale, Stethoscope, Syringe } from 'lucide-react';
 
 export default function PetsPage() {
   const router = useRouter();
@@ -196,6 +196,14 @@ export default function PetsPage() {
                         {pendientes}
                       </span>
                     )}
+                  </Link>
+                  <Link
+                    href={`/members/${id}/pets/${mascota.id}/historial`}
+                    aria-label={`Ver el historial de ${mascota.nombre}`}
+                    className="px-3.5 h-8.5 text-[10px] font-extrabold text-teal-700 bg-teal-50 border border-teal-100 hover:bg-teal-100 rounded-xl transition-colors flex items-center gap-1"
+                  >
+                    <Stethoscope aria-hidden="true" className="h-3.5 w-3.5" />
+                    Historial
                   </Link>
                   <button
                     onClick={() => abrirEdicion(mascota)}

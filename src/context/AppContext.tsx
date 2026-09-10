@@ -52,9 +52,11 @@ import {
 } from '../data/mockData';
 import { MENSAJE_ILEGIBLE } from '../lib/lecturaExpediente';
 import {
+  validarHistorialVet,
   validarMascota,
   validarPeso,
   validarVacunaMascota,
+  type TipoHistorialVet,
   type BorradorMascota,
   type MedicalHistoryEntry as EntradaHistorialVet,
   type Pet,
@@ -436,6 +438,15 @@ interface AppContextProps {
     proximaDosis?: string | null;
     laboratorio?: string | null;
     lote?: string | null;
+    veterinario?: string | null;
+  }) => Validacion;
+  /** D4 · Registra una atención veterinaria ya ocurrida. */
+  addPetHistory: (entrada: {
+    petId: string;
+    fecha: string;
+    tipo: TipoHistorialVet;
+    diagnostico: string;
+    tratamiento?: string | null;
     veterinario?: string | null;
   }) => Validacion;
   addMedicalOrder: (order: Omit<MedicalOrder, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => void;
@@ -3829,6 +3840,50 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     setPetVaccines((prev) => [...prev, nueva]);
+    return { valido: true };
+  };
+
+  /**
+   * D4 · Registra una atención veterinaria.
+   *
+   * Es un registro de lo que YA pasó: no programa nada, no entra en la agenda
+   * y no genera avisos. Por eso aquí no hay `scheduleAutoSync` de agenda ni
+   * recordatorio que sembrar, y `TipoEvento` sigue teniendo cuatro valores.
+   */
+  const addPetHistory = (entrada: {
+    petId: string;
+    fecha: string;
+    tipo: TipoHistorialVet;
+    diagnostico: string;
+    tratamiento?: string | null;
+    veterinario?: string | null;
+  }): Validacion => {
+    const validacion = validarHistorialVet(entrada);
+    if (!validacion.valido) return validacion;
+
+    const mascota = pets.find((p) => p.id === entrada.petId);
+    if (!mascota) {
+      return { valido: false, problemas: [{ campo: 'petId', mensaje: 'La mascota ya no existe.' }] };
+    }
+
+    const nueva: EntradaHistorialVet = {
+      id: `histvet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      petId: entrada.petId,
+      // Denormalizado desde la mascota: es lo que usan las reglas de Firestore
+      // para decidir quién puede leerlo, sin releer el documento padre.
+      memberId: mascota.memberId,
+      fecha: entrada.fecha,
+      tipo: entrada.tipo,
+      diagnostico: entrada.diagnostico.trim(),
+      tratamiento: entrada.tratamiento?.trim() || null,
+      veterinario: entrada.veterinario?.trim() || null,
+      // Los adjuntos llegan con el módulo de documentos: aquí se guardaría la
+      // referencia, nunca el archivo.
+      documentoId: null,
+      ...marcasDeCreacion(),
+    };
+
+    setPetHistory((prev) => [...prev, nueva]);
     return { valido: true };
   };
 
@@ -7281,6 +7336,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setPetActiva,
       addPetWeight,
       addPetVaccine,
+      addPetHistory,
       addMedicalOrder,
       updateMedicalOrder,
       deleteMedicalOrder,

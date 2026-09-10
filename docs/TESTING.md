@@ -680,6 +680,7 @@ web/
 │   ├── mascotas.e2e.ts          alta, validación e inactivación (Bloque D)
 │   ├── peso-mascota.e2e.ts      gráfica legible sin verla y alertas
 │   ├── vacunas-mascota.e2e.ts   estado calculado, agenda y aviso sin nombre
+│   ├── historial-veterinario.e2e.ts  orden, filtro y frontera con la agenda
 │   ├── purga-almacenamiento.e2e.ts
 │   └── dialogo-cierre.e2e.ts
 ├── src/lib/*.test.ts             unitarias junto al módulo que prueban

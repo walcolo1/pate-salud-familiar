@@ -1,10 +1,14 @@
 # Tablero del proyecto
 
 Estado de los bloques del plan de refactorización y migración.
-Última actualización: **2026-09-08**.
+Última actualización: **2026-09-10**.
 
-Verificado en esta fecha contra el código y el arnés: 199 unitarias, 55 E2E,
-`tsc` limpio y lint sin regresiones.
+Para retomar el trabajo sin releer el historial, empieza por
+[ESTADO_PROYECTO.md](ESTADO_PROYECTO.md): decisiones vigentes, restricciones
+permanentes y deuda conocida. Este tablero es el detalle paso a paso.
+
+Verificado en esta fecha contra el código y el arnés: 417 unitarias, 157 E2E,
+axe en 0 sobre 33 mediciones, `tsc` limpio y lint sin regresiones.
 
 ---
 
@@ -79,14 +83,15 @@ los dos. Sí quedó verificado que **no aparecen en el consentimiento inicial**.
 
 ---
 
-## Bloque D · Mascotas y veterinario — **EN CURSO**
+## Bloque D · Mascotas y veterinario — **CERRADO**
 
 | Paso | Estado |
 |---|---|
 | D1 · Modelo de datos, CRUD y pantalla de mascotas | **cerrado** |
 | D2 · Controles de peso (gráfica y alertas) | **cerrado** |
 | D3 · Vacunación (calendario y recordatorios) | **cerrado** |
-| D4 · Historial clínico veterinario | pendiente |
+| D4-fase-1 · Convención de nombres accesibles en `Dialog` | **cerrado** |
+| D4-fase-2 · Historial clínico veterinario | **cerrado** |
 
 ---
 
