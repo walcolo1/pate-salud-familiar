@@ -678,6 +678,7 @@ decidió y por qué.
 | **El indicador de un recordatorio es `<span aria-hidden>`** | No tiene manejador propio: quien responde al clic es la tarjeta entera. Como `<button>` se anunciaba como un control que no hacía nada |
 | **Un expediente ilegible no se borra** | Se conserva el original y una copia en `pate:cuarentena:`. Reintentar solo significa algo si los datos siguen ahí |
 | **El aviso de revacunar no dice el nombre del animal** (D3) | Ver abajo |
+| **El botón de cerrar de `Dialog` se llama «Cerrar», sin el título** (D4) | Ver abajo |
 
 ## El nombre de la mascota tampoco va en un aviso (D3)
 
@@ -701,6 +702,54 @@ notificación. Dentro de la aplicación, en cambio, el evento de agenda **sí**
 lleva a la cartilla de esa mascota: ahí ya se ha pasado el bloqueo de sesión.
 
 ---
+
+## El nombre de un control es también su dirección (D4)
+
+El botón de cerrar de `Dialog` se llamaba **«Cerrar {titulo}»**: «Cerrar
+Registrar vacuna», «Cerrar Registrar mascota», «Cerrar Marcar inactiva». Se lee
+bien en voz alta, y por eso duró tanto.
+
+El problema es que un nombre accesible hace dos trabajos a la vez. Anuncia el
+control, sí, pero además es **como se le localiza**: por él lo busca quien
+navega con un lector de pantalla, y por él lo buscan las pruebas. Y los títulos
+de los diálogos están hechos de los mismos sustantivos que sus campos. El
+diálogo «Registrar vacuna» tiene un campo «Vacuna», así que el nombre del botón
+de cerrar **contenía** el nombre del campo: buscar «Vacuna» devolvía dos
+elementos. Ocurrió en D1, en D2 y otra vez en D3.
+
+Se podía seguir tapando caso por caso con `exact: true`. Pero eso lo arregla en
+la prueba, no en la aplicación: quien navegue por nombres sigue encontrando dos
+cosas donde hay una.
+
+**La convención, desde D4:**
+
+```tsx
+aria-label="Cerrar"
+aria-describedby={idTitulo}   // el <h2> del propio diálogo
+```
+
+El nombre vuelve a identificar solo la acción. El contexto no se pierde: un
+lector de pantalla ya anuncia el diálogo entero al entrar, y al llegar al botón
+la descripción repite el título. Lo que cambia es en qué campo vive el título —
+descripción en vez de nombre—, y ese campo no se usa para buscar.
+
+**La regla general, que es lo que de verdad se fija:** dentro de un diálogo,
+ningún nombre de etiqueta puede ser subcadena de otro. Vale para `aria-label`,
+para `aria-labelledby` y para un `<label for>`, que son las tres fuentes que
+`getByLabel` resuelve, y se compara sin distinguir mayúsculas porque `getByLabel`
+tampoco las distingue.
+
+Lo vigilan tres pruebas en `nombres-accesibles.e2e.ts`:
+
+| Prueba | Qué fija |
+|---|---|
+| **N6** | Cada diálogo tiene **exactamente un** botón llamado exactamente «Cerrar», y su `aria-describedby` apunta al título |
+| **N7** | Ningún nombre de etiqueta del diálogo es subcadena de otro |
+| **N8** | El caso que originó todo: en «Registrar vacuna» de una mascota, `getByLabel('Vacuna')` —sin `exact`— encuentra **un** elemento |
+
+N8 va aparte a propósito. Los diálogos de N6 y N7 no tenían la colisión ni
+antes del cambio: sin N8, la regla pasaría sin mirar nada. Con el nombre
+anterior, las tres fallan.
 
 # Puerta de C9
 
@@ -745,7 +794,7 @@ que este mismo documento acaba de dar por buenos.
 | Ficha coherente | `ficha-familiar.e2e.ts` (5) |
 | Pautas recurrentes | `recordatorios-recurrentes.e2e.ts` (5) |
 | Teclado y foco | `teclado-navegacion.e2e.ts` (4) |
-| Nombres accesibles | `etiquetas-campos.e2e.ts` (4) · `nombres-accesibles.e2e.ts` (5) |
+| Nombres accesibles | `etiquetas-campos.e2e.ts` (4) · `nombres-accesibles.e2e.ts` (10) |
 | Estados de carga, vacío y error | `estados-carga-error.e2e.ts` (6) |
 | Confirmaciones irreversibles | `confirmaciones-destructivas.e2e.ts` (3) |
 | Lector de pantalla | **Manual**: `TESTING.md` §6.12 |
@@ -769,6 +818,8 @@ nadie consiga usar con lector de pantalla; §6.12 es la única que lo comprueba.
 Hasta que C1.3 fije el patrón definitivo, lo mínimo exigible:
 
 - [ ] Todo control tiene nombre accesible: texto visible o `aria-label`.
+- [ ] Ese nombre no contiene el de otro control del mismo diálogo. El botón
+      de cerrar se llama «Cerrar»; el contexto va en `aria-describedby`.
 - [ ] Todo campo de formulario tiene `id` y un `<label htmlFor>` asociado.
       Un `placeholder` **no** es una etiqueta: desaparece al escribir.
 - [ ] Toda imagen tiene `alt`, descriptivo o `alt=""` si es decorativa.

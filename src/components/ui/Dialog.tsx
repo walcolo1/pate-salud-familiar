@@ -136,11 +136,26 @@ export default function Dialog({
             )}
           </div>
 
+          {/*
+            El nombre es «Cerrar» a secas, y el contexto viaja por
+            `aria-describedby` hasta el título del diálogo.
+
+            Antes se llamaba «Cerrar {titulo}». Se leía bien, pero metía el
+            título dentro del NOMBRE del control, y el título contiene los
+            mismos sustantivos que los campos: «Cerrar Registrar vacuna»
+            contiene «vacuna», así que buscar el campo «Vacuna» encontraba
+            también el botón de cerrar. Le pasó a tres bloques seguidos.
+
+            Un lector de pantalla ya anuncia el diálogo al entrar, y la
+            descripción repite el título al llegar al botón: no se pierde nada,
+            y el nombre vuelve a identificar solo la acción.
+          */}
           {!sinBotonCerrar && (
             <button
               type="button"
               onClick={onCerrar}
-              aria-label={`Cerrar ${titulo}`}
+              aria-label="Cerrar"
+              aria-describedby={idTitulo}
               className="-mr-1 -mt-1 shrink-0 rounded-xl p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
             >
               <svg
