@@ -262,58 +262,6 @@ Se ejecutan antes del **corte final de Firebase en el bloque G**.
 2. Pulsar *Cerrar Sesión* mientras está en curso.
 3. **Criterio:** aparece *"Guardando cambios"* con **solo** dos opciones —*Esperar a que termine* y *Cancelar cierre de sesión*—, sin ninguna forma de abortar la sincronización. Al terminar, el cierre continúa solo si no quedan pendientes.
 
-### 6.12 · Avisos locales en un dispositivo real (C3.2)
-
-*El arnés cubre todo lo que puede cubrirse en un navegador sin cabeza: que el
-Service Worker se registra, que el permiso solo se pide al pulsar, que el
-temporizador se arma, que el texto no lleva datos clínicos y que marcar la toma
-como hecha lo cancela. Lo que **no** puede cubrir es el cuadro real del
-navegador ni la notificación que pinta el sistema operativo.*
-
-**Por qué hay evidencia simulada aquí.** Chromium sin cabeza arranca con las
-notificaciones **denegadas**, y `context.grantPermissions(['notifications'])`
-no cambia lo que devuelve `Notification.permission` —se comprobó: sigue
-diciendo «denied»—. Las pruebas N1–N4 sustituyen **solo** esa respuesta del
-navegador; todo lo demás es el código de producción.
-
-> **Fecha de ejecución:** *pendiente*
-> **Dispositivo:** *pendiente* (conviene un móvil con la PWA instalada)
-
-- [ ] 1 · Abrir `/reminders` en un navegador donde no se haya decidido el
-      permiso. Debe verse la tarjeta que **explica antes de pedir**, con las
-      tres advertencias: sin datos clínicos, sin servidor, y solo con la
-      aplicación abierta.
-- [ ] 2 · Comprobar que **no ha aparecido ningún cuadro del navegador** hasta
-      aquí.
-- [ ] 3 · Pulsar «Activar avisos». Ahora sí debe aparecer el cuadro del
-      navegador. Conceder.
-- [ ] 4 · Registrar un medicamento cuya próxima toma caiga dentro de los
-      próximos minutos.
-- [ ] 5 · Dejar la aplicación abierta y esperar. **La notificación debe decir
-      «Es hora de una toma de medicamento»** y nada más: ni el nombre del
-      medicamento, ni la dosis, ni de quién es.
-- [ ] 6 · Pulsar la notificación. Debe **traer al frente la ventana que ya
-      estaba abierta**, no abrir una segunda.
-- [ ] 7 · Marcar la toma como hecha y comprobar que **no vuelve a sonar**.
-- [ ] 8 · Denegar el permiso desde los ajustes del navegador y recargar: debe
-      verse la tarjeta de «Avisos bloqueados» explicando cómo revertirlo.
-
-#### Limitación conocida, y por qué
-
-Con la aplicación **cerrada** no suena nada. No es un descuido: hoy no existe
-forma de programar un aviso local diferido desde una PWA sin servidor.
-
-| Vía | Por qué no |
-|---|---|
-| `TimestampTrigger` (Notification Triggers) | Fue una prueba de origen de Chrome y **nunca llegó a versión estable**. Se detectaría si algún día apareciera |
-| Web Push | Exige **un servidor con claves VAPID**. El proyecto no tiene backend propio, y montarlo solo para esto contradice el Bloque E |
-| Periodic Background Sync | Solo Chromium, con la PWA instalada, y **el navegador decide cuándo**: el mínimo real ronda las doce horas. Para una toma a las 08:00 no sirve |
-
-La interfaz lo dice en voz alta en la propia tarjeta de permiso, para que nadie
-retire la alarma de su teléfono confiando en esto.
-
----
-
 ### 6.11 · Consentimiento OAuth completamente limpio
 
 *Pendiente. La validación B5 se ejecutó sobre una sesión que **ya tenía permisos
@@ -420,6 +368,203 @@ en texto de la tabla de arriba es evidencia suficiente por sí solo.
 
 De la URL de consentimiento, recortar **todo lo que siga a `?`**: ahí viajan
 `client_id`, `scope` y `state`.
+
+---
+
+### 6.12 · Validación manual de accesibilidad (cierre del Bloque C)
+
+*El arnés automático llegó hasta donde puede llegar: **0 violaciones de axe en
+25 mediciones**, 115 pruebas E2E y 298 unitarias. Nada de eso demuestra que la
+aplicación se pueda usar. Un formulario puede tener todos sus campos
+etiquetados y aun así ser imposible de completar con lector de pantalla si el
+orden no tiene sentido o si un cambio de estado no se anuncia.*
+
+*Esta validación es la única que puede decirlo, y la hace una persona.*
+
+> **Fecha de ejecución:** *pendiente*
+> **Ejecutada por:** *pendiente*
+> **Lector de pantalla:** NVDA (Windows) o VoiceOver (macOS) — *anotar cuál y versión*
+> **Navegador:** *anotar*
+> **Dispositivo:** *anotar; conviene repetir el bloque D en un móvil con la PWA instalada*
+>
+> **Veredicto: _pendiente_**
+
+#### Cómo se anota
+
+Cada casilla se marca solo si se cumple **tal y como está escrita**. Si algo se
+cumple «más o menos», se deja sin marcar y se escribe qué pasó en
+Observaciones: media casilla marcada es peor que ninguna, porque da por cerrado
+lo que no lo está.
+
+---
+
+#### A · Recorrido con teclado, sin ratón
+
+*Desenchufa el ratón o no lo toques. Si en algún punto hay que usarlo, esa
+casilla no se marca.*
+
+- [ ] **A1** · Desde `/dashboard`, recorrer la página entera con `Tab`. En todo
+      momento **se ve dónde está el foco**.
+- [ ] **A2** · El orden del tabulador **sigue el orden visual**. No salta de
+      arriba a abajo ni se mete en la barra de navegación a mitad del contenido.
+- [ ] **A3** · `Shift+Tab` recorre el mismo camino hacia atrás.
+- [ ] **A4** · Abrir un formulario clínico (por ejemplo, «Registrar vacuna») con
+      `Enter` desde su botón.
+- [ ] **A5** · Con el diálogo abierto, `Tab` **no se escapa** a la página de
+      debajo: el foco da la vuelta dentro del diálogo.
+- [ ] **A6** · `Escape` cierra el diálogo **y el foco vuelve al botón que lo
+      abrió**, no al principio de la página.
+- [ ] **A7** · En `/reminders`, marcar un recordatorio como hecho **con
+      `Enter`** y desmarcarlo **con la barra espaciadora**.
+- [ ] **A8** · Al pulsar la barra espaciadora sobre un recordatorio, **la página
+      no se desplaza**.
+- [ ] **A9** · En `/agenda`, cambiar de mes y de vista solo con teclado.
+- [ ] **A10** · Recorrer la ficha de un familiar saltando entre secciones desde
+      la barra de navegación, sin tocar el ratón.
+
+**Observaciones (A):**
+
+```
+```
+
+---
+
+#### B · Lector de pantalla
+
+*Con la pantalla apagada o los ojos cerrados siempre que se pueda. Lo que se
+comprueba es si **basta con lo que se oye**.*
+
+- [ ] **B1** · Al entrar en `/dashboard`, el lector anuncia un encabezado que
+      dice dónde se está.
+- [ ] **B2** · Recorrer los campos de «Registrar vacuna» y comprobar que **cada
+      uno se anuncia con su nombre**: «Nombre de la vacuna», «Dosis No.»,
+      «Fecha aplicación»… Ninguno se anuncia como «cuadro de edición, en blanco».
+- [ ] **B3** · El nombre que se **oye** coincide con la etiqueta que se **ve**.
+      Si difieren, anotar cuál y dónde.
+- [ ] **B4** · Al abrir un diálogo, el lector anuncia **su título** y que es un
+      diálogo, y no sigue leyendo el contenido de la página de detrás.
+- [ ] **B5** · En la ficha de un familiar, la sección actual se anuncia como
+      **«página actual»** (`aria-current`), no solo con color.
+- [ ] **B6** · Los botones que solo llevan icono se anuncian con un nombre que
+      dice qué hacen («Eliminar documento…», «Mes siguiente», «Cerrar…»).
+- [ ] **B7** · Rellenar y guardar un formulario clínico **de principio a fin**
+      sin ver la pantalla. Esta es la casilla que de verdad importa.
+
+**Observaciones (B):**
+
+```
+```
+
+---
+
+#### C · Estados: carga, vacío y error
+
+- [ ] **C1** · Al abrir la aplicación, el lector anuncia que **está cargando**;
+      no se queda en silencio.
+- [ ] **C2** · Un familiar recién creado tiene todas las secciones vacías, y
+      cada una **dice qué hacer**, no solo que está vacía.
+- [ ] **C3** · Provocar un error de carga: en la consola del navegador,
+      `localStorage.setItem('pate-salud-state:demo', '{roto')` y recargar.
+- [ ] **C4** · Aparece **«No se pudo abrir tu expediente»**, y el lector lo
+      anuncia solo, sin tener que buscarlo.
+- [ ] **C5** · El mensaje dice que **no se ha borrado nada**, y ofrece
+      reintentar y una alternativa.
+- [ ] **C6** · Comprobar en la consola que
+      `localStorage.getItem('pate:cuarentena:pate-salud-state:demo')`
+      **contiene el expediente dañado**: la copia de rescate existe.
+- [ ] **C7** · Restaurar el expediente bueno y pulsar «Volver a intentarlo»: la
+      aplicación se recupera **sin recargar a mano**.
+- [ ] **C8** · En ningún momento del fallo se llegó a ver «Aún no tienes
+      familiares registrados».
+
+**Observaciones (C):**
+
+```
+```
+
+---
+
+#### D · Avisos locales (C3.2)
+
+*Conviene hacer este bloque en un móvil con la PWA instalada, que es donde
+importa.*
+
+- [ ] **D1** · Abrir `/reminders` en un navegador donde **no se haya decidido**
+      el permiso. Se ve la tarjeta que **explica antes de pedir**, con las tres
+      advertencias: sin datos clínicos, sin servidor, y solo con la aplicación
+      abierta.
+- [ ] **D2** · **No ha aparecido ningún cuadro del navegador** hasta aquí.
+- [ ] **D3** · Pulsar «Activar avisos». Ahora sí aparece el cuadro del
+      navegador. Conceder.
+- [ ] **D4** · Registrar un medicamento cuya próxima toma caiga dentro de los
+      próximos minutos.
+- [ ] **D5** · Dejar la aplicación abierta y esperar. La notificación dice
+      **«Es hora de una toma de medicamento»** y **nada más**: ni el nombre del
+      medicamento, ni la dosis, ni de quién es.
+- [ ] **D6** · Pulsar la notificación: **trae al frente la ventana que ya
+      estaba abierta**, no abre una segunda.
+- [ ] **D7** · Marcar la toma como hecha y comprobar que **no vuelve a sonar**.
+- [ ] **D8** · Denegar el permiso desde los ajustes del navegador y recargar: se
+      ve la tarjeta de «Avisos bloqueados» explicando cómo revertirlo.
+
+**Observaciones (D):**
+
+```
+```
+
+##### Por qué hay evidencia simulada en las pruebas de avisos
+
+Chromium sin cabeza arranca con las notificaciones **denegadas**, y
+`context.grantPermissions(['notifications'])` no cambia lo que devuelve
+`Notification.permission` —se comprobó: sigue diciendo «denied»—. Las pruebas
+N1–N4 sustituyen **solo esa respuesta**; armar el temporizador, componer el
+texto y pedir la notificación al Service Worker es código de producción sin
+tocar. El cuadro real del navegador es el bloque D de arriba.
+
+##### Limitación conocida: con la aplicación cerrada no suena nada
+
+No es un descuido. Hoy no existe forma de programar un aviso local diferido
+desde una PWA sin servidor:
+
+| Vía | Por qué no |
+|---|---|
+| `TimestampTrigger` (Notification Triggers) | Fue una prueba de origen de Chrome y **nunca llegó a versión estable**. El código lo detecta por si algún día aparece |
+| Web Push | Exige **un servidor con claves VAPID**. El proyecto no tiene backend propio, y montarlo solo para esto contradice el Bloque E |
+| Periodic Background Sync | Solo Chromium, con la PWA instalada, y **el navegador decide cuándo**: el mínimo real ronda las **doce horas**. Para una toma a las 08:00 no sirve |
+
+La tarjeta de permiso lo dice en voz alta, para que nadie retire la alarma de
+su teléfono confiando en esto.
+
+---
+
+#### E · Zoom y tamaño de texto
+
+- [ ] **E1** · Ampliar al **200 %** en el navegador. No se pierde contenido ni
+      aparece desplazamiento horizontal en el cuerpo de la página.
+- [ ] **E2** · En un móvil, **el gesto de pellizcar para ampliar funciona**
+      (hasta C1.5 estaba bloqueado con `userScalable: false`).
+
+**Observaciones (E):**
+
+```
+```
+
+---
+
+#### Veredicto
+
+- [ ] **Todas las casillas de A, B, C y E marcadas.**
+- [ ] **Todas las casillas de D marcadas**, salvo lo cubierto por la limitación
+      conocida.
+
+> **Resultado:** _pendiente_
+>
+> **Si hay casillas sin marcar**, anotar aquí cuáles y qué se decide con cada
+> una: se corrige antes de C9, o se registra como deuda con su motivo. Una
+> casilla sin marcar y sin decisión es una casilla olvidada.
+
+```
+```
 
 ---
 

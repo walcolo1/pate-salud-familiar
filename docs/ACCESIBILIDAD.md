@@ -1,6 +1,75 @@
 # Accesibilidad
 
-> Bloque C · Pasos C1.1 a C1.5 y C2 · Última actualización: **2026-09-09**
+> Bloque C completo · C1.1 a C1.5, C2, C3.1 a C3.4, cerrado en C4 · Última actualización: **2026-09-09**
+
+## Resumen del Bloque C
+
+Este documento creció paso a paso y cada sección explica su momento. Esto es lo
+que quedó al cerrarlo.
+
+### Dónde estaba y dónde está
+
+| | Antes de C1 | Al cerrar C4 |
+|---|---|---|
+| Violaciones de axe | Sin medir | **0** en 25 mediciones, en las cuatro gravedades |
+| Campos con nombre accesible | 13 de 102 | **102 de 102** |
+| Diálogos de verdad | 0 de 11 | **11 de 11** sobre `<dialog>` nativo |
+| `window.confirm` / `alert` | 18 / 46 | **0** / 23, y los 23 son errores recuperables |
+| Foco visible | 88 `outline-none`, cero reglas de `:focus-visible` | Regla global |
+| Zoom | Bloqueado (`userScalable: false`) | Permitido hasta ×5 |
+| Estado de error de carga | **No existía** | `EstadoError` en un único punto |
+| Pruebas | 191 unitarias, 65 E2E | **298 unitarias, 115 E2E** |
+
+### Qué se arregló en cada paso
+
+| Paso | Qué hizo |
+|---|---|
+| **C1.1** | Arnés de axe con línea base que solo puede bajar |
+| **C1.2** | Los 7 controles sin nombre accesible que se medían entonces |
+| **C1.3a** | `Dialog` sobre `<dialog>` nativo, 8 diálogos migrados y **cobertura ampliada de 5 a 21 mediciones** |
+| **C1.3b** | Los 3 diálogos de órdenes, 18 `confirm` y 23 `alert` |
+| **C1.4** | 89 campos de formulario con etiqueta asociada |
+| **C1.5** | Contraste AA, foco visible, teclado y zoom |
+| **C2** | Estados de carga, vacío y error unificados |
+| **C3.1** | Agenda unificada de citas, tomas y controles |
+| **C3.2** | Avisos locales sin un solo dato clínico |
+| **C3.3** | La ficha del familiar deja de ser nueve pantallas sueltas |
+| **C3.4** | Pautas de medicación con tope e historial intacto |
+
+### Lo que la medición enseñó de sí misma
+
+En C1.3a las críticas pasaron de **0 a 27** sin que nada empeorara: los campos
+sin etiqueta vivían dentro de diálogos cerrados, y axe solo ve lo que está
+pintado. Medir cinco rutas en reposo daba cero y hacía invisibles a la vez la
+deuda y su arreglo.
+
+Es la lección más útil del bloque: **un arnés verde puede significar que no se
+está mirando**. Por eso cada subruta se mide dos veces —en reposo y con su
+diálogo abierto— y por eso la puerta se probó rompiéndola a propósito.
+
+### Seis fallos que aparecieron al escribir las pruebas
+
+Ninguno se buscaba. Todos salieron porque una prueba exigió algo que el código
+decía cumplir:
+
+1. **El expediente se borraba solo.** `loadAppState` hacía `removeItem` ante un
+   fallo de lectura: un byte corrupto destruía el historial de una familia sin
+   avisar. Y la pantalla decía «Aún no tienes miembros registrados».
+2. **El Service Worker no se registraba nunca.** El registro colgaba de un
+   `addEventListener('load')` instalado después de que ese evento ya hubiera
+   ocurrido. Sin caché de PWA ni avisos, y sin un error en consola.
+3. **Los identificadores de las tomas chocaban.** `dose-${Date.now()}-${azar}`
+   dentro de un bucle: con 400 tomas, más del 90 % de probabilidad de colisión.
+   Dos tomas con el mismo id significan que marcar una marca la otra.
+4. **No había tope de tomas.** Un año cada cuatro horas generaba 2.190
+   registros clínicos sin preguntar.
+5. **Los recordatorios no se podían marcar sin ratón.** La tarjeta respondía al
+   clic desde un `<div>` sin `tabIndex` ni `onKeyDown`. No era incómodo: era
+   imposible.
+6. **`2026-13-40` era una fecha válida.** `Date` la convertía en un día
+   cualquiera de 2027, y el aviso habría sonado entonces.
+
+---
 
 ## Qué es axe-core y por qué se usa
 
@@ -232,10 +301,10 @@ ni `tabindex`— y falla nombrándolo.
 
 ### El resultado
 
-**0 violaciones de axe en las 24 mediciones**, en las cuatro gravedades. La
-línea base pasó a ser todo ceros, así que a partir de aquí la puerta no tolera
-ni una: cualquier violación nueva, en cualquier ruta o diálogo cubierto, deja
-`test:all` en rojo.
+**0 violaciones de axe en las 24 mediciones** que había entonces, en las cuatro
+gravedades. La línea base pasó a ser todo ceros, así que a partir de aquí la
+puerta no tolera ni una: cualquier violación nueva, en cualquier ruta o diálogo
+cubierto, deja `test:all` en rojo. (En C3.1 entró `/agenda` y son **25**.)
 
 Sigue siendo **un suelo, no un techo**. Que axe no encuentre nada no dice que
 el orden de tabulación tenga sentido, ni que un formulario clínico se pueda
@@ -380,6 +449,7 @@ explicar por qué.
 | `/reminders` | Listas con acciones y estados |
 | `/members/new` | Alta de familiar: el formulario más largo de la aplicación |
 | `/onboarding` | Primera pantalla que ve alguien nuevo |
+| `/agenda` | C3.1: la vista unificada de citas, tomas y controles |
 | `/members/:id/appts` · `checkups` · `documents` · `exams` · `medications` · `orders` · `vaccines` | Las siete subrutas de la ficha, **cada una medida dos veces**: en reposo y con su diálogo abierto |
 | `/members/:id/orders` · tres diálogos | C1.3b: autorización, agendar y adjuntar soporte. Sus botones solo existen si hay una orden en el estado adecuado, así que la prueba **siembra dos órdenes sintéticas** antes de abrirlos |
 
@@ -527,6 +597,150 @@ un `<select>` sin etiqueta. Es exactamente lo que resuelve C1.2.
 **`meta-viewport` es un solo fallo, contado cinco veces.** Está en el layout
 raíz —`maximumScale: 1` y `userScalable: false` impiden ampliar la página—, así
 que se arregla una vez y desaparece de las cinco rutas.
+
+# Funcionalidades clínicas (C3)
+
+## Agenda unificada (C3.1)
+
+Las citas, las tomas y los controles se guardaban en tres estructuras escritas
+por separado que acabaron representando lo mismo de tres maneras: **tres
+nombres de campo temporal, dos granularidades y dos catálogos de estado
+incompatibles** —`COMPLETED` en unas, `TAKEN` en otras—. Cualquier pantalla que
+quisiera enseñarlos juntos tenía que traducir, y si cada pantalla traduce por su
+cuenta, cada una se equivoca a su manera.
+
+`lib/agenda.ts` traduce una sola vez a `EventoCalendario`. `/agenda` navega por
+mes y semana, filtra por familiar y **no hace ni una llamada a Google**: hay una
+prueba que vigila justamente eso.
+
+**Las fechas se manejan como texto `YYYY-MM-DD`** y, cuando hay que calcular, se
+construyen con `new Date(año, mes, día)`. `new Date('2026-03-10')` es medianoche
+UTC: al oeste de Greenwich dibuja media agenda un día antes, y eso solo se nota
+en producción.
+
+## Avisos locales (C3.2)
+
+El cuerpo del aviso es **una plantilla fija por tipo**, nunca una
+interpolación: «Es hora de una toma de medicamento», no qué medicamento ni de
+quién. Se lee sobre la pantalla bloqueada, delante de quien tenga el móvil a la
+vista. El clic lleva a `/reminders`, jamás a la ficha de un familiar, porque el
+destino también identifica.
+
+El permiso se pide **bajo demanda** y después de explicar, incluido lo que no
+hace. Un cuadro del navegador que aparece solo se deniega por reflejo, y esa
+denegación es difícil de deshacer.
+
+**Limitación conocida:** con la aplicación cerrada no suena nada, y no hay forma
+de arreglarlo sin servidor. El detalle y las tres vías descartadas están en
+`TESTING.md` §6.12.
+
+## Ficha del familiar (C3.3)
+
+Cada una de las nueve secciones tenía un solo enlace, «Volver al perfil»: para
+ir de citas a vacunas había que subir y bajar. Y **ninguna decía de quién era el
+expediente**, así que con la aplicación abierta en «Vacunas» no había forma de
+saber si eran las de un hijo o las del titular.
+
+`members/[id]/layout.tsx` pone la cabecera y la barra de secciones una sola vez.
+No envuelve al perfil —ya trae la suya— ni al formulario de edición, donde una
+barra de navegación invita a salirse a medio rellenar.
+
+`lib/edad.ts` recoge un cálculo que estaba copiado dos veces y escrito otras dos
+distinto. Cuenta **meses y días** por debajo del año: «0 años» no dice nada de un
+bebé de tres meses, y en pediatría esa diferencia lo es todo.
+
+## Pautas de medicación (C3.4)
+
+`lib/pautaMedicacion.ts` genera las tomas, con **tope de 400** y aviso previo:
+el diálogo dice cuántas van a salir antes de crear ninguna.
+
+`reprogramarDosis` cambia la pauta **sin tocar lo ocurrido**. Conserva las tomas
+marcadas y también **las pendientes ya vencidas**: que nadie registrara una toma
+no la convierte en inexistente, y borrarla haría desaparecer justo lo que un
+médico querría ver.
+
+---
+
+# Decisiones deliberadas
+
+Ninguna de estas es un descuido. Si alguien las cambia, que sea sabiendo qué se
+decidió y por qué.
+
+| Decisión | Por qué |
+|---|---|
+| **`Dialog` no cierra al pulsar fuera** | Contienen formularios clínicos a medio rellenar. Perder media hora de datos por un clic descuidado es peor que un clic de más en «Cancelar». Se activa por diálogo con `cerrarAlPulsarFuera` |
+| **Los avisos no llevan datos clínicos** | Se leen sobre la pantalla bloqueada. El detalle queda dentro de la aplicación, detrás del bloqueo de sesión de A6-F3 |
+| **El clic de un aviso va a `/reminders`** | Un enlace a `/members/<id>` identificaría a la persona desde la propia notificación |
+| **«Familiar no encontrado» no ofrece reintentar** | Volver a mirar la misma lista da el mismo resultado. Ofrece la salida real: la lista de familiares |
+| **Tres estados vacíos se quedaron sin acción** | El historial se deriva de lo demás; las alarmas nacen de citas y medicamentos. Un botón ahí sería una salida que no lleva a ningún sitio |
+| **Los `placeholder` siguen en `slate-400`** | axe no los mide, y oscurecerlos los acerca al texto ya escrito: justo la confusión que un marcador no debe provocar |
+| **`animate-pulse` fuera de los textos** | Un texto que se atenúa dos veces por segundo es ilegible en el valle, lo mida quien lo mida. Se conserva en iconos y puntos de estado |
+| **El indicador de un recordatorio es `<span aria-hidden>`** | No tiene manejador propio: quien responde al clic es la tarjeta entera. Como `<button>` se anunciaba como un control que no hacía nada |
+| **Un expediente ilegible no se borra** | Se conserva el original y una copia en `pate:cuarentena:`. Reintentar solo significa algo si los datos siguen ahí |
+
+---
+
+# Puerta de C9
+
+*Lo que hay que volver a comprobar antes de dar el Bloque C por bueno en la
+validación final.*
+
+## Rutas cubiertas por la red de axe
+
+Son **25 mediciones** (no 24: `/agenda` entró en C3.1). Las siete subrutas de la
+ficha se miden **dos veces** —en reposo y con su diálogo abierto— y las órdenes
+médicas aportan tres diálogos más:
+
+| Ruta | Mediciones |
+|---|---|
+| `/dashboard` · `/members` · `/settings` · `/reminders` · `/agenda` · `/onboarding` | 6 |
+| `/appointments/import` | 1 |
+| `/members/new` | 1 |
+| `/members/:id/appts` · `checkups` · `documents` · `exams` · `medications` · `orders` · `vaccines` | 14 (7 en reposo + 7 con diálogo) |
+| `/members/:id/orders` → autorización, agendar y adjuntar soporte | 3 |
+
+**Nota sobre el listado del plan:** no existe ninguna ruta `/appointments`. La
+agenda unificada está en **`/agenda`** y `/appointments/import` es la
+importación manual del Bloque B.
+
+**Dos rutas quedan fuera de la red y conviene saberlo:**
+
+| Ruta | Por qué no está |
+|---|---|
+| `/members/:id/edit` | No entró en la cobertura de C1.3a y no se añadió después. Sus campos **sí** están etiquetados —los cubre `etiquetas-campos.e2e.ts`— pero axe no la mide |
+| `/login` | Se mide en `sin-configuracion.e2e.ts` por otro motivo, no por accesibilidad |
+
+Añadirlas es trabajo de una línea cada una en `RUTAS`. Se deja anotado en vez de
+hacerlo aquí, porque cambiar la cobertura al cerrar el bloque mueve los números
+que este mismo documento acaba de dar por buenos.
+
+## Funcionalidades a verificar
+
+| Funcionalidad | Dónde está su prueba |
+|---|---|
+| Agenda unificada | `agenda-unificada.e2e.ts` (6) |
+| Avisos locales | `notificaciones-locales.e2e.ts` (6) |
+| Ficha coherente | `ficha-familiar.e2e.ts` (5) |
+| Pautas recurrentes | `recordatorios-recurrentes.e2e.ts` (5) |
+| Teclado y foco | `teclado-navegacion.e2e.ts` (4) |
+| Nombres accesibles | `etiquetas-campos.e2e.ts` (4) · `nombres-accesibles.e2e.ts` (5) |
+| Estados de carga, vacío y error | `estados-carga-error.e2e.ts` (6) |
+| Confirmaciones irreversibles | `confirmaciones-destructivas.e2e.ts` (3) |
+| Lector de pantalla | **Manual**: `TESTING.md` §6.12 |
+
+## Criterio de aprobación
+
+C9 aprueba el Bloque C **solo si se cumplen las tres**:
+
+1. `npm run test:all` en verde: 298 unitarias, `tsc` sin errores, lint sin
+   regresiones y 115 E2E.
+2. **0 violaciones de axe** en las 25 mediciones, en las cuatro gravedades.
+3. **`TESTING.md` §6.12 aprobada**, con fecha, ejecutante y observaciones.
+
+La tercera no es un trámite. Las otras dos las puede pasar una aplicación que
+nadie consiga usar con lector de pantalla; §6.12 es la única que lo comprueba.
+
+---
 
 ## Lista de comprobación para componentes nuevos
 

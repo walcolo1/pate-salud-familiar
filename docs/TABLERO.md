@@ -60,7 +60,7 @@ los dos. Sí quedó verificado que **no aparecen en el consentimiento inicial**.
 
 ---
 
-## Bloque C · Accesibilidad y UX — **EN CURSO**
+## Bloque C · Accesibilidad y UX — **CERRADO** (pendiente la validación manual §6.12)
 
 | Paso | Estado |
 |---|---|
@@ -75,6 +75,7 @@ los dos. Sí quedó verificado que **no aparecen en el consentimiento inicial**.
 | C3.2 · Avisos locales sin PHI (con limitación conocida) | **cerrado** |
 | C3.3 · Ficha del familiar coherente (9 secciones) | **cerrado** |
 | C3.4 · Pautas de medicación recurrentes | **cerrado** |
+| C4 · Cierre: validación manual documentada y puerta de C9 | **cerrado** |
 
 ---
 
