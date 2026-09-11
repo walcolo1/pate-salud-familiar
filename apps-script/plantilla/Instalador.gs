@@ -67,6 +67,23 @@ function onOpen() {
  * de una pasada o nazca partida en fases.
  */
 function instalar() {
+  // Un cerrojo de documento. `instalar()` se puede lanzar desde el menú y desde
+  // el editor a la vez, y dos pasadas simultáneas crearían las pestañas por
+  // duplicado: las dos leerían la lista de existentes antes de que ninguna
+  // hubiera escrito. La idempotencia protege de repetir, no de solaparse.
+  var cerrojo = LockService.getDocumentLock();
+  if (!cerrojo.tryLock(30000)) {
+    SpreadsheetApp.getActive().toast('Ya hay una instalación en curso.', 'Paté', 8);
+    return null;
+  }
+  try {
+    return instalarConCerrojo_();
+  } finally {
+    cerrojo.releaseLock();
+  }
+}
+
+function instalarConCerrojo_() {
   var t0 = Date.now();
   var hoja = SpreadsheetApp.getActive();
   var resumen = {
@@ -194,7 +211,10 @@ function mostrarDiagnostico() {
   var ultima = propiedades.getProperty(CLAVE_ULTIMA_INSTALACION);
 
   var lineas = [
-    'Pestañas: ' + (21 - pestanasQueFaltan(existentes).length) + ' de 21',
+    'Pestañas: ' +
+      (NOMBRES_PESTANAS.length - pestanasQueFaltan(existentes).length) +
+      ' de ' +
+      NOMBRES_PESTANAS.length,
     'Disparadores: ' + ScriptApp.getProjectTriggers().length,
     'Identificador de hoja guardado: ' + (propiedades.getProperty(CLAVE_ID_HOJA) ? 'sí' : 'NO'),
     'Cliente OAuth configurado: ' + (propiedades.getProperty(CLAVE_CLIENTE_OAUTH) ? 'sí' : 'NO'),
@@ -346,7 +366,10 @@ function listarSubcarpetas_(raiz) {
 function crearCarpeta_(nombre, padre) {
   var cuerpo = { name: nombre, mimeType: 'application/vnd.google-apps.folder' };
   if (padre) cuerpo.parents = [padre.id];
-  return Drive.Files.create(cuerpo, null, { fields: 'id,name' });
+  // Un solo argumento: la forma con `media` nula y `optionalArgs` es la que
+  // más a menudo falla, y aquí no se sube ningún contenido. La respuesta por
+  // defecto de Drive v3 ya trae `id` y `name`, que es todo lo que se usa.
+  return Drive.Files.create(cuerpo);
 }
 
 /** Traduce una especificación de disparador a la API de `ScriptApp`. */
