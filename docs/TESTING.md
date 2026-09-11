@@ -738,6 +738,21 @@ URL_WEBAPP_HUMO="PEGAR_AQUI_LA_URL" npx playwright test e2e/webapp-humo.e2e.ts -
 
 ---
 
+### E2 · Instalación real sobre una cuenta de pruebas
+
+*Pendiente. Cierra los cuatro criterios que E0-bis traspasó a E2, y de paso
+captura la pantalla de consentimiento con los ámbitos reales que E8 necesita.*
+
+El guion completo, con sus criterios y sus capturas, está en
+[`EVIDENCIA_E2.md`](EVIDENCIA_E2.md). Requiere una cuenta `@gmail.com` de
+pruebas: entra en el §5 de este documento.
+
+> **Estado: PENDIENTE.** Las decisiones del instalador están probadas en frío
+> (`planInstalacion.test.ts`, 29 pruebas), pero **un plan probado no es una
+> ejecución probada**.
+
+---
+
 ## 6-bis · Validaciones manuales YA EJECUTADAS
 
 Lo que sigue no está pendiente: se ejecutó contra recursos reales y se

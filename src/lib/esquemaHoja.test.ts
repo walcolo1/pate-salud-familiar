@@ -167,13 +167,14 @@ describe('la versión del esquema', () => {
   });
 });
 
-describe('el Esquema.gs generado', () => {
-  it('no se ha quedado atrás respecto a esta definición', () => {
+describe('los ficheros .gs generados', () => {
+  it('no se han quedado atrás respecto a sus fuentes', () => {
     // Es la prueba que sostiene la decisión de generar en vez de duplicar: si
-    // alguien edita el `.ts` y no regenera, o edita el `.gs` a mano, aquí se ve.
-    // Falla con el comando exacto que hay que ejecutar.
+    // alguien edita un `.ts` y no regenera, o edita un `.gs` a mano, aquí se
+    // ve. Cubre `Esquema.gs` y `Instalacion.gs`, y falla con el comando exacto
+    // que hay que ejecutar.
     expect(() =>
-      execFileSync(process.execPath, ['scripts/generar-esquema-gs.mjs', '--revisar'], {
+      execFileSync(process.execPath, ['scripts/generar-gs.mjs', '--revisar'], {
         cwd: process.cwd(),
         stdio: 'pipe',
       }),

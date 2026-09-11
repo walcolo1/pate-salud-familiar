@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | **en curso** · E0, E0-bis y E1 cerrados |
+| **E** | Backend de Apps Script por titular | **en curso** · E0, E0-bis y E1 cerrados; E2 escrito y probado en frío |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 
@@ -111,7 +111,8 @@ cada módulo. Las que más condicionan lo que venga:
 | Qué | Dónde |
 |---|---|
 | Validación con lector de pantalla, escrita pero **no ejecutada** | `TESTING.md` §6.12 |
-| Cabos de E0-bis traspasados: `/copy` con script vinculado, ejecución real de un disparador y tiempo de `instalar()` completa | Criterios de aceptación de **E2**, en `E0-BIS-INFORME.md` |
+| Instalación real de E2 sin ejecutar: `/copy`, tiempo de `instalar()`, disparador que corre, no duplicar | `EVIDENCIA_E2.md`, con guion |
+| La carpeta `Temporal` existe y **nadie la vacía** hasta que E11 implemente la tarea diaria | `planInstalacion.ts` · `EVIDENCIA_E2.md` |
 | La pantalla de «no verificada» con los ámbitos reales, sin capturar | Criterio de aceptación de **E8** |
 | Validación de consentimiento OAuth limpio | `TESTING.md` §6.11 |
 | `/members/:id/edit` y `/login` fuera de la red de axe | `ACCESIBILIDAD.md`, puerta de C9 |

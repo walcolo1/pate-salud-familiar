@@ -1,11 +1,12 @@
-# Plantilla del backend — Bloque E, E1
+# Plantilla del backend — Bloque E
 
 El expediente de una familia **es** esta hoja. El script vive dentro de ella, no
 al lado: eso es lo que hace que `Archivo ▸ Hacer una copia` se lo lleve a la
 cuenta del titular, y todo el alta del §3.1 depende de ello.
 
-E1 entrega la estructura. La lógica llega en E2–E6; aquí cada fichero trae su
-contrato escrito y lanza `NO_IMPLEMENTADO` con el paso que lo cierra.
+E1 entregó la estructura y E2 el instalador. El resto de la lógica llega en
+E3–E6; esos ficheros traen su contrato escrito y lanzan `NO_IMPLEMENTADO` con
+el paso que los cierra.
 
 ---
 
@@ -80,21 +81,29 @@ sabiendo lo que cuesta en confianza, no descubrirlo al desplegarla.
 |---|---|---|
 | `appsscript.json` | Manifiesto: ámbitos, servicios avanzados y `webapp` | E1 ✅ |
 | `Esquema.gs` | **Generado.** Las 21 pestañas y sus encabezados | E1 ✅ |
+| `Instalacion.gs` | **Generado.** Las decisiones del instalador y las semillas | E2 ✅ |
+| `Instalador.gs` | `onOpen`, `instalar()` idempotente, disparadores y auditoría | E2 ✅ |
 | `Router.gs` | `doPost` único. Hoy responde lo mínimo para ser sondeable | E6 |
 | `Auth.gs` | `verificarIdentidad` y `normalizarEmail` | E3 |
 | `Acceso.gs` | `resolverAcceso` y `mutarAcceso`, con versión de caché | E4 |
 | `Permisos.gs` | Matriz de roles y `puede()`, con denegación por defecto | E5 |
 | `Invitaciones.gs` | Invitar, aceptar, cambiar rol y revocar | E5 |
-| `Instalador.gs` | `onOpen`, `instalar()` idempotente y disparadores | E2 |
 
-`Esquema.gs` **no se edita a mano.** Se genera desde `src/lib/esquemaHoja.ts`:
+**Los dos ficheros marcados «Generado» no se editan a mano.** Salen de
+`src/lib/esquemaHoja.ts` y `src/lib/planInstalacion.ts`, que es donde viven las
+pruebas:
 
 ```bash
-node scripts/generar-esquema-gs.mjs
+node scripts/generar-gs.mjs
 ```
 
-Una prueba comprueba que no se ha quedado atrás. Si alguien toca el `.gs`
+Una prueba comprueba que no se han quedado atrás. Si alguien toca un `.gs`
 directamente, la siguiente ejecución del generador lo pisa sin avisar.
+
+Ese reparto es lo que hace que el instalador sea probable: las **decisiones**
+—qué pestañas faltan, qué disparadores borrar— están en TypeScript y tienen 29
+pruebas; `Instalador.gs` se queda con las llamadas a Google, que solo una
+ejecución real puede comprobar.
 
 ---
 
@@ -115,8 +124,12 @@ titular, sobre su copia.
 
 ---
 
-## Lo que E1 deja sin comprobar
+## Lo que sigue sin comprobarse
 
-Que `/copy` arrastre el script vinculado sigue **sin verificarse** —es uno de
-los cabos que E0-bis traspasó a E2— y es la suposición de la que cuelga todo
-este diseño. Se comprueba copiando esta plantilla y viendo si el código llega.
+Que `/copy` arrastre el script vinculado **sigue sin verificarse**, y es la
+suposición de la que cuelga todo este diseño. Eso, el tiempo real de
+`instalar()` y ver un disparador ejecutarse son los criterios de aceptación de
+E2, con su guion en [`../../docs/EVIDENCIA_E2.md`](../../docs/EVIDENCIA_E2.md).
+
+El código está escrito y probado en frío. Un plan probado no es una ejecución
+probada.
