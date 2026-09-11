@@ -110,12 +110,19 @@ describe('Content-Security-Policy', () => {
     expect(csp()).not.toContain('apis.google.com');
   });
 
-  it('connect-src se limita a tres destinos y ni uno más', () => {
+  it('connect-src se limita a cinco destinos y ni uno más', () => {
     // Si alguien añade un destino, esta prueba obliga a justificarlo aquí.
+    //
+    // Los dos últimos entraron en E0-bis y no por comodidad: sin ellos, la PWA
+    // no puede hablar con el Web App de Apps Script de su titular, que es el
+    // backend del Bloque E. Cada destino es un sitio al que podrían salir datos
+    // clínicos, así que la lista se lee entera antes de tocarla.
     expect([...DIRECTIVAS_CSP['connect-src']]).toEqual([
       "'self'",
       'https://*.googleapis.com',
       'https://accounts.google.com',
+      'https://script.google.com',
+      'https://script.googleusercontent.com',
     ]);
   });
 
@@ -131,12 +138,23 @@ describe('Content-Security-Policy', () => {
     expect(csp()).not.toContain('unsafe-eval');
   });
 
-  it('NO abre paso a Apps Script todavía: eso es del Bloque E', () => {
-    // Ausencia deliberada, no olvido. El Bloque E tendrá que añadirlo a
-    // propósito, y esta prueba fallará hasta que lo haga.
-    expect(csp()).not.toContain('script.google.com');
-    expect(csp()).not.toContain('script.googleusercontent.com');
-    expect(csp()).not.toContain('googleusercontent.com/macros');
+  it('abre paso a Apps Script SOLO donde hace falta: conectarse', () => {
+    // Hasta E0-bis esta prueba exigía lo contrario, y era correcta: la ausencia
+    // era deliberada. Se invierte a propósito, con la medición delante
+    // (`docs/evidencia/E0bis-06-sonda-cors.md`), no de refilón.
+    expect(DIRECTIVAS_CSP['connect-src']).toContain('https://script.google.com');
+    // El segundo host no es decorativo: `…/exec` redirige a `/macros/echo` en
+    // `script.googleusercontent.com`, y la CSP comprueba también el destino de
+    // la redirección. Con uno solo, la petición muere igual.
+    expect(DIRECTIVAS_CSP['connect-src']).toContain('https://script.googleusercontent.com');
+
+    // Y en ninguna otra directiva. El Web App es un destino de datos, no una
+    // fuente de código ni un marco: nada de Apps Script debe poder ejecutarse
+    // ni pintarse dentro de la aplicación.
+    for (const d of ['script-src', 'script-src-elem', 'frame-src', 'img-src', 'style-src']) {
+      expect(DIRECTIVAS_CSP[d] ?? [], d).not.toContain('https://script.google.com');
+      expect(DIRECTIVAS_CSP[d] ?? [], d).not.toContain('https://script.googleusercontent.com');
+    }
   });
 
   it('no se cuela `data:` ni `blob:` donde podrían ejecutarse', () => {

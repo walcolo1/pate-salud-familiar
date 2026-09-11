@@ -230,7 +230,9 @@ test.describe('Bloque B · D1 · lectura de PDF', () => {
 
     expect(csp).toContain("script-src 'self' 'unsafe-inline' https://accounts.google.com");
     expect(csp).toContain("worker-src 'self'");
-    expect(csp).toContain("connect-src 'self' https://*.googleapis.com https://accounts.google.com");
+    expect(csp).toContain(
+      "connect-src 'self' https://*.googleapis.com https://accounts.google.com https://script.google.com https://script.googleusercontent.com",
+    );
     expect(csp).not.toContain('unsafe-eval');
     expect(csp).not.toContain('wasm-unsafe-eval');
     expect(csp).not.toContain('cdnjs');

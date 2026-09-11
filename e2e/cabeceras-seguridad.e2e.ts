@@ -73,8 +73,10 @@ test.describe('A7 · cabeceras de seguridad', () => {
     expect(csp).toContain("form-action 'self'");
     expect(csp).toContain('frame-src https://accounts.google.com');
     expect(csp).not.toContain('unsafe-eval');
-    // Apps Script llega en el Bloque E, no antes.
-    expect(csp).not.toContain('script.google.com');
+    // Apps Script entra en connect-src (E0-bis), pero NUNCA como fuente de
+    // código: si apareciera en script-src, el Web App de cualquier titular
+    // podría ejecutar código dentro de la aplicación.
+    expect(csp).toContain("script-src 'self' 'unsafe-inline' https://accounts.google.com;");
   });
 
   test('C2b · la CSP servida aplica el mínimo privilegio en connect-src', async ({ page }) => {
@@ -86,7 +88,7 @@ test.describe('A7 · cabeceras de seguridad', () => {
     expect(csp).not.toContain('apis.google.com');
 
     expect(csp).toContain(
-      "connect-src 'self' https://*.googleapis.com https://accounts.google.com",
+      "connect-src 'self' https://*.googleapis.com https://accounts.google.com https://script.google.com https://script.googleusercontent.com",
     );
   });
 

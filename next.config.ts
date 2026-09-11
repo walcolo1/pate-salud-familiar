@@ -89,7 +89,23 @@ export const DIRECTIVAS_CSP: Readonly<Record<string, readonly string[]>> = {
   // `*.firebaseio.com` NO está: la auditoría de A7 confirmó cero referencias a
   // Realtime Database. Permitir conexiones a un servicio que la aplicación no
   // usa solo amplía la superficie por la que podrían salir datos clínicos.
-  'connect-src': ["'self'", 'https://*.googleapis.com', 'https://accounts.google.com'],
+  //
+  // Los dos hosts de Apps Script se abren en el Bloque E (E0-bis): el Web App
+  // de cada titular pasa a ser el backend. Sin ellos, el navegador corta el
+  // `fetch` antes de que CORS llegue a opinar, y el error —`TypeError: Failed
+  // to fetch`— es idéntico al de un fallo de CORS.
+  //
+  // Hacen falta LOS DOS, y esto no se dedujo: se midió. `…/exec` responde con
+  // una redirección a `script.googleusercontent.com/macros/echo`, y `connect-src`
+  // comprueba también el destino de la redirección. Con solo el primer host, la
+  // petición sigue muriendo. Lo fija `e2e/webapp-humo.e2e.ts` (E0b-3).
+  'connect-src': [
+    "'self'",
+    'https://*.googleapis.com',
+    'https://accounts.google.com',
+    'https://script.google.com',
+    'https://script.googleusercontent.com',
+  ],
 
   // GIS dibuja el botón de acceso dentro de un iframe propio.
   'frame-src': ['https://accounts.google.com'],
