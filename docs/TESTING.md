@@ -568,6 +568,176 @@ su teléfono confiando en esto.
 
 ---
 
+### E0-bis · Despliegue de humo del backend de Apps Script
+
+*Pendiente. Es la puerta del Bloque E: confirma con evidencia cuatro cosas que
+la documentación de Google no cierra, antes de escribir el backend encima de
+una suposición.*
+
+**Requiere una cuenta `@gmail.com` real.** Entra de lleno en el §5 de este
+documento: no hay forma de automatizarla, porque lo que se comprueba incluye
+una pantalla de consentimiento y un despliegue.
+
+> **Usar una cuenta de PRUEBAS**, no la cuenta con la que se usa la aplicación
+> a diario. El script crea pestañas y una carpeta en el Drive de quien lo
+> ejecuta, y al terminar se tira entera.
+
+> **Fecha de ejecución:** 2026-09-11 (parcial)
+> **Ejecutada por:** el titular, con apoyo del arnés
+> **Cuenta usada:** una `@gmail.com` de pruebas; la dirección no se versiona
+>
+> **Estado: PARCIAL.** Punto 1 **verificado**; puntos 2, 3 y 4 pendientes.
+> Resultados y hallazgos en [`E0-BIS-INFORME.md`](E0-BIS-INFORME.md) y
+> [`evidencia/E0bis-06-sonda-cors.md`](evidencia/E0bis-06-sonda-cors.md).
+>
+> ⚠️ La implementación de humo usada **no era** `apps-script/humo/Codigo.gs`,
+> así que los pasos 7 y 8 no se pudieron ejecutar. Para cerrarlos hay que
+> desplegar el script del repositorio.
+
+#### Qué se está respondiendo
+
+| # | Pregunta | Cómo se responde |
+|---|---|---|
+| 1 | ¿`USER_DEPLOYING` + `ANYONE_ANONYMOUS` cruza CORS? | Automatizado: `e2e/webapp-humo.e2e.ts` |
+| 2 | ¿Qué pantalla ve el titular al autorizar? | Captura, paso 4 |
+| 3 | ¿`/copy` arrastra el script? ¿Se crean disparadores desde código? | Pasos 1 y 7 |
+| 4 | ¿Cuánto tarda instalar, frente a los 6 minutos? | El script lo mide solo, paso 8 |
+
+#### Procedimiento
+
+**Preparación**
+
+- [ ] 0 · Tener a mano `apps-script/humo/Codigo.gs` y
+      `apps-script/humo/appsscript.json` de este repositorio.
+
+**Paso 1 · La hoja y la copia**
+
+- [ ] 1.1 · Con la cuenta de pruebas, crear una hoja de cálculo en blanco
+      llamada `PATE HUMO E0BIS`.
+- [ ] 1.2 · **Extensiones ▸ Apps Script**. Pegar `Codigo.gs` sobre el contenido
+      del fichero `Código.gs` que trae el editor.
+- [ ] 1.3 · **Configuración del proyecto ▸ Mostrar el archivo de manifiesto
+      `appsscript.json`**. Pegar el manifiesto del repositorio.
+- [ ] 1.4 · Guardar. Volver a la hoja y **Archivo ▸ Hacer una copia**.
+- [ ] 1.5 · Abrir la copia y comprobar en **Extensiones ▸ Apps Script** que
+      **el código está ahí**.
+      *Criterio:* el script viaja con la copia. Si no estuviera, el onboarding
+      del §3.1 de la especificación se cae entero y hay que rediseñarlo.
+- [ ] 1.6 · En la copia, mirar **Activadores** (el reloj, panel izquierdo).
+      *Criterio:* **cero disparadores**. Se espera que NO se copien; es
+      justamente lo que obliga a que `instalar()` los cree.
+
+**Paso 2 · El menú aparece solo**
+
+- [ ] 2.1 · Recargar la copia de la hoja.
+- [ ] 2.2 · *Criterio:* aparece el menú **Paté · Humo**. Confirma que `onOpen`
+      funciona sin autorización previa, que es lo que hace posible el paso 4
+      del alta de un titular.
+
+**Paso 3 · Desplegar como aplicación web**
+
+- [ ] 3.1 · En el editor: **Implementar ▸ Nueva implementación ▸ ⚙ ▸
+      Aplicación web**.
+- [ ] 3.2 · **Ejecutar como: Yo**. **Quién tiene acceso: Cualquier usuario**.
+      *Criterio:* la opción existe y no está atenuada en una cuenta gratuita.
+      Si solo apareciera «Solo yo» o una opción de dominio, **parar aquí**:
+      sería un bloqueo (c) y el Bloque E habría que rediseñarlo.
+- [ ] 3.3 · 📸 **Captura** de la ventana de implementación con las dos opciones
+      a la vista → `E0bis-03-opciones-de-despliegue.png`.
+- [ ] 3.4 · **Implementar**.
+
+**Paso 4 · Autorizar — la captura importante**
+
+- [ ] 4.1 · Google pide autorizar. Elegir la cuenta de pruebas.
+- [ ] 4.2 · 📸 **Captura de la pantalla «Google no ha verificado esta
+      aplicación»** → `E0bis-04-pantalla-app-no-verificada.png`.
+      *Criterio:* se espera que **aparezca**. La especificación §3.1 paso 6
+      dice lo contrario y está equivocada; esta captura es la prueba, y va al
+      asistente de onboarding para que el titular no se asuste y abandone.
+- [ ] 4.3 · **Configuración avanzada ▸ Ir a … (no seguro)**.
+- [ ] 4.4 · 📸 **Captura de los permisos solicitados**, con la lista de ámbitos
+      entera → `E0bis-05-ambitos-solicitados.png`.
+      *Criterio:* anotar **textualmente** cómo describe Google el ámbito
+      `drive`. Es lo que va a leer el titular, y decide si vale la pena la vía
+      de ámbitos mínimos.
+- [ ] 4.5 · **Permitir**.
+- [ ] 4.6 · Copiar la **URL de la aplicación web** (la que termina en `/exec`).
+      ⚠️ Esa URL es ejecutable por cualquiera: **no pegarla en el repositorio,
+      ni en el informe, ni en una captura sin tapar**.
+
+**Paso 5 · Que responde, a secas**
+
+- [ ] 5.1 · Abrir la URL `/exec` en el navegador.
+      *Criterio:* devuelve `{"ok":true,"metodo":"GET","version":"humo-1"}`.
+
+**Paso 6 · CORS de verdad, desde el origen de la PWA**
+
+- [ ] 6.1 · En una terminal, desde `web/`:
+
+```bash
+URL_WEBAPP_HUMO="PEGAR_AQUI_LA_URL" npx playwright test e2e/webapp-humo.e2e.ts --project=app --reporter=line
+```
+
+- [x] 6.2 · *Criterio:* las cuatro pruebas resueltas.
+      - `E0b-1` — desde una página **sin CSP**, `text/plain` cruza y devuelve
+        `ok`. ✅
+      - `E0b-2` — `application/json` **también** cruza. El preflight ya no mata
+        la petición: la decisión C-1 pierde su motivo, aunque no su prudencia.
+      - `E0b-3` — desde la aplicación real **falla, y la culpa es de la CSP**:
+        `connect-src` no incluye `script.google.com`. ✅
+      - `E0b-4` — omitida: el Web App desplegado no era el del repositorio.
+- [x] 6.3 · Acta en `docs/evidencia/E0bis-06-sonda-cors.md`, con el
+      identificador de la implementación **sin versionar**.
+
+**Paso 7 · Disparadores creados desde código**
+
+- [ ] 7.1 · En la hoja: **Paté · Humo ▸ 2 · Crear disparador de prueba**.
+- [ ] 7.2 · *Criterio:* en **Activadores** del editor aparece **uno**, cada
+      minuto, con `tareaDePrueba`.
+- [ ] 7.3 · Ejecutarlo otra vez desde el menú. *Criterio:* sigue habiendo
+      **uno**, no dos. Confirma que la instalación se puede reejecutar sin
+      agotar la cuota de 20 disparadores.
+- [ ] 7.4 · Esperar dos minutos y mirar la pestaña `MEDICIONES`.
+      *Criterio:* hay filas `disparador_ejecutado`. Confirma que un disparador
+      creado desde código **realmente corre** en una cuenta gratuita.
+- [ ] 7.5 · 📸 Captura del panel de activadores → `E0bis-07-disparadores.png`.
+
+**Paso 8 · Cuánto tarda instalar**
+
+- [ ] 8.1 · **Paté · Humo ▸ 1 · Instalación simulada**. Esperar a que termine.
+- [ ] 8.2 · Mirar la pestaña `MEDICIONES`. *Criterio:* `ms_total_instalacion`
+      con margen holgado frente a `limite_ms_por_ejecucion` (360 000).
+      - Menos de 60 000 ms → cómodo: `instalar()` puede ir de una pasada.
+      - Entre 60 000 y 180 000 → aceptable, pero la siembra de catálogos y la
+        migración **tienen que ir por lotes**.
+      - Más de 180 000 → el instalador nace partido en fases desde el día uno.
+- [ ] 8.3 · 📸 Captura de la pestaña `MEDICIONES` → `E0bis-08-mediciones.png`.
+- [ ] 8.4 · **Paté · Humo ▸ 3 · Diagnóstico** y anotar pestañas y disparadores.
+
+**Cierre**
+
+- [ ] 9.1 · **Paté · Humo ▸ 9 · Limpiar todo**.
+- [ ] 9.2 · **Implementar ▸ Gestionar implementaciones ▸ Archivar**. Deja la
+      URL muerta: un endpoint público olvidado es un endpoint público.
+- [ ] 9.3 · Mandar la hoja de humo a la papelera.
+- [ ] 9.4 · En `myaccount.google.com`, revocar el acceso del script si se
+      quiere dejar la cuenta como estaba.
+- [ ] 9.5 · Guardar las capturas en `docs/evidencia/` **con los correos y los
+      identificadores tapados** (ver `docs/evidencia/README.md`) y rellenar
+      allí la tabla.
+
+#### Qué se decide con el resultado
+
+| Si pasa esto | Entonces |
+|---|---|
+| Los cuatro puntos en verde | **Se procede con E1** |
+| «Cualquier usuario» no disponible (3.2) | **Bloqueo (c).** El Web App no puede ser público; hay que rediseñar el transporte |
+| `application/json` **no** falla (6.2) | Revisar la decisión C-1: puede que ya se pueda usar JSON directo |
+| `getActiveUser()` devuelve correo (6.3) | Rehacer el análisis de identidad: parte del §4 sobraría |
+| `ms_total_instalacion` > 180 000 (8.2) | `instalar()` nace por fases, y E2 crece |
+
+---
+
 ## 6-bis · Validaciones manuales YA EJECUTADAS
 
 Lo que sigue no está pendiente: se ejecutó contra recursos reales y se
@@ -681,6 +851,7 @@ web/
 │   ├── peso-mascota.e2e.ts      gráfica legible sin verla y alertas
 │   ├── vacunas-mascota.e2e.ts   estado calculado, agenda y aviso sin nombre
 │   ├── historial-veterinario.e2e.ts  orden, filtro y frontera con la agenda
+│   ├── webapp-humo.e2e.ts     sonda de CORS del Bloque E; se omite sin URL
 │   ├── purga-almacenamiento.e2e.ts
 │   └── dialogo-cierre.e2e.ts
 ├── src/lib/*.test.ts             unitarias junto al módulo que prueban

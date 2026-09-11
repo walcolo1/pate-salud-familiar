@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | pendiente |
+| **E** | Backend de Apps Script por titular | **en curso** · E0 y E0-bis cerrados; E1 a la espera de aprobación |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 
@@ -105,6 +105,8 @@ cada módulo. Las que más condicionan lo que venga:
 | Qué | Dónde |
 |---|---|
 | Validación con lector de pantalla, escrita pero **no ejecutada** | `TESTING.md` §6.12 |
+| Cabos de E0-bis traspasados: `/copy` con script vinculado, ejecución real de un disparador y tiempo de `instalar()` completa | Criterios de aceptación de **E2**, en `E0-BIS-INFORME.md` |
+| La pantalla de «no verificada» con los ámbitos reales, sin capturar | Criterio de aceptación de **E8** |
 | Validación de consentimiento OAuth limpio | `TESTING.md` §6.11 |
 | `/members/:id/edit` y `/login` fuera de la red de axe | `ACCESIBILIDAD.md`, puerta de C9 |
 | 23 `alert` de error siguen sin migrar al sistema de avisos | `src/` |
@@ -115,6 +117,12 @@ cada módulo. Las que más condicionan lo que venga:
 
 ## Siguiente paso
 
-**Bloque E — backend de Apps Script por titular.** Antes de empezar, comprobar
-que ningún paso del diseño exige una cuenta de organización; si lo exige, parar
-y avisar.
+**E1 · Proyecto plantilla**, en cuanto haya aprobación. El riesgo que
+justificaba E0-bis —que la PWA no pudiera hablar con el Web App— está
+despejado de punta a punta: la CSP ya admite los dos hosts de Apps Script y el
+`fetch` llega, medido en navegador real.
+
+Lo que quedó abierto no bloquea E1: son criterios de aceptación de **E2** (que
+`/copy` arrastre el script, que `instalar()` complete dentro de los 6 minutos y
+que un disparador suyo llegue a ejecutarse) y de **E8** (la pantalla de
+consentimiento con los ámbitos reales).
