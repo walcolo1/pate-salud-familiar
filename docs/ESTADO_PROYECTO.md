@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | **en curso** · E0 y E0-bis cerrados; E1 a la espera de aprobación |
+| **E** | Backend de Apps Script por titular | **en curso** · E0, E0-bis y E1 cerrados |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 
@@ -82,6 +82,12 @@ cada módulo. Las que más condicionan lo que venga:
   Bloque G, desde Firestore.
 - **El nombre accesible es también la dirección del control.** Ningún nombre de
   etiqueta puede ser subcadena de otro dentro de un diálogo (D4-fase-1).
+- **Ámbitos mínimos en Apps Script.** Servicios avanzados en vez de los
+  clásicos, para pedir `drive.file` en vez de `drive` y `script.send_mail` en
+  vez del buzón entero. El backend de E1 **no pide ningún ámbito restringido**.
+- **El esquema de la hoja se define una vez.** `src/lib/esquemaHoja.ts` es la
+  única definición; el `Esquema.gs` del instalador se genera, y una prueba falla
+  si se queda atrás.
 
 ---
 
@@ -117,12 +123,15 @@ cada módulo. Las que más condicionan lo que venga:
 
 ## Siguiente paso
 
-**E1 · Proyecto plantilla**, en cuanto haya aprobación. El riesgo que
-justificaba E0-bis —que la PWA no pudiera hablar con el Web App— está
-despejado de punta a punta: la CSP ya admite los dos hosts de Apps Script y el
-`fetch` llega, medido en navegador real.
+**E2 · Instalador**, en cuanto haya aprobación. Hereda cuatro criterios de
+aceptación de E0-bis, todos comprobables sobre la plantilla de E1:
 
-Lo que quedó abierto no bloquea E1: son criterios de aceptación de **E2** (que
-`/copy` arrastre el script, que `instalar()` complete dentro de los 6 minutos y
-que un disparador suyo llegue a ejecutarse) y de **E8** (la pantalla de
-consentimiento con los ámbitos reales).
+- que `/copy` arrastre el script vinculado y `instalar()` monte sus 21 pestañas
+  **desde la copia**;
+- que `instalar()` completa quepa en los 6 minutos, cronometrándose sola;
+- que un disparador creado por el instalador llegue a ejecutarse;
+- que reejecutar `instalar()` no duplique disparadores.
+
+**E8** hereda el suyo: capturar la pantalla de consentimiento con los ámbitos
+reales de `apps-script/plantilla/appsscript.json`, que son más suaves que los
+del script de humo.

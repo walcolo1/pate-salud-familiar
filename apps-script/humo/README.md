@@ -8,7 +8,14 @@ El guion paso a paso está en [`../../docs/TESTING.md` §E0-bis](../../docs/TEST
 
 ## Por qué estos ámbitos y no los mínimos
 
-`oauthScopes` declara a propósito los ámbitos **del backend real**, no los que
+> **Corregido en E1.** Cuando se escribió esto, se daba por hecho que el backend
+> usaría `DriveApp` y por tanto el ámbito `drive`, que es restringido. E1 tomó
+> la vía de ámbitos mínimos —servicios avanzados y `drive.file`—, así que
+> **los ámbitos de abajo ya no son los del backend real**: son más amplios.
+> La plantilla verdadera está en `../plantilla/appsscript.json`, y es la que
+> hay que usar para capturar la pantalla de consentimiento de E8.
+
+`oauthScopes` declaraba los ámbitos que se suponían del backend real, no los que
 este script de humo necesitaría:
 
 | Ámbito | Para qué | Sensibilidad |
@@ -23,10 +30,11 @@ porque el punto 2 de E0-bis es ver **la pantalla exacta que verá un titular
 real**, y esa pantalla depende de los ámbitos pedidos. Medir una pantalla más
 benigna que la de producción no sirve de nada.
 
-`drive` es el que empuja la pantalla al peor caso. Si tras E0-bis se decide la
-vía de ámbitos mínimos —`drive.file` con el servicio avanzado de Drive en lugar
-de `DriveApp`—, hay que **repetir el paso 4 del guion** para capturar la
-pantalla más suave, porque será otra.
+`drive` es el que empuja la pantalla al peor caso. E1 **sí** tomó la vía de
+ámbitos mínimos, así que la pantalla real es más suave que la que produciría
+este manifiesto. La captura de E8 tiene que salir de la plantilla, no de aquí:
+enseñar al titular una pantalla más alarmante que la que verá también es
+engañarle, solo que en la otra dirección.
 
 ## Los ficheros
 

@@ -136,6 +136,65 @@ público y anónimo por diseño (`ANYONE_ANONYMOUS`), y toda la autorización re
 en la verificación del `id_token` dentro de `doPost`. Abrir la CSP solo permite
 que la conversación ocurra; no dice quién habla.
 
+---
+
+## Ámbitos del backend de Apps Script (E1)
+
+Siete ámbitos, declarados a mano en `apps-script/plantilla/appsscript.json`.
+Cada uno es un permiso que un titular concede **sobre su propia cuenta**, así
+que la lista está bajo llave: `src/lib/manifiestoPlantilla.test.ts` la compara
+entera —igualdad, no «contiene»— y falla si alguien añade, quita o reordena uno.
+
+| Ámbito | Para qué se pide | Qué evita pedir |
+|---|---|---|
+| `spreadsheets` | Abrir la hoja del titular por identificador y leer o escribir sus pestañas | — |
+| `drive.file` | Crear el árbol de carpetas y guardar los documentos que suba la aplicación | `drive`, **restringido**: ver, editar y borrar todo el Drive |
+| `calendar.events` | Crear y mover los eventos de las citas | `calendar`, que además administra los calendarios |
+| `script.send_mail` | Enviar el correo de invitación con `MailApp` | `https://mail.google.com/`, **restringido**: acceso total al buzón |
+| `script.scriptapp` | Crear los disparadores desde el instalador | — |
+| `script.external_request` | `UrlFetch`, para verificar el `id_token` contra Google | — |
+| `userinfo.email` | Capturar el correo del titular durante la instalación | — |
+
+**Ninguno es restringido.** No es casualidad: dos elecciones de diseño lo
+evitan, y ambas cuestan algo de comodidad.
+
+**Servicios avanzados en vez de los clásicos.** `DriveApp` y `CalendarApp` son
+más cómodos, pero arrastran los ámbitos amplios —el primero exige `drive`
+entero—. Con `Drive.Files` y `Calendar.Events` declarados en `dependencies`, y
+los `oauthScopes` fijados a mano, se hace lo mismo con `drive.file`.
+
+Lo que cuesta: **con `drive.file` el script solo ve los ficheros que él mismo
+creó**. Si algún día hiciera falta leer uno que el usuario dejó por su cuenta,
+la respuesta correcta será que la aplicación lo importe, no ampliar el ámbito.
+
+**`MailApp`, no `GmailApp`.** Los dos envían correo. `GmailApp` exige el buzón
+entero; `MailApp` se conforma con `script.send_mail`, que solo permite enviar.
+Pedir acceso a todo el correo de alguien para mandarle una invitación a su
+familia es justo el tipo de exceso que hace que una instalación se cancele en
+la pantalla de permisos.
+
+### El único que no se pudo estrechar
+
+`spreadsheets.currentonly` parecía lo correcto para un script vinculado: da
+acceso al documento que lo contiene y a ninguno más. **No sirve aquí.** En una
+ejecución de Web App no hay documento activo —el script no corre desde la hoja,
+sino desde una petición HTTP—, así que `getActiveSpreadsheet()` devuelve `null`.
+Con ese ámbito el router no podría ni leer la hoja `ACCESO`, que es donde vive
+toda la autorización. La hoja se abre por identificador, y `openById` exige el
+ámbito completo.
+
+De ahí sale una obligación para el instalador: **guardar el identificador de la
+hoja en `PropertiesService`** mientras todavía hay documento activo. Es el único
+momento en que se puede.
+
+### Lo que llegará después, y lo que costará
+
+El escaneo de correo de E11 necesitará `gmail.readonly` o el ámbito completo de
+Gmail: **restringidos los dos**. No están declarados a propósito. Cuando se
+añada esa función, **cada titular tendrá que volver a autorizar**, y verá una
+pantalla bastante más seria. Conviene decidirla sabiendo lo que cuesta en
+confianza, no descubrirlo el día del despliegue.
+
 ## Dónde está lo demás
 
 | Tema | Documento |

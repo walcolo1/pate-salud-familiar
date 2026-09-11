@@ -102,6 +102,7 @@ los dos. Sí quedó verificado que **no aparecen en el consentimiento inicial**.
 | **E** | Backend de Apps Script por titular | **en curso** |
 | E0 · Reconocimiento de restricciones de cuenta | Ningún paso exige Workspace. Ver `E0-BIS-INFORME.md` | **cerrado** |
 | E0-bis · Verificación empírica con cuenta de pruebas | Transporte verificado y CSP corregida; tres cabos traspasados a E2 y uno a E8 | **cerrado** |
+| E1 · Proyecto plantilla: 21 pestañas, manifiesto de ámbitos mínimos y esqueleto | **cerrado** |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 
