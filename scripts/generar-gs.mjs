@@ -62,6 +62,15 @@ const FICHEROS = [
     titulo: 'Resolución de rol y alcance',
     fuente: 'src/lib/acceso.ts',
   },
+  {
+    // Este sí se llama igual que el fichero del backend, porque E5 no tiene
+    // nada que escribir a mano: `puede()` es pura y no toca hoja, caché ni
+    // red. El generado ES el fichero entero.
+    origen: join(RAIZ, 'src', 'lib', 'permisos.ts'),
+    destino: join(DESTINO, 'Permisos.gs'),
+    titulo: 'Matriz de permisos por rol',
+    fuente: 'src/lib/permisos.ts',
+  },
 ];
 
 function cabecera(titulo, fuente) {

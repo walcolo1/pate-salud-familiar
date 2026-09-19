@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | **en curso** · E0, E0-bis, E1, E2, E3 y E4 cerrados |
+| **E** | Backend de Apps Script por titular | **en curso** · E0 a E5 cerrados |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 
@@ -126,9 +126,14 @@ cada módulo. Las que más condicionan lo que venga:
 
 ## Siguiente paso
 
-**E5 · `Permisos.gs`**, en cuanto haya aprobación. E4 resolvió el **alcance**
-—a qué pacientes llega alguien—; E5 resuelve el **verbo**: qué acciones admite
-cada rol, con denegación por defecto.
+**E6 · `Router.gs`**, en cuanto haya aprobación. Es donde las tres piezas se
+juntan en una sola puerta: verificar el `id_token`, resolver el acceso y
+despachar con `puede()` delante de cada acción.
+
+Es también donde por fin se pueden comprobar contra Google las cosas que E3,
+E4 y E5 dejaron probadas solo en frío: que `UrlFetchApp` alcance `tokeninfo`,
+que el cerrojo serialice dos mutaciones, y que revocar deje a alguien fuera en
+la **siguiente petición** y no en la siguiente ventana de caché.
 
 El transporte (E0-bis) y la instalación (E2) están validados contra Google de
 verdad. Lo de E3 está probado en frío: las cuatro comprobaciones que necesitan
