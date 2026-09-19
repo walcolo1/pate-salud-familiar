@@ -25,6 +25,7 @@ const DESTINO = join(RAIZ, 'apps-script', 'dist');
 const { ORDEN_CONSOLIDADO, colisiones, consolidar, desajustesDeOrden } = await cargarModuloTs(
   join(RAIZ, 'src', 'lib', 'consolidarPlantilla.ts'),
 );
+const { hallazgos, informe } = await cargarModuloTs(join(RAIZ, 'src', 'lib', 'higienePlantilla.ts'));
 
 const presentes = readdirSync(PLANTILLA).filter((n) => n.endsWith('.gs'));
 
@@ -49,6 +50,19 @@ if (choques.length > 0) {
   process.exit(1);
 }
 
+// Higiene (E8). La plantilla se copia una vez por familia: lo que lleve dentro
+// se multiplica por cada titular y ya no se puede retirar. Se comprueba aquí
+// además de en `test:run` porque este es el fichero que se pega en el editor.
+const sucio = hallazgos([
+  ...ficheros,
+  { nombre: 'appsscript.json', codigo: readFileSync(join(PLANTILLA, 'appsscript.json'), 'utf8') },
+]);
+if (sucio.length > 0) {
+  console.error('consolidar-gs: la plantilla lleva cosas que no deben copiarse.');
+  console.error(informe(sucio));
+  process.exit(1);
+}
+
 const fecha = new Date().toISOString().slice(0, 10);
 const salida = join(DESTINO, 'Pate.gs');
 
@@ -57,7 +71,7 @@ writeFileSync(salida, consolidar(ficheros, fecha), 'utf8');
 
 const lineas = readFileSync(salida, 'utf8').split('\n').length;
 console.log(`consolidar-gs: ${ficheros.length} ficheros → ${salida} (${lineas} líneas)`);
-console.log('consolidar-gs: sin colisiones de nombres globales.');
+console.log('consolidar-gs: sin colisiones de nombres globales y sin restos que no deban copiarse.');
 console.log('');
 console.log('En el editor de Apps Script: borra TODOS los .gs del proyecto, crea uno');
 console.log('llamado «Pate» y pega este contenido. El manifiesto va aparte.');

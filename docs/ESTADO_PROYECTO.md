@@ -4,7 +4,7 @@
 paso está en [TABLERO.md](TABLERO.md); esto es dónde estamos, qué sostiene lo
 hecho y qué falta.*
 
-Última actualización: **19 de septiembre de 2026**, al cerrar **E6-live**.
+Última actualización: **19 de septiembre de 2026**, al cerrar el **Bloque E**.
 
 ---
 
@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | **en curso** · E0 a E7 cerrados; E0–E6 validados en vivo |
+| **E** | Backend de Apps Script por titular | **cerrado** · E0 a E8; E0–E6 validados en vivo |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 
@@ -112,10 +112,11 @@ cada módulo. Las que más condicionan lo que venga:
 |---|---|
 | Validación con lector de pantalla, escrita pero **no ejecutada** | `TESTING.md` §6.12 |
 | Confirmar que no llegan correos de error de los disparadores (al día siguiente de instalar) | `EVIDENCIA_E2.md` |
-| La plantilla de pruebas quedó instalada: **no sirve como plantilla**. La de producción hay que armarla limpia | `EVIDENCIA_E2.md` · criterio de **E8** |
-| La pantalla de «app no verificada» sigue sin captura | Criterio de **E8** |
+| Armar la plantilla maestra y pegar su enlace `/copy`: el guion está escrito, falta ejecutarlo | `PLANTILLA_PRODUCCION.md` |
+| Las cinco capturas de la pantalla de «app no verificada», sobre una copia de usar y tirar | `PLANTILLA_PRODUCCION.md` · paso 6 |
 | La carpeta `Temporal` existe y **nadie la vacía** hasta que E11 implemente la tarea diaria | `planInstalacion.ts` · `EVIDENCIA_E2.md` |
-| La pantalla de «no verificada» con los ámbitos reales, sin capturar | Criterio de aceptación de **E8** |
+| Actualizar una copia ya repartida cuando cambie el código: la maestra no actualiza a nadie hacia atrás | `PLANTILLA_PRODUCCION.md` |
+| Las cinco comprobaciones de E7 contra Google, entre ellas que el familiar no vea pantalla de permisos | `INVITACIONES.md` · necesitan **E9** |
 | Validación de consentimiento OAuth limpio | `TESTING.md` §6.11 |
 | `/members/:id/edit` y `/login` fuera de la red de axe | `ACCESIBILIDAD.md`, puerta de C9 |
 | 23 `alert` de error siguen sin migrar al sistema de avisos | `src/` |
@@ -126,24 +127,34 @@ cada módulo. Las que más condicionan lo que venga:
 
 ---
 
+## El Bloque E, cerrado
+
+Nueve pasos. El backend de cada familia vive dentro de su propia hoja, con su
+propio despliegue y su propio Drive: el aislamiento es de la infraestructura de
+cuentas de Google, no de reglas que alguien pueda escribir al revés.
+
+| Paso | Qué | Validado contra Google |
+|---|---|---|
+| **E0 · E0-bis** | Reconocimiento, cuotas y transporte | ✅ · corrigió tres afirmaciones de la especificación |
+| **E1** | Plantilla, 21 pestañas y siete ámbitos, ninguno restringido | ✅ en E2 |
+| **E2** | Instalador idempotente | ✅ · 23 s desde cero, 4,9 s al repetir |
+| **E3** | Verificación del `id_token` | ✅ en E6-live |
+| **E4** | Rol, alcance y revocación inmediata | ✅ · 2 535 ms con la caché caliente |
+| **E5** | Matriz de permisos por rol | ✅ por la cadena, en E6-live |
+| **E6 · E6-live** | Router: puerta única y `aplicar()` por lotes | ✅ · 9 de 9 |
+| **E6-bis** | Normalización simétrica de correos | Probado en frío |
+| **E7** | Invitaciones | Probado en frío · espera a **E9** |
+| **E8** | Plantilla maestra y guion de publicación | Guion escrito · falta ejecutarlo |
+
+**Lo que queda del bloque no es código**: armar la hoja maestra, capturar la
+pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
+`/invitacion` de la PWA. Están en la tabla de deuda, cada una con su sitio.
+
+---
+
 ## Siguiente paso
 
-**E8**, en cuanto haya aprobación: la plantilla de producción armada limpia
-—la de pruebas quedó instalada y no sirve— y la captura de la pantalla de «app
-no verificada» con los ámbitos reales.
-
-**E7 quedó escrito y probado en frío.** Sus cinco comprobaciones contra Google
-—entre ellas la que importa, que el familiar **no vea ninguna pantalla de
-permisos**— necesitan la ruta `/invitacion` de la PWA, que es **E9**. Están
-listadas al final de [INVITACIONES.md](INVITACIONES.md).
-
-**E6-live quedó cerrado**: nueve peticiones contra un despliegue real, las cinco
-promesas demostradas, incluida la que justifica todo el diseño de E4 —revocar
-deja fuera en la petición siguiente, medido en 2 535 ms con la caché caliente
-frente a los 300 000 ms del TTL—. El detalle está en
-[EVIDENCIA_E6.md](EVIDENCIA_E6.md).
-
-El transporte (E0-bis) y la instalación (E2) están validados contra Google de
-verdad. Lo de E3 está probado en frío: las cuatro comprobaciones que necesitan
-red esperan a E6, cuando el router responda de punta a punta
-(ver `AUTENTICACION.md`).
+**Bloque G · el corte seco de Firebase**, o **E9** si se prefiere terminar de
+atar el backend antes de mover la PWA. E9 es además lo que desbloquea las cinco
+comprobaciones de E7 y las dos de `aplicar()` que siguen abiertas en
+`ROUTER.md`.
