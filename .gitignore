@@ -74,3 +74,8 @@ firebase-debug.log
 # El enlace /copy de la plantilla de PRODUCCION si sera publico; estos son de
 # una cuenta personal de pruebas y se tiran al cerrar el paso.
 /docs/evidencia/plantilla-local.md
+
+# Consolidado de la plantilla para pegar en Apps Script.
+# Es una derivada de apps-script/plantilla/*.gs: versionarla solo crearia una
+# copia que se queda atras.
+/apps-script/dist/

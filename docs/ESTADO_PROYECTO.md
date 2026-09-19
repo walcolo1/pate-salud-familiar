@@ -4,7 +4,7 @@
 paso está en [TABLERO.md](TABLERO.md); esto es dónde estamos, qué sostiene lo
 hecho y qué falta.*
 
-Última actualización: **10 de septiembre de 2026**, al cerrar **D4-fase-2**.
+Última actualización: **19 de septiembre de 2026**, al preparar **E6-live**.
 
 ---
 
@@ -43,11 +43,11 @@ La suite de accesibilidad (`e2e/accesibilidad.e2e.ts`) compara contra
 `e2e/axe-baseline.json` con **tolerancia cero**: cualquier violación nueva es
 una regresión, y la línea base solo se reescribe con bajadas reales.
 
-Estado al cerrar D4-fase-2:
+Estado al preparar E6-live:
 
 | Puerta | Resultado |
 |---|---|
-| `vitest run` | 417 pruebas, 19 ficheros |
+| `vitest run` | 676 pruebas, 28 ficheros |
 | `tsc --noEmit` | 0 |
 | `lint:cambiados` | sin regresiones |
 | Playwright | 157 pruebas |
@@ -121,19 +121,19 @@ cada módulo. Las que más condicionan lo que venga:
 | 23 `alert` de error siguen sin migrar al sistema de avisos | `src/` |
 | Deuda de lint en `AppContext.tsx` (72 errores en línea base) | `scripts/lint-baseline.json` |
 | Adjuntos del historial veterinario: el campo `documentoId` existe y nadie lo rellena | `src/domain/mascotas.ts` |
+| `ACCESO` compara el correo normalizado contra la celda tal cual: una dirección de `gmail.com` **con puntos** no se encuentra nunca | `src/lib/acceso.ts` · `EVIDENCIA_E6.md` |
 
 ---
 
 ## Siguiente paso
 
-**E7 · `Invitaciones.gs`**, en cuanto haya aprobación. Es lo que hace que un
-familiar no tenga que autorizar nada: recibe un correo con un enlace y entra.
+**E6-live · la validación real del backend**, antes de E7. El arnés está
+escrito y las puertas en verde; falta ejecutarlo contra un despliegue. El
+procedimiento completo —consolidar, pegar, desplegar y correr las nueve
+peticiones— está en [EVIDENCIA_E6.md](EVIDENCIA_E6.md).
 
-Pendiente antes o después de E7, y ya con todo el backend escrito: **la
-validación real del Bloque E**. Cinco cosas que solo se pueden ver
-desplegando —entre ellas que revocar deje a alguien fuera en la siguiente
-petición, que es el criterio que justifica el diseño de E4— están listadas al
-final de `ROUTER.md`.
+Después, **E7 · `Invitaciones.gs`**: lo que hace que un familiar no tenga que
+autorizar nada, sino recibir un correo con un enlace y entrar.
 
 El transporte (E0-bis) y la instalación (E2) están validados contra Google de
 verdad. Lo de E3 está probado en frío: las cuatro comprobaciones que necesitan
