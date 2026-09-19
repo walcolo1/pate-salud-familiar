@@ -53,7 +53,15 @@ En orden, con dos dígitos, en minúsculas y sin tildes en el nombre del fichero
 | `E0bis-04-pantalla-app-no-verificada.png` | E0-bis, paso 4 | Pendiente |
 | `E0bis-05-ambitos-solicitados.png` | E0-bis, paso 4 | Pendiente |
 | `E0bis-07-disparadores.md` | E0-bis, paso 7 | **Parcial, 2026-09-11.** Un disparador se crea desde código en cuenta gratuita. Falta verlo ejecutarse, la idempotencia y el `/copy` |
-| `E0bis-08-mediciones.png` | E0-bis, paso 8 | Pendiente. Los 624 ms de E0bis-07 miden crear un disparador, **no** la instalación de las 18 pestañas |
+| `E0bis-08-mediciones.png` | E0-bis, paso 8 | Sustituido por la validación de E2, que mide la instalación de verdad |
+| `E2-01-copia-con-script.png` | E2 · criterio 1 | **2026-09-18.** La copia conserva el menú Paté: el script viaja con `/copy` |
+| `E2-02-se-requiere-autorizacion.png` | E2 · paso 3 | Diálogo previo. **No** es la pantalla de «app no verificada», que sigue sin capturar |
+| `E2-03-ambitos-solicitados.png` | E2 · paso 3 | Los siete ámbitos en las palabras de Google. **Es la que E8 necesita** |
+| `E2-04-ejecucion-completada.png` | E2 · paso 4 | Registro de una ejecución de `instalar` |
+| `E2-05-instalacion-registro.png` | E2 · paso 4 | Editor con el código cargado y su registro |
+| `E2-06-ejecuciones.png` | E2 · paso 6 | Primera lectura: solo `onOpen`, activador sencillo. Es la que destapó que faltaba el criterio 3 |
+| `E2-07-activadores-creados.png` | E2 · criterio 4 | Los **tres** activadores tras reejecutar, no seis |
+| `E2-08-disparador-instalable-ejecutado.png` | E2 · criterio 3 | `registrarApertura` ejecutándose como activador instalable, junto a `onOpen` sin pisarse |
 
 Cada fila que siga diciendo «Pendiente» es un punto que el informe E0-bis **no
 puede declarar verificado**, por muy seguros que estemos de lo que va a salir.

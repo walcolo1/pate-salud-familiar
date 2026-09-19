@@ -1,11 +1,14 @@
 # Evidencia E2 — Instalador idempotente
 
-**Estado: TRES CRITERIOS DE CUATRO. Ejecutada el 2026-09-18.**
+**Estado: LOS CUATRO CRITERIOS CERRADOS. Ejecutada el 2026-09-18.**
 
 Las decisiones del instalador estaban probadas en frío; el 18 de septiembre se
-ejecutó sobre una cuenta `@gmail.com` de pruebas. Tres criterios quedan
-cerrados con evidencia, uno **no**, y aparecieron dos cosas que el guion no
-preveía.
+ejecutó sobre una cuenta `@gmail.com` de pruebas. Los cuatro criterios que
+E0-bis traspasó a este paso quedan cerrados con evidencia, y aparecieron dos
+cosas que el guion no preveía.
+
+Queda un cabo menor, con fecha: confirmar mañana que no llegó ningún correo de
+error de Apps Script.
 
 ---
 
@@ -33,13 +36,10 @@ y una prueba falla si divergen.
 |---|---|---|---|
 | 1 | `/copy` arrastra el script vinculado | ✅ **CERRADO** | `E2-01-copia-con-script.png`: la hoja titulada «**Copia de** Paté · Salud Familiar — PLANTILLA» tiene el menú **Paté** en su barra. El script viaja |
 | 2 | `instalar()` completa cabe en 6 minutos | ✅ **CERRADO**, con un matiz | 23,279 s de reloj la instalación desde cero, 4,863 s la reejecución. Frente a 360 s, holgadísimo |
-| 3 | Un disparador **del instalador** aparece en el registro | ❌ **NO DEMOSTRADO** | Ver abajo |
-| 4 | Reejecutar no duplica | ✅ **CERRADO** en hoja y semillas, sin captura del recuento de disparadores | Reejecución de 4,863 s: ni pestañas duplicadas ni el dominio borrado resucitado |
+| 3 | Un disparador **del instalador** aparece en el registro | ✅ **CERRADO** | `E2-08`: `registrarApertura`, tipo **Activador**, 2,6 s y 1,38 s, Completada las dos veces |
+| 4 | Reejecutar no duplica | ✅ **CERRADO** | Reejecución de 4,863 s sin pestañas duplicadas ni dominio resucitado, y `E2-07`: **tres** activadores después, no seis |
 
-**E2 no se cierra con el criterio 3 abierto.** Es el que separa «el instalador
-dice que creó disparadores» de «los disparadores existen y corren».
-
-### Por qué el criterio 3 no está cerrado
+### El criterio 3, y lo que enseña de propina
 
 `E2-06-ejecuciones.png` lista tres ejecuciones:
 
@@ -49,21 +49,38 @@ dice que creó disparadores» de «los disparadores existen y corren».
 | 20:45:50 | `instalar` | Editor | 23,279 s |
 | 20:28:33 | `onOpen` | **Activador sencillo** | 0,502 s |
 
-El único disparador que aparece es `onOpen`, y está marcado **«Activador
-sencillo»**: es el que Apps Script ejecuta por su cuenta, sin autorización y
-**sin instalador**. Existe con o sin `instalar()`.
+En esa primera captura el único disparador era `onOpen`, marcado **«Activador
+sencillo»** —el que Apps Script ejecuta por su cuenta, que existe con o sin
+instalador—. Faltaba ver correr uno **instalable**, que es lo que el criterio
+pide y lo que separa «el instalador dice que los creó» de «existen y corren».
 
-Lo que el criterio 3 pide es ver correr un disparador **instalable**, de los que
-crea el instalador. Ese es `registrarApertura`, y **no aparece en la lista**.
+`E2-07-activadores-creados.png` enseña el panel **Activadores** con los tres,
+exactamente los que declara `DISPARADORES`:
 
-Dos lecturas posibles, y no se pueden distinguir con esta evidencia:
+| Función | Evento |
+|---|---|
+| `tareaHoraria` | Basado en tiempo |
+| `tareaDiaria` | Basado en tiempo |
+| `registrarApertura` | De una hoja de cálculo · **Al abrirse** |
 
-- la hoja no se volvió a abrir después de instalar, así que el disparador existe
-  pero no ha tenido ocasión de ejecutarse; o
-- los disparadores no llegaron a crearse, y entonces fallan el 3 **y** el 4.
+Tres, no seis, **después** de haber reejecutado `instalar()`. Eso termina de
+cerrar también el criterio 4 por el lado que faltaba.
 
-Se distingue en dos minutos: abrir el panel **Activadores** del editor. Si hay
-tres, es lo primero. Si hay cero, es lo segundo.
+`E2-08-disparador-instalable-ejecutado.png` cierra el 3, y de paso demuestra
+algo que no estaba en el guion. En cada una de las dos aperturas de la hoja
+corren **dos funciones distintas**:
+
+| Hora | Función | Tipo | Duración |
+|---|---|---|---|
+| 21:04:36 | `registrarApertura` | **Activador** | 1,38 s |
+| 21:04:35 | `onOpen` | Activador sencillo | 0,386 s |
+| 21:04:22 | `registrarApertura` | **Activador** | 2,6 s |
+| 21:04:22 | `onOpen` | Activador sencillo | 0,71 s |
+
+Es la comprobación en vivo de la decisión que `planInstalacion.ts` protege con
+una prueba: **el disparador instalable NO va sobre `onOpen`**. Si fuera al
+revés, aquí se vería `onOpen` dos veces por apertura y el menú se construiría
+por duplicado. Se ven dos funciones, cada una con su disparador, sin pisarse.
 
 ### Sobre el número de milisegundos
 
@@ -193,16 +210,19 @@ con el segundo, el titular leería «leer, redactar, enviar y borrar
 
 ---
 
-## Lo que falta para cerrar E2
+## El cabo que queda
 
-1. Abrir el panel **Activadores** del editor y contar. Deberían ser **tres**:
-   `registrarApertura`, `tareaDiaria` y `tareaHoraria`. 📸 `E2-07-activadores.png`
-2. Cerrar y reabrir **la copia**, y comprobar que en `Ejecuciones` aparece
-   `registrarApertura` como **activador instalable**. 📸 `E2-08-disparador-instalable.png`
-3. Al día siguiente, confirmar que no llegó ningún correo de error. Cuando se
-   tomaron estas capturas habían pasado unos diez minutos desde la instalación:
-   `tareaHoraria` no había corrido **ni una vez**, así que «sin correos de
-   error» todavía no es una observación, es una expectativa.
+Confirmar que **no llegó ningún correo de error de Apps Script**. Cuando se
+tomaron estas capturas habían pasado unos diez minutos desde la instalación y
+`tareaHoraria` no había corrido ni una vez, así que «sin correos de error»
+todavía no era una observación: era una expectativa.
+
+Es el criterio que más pesa para la confianza del titular —un disparador
+horario que falla son 24 correos al día— y por eso los tres manejadores están
+envueltos en `try/catch` y lo que aún no existe no se intenta.
+
+Se confirma mirando la bandeja al día siguiente. Si llega alguno, hay que
+volver a abrir E2.
 
 ---
 

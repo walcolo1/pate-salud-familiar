@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | **en curso** · E0, E0-bis y E1 cerrados; E2 escrito y probado en frío |
+| **E** | Backend de Apps Script por titular | **en curso** · E0, E0-bis, E1 y E2 cerrados |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 
@@ -111,7 +111,9 @@ cada módulo. Las que más condicionan lo que venga:
 | Qué | Dónde |
 |---|---|
 | Validación con lector de pantalla, escrita pero **no ejecutada** | `TESTING.md` §6.12 |
-| Instalación real de E2 sin ejecutar: `/copy`, tiempo de `instalar()`, disparador que corre, no duplicar | `EVIDENCIA_E2.md`, con guion |
+| Confirmar que no llegan correos de error de los disparadores (al día siguiente de instalar) | `EVIDENCIA_E2.md` |
+| La plantilla de pruebas quedó instalada: **no sirve como plantilla**. La de producción hay que armarla limpia | `EVIDENCIA_E2.md` · criterio de **E8** |
+| La pantalla de «app no verificada» sigue sin captura | Criterio de **E8** |
 | La carpeta `Temporal` existe y **nadie la vacía** hasta que E11 implemente la tarea diaria | `planInstalacion.ts` · `EVIDENCIA_E2.md` |
 | La pantalla de «no verificada» con los ámbitos reales, sin capturar | Criterio de aceptación de **E8** |
 | Validación de consentimiento OAuth limpio | `TESTING.md` §6.11 |
@@ -124,15 +126,9 @@ cada módulo. Las que más condicionan lo que venga:
 
 ## Siguiente paso
 
-**E2 · Instalador**, en cuanto haya aprobación. Hereda cuatro criterios de
-aceptación de E0-bis, todos comprobables sobre la plantilla de E1:
+**E3 · `Auth.gs`**, en cuanto haya aprobación. Es la única puerta del backend:
+el endpoint es público y anónimo por diseño, así que toda la autorización
+descansa en verificar el `id_token`.
 
-- que `/copy` arrastre el script vinculado y `instalar()` monte sus 21 pestañas
-  **desde la copia**;
-- que `instalar()` completa quepa en los 6 minutos, cronometrándose sola;
-- que un disparador creado por el instalador llegue a ejecutarse;
-- que reejecutar `instalar()` no duplique disparadores.
-
-**E8** hereda el suyo: capturar la pantalla de consentimiento con los ámbitos
-reales de `apps-script/plantilla/appsscript.json`, que son más suaves que los
-del script de humo.
+El transporte (E0-bis) y la instalación (E2) están validados contra Google de
+verdad, no solo en frío.
