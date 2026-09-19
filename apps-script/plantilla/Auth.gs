@@ -25,8 +25,10 @@
  * ESTADO: E1 · contrato. La implementación llega en E3.
  */
 
-/** Clave de `PropertiesService` donde la instalación guarda el cliente OAuth. */
-var CLAVE_CLIENTE_OAUTH = 'OAUTH_CLIENT_ID';
+// `CLAVE_CLIENTE_OAUTH` NO se declara aquí: la define `Instalacion.gs`, que es
+// generado. En Apps Script todos los ficheros comparten un único ámbito global,
+// así que dos `var` con el mismo nombre no dan error — gana la del fichero que
+// se cargue después, en silencio. Una sola declaración, en el fichero generado.
 
 /** Cuánto se cachea un token ya verificado. Corto: un token dura una hora. */
 var CACHE_TOKEN_SEGUNDOS = 300;

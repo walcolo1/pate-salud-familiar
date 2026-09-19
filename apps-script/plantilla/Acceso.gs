@@ -29,8 +29,10 @@
  * ESTADO: E1 · contrato. La implementación llega en E4.
  */
 
-/** Propiedad que versiona la caché de ACCESO. La incrementa `mutarAcceso`. */
-var CLAVE_VERSION_ACCESO = 'ACCESO_VERSION';
+// `CLAVE_VERSION_ACCESO` —la propiedad que versiona la caché, y que incrementa
+// `mutarAcceso`— la declara `Instalacion.gs`. Ver la nota de `Auth.gs`: dos
+// `var` con el mismo nombre en dos ficheros no dan error, gana el último
+// cargado, y un cambio en el perdedor se ignora sin decir nada.
 
 /** Estados posibles de una fila de ACCESO. */
 var ESTADOS_ACCESO = ['ACTIVO', 'INVITADO', 'REVOCADO'];
