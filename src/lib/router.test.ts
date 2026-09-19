@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   ACCIONES,
+  exigeAcceso,
+  exigeToken,
   CLAVE_REVISION,
   TABLAS_PROHIBIDAS,
   VERBO_POR_TABLA,
@@ -65,6 +67,7 @@ function deps(over: Partial<Dependencias> = {}): Dependencias {
       invitar: () => ({ creada: true }),
       cambiarRol: () => ({ cambiada: true }),
       revocar: () => ({ revocada: true }),
+      aceptarInvitacion: () => ({ aceptada: true }),
       verAuditoria: () => [],
       exportar: () => ({}),
     },
@@ -125,10 +128,10 @@ describe('el catálogo de acciones', () => {
     expect(r).toEqual({ ok: false, error: 'ACCION_DESCONOCIDA' });
   });
 
-  it('toda acción del catálogo declara verbo, salvo la anónima', () => {
+  it('toda acción declara verbo, salvo las que no tienen acceso contra el que comprobarlo', () => {
     for (const nombre of Object.keys(ACCIONES)) {
       const d = ACCIONES[nombre];
-      if (d.anonima) expect(d.verbo, nombre).toBeNull();
+      if (!exigeAcceso(d)) expect(d.verbo, nombre).toBeNull();
       else expect(d.verbo, nombre).toBeTruthy();
     }
   });
@@ -228,16 +231,16 @@ describe('`ping` es la única acción anónima, y no cuenta nada', () => {
     expect(verificar).not.toHaveBeenCalled();
   });
 
-  it('es la ÚNICA anónima del catálogo', () => {
-    const anonimas = Object.keys(ACCIONES).filter((a) => ACCIONES[a].anonima);
-    expect(anonimas).toEqual(['ping']);
+  it('es la ÚNICA sin token del catálogo', () => {
+    const sinToken = Object.keys(ACCIONES).filter((a) => !exigeToken(ACCIONES[a]));
+    expect(sinToken).toEqual(['ping']);
   });
 
   it('ninguna otra acción pasa sin token', () => {
     // Si una acción con verbo pudiera saltarse la identidad, el muro entero
     // sería decorativo.
     for (const nombre of Object.keys(ACCIONES)) {
-      if (ACCIONES[nombre].anonima) continue;
+      if (!exigeToken(ACCIONES[nombre])) continue;
       const r = despacharPeticion(
         { accion: nombre },
         deps({
@@ -427,5 +430,153 @@ describe('la traza de auditoría', () => {
   it('con un lote vacío no se rompe', () => {
     expect(trazaDeLote([])).toBe('');
     expect(trazaDeLote(undefined as never)).toBe('');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// E7 · la segunda excepción a la cadena
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * `aceptarInvitacion` es el único sitio donde alguien con identidad verificada
+ * y **sin acceso** llega a un manejador. Es un agujero nuevo en el muro que E6
+ * validó, así que se cierra por los cuatro lados.
+ */
+describe('E7 · aceptarInvitacion: identidad sí, acceso no', () => {
+  it('llega al manejador aunque resolverAcceso deniegue', () => {
+    const resolver = vi.fn(() => {
+      throw new Error('ACCESO_DENEGADO');
+    });
+    const r = despacharPeticion(peticion('aceptarInvitacion', { t: 'x' }), deps({ resolverAcceso: resolver }));
+    expect(r).toEqual({ ok: true, data: { aceptada: true } });
+    expect(resolver, 'ni siquiera se pregunta por el acceso').not.toHaveBeenCalled();
+  });
+
+  it('pero SIGUE exigiendo token', () => {
+    // Lo que se salta es el acceso, no la identidad. Sin `id_token` no hay
+    // correo verificado contra el que comparar la invitación, y sin eso el
+    // reenvío funcionaría.
+    const r = despacharPeticion(
+      { accion: 'aceptarInvitacion', payload: {} },
+      deps({
+        verificarIdentidad: () => {
+          throw new Error('TOKEN_INVALIDO');
+        },
+      }),
+    );
+    expect(r).toEqual({ ok: false, error: 'TOKEN_INVALIDO' });
+  });
+
+  it('el manejador recibe la identidad, porque no tiene acceso del que sacarla', () => {
+    let visto: unknown = 'no llamado';
+    despacharPeticion(
+      peticion('aceptarInvitacion'),
+      deps({
+        verificarIdentidad: () => ({ email: 'invitada@example.invalid', sub: '9' }),
+        manejadores: {
+          aceptarInvitacion: (_p, _a, identidad) => {
+            visto = identidad;
+            return {};
+          },
+        },
+      }),
+    );
+    expect(visto).toEqual({ email: 'invitada@example.invalid', sub: '9' });
+  });
+
+  it('y recibe el acceso en null, no un objeto a medias', () => {
+    let visto: unknown = 'no llamado';
+    despacharPeticion(
+      peticion('aceptarInvitacion'),
+      deps({
+        resolverAcceso: () => {
+          throw new Error('ACCESO_DENEGADO');
+        },
+        manejadores: {
+          aceptarInvitacion: (_p, acceso) => {
+            visto = acceso;
+            return {};
+          },
+        },
+      }),
+    );
+    expect(visto).toBeNull();
+  });
+
+  it('es la ÚNICA que se salta el acceso teniendo token', () => {
+    const sinAcceso = Object.keys(ACCIONES).filter(
+      (a) => exigeToken(ACCIONES[a]) && !exigeAcceso(ACCIONES[a]),
+    );
+    expect(sinAcceso).toEqual(['aceptarInvitacion']);
+  });
+
+  it('nadie puede saltarse el acceso y tener verbo a la vez', () => {
+    // Un verbo se comprueba contra un rol, y el rol sale del acceso. Una acción
+    // con las dos cosas pasaría `puede()` sobre un objeto que no existe.
+    for (const nombre of Object.keys(ACCIONES)) {
+      if (exigeAcceso(ACCIONES[nombre])) continue;
+      expect(ACCIONES[nombre].verbo, nombre).toBeNull();
+    }
+  });
+
+  it('nadie puede saltarse el token sin saltarse también el acceso', () => {
+    for (const nombre of Object.keys(ACCIONES)) {
+      if (exigeToken(ACCIONES[nombre])) continue;
+      expect(exigeAcceso(ACCIONES[nombre]), nombre).toBe(false);
+    }
+  });
+
+  it('todas las demás siguen pasando por resolverAcceso', () => {
+    for (const nombre of Object.keys(ACCIONES)) {
+      if (!exigeAcceso(ACCIONES[nombre])) continue;
+      const r = despacharPeticion(
+        peticion(nombre),
+        deps({
+          resolverAcceso: () => {
+            throw new Error('ACCESO_DENEGADO');
+          },
+        }),
+      );
+      expect(r, nombre).toEqual({ ok: false, error: 'ACCESO_DENEGADO' });
+    }
+  });
+
+  it('los códigos de invitación salen tal cual, sin confundirse con los otros', () => {
+    // `INVITACION_DESTINATARIO_INVALIDO` lleva «INVALIDO» dentro y no puede
+    // acabar traducido a TOKEN_INVALIDO por una comparación de subcadenas.
+    for (const codigo of [
+      'INVITACION_DESCONOCIDA',
+      'INVITACION_EXPIRADA',
+      'INVITACION_YA_USADA',
+      'INVITACION_REVOCADA',
+      'INVITACION_DESTINATARIO_INVALIDO',
+    ]) {
+      expect(codigoDeExcepcion(new Error(codigo)), codigo).toBe(codigo);
+      const r = despacharPeticion(
+        peticion('aceptarInvitacion'),
+        deps({
+          manejadores: {
+            aceptarInvitacion: () => {
+              throw new Error(codigo);
+            },
+          },
+        }),
+      );
+      expect(r, codigo).toEqual({ ok: false, error: codigo });
+    }
+  });
+
+  it('un fallo cualquiera del manejador sigue siendo ERROR_DESPACHO', () => {
+    const r = despacharPeticion(
+      peticion('aceptarInvitacion'),
+      deps({
+        manejadores: {
+          aceptarInvitacion: () => {
+            throw new Error('se cayó la hoja');
+          },
+        },
+      }),
+    );
+    expect(r).toEqual({ ok: false, error: 'ERROR_DESPACHO' });
   });
 });

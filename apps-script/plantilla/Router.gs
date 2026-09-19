@@ -23,7 +23,7 @@
  */
 
 /** Versión del contrato con la PWA. Sube cuando cambie la forma de responder. */
-var VERSION_API = 'e6';
+var VERSION_API = 'e7';
 
 /** Cuánto espera el cerrojo de un lote antes de rendirse. */
 var ESPERA_LOTE_MS = 15000;
@@ -76,6 +76,9 @@ function dependencias_() {
 
 /**
  * Qué hace cada acción, **ya autorizada**.
+ *
+ * Todos reciben `(payload, acceso, identidad)`. Solo `aceptarInvitacion` usa el
+ * tercer argumento, y no le queda otra: llega con el acceso en `null`.
  *
  * Ninguno de estos vuelve a comprobar identidad ni rol: para cuando se les
  * llama, la cadena ya pasó. Lo que sí hacen las mutaciones es revalidar el
@@ -132,8 +135,24 @@ var MANEJADORES = {
     return aplicar(acceso, payload.mutaciones);
   },
 
+  /**
+   * Invitar genera el token, escribe la fila y manda el correo (E7).
+   *
+   * Ya no es un `mutarAcceso` pelado: una fila con estado INVITADO y sin token
+   * no deja entrar a nadie, así que invitar sin enviar nada no invitaba.
+   */
   invitar: function (payload, acceso) {
-    return mutarAcceso('INVITAR', payload, acceso);
+    return invitar(payload, acceso);
+  },
+
+  /**
+   * Canjear una invitación. La única acción con identidad y sin acceso.
+   *
+   * Recibe la identidad porque no tiene acceso del que sacar el correo: el
+   * suyo sale del `id_token` y de ningún otro sitio.
+   */
+  aceptarInvitacion: function (payload, acceso, identidad) {
+    return aceptarInvitacion(payload, acceso, identidad);
   },
   cambiarRol: function (payload, acceso) {
     return mutarAcceso('CAMBIAR_ROL', payload, acceso);

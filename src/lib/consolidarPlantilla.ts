@@ -28,6 +28,7 @@ export const ORDEN_CONSOLIDADO: readonly string[] = [
   'Autorizacion.gs',
   'Permisos.gs',
   'Despacho.gs',
+  'Invitacion.gs',
   'Instalador.gs',
   'Auth.gs',
   'Acceso.gs',

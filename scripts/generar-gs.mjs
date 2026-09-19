@@ -79,6 +79,14 @@ const FICHEROS = [
     titulo: 'Cadena de seguridad y despacho',
     fuente: 'src/lib/router.ts',
   },
+  {
+    // Mismo reparto que los demás: `Invitaciones.gs` es el escrito a mano —el
+    // azar, el hash y el correo—, y aquí van las decisiones.
+    origen: join(RAIZ, 'src', 'lib', 'invitaciones.ts'),
+    destino: join(DESTINO, 'Invitacion.gs'),
+    titulo: 'Decisiones sobre invitaciones',
+    fuente: 'src/lib/invitaciones.ts',
+  },
 ];
 
 function cabecera(titulo, fuente) {

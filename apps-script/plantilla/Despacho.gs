@@ -44,7 +44,18 @@ var CODIGOS_ERROR = [
     'ERROR_CERROJO',
     'ERROR_DESPACHO',
     'ERROR_INTERNO',
+    // E7 · los de aceptar una invitación. Estos SÍ distinguen el motivo, y está
+    // razonado en `invitaciones.ts`: para llegar hasta ellos hay que traer un
+    // token, que es un secreto. Ninguno dice para quién era la invitación.
+    'INVITACION_DESCONOCIDA',
+    'INVITACION_EXPIRADA',
+    'INVITACION_YA_USADA',
+    'INVITACION_REVOCADA',
+    'INVITACION_DESTINATARIO_INVALIDO',
 ];
+/** Por omisión se exige todo. Lo que no se declara, se cierra. */
+var exigeToken = (d) => d.exigeToken !== false;
+var exigeAcceso = (d) => d.exigeAcceso !== false;
 /**
  * El catálogo de acciones.
  *
@@ -62,7 +73,7 @@ var ACCIONES = {
      * titular antes de registrarla, y para que la sonda de E0-bis siga sirviendo
      * como prueba de vida.
      */
-    ping: { verbo: null, anonima: true },
+    ping: { verbo: null, exigeToken: false, exigeAcceso: false },
     obtenerRevision: { verbo: 'LISTAR_PACIENTES' },
     listarPacientes: { verbo: 'LISTAR_PACIENTES' },
     verCatalogos: { verbo: 'VER_CATALOGOS' },
@@ -71,6 +82,15 @@ var ACCIONES = {
     invitar: { verbo: 'ADMINISTRAR_ACCESOS', muta: true },
     cambiarRol: { verbo: 'ADMINISTRAR_ACCESOS', muta: true },
     revocar: { verbo: 'ADMINISTRAR_ACCESOS', muta: true },
+    /**
+     * Canjear una invitación. La única acción con identidad y sin acceso.
+     *
+     * No lleva verbo porque no hay rol contra el que comprobarlo: el rol es el
+     * resultado de esta llamada, no su requisito. Lo que la protege no es la
+     * matriz de E5 sino el token, que es un secreto de 244 bits con caducidad y
+     * un solo uso.
+     */
+    aceptarInvitacion: { verbo: null, exigeAcceso: false, muta: true },
     verAuditoria: { verbo: 'VER_AUDITORIA' },
     exportar: { verbo: 'EXPORTAR_EXPEDIENTE' },
 };
@@ -185,23 +205,32 @@ function despacharPeticion(solicitud, deps) {
     const payload = solicitud.payload && typeof solicitud.payload === 'object' && !Array.isArray(solicitud.payload)
         ? solicitud.payload
         : {};
-    // 2 · Identidad. La acción anónima se salta esto **y solo esto**: sigue sin
-    //     poder llegar a ninguna acción con verbo.
+    // 2 · Identidad. `ping` se salta esto, y al saltárselo se salta también los
+    //     dos pasos siguientes: no hay forma de tener verbo sin identidad.
     let acceso = null;
-    if (!definicion.anonima) {
-        let identidad;
+    let identidad = null;
+    if (exigeToken(definicion)) {
         try {
             identidad = deps.verificarIdentidad(solicitud.idToken);
         }
-        catch (err) {
+        catch {
             anotar('token_rechazado', nombre);
             return respuestaError('TOKEN_INVALIDO');
         }
-        // 3 · Acceso.
+    }
+    // 3 · Acceso. `aceptarInvitacion` se salta ESTE paso y solo este: llegó con
+    //     identidad verificada y viene justo a conseguir el acceso que no tiene.
+    if (exigeAcceso(definicion)) {
+        if (!identidad) {
+            // Imposible por construcción —una prueba lo fija—, pero el orden de la
+            // cadena no puede depender de que nadie se equivoque editando la tabla.
+            anotar('configuracion_incoherente', nombre);
+            return respuestaError('TOKEN_INVALIDO');
+        }
         try {
             acceso = deps.resolverAcceso(identidad.email);
         }
-        catch (err) {
+        catch {
             anotar('acceso_denegado', nombre);
             return respuestaError('ACCESO_DENEGADO');
         }
@@ -222,7 +251,7 @@ function despacharPeticion(solicitud, deps) {
         return respuestaError('ACCION_DESCONOCIDA');
     }
     try {
-        return { ok: true, data: manejador(payload, acceso) };
+        return { ok: true, data: manejador(payload, acceso, identidad) };
     }
     catch (err) {
         const codigo = codigoDeExcepcion(err);
@@ -239,6 +268,12 @@ function despacharPeticion(solicitud, deps) {
  */
 function codigoDeExcepcion(err) {
     const mensaje = err && err.message ? String(err.message) : '';
+    // Los de invitación van primero: `INVITACION_DESTINATARIO_INVALIDO` no debe
+    // caer en ninguna de las reglas de abajo por contener una subcadena suya.
+    for (const codigo of CODIGOS_ERROR) {
+        if (codigo.indexOf('INVITACION_') === 0 && mensaje.indexOf(codigo) !== -1)
+            return codigo;
+    }
     if (mensaje.indexOf('OCUPADO') !== -1 || mensaje.indexOf('Lock') !== -1)
         return 'ERROR_CERROJO';
     if (mensaje.indexOf('ACCESO_DENEGADO') !== -1)

@@ -69,6 +69,18 @@ registro de ejecuciones.
 
 ---
 
+## Las dos excepciones, y son distintas
+
+`ping` responde **sin identidad**. `aceptarInvitacion` responde **con identidad
+y sin acceso**: quien acepta viene justo a conseguir el acceso que no tiene.
+
+Ninguna de las dos es un caso especial escondido en el despacho; las dos son
+marcas en el catálogo, `exigeToken` y `exigeAcceso`, porque una tabla se puede
+recorrer con una prueba y un `if` no. Cuatro invariantes las cierran, y están en
+[INVITACIONES.md](INVITACIONES.md).
+
+---
+
 ## `ping` es la única acción anónima
 
 Responde sin token. Es una excepción deliberada, y está medida:
@@ -105,6 +117,7 @@ decorativo.
 | `consultar` | `LEER_HISTORIA` | `payload.pacienteId` | — |
 | `aplicar` | `LISTAR_PACIENTES` + uno por mutación | por mutación | ✅ |
 | `invitar` · `cambiarRol` · `revocar` | `ADMINISTRAR_ACCESOS` | — | ✅ |
+| `aceptarInvitacion` | — *(identidad sí, acceso no)* | — | ✅ |
 | `verAuditoria` | `VER_AUDITORIA` | — | — |
 | `exportar` | `EXPORTAR_EXPEDIENTE` | — | — |
 

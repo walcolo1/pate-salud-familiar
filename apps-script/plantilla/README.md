@@ -90,11 +90,12 @@ sabiendo lo que cuesta en confianza, no descubrirlo al desplegarla.
 | `Autorizacion.gs` | **Generado.** Rol, alcance, clave versionada y reglas de mutación | E4 ✅ |
 | `Acceso.gs` | `resolverAccesoLocal` y `mutarAcceso`: hoja, caché y cerrojo | E4 ✅ |
 | `Permisos.gs` | **Generado.** Matriz de verbos por rol y `puede()` | E5 ✅ |
-| `Invitaciones.gs` | Invitar, aceptar, cambiar rol y revocar | E5 |
+| `Invitacion.gs` | **Generado.** Token, caducidad, estados y el cuerpo del correo | E7 ✅ |
+| `Invitaciones.gs` | `invitar` y `aceptarInvitacion`: azar, hash, hoja, cerrojo y `MailApp` | E7 ✅ |
 
-**Los seis ficheros marcados «Generado» no se editan a mano.** Salen de
+**Los siete ficheros marcados «Generado» no se editan a mano.** Salen de
 `src/lib/esquemaHoja.ts`, `planInstalacion.ts`, `autenticacion.ts`, `acceso.ts`,
-`permisos.ts` y `router.ts`, que es donde viven las pruebas. El destino de `acceso.ts` se
+`permisos.ts`, `router.ts` e `invitaciones.ts`, que es donde viven las pruebas. El destino de `acceso.ts` se
 llama `Autorizacion.gs` porque `Acceso.gs` ya es el fichero escrito a mano,
 igual que `Instalacion.gs` frente a `Instalador.gs`. `Permisos.gs` **no** tiene
 contraparte a mano: `puede()` es pura y no hay nada que solo se pueda comprobar

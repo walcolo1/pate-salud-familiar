@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | **en curso** · E0 a E6 cerrados y validados en vivo |
+| **E** | Backend de Apps Script por titular | **en curso** · E0 a E7 cerrados; E0–E6 validados en vivo |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 
@@ -128,8 +128,14 @@ cada módulo. Las que más condicionan lo que venga:
 
 ## Siguiente paso
 
-**E7 · `Invitaciones.gs`**, en cuanto haya aprobación. Es lo que hace que un
-familiar no tenga que autorizar nada: recibe un correo con un enlace y entra.
+**E8**, en cuanto haya aprobación: la plantilla de producción armada limpia
+—la de pruebas quedó instalada y no sirve— y la captura de la pantalla de «app
+no verificada» con los ámbitos reales.
+
+**E7 quedó escrito y probado en frío.** Sus cinco comprobaciones contra Google
+—entre ellas la que importa, que el familiar **no vea ninguna pantalla de
+permisos**— necesitan la ruta `/invitacion` de la PWA, que es **E9**. Están
+listadas al final de [INVITACIONES.md](INVITACIONES.md).
 
 **E6-live quedó cerrado**: nueve peticiones contra un despliegue real, las cinco
 promesas demostradas, incluida la que justifica todo el diseño de E4 —revocar

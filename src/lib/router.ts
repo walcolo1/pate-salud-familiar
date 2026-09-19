@@ -39,6 +39,14 @@ export const CODIGOS_ERROR = [
   'ERROR_CERROJO',
   'ERROR_DESPACHO',
   'ERROR_INTERNO',
+  // E7 · los de aceptar una invitación. Estos SÍ distinguen el motivo, y está
+  // razonado en `invitaciones.ts`: para llegar hasta ellos hay que traer un
+  // token, que es un secreto. Ninguno dice para quién era la invitación.
+  'INVITACION_DESCONOCIDA',
+  'INVITACION_EXPIRADA',
+  'INVITACION_YA_USADA',
+  'INVITACION_REVOCADA',
+  'INVITACION_DESTINATARIO_INVALIDO',
 ] as const;
 export type CodigoError = (typeof CODIGOS_ERROR)[number];
 
@@ -59,9 +67,30 @@ export interface DefinicionAccion {
   campoPaciente?: string;
   /** `true` cuando la acción escribe. Sirve para el registro y el cerrojo. */
   muta?: boolean;
-  /** Si no exige identidad. Una sola acción, y está razonada abajo. */
-  anonima?: boolean;
+  /**
+   * Si exige un `id_token` válido. Por omisión, **sí**.
+   *
+   * Solo `ping` dice que no, y está razonado abajo.
+   */
+  exigeToken?: boolean;
+  /**
+   * Si exige una fila activa en `ACCESO`. Por omisión, **sí**.
+   *
+   * `aceptarInvitacion` es la única que dice que no, y no puede ser de otra
+   * manera: quien acepta tiene identidad verificada y **todavía no tiene
+   * acceso**, que es exactamente lo que viene a conseguir.
+   *
+   * Es la segunda excepción a la cadena y es más delicada que `ping`, así que
+   * está declarada aquí en vez de vivir como un caso especial dentro del
+   * despacho: una marca en una tabla se puede recorrer con una prueba, un `if`
+   * escondido no.
+   */
+  exigeAcceso?: boolean;
 }
+
+/** Por omisión se exige todo. Lo que no se declara, se cierra. */
+export const exigeToken = (d: DefinicionAccion): boolean => d.exigeToken !== false;
+export const exigeAcceso = (d: DefinicionAccion): boolean => d.exigeAcceso !== false;
 
 /**
  * El catálogo de acciones.
@@ -80,7 +109,7 @@ export const ACCIONES: Record<string, DefinicionAccion> = {
    * titular antes de registrarla, y para que la sonda de E0-bis siga sirviendo
    * como prueba de vida.
    */
-  ping: { verbo: null, anonima: true },
+  ping: { verbo: null, exigeToken: false, exigeAcceso: false },
 
   obtenerRevision: { verbo: 'LISTAR_PACIENTES' },
   listarPacientes: { verbo: 'LISTAR_PACIENTES' },
@@ -90,6 +119,16 @@ export const ACCIONES: Record<string, DefinicionAccion> = {
   invitar: { verbo: 'ADMINISTRAR_ACCESOS', muta: true },
   cambiarRol: { verbo: 'ADMINISTRAR_ACCESOS', muta: true },
   revocar: { verbo: 'ADMINISTRAR_ACCESOS', muta: true },
+  /**
+   * Canjear una invitación. La única acción con identidad y sin acceso.
+   *
+   * No lleva verbo porque no hay rol contra el que comprobarlo: el rol es el
+   * resultado de esta llamada, no su requisito. Lo que la protege no es la
+   * matriz de E5 sino el token, que es un secreto de 244 bits con caducidad y
+   * un solo uso.
+   */
+  aceptarInvitacion: { verbo: null, exigeAcceso: false, muta: true },
+
   verAuditoria: { verbo: 'VER_AUDITORIA' },
   exportar: { verbo: 'EXPORTAR_EXPEDIENTE' },
 };
@@ -208,15 +247,30 @@ export function siguienteRevision(crudo: unknown): number {
 // El despacho
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Lo que devuelve E3: quién llama, según Google. */
+export interface Identidad {
+  email: string;
+  sub: string;
+}
+
 export interface Dependencias {
   /** E3. Lanza si el token no vale. */
-  verificarIdentidad: (idToken: unknown) => { email: string; sub: string };
+  verificarIdentidad: (idToken: unknown) => Identidad;
   /** E4. Lanza si el correo no tiene acceso activo. */
   resolverAcceso: (email: string) => Acceso;
   /** E5. */
   puede: (a: Acceso, v: Verbo, p?: unknown, e?: unknown) => boolean;
-  /** Lo que hace cada acción, ya autorizada. */
-  manejadores: Record<string, (payload: Record<string, unknown>, acceso: Acceso) => unknown>;
+  /**
+   * Lo que hace cada acción, ya autorizada.
+   *
+   * Reciben también la **identidad**, porque `aceptarInvitacion` no tiene
+   * acceso del que sacar el correo: el suyo sale del `id_token` y de ningún
+   * otro sitio. Los demás manejadores la ignoran.
+   */
+  manejadores: Record<
+    string,
+    (payload: Record<string, unknown>, acceso: Acceso, identidad: Identidad | null) => unknown
+  >;
   /** Para dejar constancia. Si lanza, se ignora: ver `despacharPeticion`. */
   registrar?: (evento: string, detalle: string) => void;
 }
@@ -259,22 +313,32 @@ export function despacharPeticion(solicitud: Solicitud, deps: Dependencias): Res
       ? (solicitud.payload as Record<string, unknown>)
       : {};
 
-  // 2 · Identidad. La acción anónima se salta esto **y solo esto**: sigue sin
-  //     poder llegar a ninguna acción con verbo.
+  // 2 · Identidad. `ping` se salta esto, y al saltárselo se salta también los
+  //     dos pasos siguientes: no hay forma de tener verbo sin identidad.
   let acceso: Acceso | null = null;
-  if (!definicion.anonima) {
-    let identidad: { email: string; sub: string };
+  let identidad: Identidad | null = null;
+
+  if (exigeToken(definicion)) {
     try {
       identidad = deps.verificarIdentidad(solicitud.idToken);
-    } catch (err) {
+    } catch {
       anotar('token_rechazado', nombre as string);
       return respuestaError('TOKEN_INVALIDO');
     }
+  }
 
-    // 3 · Acceso.
+  // 3 · Acceso. `aceptarInvitacion` se salta ESTE paso y solo este: llegó con
+  //     identidad verificada y viene justo a conseguir el acceso que no tiene.
+  if (exigeAcceso(definicion)) {
+    if (!identidad) {
+      // Imposible por construcción —una prueba lo fija—, pero el orden de la
+      // cadena no puede depender de que nadie se equivoque editando la tabla.
+      anotar('configuracion_incoherente', nombre as string);
+      return respuestaError('TOKEN_INVALIDO');
+    }
     try {
       acceso = deps.resolverAcceso(identidad.email);
-    } catch (err) {
+    } catch {
       anotar('acceso_denegado', nombre as string);
       return respuestaError('ACCESO_DENEGADO');
     }
@@ -298,7 +362,7 @@ export function despacharPeticion(solicitud: Solicitud, deps: Dependencias): Res
   }
 
   try {
-    return { ok: true, data: manejador(payload, acceso as Acceso) };
+    return { ok: true, data: manejador(payload, acceso as Acceso, identidad) };
   } catch (err) {
     const codigo = codigoDeExcepcion(err);
     anotar('fallo_manejador', (nombre as string) + ':' + codigo);
@@ -315,6 +379,12 @@ export function despacharPeticion(solicitud: Solicitud, deps: Dependencias): Res
  */
 export function codigoDeExcepcion(err: unknown): CodigoError {
   const mensaje = err && (err as Error).message ? String((err as Error).message) : '';
+
+  // Los de invitación van primero: `INVITACION_DESTINATARIO_INVALIDO` no debe
+  // caer en ninguna de las reglas de abajo por contener una subcadena suya.
+  for (const codigo of CODIGOS_ERROR) {
+    if (codigo.indexOf('INVITACION_') === 0 && mensaje.indexOf(codigo) !== -1) return codigo;
+  }
 
   if (mensaje.indexOf('OCUPADO') !== -1 || mensaje.indexOf('Lock') !== -1) return 'ERROR_CERROJO';
   if (mensaje.indexOf('ACCESO_DENEGADO') !== -1) return 'ACCESO_DENEGADO';
