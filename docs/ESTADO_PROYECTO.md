@@ -4,7 +4,7 @@
 paso está en [TABLERO.md](TABLERO.md); esto es dónde estamos, qué sostiene lo
 hecho y qué falta.*
 
-Última actualización: **19 de septiembre de 2026**, al preparar **E6-live**.
+Última actualización: **19 de septiembre de 2026**, al cerrar **E6-live**.
 
 ---
 
@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | **en curso** · E0 a E6 cerrados |
+| **E** | Backend de Apps Script por titular | **en curso** · E0 a E6 cerrados y validados en vivo |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 
@@ -121,19 +121,22 @@ cada módulo. Las que más condicionan lo que venga:
 | 23 `alert` de error siguen sin migrar al sistema de avisos | `src/` |
 | Deuda de lint en `AppContext.tsx` (72 errores en línea base) | `scripts/lint-baseline.json` |
 | Adjuntos del historial veterinario: el campo `documentoId` existe y nadie lo rellena | `src/domain/mascotas.ts` |
+| `E0b-4` sin volver a pasar contra el despliegue de E6: el criterio 1 está cerrado desde Node, no desde un navegador | `EVIDENCIA_E6.md` · paso 7 |
+| El cerrojo de `aplicar` y el lote de varias pestañas siguen sin comprobarse en vivo: hacen falta dos peticiones a la vez y datos que escribir | `ROUTER.md` · criterio de **E9** |
 | `ACCESO` compara el correo normalizado contra la celda tal cual: una dirección de `gmail.com` **con puntos** no se encuentra nunca | `src/lib/acceso.ts` · `EVIDENCIA_E6.md` |
 
 ---
 
 ## Siguiente paso
 
-**E6-live · la validación real del backend**, antes de E7. El arnés está
-escrito y las puertas en verde; falta ejecutarlo contra un despliegue. El
-procedimiento completo —consolidar, pegar, desplegar y correr las nueve
-peticiones— está en [EVIDENCIA_E6.md](EVIDENCIA_E6.md).
+**E7 · `Invitaciones.gs`**, en cuanto haya aprobación. Es lo que hace que un
+familiar no tenga que autorizar nada: recibe un correo con un enlace y entra.
 
-Después, **E7 · `Invitaciones.gs`**: lo que hace que un familiar no tenga que
-autorizar nada, sino recibir un correo con un enlace y entrar.
+**E6-live quedó cerrado**: nueve peticiones contra un despliegue real, las cinco
+promesas demostradas, incluida la que justifica todo el diseño de E4 —revocar
+deja fuera en la petición siguiente, medido en 2 535 ms con la caché caliente
+frente a los 300 000 ms del TTL—. El detalle está en
+[EVIDENCIA_E6.md](EVIDENCIA_E6.md).
 
 El transporte (E0-bis) y la instalación (E2) están validados contra Google de
 verdad. Lo de E3 está probado en frío: las cuatro comprobaciones que necesitan

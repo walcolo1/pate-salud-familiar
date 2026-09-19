@@ -1,6 +1,9 @@
 # Evidencia E6-live — el backend contra un despliegue real
 
-**Estado: PREPARADO. Pendiente de ejecución.**
+**Estado: LAS CINCO PROMESAS CERRADAS. Ejecutada el 2026-09-19.**
+
+9 pruebas, 9 en verde, 0 fallos. Queda un cabo: el criterio 1 medido además
+dentro de un navegador (paso 7).
 
 Las 35 pruebas de `router.test.ts` cubren la cadena con dobles: el orden de los
 eslabones, cada corte, la validación del lote, la traducción de errores. Lo que
@@ -194,22 +197,71 @@ depende de tener un despliegue vivo.
 
 ## Resultados
 
-*(Pendiente de ejecución. Aquí va la tabla que imprime el guion.)*
+Ejecutado el **19 de septiembre de 2026** contra la hoja de pruebas de E2, con
+dos cuentas `@gmail.com` personales. Ningún dato clínico real viajó en estas
+peticiones.
 
 | Prueba | Promesa | Qué comprueba | Resultado | ms |
 |---|---|---|---|---|
-| `E6L-1` | 1 | `ping` anónimo responde y no cuenta nada | | |
-| `E6L-2` | 3 | sin el campo `idToken` se rechaza | | |
-| `E6L-3` | 3 | una cadena que no es un JWT se rechaza sin salir a la red | | |
-| `E6L-4` | 3 | un JWT bien formado que Google no firmó se rechaza | | |
-| `E6L-5` | 2 | el `id_token` real del titular pasa las tres validaciones | | |
-| `E6L-6` | 4 | una cuenta real que no figura en `ACCESO` se deniega | | |
-| `E6L-7` | 5 | la misma cuenta, ya dada de alta, entra | | |
-| `E6L-8` | 5 | el titular la revoca por la API | | |
-| `E6L-9` | 5 | la petición inmediatamente siguiente se rechaza | | |
+| `E6L-1` | 1 | `ping` anónimo responde y no cuenta nada | ✅ `ok:true` · sin fugas · `{"ok":true,"data":{"version":"e6","esquema":1}}` | 1601 |
+| `E6L-2` | 3 | sin el campo `idToken` se rechaza | ✅ `ok:false` · `TOKEN_INVALIDO` | 1299 |
+| `E6L-3` | 3 | una cadena que no es un JWT se rechaza sin salir a la red | ✅ `ok:false` · `TOKEN_INVALIDO` | 830 |
+| `E6L-4` | 3 | un JWT bien formado que Google no firmó se rechaza | ✅ `ok:false` · `TOKEN_INVALIDO` | 1272 |
+| `E6L-5` | 2 | el `id_token` real del titular pasa las tres validaciones | ✅ `ok:true` | 3313 |
+| `E6L-6` | 4 | una cuenta real que no figura en `ACCESO` se deniega | ✅ `ok:false` · `ACCESO_DENEGADO` | 3657 |
+| `E6L-7` | 5 | la misma cuenta, ya dada de alta, entra | ✅ `ok:true` | 3608 |
+| `E6L-8` | 5 | el titular la revoca por la API | ✅ `ok:true` | 4744 |
+| `E6L-9` | 5 | la petición inmediatamente siguiente se rechaza | ✅ `ok:false` · `ACCESO_DENEGADO` | 2535 |
 
-Hueco entre revocar y reintentar: **— ms**. El TTL de la caché de `ACCESO` es de
-cinco minutos.
+### La revocación en caliente, que es el criterio que importa
+
+`E6L-9` salió inmediatamente después de que `E6L-8` devolviera, y volvió
+rechazada en **2 535 ms** —el viaje de ida y vuelta completo—. El TTL de la
+caché de `ACCESO` es de **300 000 ms**.
+
+Y la cuenta **estaba dentro** cuando se revocó: `E6L-7` había pasado, así que su
+entrada de caché estaba caliente. Eso es lo que hace significativo el resultado.
+Con la caché fría, que una cuenta revocada no entre no demostraría nada.
+
+La versión en la clave funciona: `mutarAcceso` la incrementó al escribir, y en
+ese mismo instante la entrada anterior dejó de encontrarse. No hubo que
+invalidar nada.
+
+### Los tres números que confirman lo que se esperaba
+
+**`E6L-3` es la más rápida de todas (830 ms).** Es la única que no sale a la red:
+`claveCache` rechaza lo que no tiene forma de JWT antes de gastar una llamada a
+Google. Un endpoint público que reenviara cada cadena a `tokeninfo` sería un
+ariete gratis contra la cuota de `UrlFetchApp`.
+
+**`E6L-4` tarda 1 272 ms y `E6L-3` 830 ms.** La diferencia es la llamada a
+`tokeninfo`: el JWT bien formado sí llega a Google, que contesta que no lo
+firmó. Eso es lo que prueba de verdad la promesa 2 por el lado negativo —que la
+verificación ocurre— y no solo que el router sabe decir que no.
+
+**`E6L-5` (3 313 ms) casi triplica a `E6L-2` (1 299 ms).** Ahí están las tres
+validaciones reales contra Google más la lectura de la hoja. Todas las
+peticiones autenticadas se quedan entre 2,5 y 4,7 s, muy lejos de los 360 s de
+límite por ejecución.
+
+### Lo que estos números NO dicen
+
+Son de una hoja con semillas, no con el expediente de una familia de verdad.
+`listarPacientes` recorrió una pestaña casi vacía. Cuando haya volumen habrá que
+volver a medir, y el sitio donde primero se notará es `exportar`, que lee las 21
+pestañas de una vez.
+
+### Pendiente: el criterio 1 en un navegador
+
+El **paso 7** no se ha ejecutado. `E6L-1` comprueba desde Node que la respuesta
+anónima no lleva datos, y eso está cerrado; lo que falta es confirmar que el
+**navegador** deja leerla con la CSP de la aplicación puesta. CORS y CSP solo
+existen dentro de un navegador, y un 200 en una terminal no dice nada de eso.
+
+E0-bis ya lo validó contra la implementación de humo, así que el transporte está
+probado; lo que no se ha vuelto a pasar es `E0b-4` —la que exige que la
+respuesta anónima no traiga ningún correo— contra **este** despliegue. Es barato
+y conviene cerrarlo antes de que la PWA empiece a hablar con el backend en E9.
 
 ---
 
@@ -237,12 +289,16 @@ Mientras esto no se arregle:
 - Conviene que la cuenta del titular no lleve puntos, o que `CONFIG` los tenga
   quitados.
 
-Es un fallo real, no una limitación de la prueba, y está pendiente de decidir si
-se arregla antes o después de E7.
+Es un fallo real, no una limitación de la prueba. **La validación no lo destapó
+porque ninguna de las dos cuentas usadas lleva puntos**, que es exactamente por
+lo que estaba escrito aquí antes de ejecutarla. Pendiente de decidir si se
+arregla antes o después de E7.
 
 ---
 
 ## Al terminar
+
+*(Hecho el 2026-09-19 salvo lo que se indique.)*
 
 - Deja la fila de la segunda cuenta como `REVOCADO`, o bórrala.
 - **Archiva la implementación** si no se va a seguir usando: una URL `/exec`

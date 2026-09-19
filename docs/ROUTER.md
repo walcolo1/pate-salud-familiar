@@ -186,16 +186,22 @@ audita duplica el problema que intenta vigilar.
 
 ---
 
-## Qué falta comprobar contra Google
+## Qué se comprobó contra Google, y qué falta
 
 Las 35 pruebas de `router.test.ts` cubren la cadena con dobles: el orden de los
 eslabones, cada corte, la validación del lote, la traducción de errores. Lo que
-esperan a una validación real:
+esperaba a una validación real se ejecutó el **19 de septiembre de 2026**
+([EVIDENCIA_E6.md](EVIDENCIA_E6.md)):
 
-1. Que `UrlFetchApp` alcance `tokeninfo` desde el Web App (heredado de E3).
-2. Que un token real emitido por la PWA pase las tres validaciones.
-3. Que el cerrojo serialice dos `aplicar` simultáneos (heredado de E4).
-4. **Que revocar deje a alguien fuera en la siguiente petición**, no en la
-   siguiente ventana de caché. Es el criterio que justifica el diseño de E4.
-5. Que un lote de varias pestañas escriba en una pasada y suba la revisión una
-   sola vez.
+| # | Qué | Estado |
+|---|---|---|
+| 1 | Que `UrlFetchApp` alcance `tokeninfo` desde el Web App | ✅ `E6L-4` · `E6L-5` |
+| 2 | Que un token real emitido por la PWA pase las tres validaciones | ✅ `E6L-5` |
+| 3 | Que el cerrojo serialice dos `aplicar` simultáneos | ⬜ **sin comprobar** |
+| 4 | **Que revocar deje a alguien fuera en la siguiente petición** | ✅ `E6L-7` → `E6L-8` → `E6L-9`, en 2 535 ms con la caché caliente |
+| 5 | Que un lote de varias pestañas escriba en una pasada y suba la revisión una sola vez | ⬜ **sin comprobar** |
+
+Los dos que faltan son los dos que tocan `aplicar`, y ninguno se puede provocar
+con una sola petición: el 3 necesita dos a la vez y el 5 necesita un lote con
+datos. Los dos se pueden cerrar cuando la PWA empiece a escribir de verdad
+—**E9**—, que es cuando además habrá algo que escribir.
