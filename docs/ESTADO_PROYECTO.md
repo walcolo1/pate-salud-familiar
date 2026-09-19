@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | **en curso** · E0 a E5 cerrados |
+| **E** | Backend de Apps Script por titular | **en curso** · E0 a E6 cerrados |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 
@@ -126,14 +126,14 @@ cada módulo. Las que más condicionan lo que venga:
 
 ## Siguiente paso
 
-**E6 · `Router.gs`**, en cuanto haya aprobación. Es donde las tres piezas se
-juntan en una sola puerta: verificar el `id_token`, resolver el acceso y
-despachar con `puede()` delante de cada acción.
+**E7 · `Invitaciones.gs`**, en cuanto haya aprobación. Es lo que hace que un
+familiar no tenga que autorizar nada: recibe un correo con un enlace y entra.
 
-Es también donde por fin se pueden comprobar contra Google las cosas que E3,
-E4 y E5 dejaron probadas solo en frío: que `UrlFetchApp` alcance `tokeninfo`,
-que el cerrojo serialice dos mutaciones, y que revocar deje a alguien fuera en
-la **siguiente petición** y no en la siguiente ventana de caché.
+Pendiente antes o después de E7, y ya con todo el backend escrito: **la
+validación real del Bloque E**. Cinco cosas que solo se pueden ver
+desplegando —entre ellas que revocar deje a alguien fuera en la siguiente
+petición, que es el criterio que justifica el diseño de E4— están listadas al
+final de `ROUTER.md`.
 
 El transporte (E0-bis) y la instalación (E2) están validados contra Google de
 verdad. Lo de E3 está probado en frío: las cuatro comprobaciones que necesitan

@@ -107,6 +107,7 @@ los dos. Sí quedó verificado que **no aparecen en el consentimiento inicial**.
 | E3 · `Auth.gs`: verificación del `id_token` | **cerrado** |
 | E4 · `Acceso.gs`: rol, alcance e invalidación por versión | **cerrado** |
 | E5 · `Permisos.gs`: matriz de verbos por rol | **cerrado** |
+| E6 · `Router.gs`: puerta única y `aplicar` transaccional | **cerrado** |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 

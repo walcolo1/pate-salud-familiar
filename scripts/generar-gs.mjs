@@ -71,6 +71,14 @@ const FICHEROS = [
     titulo: 'Matriz de permisos por rol',
     fuente: 'src/lib/permisos.ts',
   },
+  {
+    // `Router.gs` es el escrito a mano: doPost, aplicar y las llamadas a la
+    // hoja. Aquí va la cadena pura que él ata.
+    origen: join(RAIZ, 'src', 'lib', 'router.ts'),
+    destino: join(DESTINO, 'Despacho.gs'),
+    titulo: 'Cadena de seguridad y despacho',
+    fuente: 'src/lib/router.ts',
+  },
 ];
 
 function cabecera(titulo, fuente) {

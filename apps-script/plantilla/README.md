@@ -85,15 +85,16 @@ sabiendo lo que cuesta en confianza, no descubrirlo al desplegarla.
 | `Instalador.gs` | `onOpen`, `instalar()` idempotente, disparadores y auditoría | E2 ✅ |
 | `Autenticacion.gs` | **Generado.** Las tres validaciones, la normalización de correos y la caché | E3 ✅ |
 | `Auth.gs` | `verificarIdentidad`: `tokeninfo`, `CacheService` y `UrlFetchApp` | E3 ✅ |
-| `Router.gs` | `doPost` único. Hoy responde lo mínimo para ser sondeable | E6 |
+| `Despacho.gs` | **Generado.** La cadena de seguridad y el catálogo de acciones | E6 ✅ |
+| `Router.gs` | `doPost`, manejadores y `aplicar` transaccional | E6 ✅ |
 | `Autorizacion.gs` | **Generado.** Rol, alcance, clave versionada y reglas de mutación | E4 ✅ |
 | `Acceso.gs` | `resolverAccesoLocal` y `mutarAcceso`: hoja, caché y cerrojo | E4 ✅ |
 | `Permisos.gs` | **Generado.** Matriz de verbos por rol y `puede()` | E5 ✅ |
 | `Invitaciones.gs` | Invitar, aceptar, cambiar rol y revocar | E5 |
 
-**Los cinco ficheros marcados «Generado» no se editan a mano.** Salen de
-`src/lib/esquemaHoja.ts`, `planInstalacion.ts`, `autenticacion.ts`, `acceso.ts`
-y `permisos.ts`, que es donde viven las pruebas. El destino de `acceso.ts` se
+**Los seis ficheros marcados «Generado» no se editan a mano.** Salen de
+`src/lib/esquemaHoja.ts`, `planInstalacion.ts`, `autenticacion.ts`, `acceso.ts`,
+`permisos.ts` y `router.ts`, que es donde viven las pruebas. El destino de `acceso.ts` se
 llama `Autorizacion.gs` porque `Acceso.gs` ya es el fichero escrito a mano,
 igual que `Instalacion.gs` frente a `Instalador.gs`. `Permisos.gs` **no** tiene
 contraparte a mano: `puede()` es pura y no hay nada que solo se pueda comprobar

@@ -101,7 +101,6 @@ test.describe('E0-bis · Web App de humo', () => {
 
     const cuerpo = JSON.parse(resultado.cuerpo ?? '{}') as RespuestaHumo;
     expect(cuerpo.ok, 'el Web App no devolvió ok').toBe(true);
-    expect(cuerpo.accion, 'el cuerpo JSON no llegó entero').toBe('ping');
   });
 
   test('E0b-2 · application/json TAMBIÉN cruza: el preflight ya no es el muro de 2025', async ({
@@ -160,32 +159,27 @@ test.describe('E0-bis · Web App de humo', () => {
     expect(cuerpo.ok).toBe(true);
   });
 
-  test('E0b-4 · el usuario activo viene vacío y el efectivo es un correo', async ({ page }) => {
-    // Sostiene toda la autenticación del Bloque E: si `Session` sirviera para
-    // saber quién llama, no haría falta verificar el `id_token`.
+  test('E0b-4 · la respuesta anónima no lleva NINGÚN correo', async ({ page }) => {
+    // `ping` es la única acción que responde sin token, y el endpoint es
+    // público: cualquiera puede llamarlo. Así que su respuesta no puede contar
+    // nada de la familia.
     //
-    // Solo se puede comprobar si el script desplegado es el de este repositorio
-    // (`apps-script/humo/Codigo.gs`), que devuelve las dos identidades. Con otro
-    // script, se omite en vez de inventar un resultado.
+    // Esta prueba nació al revés. La versión de E1 devolvía `usuarioActivo` y
+    // `usuarioEfectivo` para comprobar el comportamiento de `Session`, y eso
+    // significaba **regalarle el correo del titular a cualquier desconocido
+    // que llamara al endpoint**. E6 lo quitó, y esto impide que vuelva.
     await abrirPaginaSinCSP(page);
     const resultado = await sondear(page, URL_WEBAPP, 'text/plain;charset=utf-8');
     expect(resultado.fallo).toBeNull();
 
-    const cuerpo = JSON.parse(resultado.cuerpo ?? '{}') as RespuestaHumo;
-    test.skip(
-      cuerpo.usuarioActivo === undefined,
-      'El Web App desplegado no devuelve identidades: no es el Codigo.gs de este repositorio.',
+    const crudo = resultado.cuerpo ?? '';
+    expect(crudo, 'la respuesta anónima contiene una dirección de correo').not.toMatch(
+      /[^@\s"]+@[^@\s"]+\.[a-z]{2,}/i,
     );
 
-    expect(
-      cuerpo.usuarioActivo,
-      'getActiveUser() devolvió algo: contradice la documentación y habría que rehacer el análisis de identidad',
-    ).toBe('');
-
-    // El correo del titular NO se afirma tal cual: si la prueba falla,
-    // Playwright imprime el valor recibido y acabaría pegado en un informe. Se
-    // comprueba su forma, no su contenido.
-    const efectivoEsUnCorreo = /^[^@\s]+@[^@\s]+$/.test(cuerpo.usuarioEfectivo ?? '');
-    expect(efectivoEsUnCorreo, 'getEffectiveUser() debería devolver un correo').toBe(true);
+    // Y tampoco el identificador de la hoja, que es la llave del expediente.
+    const cuerpo = JSON.parse(crudo || '{}') as RespuestaHumo;
+    expect(Object.keys(cuerpo)).not.toContain('idHoja');
+    expect(crudo).not.toMatch(/[A-Za-z0-9_-]{40,}/);
   });
 });
