@@ -30,7 +30,7 @@ y una prueba falla si divergen.
 
 | # | Criterio | Estado | Cómo se cierra |
 |---|---|---|---|
-| 1 | `/copy` arrastra el script vinculado | ⏳ **PENDIENTE** | Pasos 1–2 del guion de abajo |
+| 1 | `/copy` arrastra el script vinculado | 🟡 **A MEDIAS** — la plantilla quedó vinculada y su menú aparece (Paso 1 ✅). Falta ver si la **copia** lo conserva | Paso 2 |
 | 2 | `instalar()` completa cabe en 6 minutos | ⏳ **PENDIENTE** | Paso 4; el propio instalador lo mide |
 | 3 | Un disparador del instalador aparece en el registro | ⏳ **PENDIENTE** | Paso 6 |
 | 4 | Reejecutar no duplica disparadores | 🟡 **PROBADO EN FRÍO** | El plan está probado; falta verlo sobre la API real (paso 5) |
@@ -44,11 +44,25 @@ estén las unitarias. Una prueba de un plan no es una prueba de su ejecución.
 
 Con una cuenta `@gmail.com` de pruebas, sobre la plantilla de E1.
 
-**Paso 1 · Armar la plantilla.** Seguir
-`apps-script/plantilla/README.md` → «Cómo se arma la plantilla». La hoja
-primero, el script después: un proyecto autónomo no viaja con `/copy`.
+**Paso 1 · Armar la plantilla.** ✅ **Hecho el 2026-09-18.** Hoja de cálculo
+nueva → `Extensiones ▸ Apps Script` → manifiesto y código pegados. Al recargar,
+**apareció el menú Paté**, que confirma tres cosas: el script quedó vinculado a
+la hoja, `onOpen` se ejecuta como disparador simple sin autorización previa, y
+los ocho ficheros concatenados cargan sin error de sintaxis.
 
-**Paso 2 · Copiar.** `Archivo ▸ Hacer una copia`. Abrir la copia.
+No confirma todavía el criterio 1 —eso es el Paso 2—, pero sí descarta el
+escenario que lo haría imposible: un proyecto autónomo.
+
+> **El identificador de la plantilla no se versiona.** Vive en
+> `docs/evidencia/plantilla-local.md`, que está en `.gitignore`. El motivo está
+> ahí explicado: `evidencia/README.md` exige tapar los identificadores de hoja
+> en las capturas, y escribirlos en texto plano al lado sería incoherente. El
+> enlace `/copy` de la plantilla de **producción** sí será público, pero esa
+> será otra hoja.
+
+**Paso 2 · Copiar.** Abrir el enlace `/copy` de la plantilla —está en
+`docs/evidencia/plantilla-local.md`— o, equivalente, `Archivo ▸ Hacer una
+copia` desde la propia hoja. Abrir la copia.
 - *Criterio 1:* aparece el menú **Paté** y en `Extensiones ▸ Apps Script` está
   todo el código. 📸 `E2-01-copia-con-script.png`
 - Mirar **Activadores**: debe haber **cero**. No se copian, y por eso el

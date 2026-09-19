@@ -69,3 +69,8 @@ firebase-debug.log
 
 # Compilacion secundaria del arnes (sin Client ID)
 /.next-sin-config/
+
+# Identificadores de las hojas de prueba de la validacion manual (Bloque E).
+# El enlace /copy de la plantilla de PRODUCCION si sera publico; estos son de
+# una cuenta personal de pruebas y se tiran al cerrar el paso.
+/docs/evidencia/plantilla-local.md
