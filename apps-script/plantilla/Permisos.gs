@@ -14,15 +14,15 @@
  * DOS PREGUNTAS, NO UNA
  * ─────────────────────
  * Un permiso tiene verbo y alcance. «Puede editar citas» no significa nada sin
- * «¿de quién?». Un CUIDADOR edita las citas de los pacientes que tiene
- * asignados y de ninguno más; un MIEMBRO, solo las suyas. Por eso `puede()`
- * recibe el acceso entero y el paciente, y no un rol suelto.
+ * «¿de quién?». El **alcance** ya lo resuelve `alcanza()`, en E4. Aquí queda el
+ * **verbo**: qué acciones admite cada rol. `puede()` los junta, y por eso
+ * recibe el acceso entero y el paciente, no un rol suelto.
  *
  * ESTADO: E1 · contrato. La implementación llega en E5.
  */
 
-/** Roles, de más a menos alcance. */
-var ROLES = ['TITULAR', 'CUIDADOR', 'MIEMBRO', 'LECTOR'];
+// `ROLES` y `alcanza()` los declara `Autorizacion.gs` (E4), que es quien
+// resuelve el alcance. Aquí queda el verbo: qué acciones admite cada rol.
 
 /**
  * ¿Puede este acceso hacer esta acción sobre este paciente?
@@ -33,18 +33,5 @@ var ROLES = ['TITULAR', 'CUIDADOR', 'MIEMBRO', 'LECTOR'];
  * @return {boolean}
  */
 function puede(acceso, accion, pacienteId) {
-  throw new Error('NO_IMPLEMENTADO: E5');
-}
-
-/**
- * ¿Alcanza este acceso a este paciente?
- *
- * `*` significa todos. Para un MIEMBRO, solo su `paciente_propio`.
- *
- * @param {Object} acceso
- * @param {string} pacienteId
- * @return {boolean}
- */
-function alcanza(acceso, pacienteId) {
   throw new Error('NO_IMPLEMENTADO: E5');
 }

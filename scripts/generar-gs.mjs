@@ -53,6 +53,15 @@ const FICHEROS = [
     titulo: 'Verificación del id_token',
     fuente: 'src/lib/autenticacion.ts',
   },
+  {
+    // El destino no se llama `Acceso.gs` porque ese nombre ya lo ocupa el
+    // fichero escrito a mano, con las llamadas a la hoja y al cerrojo. Mismo
+    // reparto que `Instalacion.gs` / `Instalador.gs`.
+    origen: join(RAIZ, 'src', 'lib', 'acceso.ts'),
+    destino: join(DESTINO, 'Autorizacion.gs'),
+    titulo: 'Resolución de rol y alcance',
+    fuente: 'src/lib/acceso.ts',
+  },
 ];
 
 function cabecera(titulo, fuente) {

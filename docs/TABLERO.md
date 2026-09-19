@@ -105,6 +105,7 @@ los dos. Sí quedó verificado que **no aparecen en el consentimiento inicial**.
 | E1 · Proyecto plantilla: 21 pestañas, manifiesto de ámbitos mínimos y esqueleto | **cerrado** |
 | E2 · Instalador idempotente, validado sobre cuenta real | **cerrado** |
 | E3 · `Auth.gs`: verificación del `id_token` | **cerrado** |
+| E4 · `Acceso.gs`: rol, alcance e invalidación por versión | **cerrado** |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 

@@ -215,8 +215,10 @@ function filasCatalogoVacunas() {
 var CLAVE_ID_HOJA = 'ID_HOJA';
 /** Cliente OAuth contra el que se valida el `aud` de cada `id_token`. */
 var CLAVE_CLIENTE_OAUTH = 'OAUTH_CLIENT_ID';
-/** Versión de la caché de ACCESO. La incrementa cada mutación. */
-var CLAVE_VERSION_ACCESO = 'ACCESO_VERSION';
+// `CLAVE_VERSION_ACCESO` la declara `acceso.ts` (E4), que es quien la usa y
+// quien la incrementa. Aquí solo estorbaría: dos `var` con el mismo nombre en
+// dos ficheros de Apps Script no dan error, gana el último cargado, y un
+// cambio en el perdedor se ignora sin decir nada.
 /** Límite de una ejecución de Apps Script, en milisegundos. */
 var LIMITE_EJECUCION_MS = 6 * 60 * 1000;
 /**

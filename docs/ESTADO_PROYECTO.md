@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | **en curso** · E0, E0-bis, E1, E2 y E3 cerrados |
+| **E** | Backend de Apps Script por titular | **en curso** · E0, E0-bis, E1, E2, E3 y E4 cerrados |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 
@@ -126,10 +126,9 @@ cada módulo. Las que más condicionan lo que venga:
 
 ## Siguiente paso
 
-**E4 · `Acceso.gs`**, en cuanto haya aprobación. E3 dice **quién** es quien
-llama; E4 dice **qué es** dentro de esta familia, leyendo `ACCESO` con
-invalidación por versión para que revocar surta efecto en la siguiente
-petición.
+**E5 · `Permisos.gs`**, en cuanto haya aprobación. E4 resolvió el **alcance**
+—a qué pacientes llega alguien—; E5 resuelve el **verbo**: qué acciones admite
+cada rol, con denegación por defecto.
 
 El transporte (E0-bis) y la instalación (E2) están validados contra Google de
 verdad. Lo de E3 está probado en frío: las cuatro comprobaciones que necesitan

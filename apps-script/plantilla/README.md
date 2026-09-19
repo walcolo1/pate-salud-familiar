@@ -86,13 +86,16 @@ sabiendo lo que cuesta en confianza, no descubrirlo al desplegarla.
 | `Autenticacion.gs` | **Generado.** Las tres validaciones, la normalización de correos y la caché | E3 ✅ |
 | `Auth.gs` | `verificarIdentidad`: `tokeninfo`, `CacheService` y `UrlFetchApp` | E3 ✅ |
 | `Router.gs` | `doPost` único. Hoy responde lo mínimo para ser sondeable | E6 |
-| `Acceso.gs` | `resolverAcceso` y `mutarAcceso`, con versión de caché | E4 |
+| `Autorizacion.gs` | **Generado.** Rol, alcance, clave versionada y reglas de mutación | E4 ✅ |
+| `Acceso.gs` | `resolverAccesoLocal` y `mutarAcceso`: hoja, caché y cerrojo | E4 ✅ |
 | `Permisos.gs` | Matriz de roles y `puede()`, con denegación por defecto | E5 |
 | `Invitaciones.gs` | Invitar, aceptar, cambiar rol y revocar | E5 |
 
-**Los tres ficheros marcados «Generado» no se editan a mano.** Salen de
-`src/lib/esquemaHoja.ts`, `src/lib/planInstalacion.ts` y
-`src/lib/autenticacion.ts`, que es donde viven las pruebas:
+**Los cuatro ficheros marcados «Generado» no se editan a mano.** Salen de
+`src/lib/esquemaHoja.ts`, `planInstalacion.ts`, `autenticacion.ts` y
+`acceso.ts`, que es donde viven las pruebas. El destino de `acceso.ts` se llama
+`Autorizacion.gs` porque `Acceso.gs` ya es el fichero escrito a mano, igual que
+`Instalacion.gs` frente a `Instalador.gs`:
 
 ```bash
 node scripts/generar-gs.mjs
