@@ -47,6 +47,12 @@ const FICHEROS = [
     titulo: 'Decisiones de la instalación',
     fuente: 'src/lib/planInstalacion.ts',
   },
+  {
+    origen: join(RAIZ, 'src', 'lib', 'autenticacion.ts'),
+    destino: join(DESTINO, 'Autenticacion.gs'),
+    titulo: 'Verificación del id_token',
+    fuente: 'src/lib/autenticacion.ts',
+  },
 ];
 
 function cabecera(titulo, fuente) {

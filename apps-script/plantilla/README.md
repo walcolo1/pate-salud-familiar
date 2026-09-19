@@ -83,15 +83,16 @@ sabiendo lo que cuesta en confianza, no descubrirlo al desplegarla.
 | `Esquema.gs` | **Generado.** Las 21 pestañas y sus encabezados | E1 ✅ |
 | `Instalacion.gs` | **Generado.** Las decisiones del instalador y las semillas | E2 ✅ |
 | `Instalador.gs` | `onOpen`, `instalar()` idempotente, disparadores y auditoría | E2 ✅ |
+| `Autenticacion.gs` | **Generado.** Las tres validaciones, la normalización de correos y la caché | E3 ✅ |
+| `Auth.gs` | `verificarIdentidad`: `tokeninfo`, `CacheService` y `UrlFetchApp` | E3 ✅ |
 | `Router.gs` | `doPost` único. Hoy responde lo mínimo para ser sondeable | E6 |
-| `Auth.gs` | `verificarIdentidad` y `normalizarEmail` | E3 |
 | `Acceso.gs` | `resolverAcceso` y `mutarAcceso`, con versión de caché | E4 |
 | `Permisos.gs` | Matriz de roles y `puede()`, con denegación por defecto | E5 |
 | `Invitaciones.gs` | Invitar, aceptar, cambiar rol y revocar | E5 |
 
-**Los dos ficheros marcados «Generado» no se editan a mano.** Salen de
-`src/lib/esquemaHoja.ts` y `src/lib/planInstalacion.ts`, que es donde viven las
-pruebas:
+**Los tres ficheros marcados «Generado» no se editan a mano.** Salen de
+`src/lib/esquemaHoja.ts`, `src/lib/planInstalacion.ts` y
+`src/lib/autenticacion.ts`, que es donde viven las pruebas:
 
 ```bash
 node scripts/generar-gs.mjs

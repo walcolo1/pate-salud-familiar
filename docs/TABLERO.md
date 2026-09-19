@@ -104,6 +104,7 @@ los dos. Sí quedó verificado que **no aparecen en el consentimiento inicial**.
 | E0-bis · Verificación empírica con cuenta de pruebas | Transporte verificado y CSP corregida; tres cabos traspasados a E2 y uno a E8 | **cerrado** |
 | E1 · Proyecto plantilla: 21 pestañas, manifiesto de ámbitos mínimos y esqueleto | **cerrado** |
 | E2 · Instalador idempotente, validado sobre cuenta real | **cerrado** |
+| E3 · `Auth.gs`: verificación del `id_token` | **cerrado** |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 

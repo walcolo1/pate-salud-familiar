@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | **en curso** · E0, E0-bis, E1 y E2 cerrados |
+| **E** | Backend de Apps Script por titular | **en curso** · E0, E0-bis, E1, E2 y E3 cerrados |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 
@@ -126,9 +126,12 @@ cada módulo. Las que más condicionan lo que venga:
 
 ## Siguiente paso
 
-**E3 · `Auth.gs`**, en cuanto haya aprobación. Es la única puerta del backend:
-el endpoint es público y anónimo por diseño, así que toda la autorización
-descansa en verificar el `id_token`.
+**E4 · `Acceso.gs`**, en cuanto haya aprobación. E3 dice **quién** es quien
+llama; E4 dice **qué es** dentro de esta familia, leyendo `ACCESO` con
+invalidación por versión para que revocar surta efecto en la siguiente
+petición.
 
 El transporte (E0-bis) y la instalación (E2) están validados contra Google de
-verdad, no solo en frío.
+verdad. Lo de E3 está probado en frío: las cuatro comprobaciones que necesitan
+red esperan a E6, cuando el router responda de punta a punta
+(ver `AUTENTICACION.md`).
