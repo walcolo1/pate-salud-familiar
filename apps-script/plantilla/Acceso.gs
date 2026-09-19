@@ -87,14 +87,20 @@ function resolverAccesoLocal(emailNormalizado) {
   return resultado.acceso;
 }
 
-/** El correo del titular, de `CONFIG`. Lo capturó `instalar()`. */
+/**
+ * El correo del titular, de `CONFIG`. Lo capturó `instalar()`.
+ *
+ * Sale **normalizado**. La celda se puede editar a mano, y un titular que
+ * teclee su dirección de gmail con puntos dejaría de coincidir con lo que llega
+ * del `id_token`: se quedaría fuera de su propio expediente (E6-bis).
+ */
 function emailTitular_(hoja) {
   var config = hoja.getSheetByName('CONFIG');
   if (!config || config.getLastRow() < 2) return '';
   var encabezados = encabezadosDe('CONFIG') || [];
   var columna = encabezados.indexOf('email_titular');
   if (columna === -1) return '';
-  return String(config.getRange(2, columna + 1).getValue() || '').trim();
+  return normalizarEmail(config.getRange(2, columna + 1).getValue());
 }
 
 function abrirHoja_() {
@@ -125,7 +131,7 @@ function registrarAcceso(emailNormalizado) {
 
     var correos = pestana.getRange(2, colEmail + 1, pestana.getLastRow() - 1, 1).getValues();
     for (var i = 0; i < correos.length; i++) {
-      if (String(correos[i][0]).trim().toLowerCase() !== emailNormalizado) continue;
+      if (normalizarEmail(correos[i][0]) !== emailNormalizado) continue;
       pestana.getRange(i + 2, colUltimo + 1).setValue(new Date().toISOString());
       return;
     }
@@ -216,7 +222,10 @@ function escribirMutacion_(pestana, operacion, objetivo, datos) {
 
   var indice = -1;
   for (var j = 0; j < filas.length; j++) {
-    if (String(filas[j][col.email]).trim().toLowerCase() === objetivo) {
+    // Normalizado a los dos lados: una fila tecleada con puntos tiene que
+    // encontrarse, o reinvitar crearía una segunda fila para la misma persona
+    // y el rol dependería de cuál se leyera primero.
+    if (normalizarEmail(filas[j][col.email]) === objetivo) {
       indice = j;
       break;
     }

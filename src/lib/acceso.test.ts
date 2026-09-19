@@ -354,3 +354,95 @@ describe('validarMutacion', () => {
     expect(validarMutacion('REVOCAR', 'viejo@example.invalid', TITULAR)).toBeNull();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// E6-bis · normalización simétrica
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * El correo se normaliza al ENTRAR y al COMPARAR, o no se normaliza en absoluto.
+ *
+ * `normalizarEmail` quita los puntos y las etiquetas `+tag` de `gmail.com`
+ * porque Google las considera la misma cuenta. Eso está bien, pero durante E6
+ * solo ocurría en un lado: lo que llegaba del `id_token` venía sin puntos y la
+ * celda se comparaba tal y como estuviera escrita.
+ *
+ * Consecuencia: una fila tecleada como `juan.perez@gmail.com` **no se
+ * encontraba nunca**, y un titular con puntos en su dirección se quedaba fuera
+ * de su propio expediente. Se descubrió preparando E6-live y no lo destapó la
+ * validación porque ninguna de las dos cuentas usadas llevaba puntos.
+ */
+describe('E6-bis · los puntos de gmail.com no dejan a nadie fuera', () => {
+  const CON_PUNTOS = 'juan.perez@gmail.com';
+  const SIN_PUNTOS = 'juanperez@gmail.com';
+
+  it('una fila tecleada con puntos se encuentra con el correo normalizado', () => {
+    const filas = [filaDe(CON_PUNTOS, 'LECTOR', 'ACTIVO', ALCANCE_TOTAL)];
+    const r = resolverAcceso(SIN_PUNTOS, filas, TITULAR);
+    expect(r.permitido, 'la fila existe y aun así se denegó').toBe(true);
+    if (!r.permitido) return;
+    expect(r.acceso.rol).toBe('LECTOR');
+  });
+
+  it('y su estado se lee de esa misma fila, no de ninguna otra', () => {
+    // Lo contrario sería peor que no encontrarla: encontrar la fila pero leer
+    // el estado equivocado deja entrar a un revocado.
+    const filas = [filaDe(CON_PUNTOS, 'LECTOR', 'REVOCADO', ALCANCE_TOTAL)];
+    expect(resolverAcceso(SIN_PUNTOS, filas, TITULAR).permitido).toBe(false);
+  });
+
+  it('una etiqueta +tag en la celda tampoco esconde la fila', () => {
+    const filas = [filaDe('juan.perez+familia@gmail.com', 'MIEMBRO', 'ACTIVO', ALCANCE_TOTAL)];
+    expect(resolverAcceso(SIN_PUNTOS, filas, TITULAR).permitido).toBe(true);
+  });
+
+  it('el titular con puntos en CONFIG sigue siendo el titular', () => {
+    // Este es el caso grave: sin esto, el dueño de la hoja no entra en su
+    // propio expediente y la única salida es editar la hoja a mano.
+    const r = resolverAcceso('anagomez@gmail.com', [], 'Ana.Gomez@GMail.com');
+    expect(r.permitido).toBe(true);
+    if (!r.permitido) return;
+    expect(r.acceso.rol).toBe('TITULAR');
+  });
+
+  it('el paciente propio del titular se encuentra aunque su fila lleve puntos', () => {
+    const filas = [fila({ email: 'Ana.Gomez@gmail.com', paciente_propio: 'p_ana' })];
+    const r = resolverAcceso('anagomez@gmail.com', filas, 'anagomez@gmail.com');
+    expect(r.permitido).toBe(true);
+    if (!r.permitido) return;
+    expect(r.acceso.pacientePropio).toBe('p_ana');
+  });
+
+  it('fuera de gmail.com los puntos SÍ distinguen dos cuentas', () => {
+    // No es una excepción olvidada: en otros dominios `juan.perez` y
+    // `juanperez` son dos buzones distintos, y tratarlos como uno dejaría
+    // entrar a quien no es.
+    const filas = [filaDe('juan.perez@example.com', 'LECTOR', 'ACTIVO', ALCANCE_TOTAL)];
+    expect(resolverAcceso('juanperez@example.com', filas, TITULAR).permitido).toBe(false);
+    expect(resolverAcceso('juan.perez@example.com', filas, TITULAR).permitido).toBe(true);
+  });
+
+  it('el correo que devuelve el acceso viene normalizado, venga como venga', () => {
+    // Lo que sale de aquí se usa como clave de caché y se escribe en la
+    // auditoría. Si a veces llevara puntos, serían dos identidades.
+    const filas = [filaDe(CON_PUNTOS, 'LECTOR', 'ACTIVO', ALCANCE_TOTAL)];
+    const r = resolverAcceso(CON_PUNTOS, filas, TITULAR);
+    expect(r.permitido).toBe(true);
+    if (!r.permitido) return;
+    expect(r.acceso.email).toBe(SIN_PUNTOS);
+  });
+
+  it('al titular no se le puede revocar escribiendo su correo con puntos', () => {
+    // `validarMutacion` es lo único que protege al titular de quedarse fuera.
+    // Una comparación literal la esquiva con solo teclear un punto.
+    expect(validarMutacion('REVOCAR', 'Ana.Gomez@gmail.com', 'anagomez@gmail.com')).toBe(
+      'TITULAR_INTOCABLE',
+    );
+  });
+
+  it('ni cambiándole el rol por la puerta de al lado', () => {
+    expect(
+      validarMutacion('CAMBIAR_ROL', 'ana.gomez+x@gmail.com', 'anagomez@gmail.com', 'LECTOR'),
+    ).toBe('TITULAR_INTOCABLE');
+  });
+});

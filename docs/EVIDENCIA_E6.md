@@ -265,34 +265,22 @@ y conviene cerrarlo antes de que la PWA empiece a hablar con el backend en E9.
 
 ---
 
-## Un aviso sobre los correos con puntos
+## Los correos con puntos: encontrado aquí, arreglado en E6-bis
 
-**Antes de elegir la segunda cuenta, léase esto.**
+Preparando esta validación apareció un fallo real que **la propia validación no
+habría destapado**: `ACCESO` comparaba el correo ya normalizado contra la celda
+tal y como estuviera escrita, así que una fila tecleada como
+`juan.perez@gmail.com` no se encontraba nunca, y un titular con puntos en su
+dirección se quedaba fuera de su propio expediente.
 
-`normalizarEmail` quita los puntos y las etiquetas `+tag` de las direcciones de
-`gmail.com`, porque Google las considera la misma cuenta y no hacerlo dejaría
-entrar dos veces a la misma persona con dos filas distintas.
+Las dos cuentas usadas el 19 de septiembre no llevaban puntos, así que las nueve
+peticiones salieron en verde con el fallo dentro. Nueve verdes no son una
+demostración de que no haya nada roto; son una demostración de que lo que se
+preguntó, funciona.
 
-Pero `ACCESO` se busca comparando el correo normalizado contra la celda **tal y
-como está escrita**: `buscarFila` solo hace `trim()` y `toLowerCase()`. Lo mismo
-vale para `CONFIG.email_titular`.
-
-Consecuencia: una fila escrita como `juan.perez@gmail.com` **no se encontrará
-nunca**, porque lo que llega es `juanperez@gmail.com`. Y si la dirección del
-titular tiene puntos, `CONFIG` no coincidirá con lo que llega y el titular se
-quedará fuera de su propio expediente.
-
-Mientras esto no se arregle:
-
-- El guion imprime el correo **ya normalizado**, que es el que hay que pegar en
-  la hoja.
-- Conviene que la cuenta del titular no lleve puntos, o que `CONFIG` los tenga
-  quitados.
-
-Es un fallo real, no una limitación de la prueba. **La validación no lo destapó
-porque ninguna de las dos cuentas usadas lleva puntos**, que es exactamente por
-lo que estaba escrito aquí antes de ejecutarla. Pendiente de decidir si se
-arregla antes o después de E7.
+**Arreglado en E6-bis**, con nueve pruebas que cubren los dos lados de la
+frontera —dentro de `gmail.com` los puntos se ignoran, fuera distinguen dos
+buzones—. El detalle está en [ACCESO.md](ACCESO.md).
 
 ---
 

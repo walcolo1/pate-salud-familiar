@@ -149,6 +149,39 @@ Dos reglas más, ambas con prueba:
 
 ---
 
+## El correo se normaliza a los dos lados (E6-bis)
+
+`normalizarEmail` quita los puntos y las etiquetas `+tag` de las direcciones de
+`gmail.com` y `googlemail.com`, porque Google las considera **la misma cuenta**.
+No hacerlo dejaría entrar dos veces a la misma persona con dos filas distintas.
+
+Lo que E6 hacía a medias era aplicarlo **solo a un lado**. El correo del
+`id_token` llegaba normalizado; la celda de `ACCESO` se comparaba tal y como
+estuviera escrita. Resultado: una fila tecleada como `juan.perez@gmail.com`
+**no se encontraba nunca**, y un titular con puntos en su dirección se quedaba
+fuera de su propio expediente, sin más salida que editar la hoja a mano.
+
+Ahora se normaliza en los cuatro sitios donde se compara o se escribe:
+
+| Dónde | Qué pasaba si faltaba |
+|---|---|
+| `buscarFila` | La fila del familiar no aparecía: `ACCESO_DENEGADO` permanente |
+| `resolverAcceso`, contra `CONFIG.email_titular` | El dueño de la hoja no entraba en su expediente |
+| `validarMutacion` | `TITULAR_INTOCABLE` se esquivaba tecleando un punto de más |
+| `emailTitular_` e `instalar()` | La celda de `CONFIG` nacía sin normalizar |
+
+**Fuera de `gmail.com` los puntos sí distinguen dos cuentas**, y eso se respeta:
+en otros dominios `juan.perez` y `juanperez` son dos buzones diferentes, y
+tratarlos como uno dejaría entrar a quien no es. Hay una prueba para cada lado
+de esa frontera.
+
+Se encontró leyendo el código al preparar E6-live, no ejecutándolo: la
+validación en vivo pasó en verde porque ninguna de las dos cuentas usadas
+llevaba puntos. Es el tipo de fallo que solo aparece con el usuario número
+tres.
+
+---
+
 ## Las columnas se leen por nombre, nunca por posición
 
 `resolverAcceso` saca la posición de cada columna de `encabezadosDe('ACCESO')`,

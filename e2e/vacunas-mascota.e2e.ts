@@ -239,9 +239,20 @@ test.describe('D3 · vacunas de mascotas', () => {
       } as typeof window.setTimeout;
     });
 
-    // Un refuerzo dentro de las próximas horas: entra en el horizonte de un día.
-    const dentroDeUnRato = new Date(Date.now() + 3 * 3600_000);
-    const fecha = `${dentroDeUnRato.getFullYear()}-${dd(dentroDeUnRato.getMonth() + 1)}-${dd(dentroDeUnRato.getDate())}`;
+    // El refuerzo tiene que caer en el futuro Y dentro del horizonte de un día,
+    // y eso depende de la hora a la que se ejecute la suite.
+    //
+    // Una fecha sin hora se programa a las **09:00 locales** (`aMilisegundos`).
+    // La versión anterior de esta prueba sembraba «hoy» siempre, así que el
+    // aviso caía a las 09:00 de hoy: verde si la suite corría por la mañana,
+    // rojo a partir de las nueve. Estuvo pasando por la hora a la que se
+    // ejecutaba, no por lo que comprobaba.
+    //
+    // Antes de las 09:00 vale hoy; después, mañana —y entonces faltan menos de
+    // 24 h para las 09:00 de mañana, así que sigue dentro del horizonte—.
+    const ahora = new Date();
+    const antesDeLasNueve = ahora.getHours() < 9;
+    const fecha = enDias(antesDeLasNueve ? 0 : 1);
 
     const { memberId, petId } = await sembrar(page, [
       { vacuna: 'VACUNA-AVISO-E2E', fecha: enDias(-365), proximaDosis: fecha },

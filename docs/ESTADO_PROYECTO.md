@@ -123,7 +123,6 @@ cada módulo. Las que más condicionan lo que venga:
 | Adjuntos del historial veterinario: el campo `documentoId` existe y nadie lo rellena | `src/domain/mascotas.ts` |
 | `E0b-4` sin volver a pasar contra el despliegue de E6: el criterio 1 está cerrado desde Node, no desde un navegador | `EVIDENCIA_E6.md` · paso 7 |
 | El cerrojo de `aplicar` y el lote de varias pestañas siguen sin comprobarse en vivo: hacen falta dos peticiones a la vez y datos que escribir | `ROUTER.md` · criterio de **E9** |
-| `ACCESO` compara el correo normalizado contra la celda tal cual: una dirección de `gmail.com` **con puntos** no se encuentra nunca | `src/lib/acceso.ts` · `EVIDENCIA_E6.md` |
 
 ---
 

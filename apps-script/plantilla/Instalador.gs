@@ -109,7 +109,9 @@ function instalarConCerrojo_() {
   //     venga después, porque todo lo demás se apoya en esto.
   var propiedades = PropertiesService.getScriptProperties();
   propiedades.setProperty(CLAVE_ID_HOJA, hoja.getId());
-  var emailTitular = Session.getEffectiveUser().getEmail();
+  // Normalizado desde el minuto cero: es lo que se compara después contra el
+  // correo del `id_token`, que llega normalizado siempre (E6-bis).
+  var emailTitular = normalizarEmail(Session.getEffectiveUser().getEmail());
   escribirConfig_(hoja, emailTitular);
   asegurarTitular_(hoja, emailTitular);
 
@@ -405,7 +407,7 @@ function auditar_(accion, resultado, detalle) {
   pestana.appendRow([
     'aud-' + Utilities.getUuid().slice(0, 8),
     ahoraISO_(),
-    Session.getEffectiveUser().getEmail(),
+    normalizarEmail(Session.getEffectiveUser().getEmail()),
     accion,
     'SISTEMA',
     '',

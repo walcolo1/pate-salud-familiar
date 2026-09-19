@@ -34,6 +34,7 @@
  */
 
 import { encabezadosDe } from './planInstalacion';
+import { normalizarEmail } from './autenticacion';
 
 /** Roles, de más a menos alcance. */
 export const ROLES = ['TITULAR', 'CUIDADOR', 'MIEMBRO', 'LECTOR'] as const;
@@ -138,7 +139,11 @@ export function resolverAcceso(
   emailTitular: string,
   version = 1,
 ): ResultadoAcceso {
-  const email = texto(emailNormalizado).toLowerCase();
+  // Se vuelve a normalizar aunque el parámetro se llame así: esta función la
+  // llaman las pruebas, el router y `Acceso.gs`, y basta con que una de las
+  // tres se salte el paso para que la comparación deje de ser simétrica.
+  // Normalizar es idempotente, así que no cuesta nada.
+  const email = normalizarEmail(emailNormalizado);
   if (email.length === 0) return { permitido: false, motivo: 'SIN_CORREO' };
 
   // El titular es TITULAR pase lo que pase en la hoja.
@@ -147,7 +152,7 @@ export function resolverAcceso(
   // su propio expediente. Una fila mal editada —o borrada por accidente— le
   // dejaría sin acceso por la aplicación, y la única salida sería arreglar la
   // hoja a mano. Además puede editarla de todos modos: es suya.
-  if (email === texto(emailTitular).toLowerCase() && email.length > 0) {
+  if (email === normalizarEmail(emailTitular) && email.length > 0) {
     return {
       permitido: true,
       acceso: {
@@ -198,7 +203,10 @@ function buscarFila(
   for (let i = 0; i < (filas ?? []).length; i++) {
     const fila = filas[i];
     if (!fila) continue;
-    if (texto(fila[col.email]).toLowerCase() === email) return fila as unknown[];
+    // Normalizado a los DOS lados. La celda la teclea una persona, así que
+    // puede traer puntos o un `+tag` que el correo verificado ya no tiene: sin
+    // esto, `juan.perez@gmail.com` no se encontraría nunca.
+    if (normalizarEmail(fila[col.email]) === email) return fila as unknown[];
   }
   return null;
 }
@@ -329,12 +337,15 @@ export function validarMutacion(
 ): string | null {
   if (!esOperacion(operacion)) return 'OPERACION_DESCONOCIDA';
 
-  const objetivo = texto(emailObjetivo).toLowerCase();
+  const objetivo = normalizarEmail(emailObjetivo);
   if (objetivo.length === 0) return 'SIN_DESTINATARIO';
 
   // El titular no se puede degradar ni revocar a sí mismo. Sería la única
   // acción de la aplicación sin vuelta atrás desde la propia aplicación.
-  if (objetivo === texto(emailTitular).toLowerCase()) return 'TITULAR_INTOCABLE';
+  //
+  // La comparación va normalizada por las dos partes: si fuera literal, se
+  // esquivaría con solo teclear un punto de más en su dirección de gmail.
+  if (objetivo === normalizarEmail(emailTitular)) return 'TITULAR_INTOCABLE';
 
   if (operacion === 'CAMBIAR_ROL') {
     if (!esRol(rolNuevo)) return 'ROL_DESCONOCIDO';
