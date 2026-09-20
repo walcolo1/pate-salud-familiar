@@ -17,6 +17,18 @@
     "moderate": 0,
     "minor": 0
   },
+  "invitacion": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
+  "invitacion-enlace-roto": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
   "mascota-historial": {
     "critical": 0,
     "serious": 0,

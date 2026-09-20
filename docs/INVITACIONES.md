@@ -234,5 +234,5 @@ validación real:
    `INVITACION_YA_USADA`.
 
 Los cinco caben en un recorrido de una sola sesión con las dos cuentas de
-E6-live, en cuanto exista la ruta `/invitacion` de la PWA — que es **E9**, no
-esto.
+E6-live. La ruta `/invitacion` que hacía falta ya existe (**E9**), y el guion
+está escrito en [EVIDENCIA_E9.md](EVIDENCIA_E9.md).

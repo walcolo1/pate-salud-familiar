@@ -191,6 +191,56 @@ async function ejecutar(prueba) {
 
 const porId = (id) => sonda.PLAN_E6.find((p) => p.id === id);
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Modo «solo invitar» (E9)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Manda una invitación y se va.
+ *
+ * Existe porque la PWA todavía no tiene pantalla para invitar —es de un bloque
+ * posterior— y el recorrido de E9 necesita que salga un correo de verdad. La
+ * alternativa era pedirle a alguien que escribiera una función de una línea en
+ * el editor de Apps Script y se acordara de borrarla.
+ */
+if (process.argv.includes('--solo-invitar')) {
+  const destinatario = argumento('a');
+  if (!destinatario) {
+    console.error('Falta a quién invitar:  --solo-invitar --a alguien@ejemplo.com');
+    process.exit(1);
+  }
+
+  const rol = (argumento('rol') ?? 'LECTOR').toUpperCase();
+  const pacientes = argumento('pacientes') ?? '*';
+
+  const idToken = await pedirToken('LA CUENTA DEL TITULAR (la dueña de la hoja)');
+  const { estado, crudo, ms } = await llamar(
+    JSON.stringify({ idToken, accion: 'invitar', payload: { email: destinatario, rol, pacientes } }),
+  );
+
+  console.log(`\n  HTTP ${estado} · ${ms} ms`);
+  console.log(`  ${sonda.redactar(crudo)}`);
+
+  let cuerpo = {};
+  try {
+    cuerpo = JSON.parse(crudo);
+  } catch {
+    /* ya se imprimió el crudo, redactado */
+  }
+
+  if (cuerpo && cuerpo.ok === true) {
+    console.log('\n  Invitación enviada. Sigue en docs/EVIDENCIA_E9.md desde el paso 2.');
+    console.log('  Ni el token ni el enlace salen por aquí: viajan por el correo y por');
+    console.log('  ningún otro sitio. Verlos en una consola sería dejarlos en el registro.');
+  } else {
+    console.log('\n  No se envió. ERROR_PAYLOAD suele ser que faltan URL_PWA o URL_BACKEND');
+    console.log('  en las propiedades del script: `invitar` falla cerrado a propósito.');
+  }
+
+  consola.close();
+  process.exit(cuerpo && cuerpo.ok === true ? 0 : 1);
+}
+
 console.log('\n════ E6-live · validación del backend contra el despliegue ════');
 console.log('Ninguna de estas peticiones lleva datos clínicos reales.\n');
 

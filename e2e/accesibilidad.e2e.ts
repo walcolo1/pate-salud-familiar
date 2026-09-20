@@ -63,6 +63,18 @@ const RUTAS: ReadonlyArray<{ nombre: string; url: string; espera?: string }> = [
   { nombre: 'members-new', url: '/members/new' },
   // /onboarding se pinta fuera del armazon de la aplicacion: no hay <main>.
   { nombre: 'onboarding', url: '/onboarding', espera: 'body' },
+  // E9 · la ruta publica de invitacion, en sus dos caras: la que pide
+  // identificarse y la que explica que el enlace no sirve. La segunda es la
+  // que mas gente vera, y es la que nadie suele medir.
+  {
+    nombre: 'invitacion',
+    url:
+      '/invitacion?t=' +
+      'a'.repeat(64) +
+      '&backend=' +
+      encodeURIComponent('https://script.google.com/macros/s/AKfycbFALSO0123456789abcdefgh/exec'),
+  },
+  { nombre: 'invitacion-enlace-roto', url: '/invitacion' },
 ];
 
 /**

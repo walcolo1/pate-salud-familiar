@@ -4,7 +4,7 @@
 paso está en [TABLERO.md](TABLERO.md); esto es dónde estamos, qué sostiene lo
 hecho y qué falta.*
 
-Última actualización: **19 de septiembre de 2026**, al cerrar el **Bloque E**.
+Última actualización: **19 de septiembre de 2026**, al cerrar **E9**.
 
 ---
 
@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | **cerrado** · E0 a E8; E0–E6 validados en vivo |
+| **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9; E0–E6 y E8 validados en vivo |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 
@@ -112,24 +112,25 @@ cada módulo. Las que más condicionan lo que venga:
 |---|---|
 | Validación con lector de pantalla, escrita pero **no ejecutada** | `TESTING.md` §6.12 |
 | Confirmar que no llegan correos de error de los disparadores (al día siguiente de instalar) | `EVIDENCIA_E2.md` |
-| Armar la plantilla maestra y pegar su enlace `/copy`: el guion está escrito, falta ejecutarlo | `PLANTILLA_PRODUCCION.md` |
 | Las cinco capturas de la pantalla de «app no verificada», sobre una copia de usar y tirar | `PLANTILLA_PRODUCCION.md` · paso 6 |
 | La carpeta `Temporal` existe y **nadie la vacía** hasta que E11 implemente la tarea diaria | `planInstalacion.ts` · `EVIDENCIA_E2.md` |
 | Actualizar una copia ya repartida cuando cambie el código: la maestra no actualiza a nadie hacia atrás | `PLANTILLA_PRODUCCION.md` |
-| Las cinco comprobaciones de E7 contra Google, entre ellas que el familiar no vea pantalla de permisos | `INVITACIONES.md` · necesitan **E9** |
+| El recorrido en vivo de la invitación, con la comprobación que sostiene el bloque: que el familiar no vea ninguna pantalla de permisos | `EVIDENCIA_E9.md` |
+| `URL_PWA` y `URL_BACKEND` sin configurar en la hoja de pruebas: hasta entonces `invitar` falla cerrado | `EVIDENCIA_E9.md` |
+| Puede hacer falta autorizar el origen de la PWA en el cliente OAuth. **No se toca sin decisión explícita** | `EVIDENCIA_E9.md` |
 | Validación de consentimiento OAuth limpio | `TESTING.md` §6.11 |
 | `/members/:id/edit` y `/login` fuera de la red de axe | `ACCESIBILIDAD.md`, puerta de C9 |
 | 23 `alert` de error siguen sin migrar al sistema de avisos | `src/` |
 | Deuda de lint en `AppContext.tsx` (72 errores en línea base) | `scripts/lint-baseline.json` |
 | Adjuntos del historial veterinario: el campo `documentoId` existe y nadie lo rellena | `src/domain/mascotas.ts` |
 | `E0b-4` sin volver a pasar contra el despliegue de E6: el criterio 1 está cerrado desde Node, no desde un navegador | `EVIDENCIA_E6.md` · paso 7 |
-| El cerrojo de `aplicar` y el lote de varias pestañas siguen sin comprobarse en vivo: hacen falta dos peticiones a la vez y datos que escribir | `ROUTER.md` · criterio de **E9** |
+| El cerrojo de `aplicar` y el lote de varias pestañas siguen sin comprobarse en vivo: hacen falta dos peticiones a la vez y datos que escribir | `ROUTER.md` · después del **Bloque G** |
 
 ---
 
 ## El Bloque E, cerrado
 
-Nueve pasos. El backend de cada familia vive dentro de su propia hoja, con su
+Diez pasos. El backend de cada familia vive dentro de su propia hoja, con su
 propio despliegue y su propio Drive: el aislamiento es de la infraestructura de
 cuentas de Google, no de reglas que alguien pueda escribir al revés.
 
@@ -143,8 +144,9 @@ cuentas de Google, no de reglas que alguien pueda escribir al revés.
 | **E5** | Matriz de permisos por rol | ✅ por la cadena, en E6-live |
 | **E6 · E6-live** | Router: puerta única y `aplicar()` por lotes | ✅ · 9 de 9 |
 | **E6-bis** | Normalización simétrica de correos | Probado en frío |
-| **E7** | Invitaciones | Probado en frío · espera a **E9** |
-| **E8** | Plantilla maestra y guion de publicación | Guion escrito · falta ejecutarlo |
+| **E7** | Invitaciones | Probado en frío · guion en `EVIDENCIA_E9.md` |
+| **E8** | Plantilla maestra y guion de publicación | ✅ · molde publicado y `/copy` probado |
+| **E9** | Ruta `/invitacion` en la PWA | Probado en frío · guion en `EVIDENCIA_E9.md` |
 
 **Lo que queda del bloque no es código**: armar la hoja maestra, capturar la
 pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
@@ -154,7 +156,10 @@ pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
 
 ## Siguiente paso
 
-**Bloque G · el corte seco de Firebase**, o **E9** si se prefiere terminar de
-atar el backend antes de mover la PWA. E9 es además lo que desbloquea las cinco
-comprobaciones de E7 y las dos de `aplicar()` que siguen abiertas en
-`ROUTER.md`.
+**El recorrido en vivo de E9** —una invitación de verdad, de un correo a una
+sesión— y después el **Bloque G**, el corte seco de Firebase.
+
+Las dos comprobaciones de `aplicar()` que siguen abiertas en `ROUTER.md` no se
+desbloquean aceptando una invitación: hacen falta dos peticiones simultáneas y
+datos que escribir. Llegan cuando la PWA guarde de verdad contra el backend,
+después de G.

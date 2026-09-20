@@ -19,9 +19,9 @@ limpia y **nunca se ejecuta**.
 > le da a cada titular.
 
 ```
-Enlace /copy:  (pendiente)
-Armada el:     (pendiente)
-Versión:       e7 · esquema 1 · 21 pestañas · 12 ficheros consolidados
+Enlace /copy: https://docs.google.com/spreadsheets/d/1eMuQxdZdt525IXryR-8PalRmuw243LlPnkO7T-L68fs/copy
+Armada el:    2026-09-19
+Versión:      e7 · esquema 1 · 21 pestañas · 12 ficheros consolidados
 ```
 
 ---
