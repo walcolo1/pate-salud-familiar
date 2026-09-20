@@ -8,6 +8,8 @@ import {
   redactar,
   resumen,
   tokenDe,
+  versionDesdePing,
+  veredictoDeVersion,
   type PruebaEnVivo,
   type Resultado,
   type TokensReales,
@@ -289,5 +291,63 @@ describe('resumen', () => {
 
   it('todo verde no deja nada abierto', () => {
     expect(resumen([r('a', 1, 'PASA')]).criteriosAbiertos).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// La versión desplegada (E9-bis)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Esto nació de una tarde perdida.
+ *
+ * Una invitación devolvía `{"ok":true,"data":{"creada":true}}`, escribía la
+ * fila y dejaba `token_hash` y `token_expira` vacías. El código del
+ * repositorio no podía hacer eso: lo que respondía era el despliegue anterior,
+ * porque guardar en el editor de Apps Script no cambia lo que sirve la URL.
+ *
+ * La causa estaba a un `ping` de distancia y nadie lo preguntó.
+ */
+describe('versionDesdePing', () => {
+  it('saca la versión de un ping bueno', () => {
+    expect(versionDesdePing('{"ok":true,"data":{"version":"e7","esquema":1}}')).toBe('e7');
+  });
+
+  it('un ping que no es JSON no es una versión', () => {
+    expect(versionDesdePing('<html>Iniciar sesión</html>')).toBeNull();
+  });
+
+  it('un ok:false tampoco', () => {
+    expect(versionDesdePing('{"ok":false,"error":"TOKEN_INVALIDO"}')).toBeNull();
+  });
+
+  it('ni un ping sin versión dentro', () => {
+    expect(versionDesdePing('{"ok":true,"data":{}}')).toBeNull();
+    expect(versionDesdePing('{"ok":true,"data":{"version":""}}')).toBeNull();
+    expect(versionDesdePing('')).toBeNull();
+  });
+});
+
+describe('veredictoDeVersion', () => {
+  it('coinciden: se sigue', () => {
+    const v = veredictoDeVersion('e7', 'e7');
+    expect(v.sigue).toBe(true);
+  });
+
+  it('no coinciden: se para y se dice EXACTAMENTE qué hacer', () => {
+    // Un aviso que dice «hay un desajuste» y no dice cómo arreglarlo deja a
+    // quien lo lee exactamente donde estaba.
+    const v = veredictoDeVersion('e7', 'e6');
+    expect(v.sigue).toBe(false);
+    expect(v.aviso).toContain('e6');
+    expect(v.aviso).toContain('e7');
+    expect(v.aviso).toMatch(/Nueva versión/);
+  });
+
+  it('sin versión: se para y se apunta a las dos causas probables', () => {
+    const v = veredictoDeVersion('e7', null);
+    expect(v.sigue).toBe(false);
+    expect(v.aviso).toMatch(/exec/);
+    expect(v.aviso).toMatch(/Cualquier usuario/);
   });
 });

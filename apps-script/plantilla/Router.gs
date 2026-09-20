@@ -22,8 +22,11 @@
  * también cruza. Se lee con `JSON.parse` igual.
  */
 
-/** Versión del contrato con la PWA. Sube cuando cambie la forma de responder. */
-var VERSION_API = 'e7';
+/*
+ * La versión del contrato NO se declara aquí: viene de `Despacho.gs`, generado
+ * desde `src/lib/router.ts`. Dos copias de un número de versión divergen, y la
+ * que miente es siempre la que alguien consulta para saber qué hay desplegado.
+ */
 
 /** Cuánto espera el cerrojo de un lote antes de rendirse. */
 var ESPERA_LOTE_MS = 15000;
@@ -48,7 +51,7 @@ function doPost(e) {
  * navegador y ver que la implementación responde.
  */
 function doGet() {
-  return responder({ ok: true, data: { version: VERSION_API } });
+  return responder({ ok: true, data: { version: VERSION_CONTRATO } });
 }
 
 function responder(objeto) {
@@ -88,7 +91,7 @@ function dependencias_() {
 var MANEJADORES = {
   /** Prueba de vida. No lee nada y no cuenta nada. */
   ping: function () {
-    return { version: VERSION_API, esquema: VERSION_ESQUEMA };
+    return { version: VERSION_CONTRATO, esquema: VERSION_ESQUEMA };
   },
 
   obtenerRevision: function () {

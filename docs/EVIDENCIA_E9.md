@@ -89,6 +89,35 @@ buscando un botón que no puede salir es el error más fácil de cometer aquí.
 
 ---
 
+## Si la fila aparece pero `token_hash` y `token_expira` quedan vacías
+
+**Es el despliegue viejo.** Pasó el 20 de septiembre de 2026 y costó una
+mañana, así que queda escrito.
+
+El síntoma completo era este:
+
+- La respuesta es `{"ok":true,"data":{"creada":true}}`.
+- En `ACCESO` aparece la fila con `INVITADO` y el rol correcto.
+- Las columnas F y G quedan vacías y no sale ningún correo.
+
+Los tres se explican con una sola causa: **la URL estaba sirviendo el código de
+E6**, donde el manejador `invitar` era `mutarAcceso('INVITAR', payload, acceso)`
+a secas. Esa función escribe `datos.tokenHash`, que en E6 nadie rellenaba, y no
+manda correo porque en E6 no había nada que mandar.
+
+La respuesta lo delata sin ambigüedad: `{creada: true}` solo lo devuelve
+`escribirMutacion_`. El `invitar` de E7 devuelve `{invitada: true, expiraEn: 7}`
+y, si faltaran `URL_PWA` o `URL_BACKEND`, habría fallado **antes de escribir
+nada** — no habría fila.
+
+Guardar en el editor de Apps Script no cambia lo que sirve la URL. Hace falta
+**Administrar implementaciones ▸ ✏️ ▸ Versión: Nueva versión**.
+
+Desde E9-bis la sonda lo comprueba sola antes de intentar nada: pregunta la
+versión con un `ping` anónimo y se para si no coincide con la del repositorio.
+
+---
+
 ## El recorrido
 
 ### Paso 1 · El titular invita

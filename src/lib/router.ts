@@ -30,6 +30,23 @@ import { type Verbo } from './permisos';
 // Contrato
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Versión del contrato con la PWA. Sube cuando cambie la forma de responder.
+ *
+ * VIVE AQUÍ Y NO EN `Router.gs` A PROPÓSITO
+ * ─────────────────────────────────────────
+ * `ping` la devuelve sin token, así que cualquiera —incluida la sonda— puede
+ * preguntarle a un despliegue **qué versión está sirviendo de verdad**, y
+ * compararla con la que espera el repositorio.
+ *
+ * Eso no es cosmético. Guardar el código en el editor de Apps Script no
+ * cambia lo que sirve la URL: hace falta publicar una versión nueva. Cuando no
+ * se hace, el síntoma aparece lejos de la causa —una fila que se escribe a
+ * medias, un correo que no sale— y nada dice que el problema sea el
+ * despliegue. Teniéndola aquí, la sonda lo detecta antes de intentar nada.
+ */
+export const VERSION_CONTRATO = 'e7';
+
 export const CODIGOS_ERROR = [
   'ERROR_PAYLOAD',
   'TOKEN_INVALIDO',

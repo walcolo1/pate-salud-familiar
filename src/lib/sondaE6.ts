@@ -360,3 +360,62 @@ export function resumen(resultados: readonly Resultado[]): {
 
   return { pasan, fallan: resultados.length - pasan, criteriosAbiertos: abiertos.sort() };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Qué versión sirve el despliegue
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * La versión que devuelve un `ping`, si la devuelve.
+ *
+ * `ping` responde sin token, así que esto se puede preguntar siempre y no
+ * cuesta nada. Cualquier cosa que no sea la forma esperada devuelve `null`: un
+ * HTML de sesión, un cuerpo vacío o un error no son una versión.
+ */
+export function versionDesdePing(crudo: string): string | null {
+  try {
+    const cuerpo = JSON.parse(crudo) as { ok?: unknown; data?: { version?: unknown } };
+    if (cuerpo?.ok !== true) return null;
+    const version = cuerpo.data?.version;
+    return typeof version === 'string' && version.length > 0 ? version : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface VeredictoVersion {
+  sigue: boolean;
+  aviso: string;
+}
+
+/**
+ * ¿Está desplegado lo que este repositorio cree que está desplegado?
+ *
+ * Guardar el código en el editor de Apps Script **no cambia lo que sirve la
+ * URL**: hace falta publicar una versión nueva. Cuando no se hace, el síntoma
+ * aparece lejos de la causa —una fila escrita a medias, un correo que no
+ * sale— y nada apunta al despliegue. Esta comprobación cuesta una petición
+ * anónima y convierte una tarde de depuración en una frase.
+ */
+export function veredictoDeVersion(esperada: string, obtenida: string | null): VeredictoVersion {
+  if (obtenida === null) {
+    return {
+      sigue: false,
+      aviso:
+        'El despliegue no contestó a `ping` con una versión. Revisa que la URL termine en /exec y que el acceso sea «Cualquier usuario».',
+    };
+  }
+
+  if (obtenida !== esperada) {
+    return {
+      sigue: false,
+      aviso: [
+        `El despliegue sirve «${obtenida}» y este repositorio es «${esperada}».`,
+        '  Guardar en el editor no basta: Administrar implementaciones ▸ ✏️ ▸ Versión: Nueva versión.',
+        '  Hasta entonces la URL responde con el código viejo, y los fallos no se parecerán a su causa.',
+      ].join('\n'),
+    };
+  }
+
+  return { sigue: true, aviso: `Despliegue en «${obtenida}», el mismo que el repositorio.` };
+}

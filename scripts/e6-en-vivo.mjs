@@ -36,6 +36,7 @@ const RAIZ = join(AQUI, '..');
 
 const sonda = await cargarModuloTs(join(RAIZ, 'src', 'lib', 'sondaE6.ts'));
 const auth = await cargarModuloTs(join(RAIZ, 'src', 'lib', 'autenticacion.ts'));
+const contrato = await cargarModuloTs(join(RAIZ, 'src', 'lib', 'router.ts'));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Configuración: por argumento o por entorno, nunca por un fichero versionado
@@ -190,6 +191,38 @@ async function ejecutar(prueba) {
 }
 
 const porId = (id) => sonda.PLAN_E6.find((p) => p.id === id);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ¿Está desplegado lo que creemos que está desplegado?
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Se pregunta ANTES de nada, y cuesta una petición anónima.
+ *
+ * Nació de una tarde perdida: una invitación devolvía `{"creada":true}`,
+ * escribía la fila y dejaba el token sin guardar. El código del repositorio no
+ * podía hacer eso —lo que respondía era el despliegue anterior— y la causa
+ * estaba a un `ping` de distancia.
+ *
+ * Guardar en el editor de Apps Script no cambia lo que sirve la URL.
+ */
+async function comprobarDespliegue() {
+  const { crudo } = await llamar(JSON.stringify({ accion: 'ping' }));
+  const veredicto = sonda.veredictoDeVersion(
+    contrato.VERSION_CONTRATO,
+    sonda.versionDesdePing(crudo),
+  );
+
+  if (!veredicto.sigue) {
+    console.error('\n  ' + veredicto.aviso);
+    consola.close();
+    process.exit(1);
+  }
+
+  console.log(`  ${veredicto.aviso}`);
+}
+
+await comprobarDespliegue();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Modo «solo invitar» (E9)
