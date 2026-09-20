@@ -65,6 +65,30 @@ sigue sirviendo el código viejo, que no conoce `aceptarInvitacion`.
 
 ---
 
+## El servidor de desarrollo NO sirve para esto
+
+**`npm run dev` no carga Google Identity Services**, y no es cosa de esta
+pantalla: pasa igual en `/login` y viene de antes de E9.
+
+La CSP de la aplicación no permite `eval`, y el modo de desarrollo de Next lo
+usa. El tiempo de ejecución del enrutador lanza `EvalError` y, con él caído,
+`next/script` nunca llega a inyectar el `<script>` de Google: queda
+**precargado y sin usar**. El botón no aparece y no hay ningún mensaje que
+explique por qué.
+
+Medido el 19 de septiembre de 2026 en las dos versiones:
+
+| Servidor | `window.google.accounts.id` | Botón |
+|---|---|---|
+| `npm run dev` | `undefined` | no aparece |
+| `npm run build && npm start` | `object` | aparece |
+
+Así que este recorrido se hace **contra una compilación de producción** —local
+o desplegada—, nunca contra el servidor de desarrollo. Perder media hora
+buscando un botón que no puede salir es el error más fácil de cometer aquí.
+
+---
+
 ## El recorrido
 
 ### Paso 1 · El titular invita
