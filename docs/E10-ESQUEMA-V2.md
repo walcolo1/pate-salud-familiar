@@ -1,7 +1,10 @@
 # E10 — el esquema crece para que no se pierda nada al mudarse
 
-**Estado: VALIDADO EN VIVO el 21 de septiembre de 2026.** Queda aplicarlo a la
-plantilla maestra.
+**Estado: v2 VALIDADO EN VIVO el 21 de septiembre de 2026. v3 (E10-bis) escrito,
+sin aplicar todavía.**
+
+Queda aplicarlo a la plantilla maestra y repetir `instalar()` en la hoja de
+pruebas, que sigue en v2.
 
 G0 se paró al descubrir que el esquema de la hoja y el modelo de la aplicación
 no son el mismo modelo ([G0-BRECHA-DE-MODELO.md](G0-BRECHA-DE-MODELO.md)).
@@ -160,6 +163,57 @@ Si en vez de eso lo reescribe, la lógica está mal y arreglarlo es urgente:
 significaría que renombra columnas con datos dentro sin moverlos.
 
 Tira la copia al terminar.
+
+---
+
+## E10-bis · las 10 que faltaban
+
+El barrido de los descriptores de G0 —campo por campo, sobre los 14 modelos—
+dejó **14 campos sin casa**. De ellos, 10 se resolvieron con columna y 4 con
+una decisión.
+
+| Pestaña | Columnas | Por qué |
+|---|---|---|
+| `EXAMENES` | `solicitado_por`, `solicitada_en`, `documentos_ids` | quién pidió el examen y cuándo, y los documentos que lo acompañan |
+| `CONTROLES` | `proxima_fecha`, `profesional` | `periodicidad_meses` no es lo mismo que la próxima fecha concreta |
+| `PERFIL_HUMANO` | `email` | el correo de `ACCESO` es el de quien **tiene acceso**; un familiar sin portal se quedaba sin el suyo |
+| `RECORDATORIOS` | `descripcion` | había título y no cuerpo |
+| `MEDICAMENTOS` · `DOSIS` | `evento_calendario_id` | `CITAS` ya lo tenía; sin esto la sincronización con Calendar nacería coja |
+| `ORDENES` | `autorizacion_estado` | **son dos cosas**: `estado` es el ciclo clínico de la orden y esto el trámite con la EPS. Una orden autorizada puede seguir pendiente de cita |
+
+`version_esquema` pasa a **3**.
+
+Los otros cuatro campos se descartaron a conciencia:
+
+- `vaccines.status` — se **calcula**, no se guarda. Es la decisión de D3, y
+  vale igual aquí: un estado guardado que nadie refresca miente en cuanto pasa
+  la medianoche.
+- `doseReminders.dose` y `medicationName` — copias de la pauta. Guardarlas dos
+  veces garantiza que algún día digan cosas distintas.
+- `tasks` entero — ver abajo.
+
+### La pérdida que hay que tener presente: las tareas genéricas
+
+`SEGUIMIENTOS` habla de seguimientos **de una orden**: `orden_id`, `plantilla`,
+`destinatario`, `enviado_en`. `FollowUpTask` es una tarea con título,
+descripción y prioridad. No le faltan tres columnas a una para ser la otra:
+**son conceptos distintos**, y meter uno en el otro dejaría una pestaña que no
+significa lo que dice su nombre.
+
+Así que `tasks` no tiene dónde escribir. `saveTask` lanzará un error explícito
+—lanzar no cuenta como mudo en G1, así que el hueco queda visible— y **las
+tareas genéricas dejarán de guardarse cuando gire la bandera de G**.
+
+Eso es pérdida de funcionalidad, no solo de columnas, y está decidido a
+sabiendas. Si algún día se recuperan, será con su propia pestaña.
+
+### El trinquete ahora vigila todas las versiones
+
+Hay `scripts/esquema-v1.json` y `scripts/esquema-v2.json`, y la prueba exige que
+los encabezados de **cada versión congelada** sean prefijo de los actuales.
+
+Comprobar solo contra v1 dejaría fuera justo a las hojas que existen: la de
+pruebas está en v2.
 
 ---
 

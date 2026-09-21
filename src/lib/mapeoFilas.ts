@@ -62,44 +62,83 @@ export const DESCARTADOS: Record<string, string> = {
   // Cada fila decía de quién era y si estaba sincronizada. Con una hoja por
   // familia eso no existe: la fila es de la familia porque está en su hoja.
   ownerEmail: 'la hoja es de la familia; no hay dueño por fila',
-  ownerGoogleId: 'ídem',
-  sourceDeviceId: 'ídem',
+  ownerGoogleId: 'la hoja es de la familia; no hay dueño por fila',
+  sourceDeviceId: 'qué dispositivo escribió una fila deja de importar cuando solo hay una copia',
   syncStatus: 'no hay dos copias que sincronizar: la hoja es la copia',
-  lastSyncedAt: 'ídem',
+  lastSyncedAt: 'no hay dos copias que sincronizar: la hoja es la copia',
   familyGroupId: 'la familia es la hoja, y la decide la URL del despliegue',
 
   // ── Reemplazado por el modelo de acceso de E4/E5 ──────────────────────────
   canAccessPortal: 'ahora es una fila en ACCESO con su rol y su alcance',
-  permissionStatus: 'ídem: el estado vive en ACCESO',
-  permissions: 'ídem: el rol y el alcance sustituyen al mapa de permisos',
+  permissionStatus: 'el estado de acceso vive en la columna `estado` de ACCESO',
+  permissions: 'el rol y el alcance de ACCESO sustituyen al mapa de permisos por miembro',
 
   // ── Estado de funciones que no existen todavía ────────────────────────────
   calendarSyncStatus: 'la sincronización con Calendar no está construida',
-  calendarSyncedAt: 'ídem',
-  calendarError: 'ídem',
+  calendarSyncedAt: 'la sincronización con Calendar no está construida',
+  calendarError: 'la sincronización con Calendar no está construida',
   googleCalendarHtmlLink: 'se puede reconstruir desde el identificador del evento',
   source: 'importación desde Gmail: es E11',
-  sourceEmail: 'ídem',
-  sourceMessageId: 'ídem',
-  sourceSubject: 'ídem',
+  sourceEmail: 'importación desde Gmail: pertenece a E11, que no existe',
+  sourceMessageId: 'importación desde Gmail: pertenece a E11, que no existe',
+  sourceSubject: 'importación desde Gmail: pertenece a E11, que no existe',
   sharedWithEmail: 'compartir un documento por Drive no está construido',
-  permissionId: 'ídem',
-  sharedAt: 'ídem',
-  revokedAt: 'ídem',
-  shareStatus: 'ídem',
-  shareError: 'ídem',
+  permissionId: 'compartir un documento por Drive no está construido',
+  sharedAt: 'compartir un documento por Drive no está construido',
+  revokedAt: 'compartir un documento por Drive no está construido',
+  shareStatus: 'compartir un documento por Drive no está construido',
+  shareError: 'compartir un documento por Drive no está construido',
   retentionStatus: 'la política de retención no está construida',
-  retentionReason: 'ídem',
-  purgedAt: 'ídem',
+  retentionReason: 'la política de retención no está construida',
+  purgedAt: 'la política de retención no está construida',
   localPath: 'una ruta del dispositivo no significa nada en otro',
 
   // ── Duplicados dentro del propio modelo ───────────────────────────────────
   doctor: 'duplica `doctorName`; se guarda uno',
   scheduledAt: 'duplica `date` + `time`, que es como lo guarda la hoja',
   avatarUrl: 'tres campos para una foto; se guarda `photoUrl`',
-  avatarPath: 'ídem',
+  avatarPath: 'tres campos para una foto; se guarda `photoUrl` y se deja dicho',
   lastUpdated: 'lo cubre `actualizado_en`, que escribe el propio router',
+
+  // ── Sellos de auditoría: los pone el backend, no el cliente ───────────────
+  // Decisión de G0. Un reloj de cliente mal puesto ordenaría mal el historial
+  // de alguien, y en un expediente clínico el orden es la mitad del dato.
+  createdAt: 'lo sella el router en `creado_en`',
+  updatedAt: 'lo sella el router en `actualizado_en`',
+  deletedAt: 'lo sella el router en `borrado_en`, en la baja lógica',
+  recordedAt: 'lo sella el router en `creado_en` al escribir la fila',
+
+  // ── Copias desnormalizadas que salen de otra fila ─────────────────────────
+  medicationName: 'se lee de la pauta a la que apunta `medicamento_id`',
 };
+
+/**
+ * Descartes que solo valen para UNA colección.
+ *
+ * `DESCARTADOS` va por nombre de campo, y eso no siempre basta: `status` se
+ * guarda en `estado` en media docena de colecciones y en las vacunas **no se
+ * guarda en absoluto**, porque D3 decidió que ese estado se calcula. Un
+ * descarte global lo habría tirado en todas.
+ */
+export const DESCARTADOS_POR_COLECCION: Record<string, Record<string, string>> = {
+  vaccines: {
+    // Decisión de D3, y vale igual aquí: un estado guardado que nadie refresca
+    // miente en cuanto pasa la medianoche. Se calcula desde `proxima_dosis`.
+    status: 'el estado de una vacuna se calcula, no se guarda (D3)',
+  },
+  doseReminders: {
+    // Igual que `medicationName`: es una copia de la pauta. Guardarla dos veces
+    // garantiza que algún día digan cosas distintas.
+    dose: 'se lee de la pauta a la que apunta `medicamento_id`',
+  },
+};
+
+/** ¿Está este campo descartado a propósito, aquí o en general? */
+export function estaDescartado(coleccion: string, campo: string): boolean {
+  if (Object.prototype.hasOwnProperty.call(DESCARTADOS, campo)) return true;
+  const propios = DESCARTADOS_POR_COLECCION[coleccion];
+  return !!propios && Object.prototype.hasOwnProperty.call(propios, campo);
+}
 
 /** Las columnas que escribe el router y no el cliente. */
 export const COLUMNAS_DEL_ROUTER: readonly string[] = [

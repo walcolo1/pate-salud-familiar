@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   COLUMNAS_SINCRONIZACION,
@@ -203,35 +203,62 @@ describe('los ficheros .gs generados', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('E10 · una hoja ya instalada tiene que sobrevivir al cambio', () => {
-  const V1 = JSON.parse(
-    readFileSync(join(process.cwd(), 'scripts', 'esquema-v1.json'), 'utf8'),
-  ) as { version: number; pestanas: Record<string, string[]> };
+  /**
+   * Todas las versiones congeladas, no solo la primera.
+   *
+   * Una hoja instalada puede estar en cualquiera de ellas: la de pruebas está
+   * en v2 y la próxima copia nacerá en v3. Comprobar solo contra v1 dejaría
+   * fuera justo a las hojas que existen.
+   */
+  const VERSIONES = readdirSync(join(process.cwd(), 'scripts'))
+    .filter((n) => /^esquema-v\d+\.json$/.test(n))
+    .map((n) => JSON.parse(readFileSync(join(process.cwd(), 'scripts', n), 'utf8')))
+    .sort((a, b) => a.version - b.version) as Array<{
+    version: number;
+    pestanas: Record<string, string[]>;
+  }>;
 
-  it('toda pestaña de v1 sigue existiendo', () => {
-    // Quitar una pestaña dejaría sus datos sin sitio donde leerse.
-    const ahora = new Set(PESTANAS.map((p) => p.nombre));
-    for (const nombre of Object.keys(V1.pestanas)) expect(ahora.has(nombre), nombre).toBe(true);
+  it('hay al menos una versión congelada', () => {
+    expect(VERSIONES.length).toBeGreaterThan(0);
   });
 
-  it('los encabezados de v1 son PREFIJO de los de ahora, columna por columna', () => {
-    // Este es el trinquete que importa. En una hoja instalada los datos ocupan
-    // la posición que tenían el día que se escribieron: meter una columna en
-    // medio desplazaría todas las de su derecha, y la fecha de nacimiento de
-    // alguien pasaría a leerse como su tipo de sangre. Sin error y en todas
-    // las filas a la vez.
-    for (const [nombre, viejos] of Object.entries(V1.pestanas)) {
-      const ahora = encabezadosDe(nombre) ?? [];
-      expect(ahora.slice(0, viejos.length), `${nombre} ya no extiende por el final`).toEqual(
-        viejos,
-      );
+  it('toda pestaña de cualquier versión anterior sigue existiendo', () => {
+    // Quitar una pestaña dejaría sus datos sin sitio donde leerse.
+    const ahora = new Set(PESTANAS.map((p) => p.nombre));
+    for (const v of VERSIONES) {
+      for (const nombre of Object.keys(v.pestanas)) {
+        expect(ahora.has(nombre), `${nombre} existía en v${v.version}`).toBe(true);
+      }
+    }
+  });
+
+  it('los encabezados de cada versión son PREFIJO de los de ahora', () => {
+    // El trinquete que importa. En una hoja instalada los datos ocupan la
+    // posición que tenían el día que se escribieron: meter una columna en medio
+    // desplazaría todas las de su derecha, y la fecha de nacimiento de alguien
+    // pasaría a leerse como su tipo de sangre. Sin error y en todas las filas.
+    for (const v of VERSIONES) {
+      for (const [nombre, viejos] of Object.entries(v.pestanas)) {
+        const ahora = encabezadosDe(nombre) ?? [];
+        expect(
+          ahora.slice(0, viejos.length),
+          `${nombre} ya no extiende por el final lo que había en v${v.version}`,
+        ).toEqual(viejos);
+      }
     }
   });
 
   it('la versión sube cuando el esquema cambia', () => {
     // Sin esto, una hoja vieja y una nueva son indistinguibles desde dentro.
-    const columnasV1 = Object.values(V1.pestanas).reduce((n, c) => n + c.length, 0);
+    const ultima = VERSIONES[VERSIONES.length - 1];
+    const columnasAntes = Object.values(ultima.pestanas).reduce((n, c) => n + c.length, 0);
     const columnasAhora = PESTANAS.reduce((n, p) => n + p.encabezados.length, 0);
-    if (columnasAhora !== columnasV1) expect(VERSION_ESQUEMA).toBeGreaterThan(V1.version);
+    if (columnasAhora !== columnasAntes) expect(VERSION_ESQUEMA).toBeGreaterThan(ultima.version);
+  });
+
+  it('cada versión anterior está congelada una sola vez', () => {
+    const numeros = VERSIONES.map((v) => v.version);
+    expect(new Set(numeros).size, 'hay dos ficheros para la misma versión').toBe(numeros.length);
   });
 
   it('ninguna columna se repite dentro de una pestaña', () => {
@@ -256,6 +283,7 @@ describe('repararEncabezados', () => {
     const viejos = JSON.parse(
       readFileSync(join(process.cwd(), 'scripts', 'esquema-v1.json'), 'utf8'),
     ).pestanas.ORDENES as string[];
+
 
     const r = repararEncabezados('ORDENES', viejos);
     expect(r.accion).toBe('REESCRIBIR');

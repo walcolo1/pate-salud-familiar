@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10** amplía el esquema a v2 |
+| **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10/E10-bis** llevan el esquema a v3 |
 | **G** | Corte seco de Firebase | **en curso** · G1 cerrado · G0 **parado** por la brecha de modelo |
 | **H** | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
 
@@ -116,7 +116,8 @@ cada módulo. Las que más condicionan lo que venga:
 | La carpeta `Temporal` existe y **nadie la vacía** hasta que E11 implemente la tarea diaria | `planInstalacion.ts` · `EVIDENCIA_E2.md` |
 | Actualizar una copia ya repartida cuando cambie el código: la maestra no actualiza a nadie hacia atrás | `PLANTILLA_PRODUCCION.md` |
 | Mirar el cuerpo del correo de invitación recibido: es lo único que queda de E9 | `EVIDENCIA_E9.md` |
-| Pegar el consolidado v2 en la plantilla maestra y reinstalar la hoja de pruebas para que reparen encabezados | `E10-ESQUEMA-V2.md` |
+| Pegar el consolidado **v3** en la plantilla maestra y repetir `instalar()` en la hoja de pruebas, que sigue en v2 | `E10-ESQUEMA-V2.md` |
+| Las **tareas genéricas** (`FollowUpTask`) dejarán de guardarse al girar la bandera de G: `SEGUIMIENTOS` es otra cosa y no tienen pestaña | `descriptores.ts` · `SIN_PESTANA` |
 | Las 4 escrituras de E11 siguen sin pestaña: lanzarán un error explícito en vez de callar | `G0-BRECHA-DE-MODELO.md` |
 | `version_esquema` dice en qué versión está una hoja, pero **nadie actúa** en consecuencia todavía | `E10-ESQUEMA-V2.md` |
 | `SheetsRepository` tiene **las 31 escrituras mudas**: girar la bandera a `sheets` hoy perdería datos en silencio. Medido y acotado por G1; lo arregla **G0** | `scripts/escrituras-mudas.json` |

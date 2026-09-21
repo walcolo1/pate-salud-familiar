@@ -139,6 +139,7 @@ export const PESTANAS: readonly DefinicionPestana[] = [
       'medicamentos_actuales',
       'medico_cabecera',
       'seguro',
+      'email',
     ),
   },
   {
@@ -198,16 +199,21 @@ export const PESTANAS: readonly DefinicionPestana[] = [
   {
     nombre: 'EXAMENES',
     descripcion: 'Exámenes clínicos solicitados o realizados.',
-    encabezados: conSincronizacion(
-      'id',
-      'paciente_id',
-      'nombre',
-      'tipo',
-      'fecha',
-      'institucion',
-      'estado',
-      'orden_id',
-      'notas',
+    encabezados: ampliado(
+      conSincronizacion(
+        'id',
+        'paciente_id',
+        'nombre',
+        'tipo',
+        'fecha',
+        'institucion',
+        'estado',
+        'orden_id',
+        'notas',
+      ),
+      'solicitado_por',
+      'solicitada_en',
+      'documentos_ids',
     ),
   },
   {
@@ -270,33 +276,41 @@ export const PESTANAS: readonly DefinicionPestana[] = [
       'duracion_dias',
       'indicaciones',
       'documento_id',
+      'evento_calendario_id',
     ),
   },
   {
     nombre: 'DOSIS',
     descripcion: 'Una fila por toma programada. El identificador es determinista.',
-    encabezados: conSincronizacion(
-      'id',
-      'medicamento_id',
-      'paciente_id',
-      'programada_en',
-      'estado',
-      'tomada_en',
-      'notas',
+    encabezados: ampliado(
+      conSincronizacion(
+        'id',
+        'medicamento_id',
+        'paciente_id',
+        'programada_en',
+        'estado',
+        'tomada_en',
+        'notas',
+      ),
+      'evento_calendario_id',
     ),
   },
   {
     nombre: 'CONTROLES',
     descripcion: 'Controles de salud periódicos, con su cadencia en meses.',
-    encabezados: conSincronizacion(
-      'id',
-      'paciente_id',
-      'tipo',
-      'fecha_programada',
-      'fecha_realizada',
-      'estado',
-      'periodicidad_meses',
-      'notas',
+    encabezados: ampliado(
+      conSincronizacion(
+        'id',
+        'paciente_id',
+        'tipo',
+        'fecha_programada',
+        'fecha_realizada',
+        'estado',
+        'periodicidad_meses',
+        'notas',
+      ),
+      'proxima_fecha',
+      'profesional',
     ),
   },
   {
@@ -331,21 +345,25 @@ export const PESTANAS: readonly DefinicionPestana[] = [
       'ips_o_clinica',
       'documento_id',
       'cita_relacionada_id',
+      'autorizacion_estado',
     ),
   },
   {
     nombre: 'RECORDATORIOS',
     descripcion: 'Lo que la agenda tiene que recordar. Un solo catálogo de estados.',
-    encabezados: conSincronizacion(
-      'id',
-      'paciente_id',
-      'tipo',
-      'titulo',
-      'fecha',
-      'hora',
-      'estado',
-      'prioridad',
-      'entidad_relacionada',
+    encabezados: ampliado(
+      conSincronizacion(
+        'id',
+        'paciente_id',
+        'tipo',
+        'titulo',
+        'fecha',
+        'hora',
+        'estado',
+        'prioridad',
+        'entidad_relacionada',
+      ),
+      'descripcion',
     ),
   },
   {
@@ -414,7 +432,7 @@ export const PESTANAS: readonly DefinicionPestana[] = [
 export const NOMBRES_PESTANAS: readonly string[] = PESTANAS.map((p) => p.nombre);
 
 /** Versión del esquema. Cambiarla obliga a una migración en `instalar()`. */
-export const VERSION_ESQUEMA = 2;
+export const VERSION_ESQUEMA = 3;
 
 export function pestanaPorNombre(nombre: string): DefinicionPestana | null {
   return PESTANAS.find((p) => p.nombre === nombre) ?? null;

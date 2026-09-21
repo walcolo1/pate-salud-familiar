@@ -116,7 +116,7 @@ var PESTANAS = [
     {
         nombre: 'PERFIL_HUMANO',
         descripcion: 'Lo propio de una persona. 1:1 con PACIENTES.',
-        encabezados: ampliado(conSincronizacion('id', 'paciente_id', 'documento_tipo', 'documento_numero', 'fecha_nacimiento', 'sexo', 'tipo_sangre', 'eps', 'alergias', 'condiciones', 'telefono_emergencia'), 'medicamentos_actuales', 'medico_cabecera', 'seguro'),
+        encabezados: ampliado(conSincronizacion('id', 'paciente_id', 'documento_tipo', 'documento_numero', 'fecha_nacimiento', 'sexo', 'tipo_sangre', 'eps', 'alergias', 'condiciones', 'telefono_emergencia'), 'medicamentos_actuales', 'medico_cabecera', 'seguro', 'email'),
     },
     {
         nombre: 'PERFIL_MASCOTA',
@@ -136,7 +136,7 @@ var PESTANAS = [
     {
         nombre: 'EXAMENES',
         descripcion: 'Exámenes clínicos solicitados o realizados.',
-        encabezados: conSincronizacion('id', 'paciente_id', 'nombre', 'tipo', 'fecha', 'institucion', 'estado', 'orden_id', 'notas'),
+        encabezados: ampliado(conSincronizacion('id', 'paciente_id', 'nombre', 'tipo', 'fecha', 'institucion', 'estado', 'orden_id', 'notas'), 'solicitado_por', 'solicitada_en', 'documentos_ids'),
     },
     {
         nombre: 'EXAMENES_RESULTADOS',
@@ -151,17 +151,17 @@ var PESTANAS = [
     {
         nombre: 'MEDICAMENTOS',
         descripcion: 'Pautas de medicación. Las tomas concretas viven en DOSIS.',
-        encabezados: ampliado(conSincronizacion('id', 'paciente_id', 'nombre', 'dosis_valor', 'dosis_unidad', 'frecuencia_tipo', 'frecuencia_valor', 'momentos', 'fecha_inicio', 'fecha_fin', 'estado', 'prescrito_por', 'notas'), 'cantidad', 'cantidad_unidad', 'duracion_dias', 'indicaciones', 'documento_id'),
+        encabezados: ampliado(conSincronizacion('id', 'paciente_id', 'nombre', 'dosis_valor', 'dosis_unidad', 'frecuencia_tipo', 'frecuencia_valor', 'momentos', 'fecha_inicio', 'fecha_fin', 'estado', 'prescrito_por', 'notas'), 'cantidad', 'cantidad_unidad', 'duracion_dias', 'indicaciones', 'documento_id', 'evento_calendario_id'),
     },
     {
         nombre: 'DOSIS',
         descripcion: 'Una fila por toma programada. El identificador es determinista.',
-        encabezados: conSincronizacion('id', 'medicamento_id', 'paciente_id', 'programada_en', 'estado', 'tomada_en', 'notas'),
+        encabezados: ampliado(conSincronizacion('id', 'medicamento_id', 'paciente_id', 'programada_en', 'estado', 'tomada_en', 'notas'), 'evento_calendario_id'),
     },
     {
         nombre: 'CONTROLES',
         descripcion: 'Controles de salud periódicos, con su cadencia en meses.',
-        encabezados: conSincronizacion('id', 'paciente_id', 'tipo', 'fecha_programada', 'fecha_realizada', 'estado', 'periodicidad_meses', 'notas'),
+        encabezados: ampliado(conSincronizacion('id', 'paciente_id', 'tipo', 'fecha_programada', 'fecha_realizada', 'estado', 'periodicidad_meses', 'notas'), 'proxima_fecha', 'profesional'),
     },
     {
         nombre: 'PESOS',
@@ -171,12 +171,12 @@ var PESTANAS = [
     {
         nombre: 'ORDENES',
         descripcion: 'Órdenes médicas y su máquina de estados de autorización.',
-        encabezados: ampliado(conSincronizacion('id', 'paciente_id', 'titulo', 'tipo', 'profesional', 'especialidad', 'emitida_en', 'vence_en', 'requiere_autorizacion', 'estado', 'resuelta_en', 'motivo', 'notas'), 'descripcion', 'autorizacion_numero', 'autorizacion_fecha', 'autorizacion_vence_en', 'eps_o_proveedor', 'ips_o_clinica', 'documento_id', 'cita_relacionada_id'),
+        encabezados: ampliado(conSincronizacion('id', 'paciente_id', 'titulo', 'tipo', 'profesional', 'especialidad', 'emitida_en', 'vence_en', 'requiere_autorizacion', 'estado', 'resuelta_en', 'motivo', 'notas'), 'descripcion', 'autorizacion_numero', 'autorizacion_fecha', 'autorizacion_vence_en', 'eps_o_proveedor', 'ips_o_clinica', 'documento_id', 'cita_relacionada_id', 'autorizacion_estado'),
     },
     {
         nombre: 'RECORDATORIOS',
         descripcion: 'Lo que la agenda tiene que recordar. Un solo catálogo de estados.',
-        encabezados: conSincronizacion('id', 'paciente_id', 'tipo', 'titulo', 'fecha', 'hora', 'estado', 'prioridad', 'entidad_relacionada'),
+        encabezados: ampliado(conSincronizacion('id', 'paciente_id', 'tipo', 'titulo', 'fecha', 'hora', 'estado', 'prioridad', 'entidad_relacionada'), 'descripcion'),
     },
     {
         nombre: 'SEGUIMIENTOS',
@@ -224,7 +224,7 @@ var PESTANAS = [
 /** Los nombres, en el mismo orden en que se crean las pestañas. */
 var NOMBRES_PESTANAS = PESTANAS.map((p) => p.nombre);
 /** Versión del esquema. Cambiarla obliga a una migración en `instalar()`. */
-var VERSION_ESQUEMA = 2;
+var VERSION_ESQUEMA = 3;
 function pestanaPorNombre(nombre) {
     var _a;
     return (_a = PESTANAS.find((p) => p.nombre === nombre)) !== null && _a !== void 0 ? _a : null;
