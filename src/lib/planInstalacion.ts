@@ -53,6 +53,61 @@ export function encabezadosDe(nombre: string): string[] | null {
   return p ? p.encabezados.slice() : null;
 }
 
+/**
+ * Qué hacer con la fila de encabezados de una pestaña que YA existe (E10).
+ *
+ * `instalar()` solo crea las pestañas que faltan, así que una hoja instalada
+ * con el esquema v1 conserva sus encabezados para siempre. Cuando el esquema
+ * crece, esa hoja sigue funcionando —los datos se leen y se escriben por la
+ * posición que fija el esquema— pero **las etiquetas mienten**: el titular abre
+ * su expediente y ve columnas sin nombre al final, o peor, nombres que ya no
+ * corresponden.
+ *
+ * Que la hoja se pueda leer a simple vista es media razón de que sea una hoja
+ * de cálculo. Un encabezado desactualizado se la come.
+ *
+ * QUÉ SE REPARA Y QUÉ NO
+ * ──────────────────────
+ * Se reescribe la fila 1 **solo si el esquema es una extensión por el final de
+ * lo que hay**. Si los encabezados existentes divergen en cualquier posición,
+ * NO se toca nada y se avisa: eso no es una hoja vieja, es una hoja que alguien
+ * editó a mano, y reescribir su fila 1 renombraría columnas con datos dentro
+ * sin moverlos.
+ */
+export type VeredictoEncabezados =
+  | { accion: 'NADA' }
+  | { accion: 'REESCRIBIR'; encabezados: string[]; columnasNuevas: string[] }
+  | { accion: 'DIVERGEN'; posicion: number; esperado: string; encontrado: string };
+
+export function repararEncabezados(
+  nombre: string,
+  actuales: readonly unknown[],
+): VeredictoEncabezados {
+  const esperados = encabezadosDe(nombre);
+  if (!esperados) return { accion: 'NADA' };
+
+  const hay = (actuales ?? []).map((c) => String(c ?? '').trim()).filter((c) => c.length > 0);
+
+  for (let i = 0; i < hay.length; i++) {
+    if (i >= esperados.length || hay[i] !== esperados[i]) {
+      return {
+        accion: 'DIVERGEN',
+        posicion: i + 1,
+        esperado: i < esperados.length ? esperados[i] : '(ninguna)',
+        encontrado: hay[i],
+      };
+    }
+  }
+
+  if (hay.length === esperados.length) return { accion: 'NADA' };
+
+  return {
+    accion: 'REESCRIBIR',
+    encabezados: esperados.slice(),
+    columnasNuevas: esperados.slice(hay.length),
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Árbol de Drive
 // ─────────────────────────────────────────────────────────────────────────────

@@ -57,6 +57,29 @@ function encabezadosDe(nombre) {
     const p = PESTANAS.filter((x) => x.nombre === nombre)[0];
     return p ? p.encabezados.slice() : null;
 }
+function repararEncabezados(nombre, actuales) {
+    const esperados = encabezadosDe(nombre);
+    if (!esperados)
+        return { accion: 'NADA' };
+    const hay = (actuales !== null && actuales !== void 0 ? actuales : []).map((c) => String(c !== null && c !== void 0 ? c : '').trim()).filter((c) => c.length > 0);
+    for (let i = 0; i < hay.length; i++) {
+        if (i >= esperados.length || hay[i] !== esperados[i]) {
+            return {
+                accion: 'DIVERGEN',
+                posicion: i + 1,
+                esperado: i < esperados.length ? esperados[i] : '(ninguna)',
+                encontrado: hay[i],
+            };
+        }
+    }
+    if (hay.length === esperados.length)
+        return { accion: 'NADA' };
+    return {
+        accion: 'REESCRIBIR',
+        encabezados: esperados.slice(),
+        columnasNuevas: esperados.slice(hay.length),
+    };
+}
 // ─────────────────────────────────────────────────────────────────────────────
 // Árbol de Drive
 // ─────────────────────────────────────────────────────────────────────────────

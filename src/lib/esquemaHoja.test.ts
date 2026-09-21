@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   COLUMNAS_SINCRONIZACION,
   NOMBRES_PESTANAS,
@@ -7,6 +9,7 @@ import {
   VERSION_ESQUEMA,
   pestanaPorNombre,
 } from './esquemaHoja';
+import { encabezadosDe, repararEncabezados } from './planInstalacion';
 
 /**
  * El esquema es un contrato entre dos programas que no se ven: el instalador
@@ -87,13 +90,26 @@ describe('los encabezados', () => {
     }
   });
 
-  it('toda tabla de datos termina con las tres columnas de cierre', () => {
+  it('toda tabla de datos lleva las tres columnas de cierre, juntas y en orden', () => {
     // Sin `borrado_en` no hay baja lógica, y sin baja lógica alguien acabará
     // borrando una fila de verdad.
+    //
+    // Hasta E10 esta prueba exigía además que fueran las ÚLTIMAS, y era una
+    // buena convención. Dejó de poder serlo: en una hoja ya instalada, los
+    // datos ocupan la posición que tenían el día que se escribieron, así que
+    // una columna nueva solo puede ir **por el final**, detrás incluso de
+    // estas tres. Entre una convención de lectura y no desplazar los datos de
+    // nadie, gana lo segundo.
     const sinCierre = ['CONFIG', 'ACCESO', 'CATALOGO_VACUNAS', 'AUDITORIA'];
     for (const p of PESTANAS) {
       if (sinCierre.includes(p.nombre)) continue;
-      expect(p.encabezados.slice(-3), p.nombre).toEqual([...COLUMNAS_SINCRONIZACION]);
+
+      const desde = p.encabezados.indexOf(COLUMNAS_SINCRONIZACION[0]);
+      expect(desde, `${p.nombre} no tiene creado_en`).toBeGreaterThanOrEqual(0);
+      expect(
+        p.encabezados.slice(desde, desde + COLUMNAS_SINCRONIZACION.length),
+        `${p.nombre}: las tres de cierre tienen que ir juntas y en orden`,
+      ).toEqual([...COLUMNAS_SINCRONIZACION]);
     }
   });
 
@@ -179,5 +195,91 @@ describe('los ficheros .gs generados', () => {
         stdio: 'pipe',
       }),
     ).not.toThrow();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// E10 · el esquema crece, y solo por el final
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('E10 · una hoja ya instalada tiene que sobrevivir al cambio', () => {
+  const V1 = JSON.parse(
+    readFileSync(join(process.cwd(), 'scripts', 'esquema-v1.json'), 'utf8'),
+  ) as { version: number; pestanas: Record<string, string[]> };
+
+  it('toda pestaña de v1 sigue existiendo', () => {
+    // Quitar una pestaña dejaría sus datos sin sitio donde leerse.
+    const ahora = new Set(PESTANAS.map((p) => p.nombre));
+    for (const nombre of Object.keys(V1.pestanas)) expect(ahora.has(nombre), nombre).toBe(true);
+  });
+
+  it('los encabezados de v1 son PREFIJO de los de ahora, columna por columna', () => {
+    // Este es el trinquete que importa. En una hoja instalada los datos ocupan
+    // la posición que tenían el día que se escribieron: meter una columna en
+    // medio desplazaría todas las de su derecha, y la fecha de nacimiento de
+    // alguien pasaría a leerse como su tipo de sangre. Sin error y en todas
+    // las filas a la vez.
+    for (const [nombre, viejos] of Object.entries(V1.pestanas)) {
+      const ahora = encabezadosDe(nombre) ?? [];
+      expect(ahora.slice(0, viejos.length), `${nombre} ya no extiende por el final`).toEqual(
+        viejos,
+      );
+    }
+  });
+
+  it('la versión sube cuando el esquema cambia', () => {
+    // Sin esto, una hoja vieja y una nueva son indistinguibles desde dentro.
+    const columnasV1 = Object.values(V1.pestanas).reduce((n, c) => n + c.length, 0);
+    const columnasAhora = PESTANAS.reduce((n, p) => n + p.encabezados.length, 0);
+    if (columnasAhora !== columnasV1) expect(VERSION_ESQUEMA).toBeGreaterThan(V1.version);
+  });
+
+  it('ninguna columna se repite dentro de una pestaña', () => {
+    // Dos columnas con el mismo nombre hacen que `columnasDe_` resuelva una
+    // sola y la otra se escriba en el vacío.
+    for (const p of PESTANAS) {
+      expect(new Set(p.encabezados).size, `${p.nombre} tiene columnas repetidas`).toBe(
+        p.encabezados.length,
+      );
+    }
+  });
+});
+
+describe('repararEncabezados', () => {
+  it('una pestaña al día no se toca', () => {
+    expect(repararEncabezados('PACIENTES', encabezadosDe('PACIENTES')!)).toEqual({
+      accion: 'NADA',
+    });
+  });
+
+  it('una pestaña de v1 se reescribe, y dice qué columnas son nuevas', () => {
+    const viejos = JSON.parse(
+      readFileSync(join(process.cwd(), 'scripts', 'esquema-v1.json'), 'utf8'),
+    ).pestanas.ORDENES as string[];
+
+    const r = repararEncabezados('ORDENES', viejos);
+    expect(r.accion).toBe('REESCRIBIR');
+    if (r.accion !== 'REESCRIBIR') return;
+    expect(r.encabezados).toEqual(encabezadosDe('ORDENES'));
+    expect(r.columnasNuevas).toContain('autorizacion_numero');
+  });
+
+  it('unos encabezados que DIVERGEN no se tocan: eso no es una hoja vieja', () => {
+    // Es una hoja que alguien editó a mano. Reescribir su fila 1 renombraría
+    // columnas con datos dentro sin mover los datos.
+    const r = repararEncabezados('PACIENTES', ['id', 'MI_COLUMNA', 'nombre']);
+    expect(r.accion).toBe('DIVERGEN');
+    if (r.accion !== 'DIVERGEN') return;
+    expect(r.posicion).toBe(2);
+    expect(r.encontrado).toBe('MI_COLUMNA');
+  });
+
+  it('las celdas vacías del final no cuentan como encabezados', () => {
+    const conVacias = [...encabezadosDe('PACIENTES')!, '', '  '];
+    expect(repararEncabezados('PACIENTES', conVacias)).toEqual({ accion: 'NADA' });
+  });
+
+  it('una pestaña que no es del esquema se deja en paz', () => {
+    expect(repararEncabezados('MIS_NOTAS', ['a', 'b'])).toEqual({ accion: 'NADA' });
   });
 });

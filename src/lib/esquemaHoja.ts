@@ -63,6 +63,24 @@ const conSincronizacion = (...campos: string[]): readonly string[] => [
   ...COLUMNAS_SINCRONIZACION,
 ];
 
+/**
+ * Columnas añadidas después de la versión 1 (E10).
+ *
+ * VAN SIEMPRE AL FINAL, detrás incluso de las de sincronización.
+ *
+ * No es estética. En una hoja ya instalada los datos ocupan las posiciones que
+ * tenían el día que se escribieron: meter una columna en medio desplazaría
+ * todas las de su derecha, y la fecha de nacimiento de alguien pasaría a leerse
+ * como su tipo de sangre. Sin error, sin aviso y en todas las filas a la vez.
+ *
+ * Añadir por el final es la única operación que una hoja vieja sobrevive, y hay
+ * una prueba que lo exige contra `scripts/esquema-v1.json`.
+ */
+const ampliado = (base: readonly string[], ...nuevas: string[]): readonly string[] => [
+  ...base,
+  ...nuevas,
+];
+
 export const PESTANAS: readonly DefinicionPestana[] = [
   {
     nombre: 'CONFIG',
@@ -96,23 +114,31 @@ export const PESTANAS: readonly DefinicionPestana[] = [
   {
     nombre: 'PACIENTES',
     descripcion: 'Núcleo común de humanos y mascotas. `tipo` los distingue.',
-    encabezados: conSincronizacion('id', 'tipo', 'nombre', 'relacion', 'activo', 'notas'),
+    encabezados: ampliado(
+      conSincronizacion('id', 'tipo', 'nombre', 'relacion', 'activo', 'notas'),
+      'foto_url',
+    ),
   },
   {
     nombre: 'PERFIL_HUMANO',
     descripcion: 'Lo propio de una persona. 1:1 con PACIENTES.',
-    encabezados: conSincronizacion(
-      'id',
-      'paciente_id',
-      'documento_tipo',
-      'documento_numero',
-      'fecha_nacimiento',
-      'sexo',
-      'tipo_sangre',
-      'eps',
-      'alergias',
-      'condiciones',
-      'telefono_emergencia',
+    encabezados: ampliado(
+      conSincronizacion(
+        'id',
+        'paciente_id',
+        'documento_tipo',
+        'documento_numero',
+        'fecha_nacimiento',
+        'sexo',
+        'tipo_sangre',
+        'eps',
+        'alergias',
+        'condiciones',
+        'telefono_emergencia',
+      ),
+      'medicamentos_actuales',
+      'medico_cabecera',
+      'seguro',
     ),
   },
   {
@@ -132,19 +158,24 @@ export const PESTANAS: readonly DefinicionPestana[] = [
   {
     nombre: 'CITAS',
     descripcion: 'Citas médicas y veterinarias, con su enlace al evento de Calendar.',
-    encabezados: conSincronizacion(
-      'id',
-      'paciente_id',
-      'titulo',
-      'especialidad',
-      'profesional',
-      'institucion',
-      'fecha',
-      'hora',
-      'estado',
-      'orden_id',
-      'evento_calendario_id',
-      'notas',
+    encabezados: ampliado(
+      conSincronizacion(
+        'id',
+        'paciente_id',
+        'titulo',
+        'especialidad',
+        'profesional',
+        'institucion',
+        'fecha',
+        'hora',
+        'estado',
+        'orden_id',
+        'evento_calendario_id',
+        'notas',
+      ),
+      'documentos_ids',
+      'completada_en',
+      'politica_recordatorio',
     ),
   },
   {
@@ -197,36 +228,48 @@ export const PESTANAS: readonly DefinicionPestana[] = [
   {
     nombre: 'DOCUMENTOS',
     descripcion: 'Referencias a archivos en Drive. Nunca el archivo, siempre su identificador.',
-    encabezados: conSincronizacion(
-      'id',
-      'paciente_id',
-      'titulo',
-      'tipo',
-      'archivo_drive_id',
-      'mime',
-      'fecha',
-      'origen',
-      'entidad_relacionada',
-      'notas',
+    encabezados: ampliado(
+      conSincronizacion(
+        'id',
+        'paciente_id',
+        'titulo',
+        'tipo',
+        'archivo_drive_id',
+        'mime',
+        'fecha',
+        'origen',
+        'entidad_relacionada',
+        'notas',
+      ),
+      'tamano_bytes',
+      'archivo_drive_url',
+      'categoria_clinica',
     ),
   },
   {
     nombre: 'MEDICAMENTOS',
     descripcion: 'Pautas de medicación. Las tomas concretas viven en DOSIS.',
-    encabezados: conSincronizacion(
-      'id',
-      'paciente_id',
-      'nombre',
-      'dosis_valor',
-      'dosis_unidad',
-      'frecuencia_tipo',
-      'frecuencia_valor',
-      'momentos',
-      'fecha_inicio',
-      'fecha_fin',
-      'estado',
-      'prescrito_por',
-      'notas',
+    encabezados: ampliado(
+      conSincronizacion(
+        'id',
+        'paciente_id',
+        'nombre',
+        'dosis_valor',
+        'dosis_unidad',
+        'frecuencia_tipo',
+        'frecuencia_valor',
+        'momentos',
+        'fecha_inicio',
+        'fecha_fin',
+        'estado',
+        'prescrito_por',
+        'notas',
+      ),
+      'cantidad',
+      'cantidad_unidad',
+      'duracion_dias',
+      'indicaciones',
+      'documento_id',
     ),
   },
   {
@@ -264,20 +307,30 @@ export const PESTANAS: readonly DefinicionPestana[] = [
   {
     nombre: 'ORDENES',
     descripcion: 'Órdenes médicas y su máquina de estados de autorización.',
-    encabezados: conSincronizacion(
-      'id',
-      'paciente_id',
-      'titulo',
-      'tipo',
-      'profesional',
-      'especialidad',
-      'emitida_en',
-      'vence_en',
-      'requiere_autorizacion',
-      'estado',
-      'resuelta_en',
-      'motivo',
-      'notas',
+    encabezados: ampliado(
+      conSincronizacion(
+        'id',
+        'paciente_id',
+        'titulo',
+        'tipo',
+        'profesional',
+        'especialidad',
+        'emitida_en',
+        'vence_en',
+        'requiere_autorizacion',
+        'estado',
+        'resuelta_en',
+        'motivo',
+        'notas',
+      ),
+      'descripcion',
+      'autorizacion_numero',
+      'autorizacion_fecha',
+      'autorizacion_vence_en',
+      'eps_o_proveedor',
+      'ips_o_clinica',
+      'documento_id',
+      'cita_relacionada_id',
     ),
   },
   {
@@ -361,7 +414,7 @@ export const PESTANAS: readonly DefinicionPestana[] = [
 export const NOMBRES_PESTANAS: readonly string[] = PESTANAS.map((p) => p.nombre);
 
 /** Versión del esquema. Cambiarla obliga a una migración en `instalar()`. */
-export const VERSION_ESQUEMA = 1;
+export const VERSION_ESQUEMA = 2;
 
 export function pestanaPorNombre(nombre: string): DefinicionPestana | null {
   return PESTANAS.find((p) => p.nombre === nombre) ?? null;

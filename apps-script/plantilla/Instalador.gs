@@ -88,6 +88,7 @@ function instalarConCerrojo_() {
   var hoja = SpreadsheetApp.getActive();
   var resumen = {
     pestanasCreadas: 0,
+    encabezadosReparados: 0,
     carpetasCreadas: 0,
     disparadoresBorrados: 0,
     disparadoresCreados: 0,
@@ -104,6 +105,15 @@ function instalarConCerrojo_() {
     crearPestana_(hoja, faltan[i]);
     resumen.pestanasCreadas++;
   }
+
+  // 1-bis · Encabezados de las pestañas que YA existían (E10).
+  //
+  // Crear las que faltan no basta cuando el esquema crece: una hoja instalada
+  // con una versión anterior conserva su fila 1 para siempre. Los datos se
+  // siguen leyendo y escribiendo bien —la posición la fija el esquema— pero
+  // las etiquetas mienten, y que la hoja se pueda leer a simple vista es media
+  // razón de que sea una hoja de cálculo.
+  resumen.encabezadosReparados += repararEncabezadosExistentes_(hoja, existentes);
 
   // 2 · Identidad de la familia y del documento. Antes que nada de lo que
   //     venga después, porque todo lo demás se apoya en esto.
@@ -293,6 +303,51 @@ function crearPestana_(hoja, nombre) {
   pestana.setFrozenRows(1);
   pestana.getRange(1, 1, 1, encabezados.length).setFontWeight('bold');
   return pestana;
+}
+
+/**
+ * Pone al día la fila 1 de las pestañas que ya estaban (E10).
+ *
+ * Solo reescribe cuando el esquema **extiende por el final** lo que hay. Si los
+ * encabezados divergen en cualquier posición, no toca nada y lo deja dicho en
+ * el registro: eso no es una hoja vieja, es una hoja que alguien editó a mano,
+ * y reescribir su fila 1 renombraría columnas con datos dentro sin moverlos.
+ *
+ * La decisión está en `Instalacion.gs`, generado desde `planInstalacion.ts`,
+ * donde tiene pruebas. Aquí solo se escribe.
+ */
+function repararEncabezadosExistentes_(hoja, existentes) {
+  var reparadas = 0;
+
+  for (var i = 0; i < existentes.length; i++) {
+    var nombre = existentes[i];
+    var pestana = hoja.getSheetByName(nombre);
+    if (!pestana || pestana.getLastColumn() === 0) continue;
+
+    var actuales = pestana.getRange(1, 1, 1, pestana.getLastColumn()).getValues()[0];
+    var veredicto = repararEncabezados(nombre, actuales);
+
+    if (veredicto.accion === 'DIVERGEN') {
+      console.warn(
+        'encabezados de ' + nombre + ' editados a mano en la columna ' + veredicto.posicion +
+          ': se esperaba «' + veredicto.esperado + '» y hay «' + veredicto.encontrado + '». No se toca.',
+      );
+      continue;
+    }
+
+    if (veredicto.accion !== 'REESCRIBIR') continue;
+
+    var fila = veredicto.encabezados;
+    pestana.getRange(1, 1, 1, fila.length).setValues([fila]);
+    pestana.getRange(1, 1, 1, fila.length).setFontWeight('bold');
+    reparadas++;
+    console.info(
+      nombre + ': ' + veredicto.columnasNuevas.length + ' columnas nuevas (' +
+        veredicto.columnasNuevas.join(', ') + ')',
+    );
+  }
+
+  return reparadas;
 }
 
 /** Escribe `CONFIG` conservando el identificador de familia si ya existía. */

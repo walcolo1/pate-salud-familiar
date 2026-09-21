@@ -4,7 +4,7 @@
 paso está en [TABLERO.md](TABLERO.md); esto es dónde estamos, qué sostiene lo
 hecho y qué falta.*
 
-Última actualización: **20 de septiembre de 2026**, al cerrar **E9** en vivo.
+Última actualización: **21 de septiembre de 2026**, al cerrar **E10**.
 
 ---
 
@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9, todos con validación en vivo |
+| **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10** amplía el esquema a v2 |
 | **G** | Corte seco de Firebase | **en curso** · G1 cerrado · G0 **parado** por la brecha de modelo |
 | **H** | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
 
@@ -116,7 +116,9 @@ cada módulo. Las que más condicionan lo que venga:
 | La carpeta `Temporal` existe y **nadie la vacía** hasta que E11 implemente la tarea diaria | `planInstalacion.ts` · `EVIDENCIA_E2.md` |
 | Actualizar una copia ya repartida cuando cambie el código: la maestra no actualiza a nadie hacia atrás | `PLANTILLA_PRODUCCION.md` |
 | Mirar el cuerpo del correo de invitación recibido: es lo único que queda de E9 | `EVIDENCIA_E9.md` |
-| La brecha entre el modelo y el esquema: 4 colecciones con más campos que columnas, y 4 escrituras sin pestaña ninguna | `G0-BRECHA-DE-MODELO.md` |
+| Pegar el consolidado v2 en la plantilla maestra y reinstalar la hoja de pruebas para que reparen encabezados | `E10-ESQUEMA-V2.md` |
+| Las 4 escrituras de E11 siguen sin pestaña: lanzarán un error explícito en vez de callar | `G0-BRECHA-DE-MODELO.md` |
+| `version_esquema` dice en qué versión está una hoja, pero **nadie actúa** en consecuencia todavía | `E10-ESQUEMA-V2.md` |
 | `SheetsRepository` tiene **las 31 escrituras mudas**: girar la bandera a `sheets` hoy perdería datos en silencio. Medido y acotado por G1; lo arregla **G0** | `scripts/escrituras-mudas.json` |
 | Validación de consentimiento OAuth limpio | `TESTING.md` §6.11 |
 | `/members/:id/edit` y `/login` fuera de la red de axe | `ACCESIBILIDAD.md`, puerta de C9 |
@@ -156,13 +158,13 @@ pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
 
 ## Siguiente paso
 
-**Decidir la brecha de modelo**, que dejó G0 parado a mitad: el esquema de la
-hoja y el modelo de la aplicación no son el mismo modelo, y mapear sin decidir
-tiraría campos que hoy un usuario ve. El análisis con la tabla campo por campo
-está en [G0-BRECHA-DE-MODELO.md](G0-BRECHA-DE-MODELO.md).
+**Retomar G0**: el mapeo de modelos a pestañas, ahora sobre base firme. E10
+cerró la brecha añadiendo 23 columnas en 6 pestañas y subiendo el esquema a
+**v2** ([E10-ESQUEMA-V2.md](E10-ESQUEMA-V2.md)).
 
-La recomendación es un paso **E10** que amplíe el esquema —unas 18 columnas en
-6 pestañas— antes de seguir con el mapeo de G0.
+Antes conviene pegar el consolidado nuevo en la plantilla maestra y reinstalar
+la hoja de pruebas: `instalar()` ahora repara encabezados de pestañas que ya
+existían, y eso no se ha ejercitado contra Google todavía.
 
 El plan completo, con los seis pasos y sus puertas, está en
 [PLAN_BLOQUE_G.md](PLAN_BLOQUE_G.md).
