@@ -104,17 +104,29 @@ Lo que hay que resolver aquí y no es mecánico:
 por igual —es lo que hace seguro el cambio de bandera—, más `test:run` sin
 regresiones, `tsc 0`, lint limpio, E2E y axe sin caídas.
 
-### G1 · Que no se pueda perder un dato en silencio
+### G1 · Que no se pueda perder un dato en silencio ✅
 
-Antes de girar ninguna bandera: que **ningún método de escritura pueda ser un
-no-op**. Una prueba que recorra el contrato entero y falle si una implementación
-registrada acepta una escritura sin hacer nada.
+**Hecho el 20 de septiembre de 2026, y antes que G0** por decisión expresa: la
+red antes del salto.
 
-Es corto y va solo porque es la única puerta que protege del fallo del punto 2,
-y porque una vez girada la bandera ya no avisa nadie.
+`src/lib/contratoRepositorio.ts` clasifica los 37 métodos en **31 de escritura
+y 6 de solo lectura**, y mira el cuerpo de cada uno: mudo es el que no llama,
+no espera, no asigna y no lanza. No ejecuta el repositorio —haría falta un
+backend— sino que lee su código, y basta para lo que tiene que atrapar.
 
-**Puertas:** la prueba falla con `SheetsRepository` tal y como está hoy. Si no
-falla, no sirve.
+**La puerta se vio en rojo antes de aceptarla.** Con la línea base vacía, la
+prueba falla nombrando las **31 de 31** escrituras mudas de `SheetsRepository`.
+
+La línea base recoge esas 31 para que la suite no viva en rojo, y **solo puede
+menguar**: una prueba rechaza cualquier muda nueva, otra rechaza que la lista
+apunte algo ya arreglado, y una tercera vigila que el total no suba. Es el
+mismo trato que `lint-baseline.json` y `axe-baseline.json`.
+
+**Ese número —31— es la deuda de G0 y se mide sola.** Cuando llegue a cero, el
+cambio de bandera es seguro por construcción.
+
+`FirebaseRepository` queda fuera: inicializa Firebase al importarse y no se
+puede instanciar en las pruebas. No es un agujero que dure — **G4 lo borra**.
 
 ### G2 · La sincronización híbrida
 
@@ -186,15 +198,15 @@ dejo escrito con sus comprobaciones y lo ejecutas tú.
 ## El orden, y por qué
 
 ```
+  G1  ninguna escritura puede ser muda    ✅ la red, puesta antes del salto
   G0  repositorio nuevo, al lado          ← nada cambia todavía
-  G1  ninguna escritura puede ser muda    ← la red antes del salto
   G2  sincronización híbrida              ← con el repositorio nuevo ya puesto
   G3  fuera Firebase Auth                 ← la hebra arriesgada, sola
   G4  el corte y la limpieza              ← cuando nada depende ya
   G5  apagar el proyecto                  ← tuyo
 ```
 
-G0 y G1 no cambian el comportamiento de nada: son construir y atar. El primer
+G1 y G0 no cambian el comportamiento de nada: son atar y construir. El primer
 paso que un usuario nota es G2. Si algo se rompe en G3, se sabe que fue la
 autenticación, porque los datos llevaban dos pasos funcionando.
 
