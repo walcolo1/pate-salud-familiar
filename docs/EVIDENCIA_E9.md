@@ -1,6 +1,13 @@
 # Evidencia E9 — un familiar entra sin autorizar nada
 
-**Estado: PREPARADO. Pendiente de ejecución.**
+**Estado: LA PROMESA DEL BLOQUE, DEMOSTRADA. Ejecutado el 20 de septiembre de 2026.**
+
+Un familiar entró en un expediente **sin ver una sola pantalla de permisos de
+Google**. Eso era lo que había que probar y está probado.
+
+Cinco de las nueve comprobaciones del guion quedan cerradas; cuatro no las
+cubre este recorrido y siguen abiertas. Están marcadas abajo, no dadas por
+buenas.
 
 Esta es la promesa de la que cuelga el bloque entero, y la única que ninguna
 prueba puede sustituir: **que el familiar no vea ni una sola pantalla de
@@ -221,19 +228,65 @@ Captura: `E9-05-cuenta-equivocada.png`.
 
 ## Resultados
 
-*(Pendiente de ejecución.)*
+Ejecutado el **20 de septiembre de 2026** contra una compilación de producción
+en `localhost:3000`, con dos cuentas `@gmail.com` personales.
 
 | # | Comprobación | Resultado |
 |---|---|---|
-| 1 | `MailApp` envía desde una cuenta gratuita | |
-| 2 | **El familiar no ve ninguna pantalla de permisos** | |
-| 3 | El enlace sobrevive al cliente de correo | |
-| 4 | La cuenta equivocada da `INVITACION_DESTINATARIO_INVALIDO` | |
-| 5 | El token queda consumido: repetir da `INVITACION_YA_USADA` | |
-| 6 | El correo no lleva ningún nombre ni nada clínico | |
-| 7 | En la hoja va el hash, nunca el token | |
-| 8 | Un `backend` ajeno no recibe ninguna petición | |
-| 9 | Solo se guarda la `/exec` en el navegador | |
+| 1 | `MailApp` envía desde una cuenta gratuita | ✅ el correo llegó de inmediato |
+| 2 | **El familiar no ve ninguna pantalla de permisos** | ✅ **cero advertencias, cero permisos** |
+| 3 | El enlace sobrevive al cliente de correo | ⬜ el recorrido se hizo con el enlace reescrito a `localhost` |
+| 4 | La cuenta equivocada da `INVITACION_DESTINATARIO_INVALIDO` | ⬜ sin probar en vivo · cubierto por `I5` con dobles |
+| 5 | El token queda consumido: repetir da `INVITACION_YA_USADA` | ⬜ sin probar en vivo · la hoja **sí** muestra el consumo (ver abajo) |
+| 6 | El correo no lleva ningún nombre ni nada clínico | ⬜ sin revisar el cuerpo recibido · trinquete en `invitaciones.test.ts` |
+| 7 | En la hoja va el hash, nunca el token | ✅ `token_hash` y `token_expira` con la forma esperada |
+| 8 | Un `backend` ajeno no recibe ninguna petición | ⬜ sin probar en vivo · cubierto por `I2` |
+| 9 | Solo se guarda la `/exec` en el navegador | ⬜ sin inspeccionar en vivo · cubierto por `I4` |
+
+### Lo que se vio, en orden
+
+1. La sonda mandó la invitación y el correo llegó.
+2. La fila apareció en `ACCESO` como `INVITADO`, con hash y caducidad.
+3. Al abrir el enlace: la pantalla de alta, el botón de Google, la elección de
+   cuenta. **Y nada más.** Ni «Google no ha verificado esta aplicación», ni
+   lista de ámbitos, ni un solo consentimiento.
+4. Redirección a `/dashboard` con la sesión puesta y el estado «Copia en Drive ·
+   Activo».
+5. En la hoja, la fila pasó a **`ACTIVO`** y se anotó el último acceso.
+
+El punto 3 es el bloque entero. El titular paga una fricción de cuatro minutos
+una vez; el familiar no paga ninguna. Se podía razonar, y ahora está visto.
+
+El punto 5 confirma además, indirectamente, el consumo del token:
+`escribirMutacion_` vacía `token_hash` y `token_expira` en el mismo paso que
+pone `ACTIVO`. Lo que no se ha comprobado es lo otro —que **reabrir** el enlace
+devuelva `INVITACION_YA_USADA`—, que es la mitad que le importa a quien vuelve
+a pulsar el enlace en el correo.
+
+### Por qué cuatro quedan abiertas, y qué cuesta cerrarlas
+
+El recorrido se hizo desde `localhost`, con el enlace reescrito a mano. Eso
+valida la aplicación y **no valida el enlace**: el correo apunta al dominio de
+Vercel, y si algún cliente de correo lo parte, esto no lo habría visto.
+
+Las cuatro se cierran en un solo recorrido más, en cuanto el alias de
+producción sirva E9:
+
+| Qué hacer | Cierra |
+|---|---|
+| Abrir el enlace **tal y como llegó**, sin tocarlo | 3 |
+| Volver a abrirlo después de haber entrado | 5 |
+| Abrirlo desde la cuenta del titular | 4 |
+| Mirar el cuerpo del correo recibido | 6 |
+| `localStorage` en la consola, y cambiar `backend` a mano | 9 y 8 |
+
+Ninguna necesita código nuevo. Son diez minutos con el correo delante.
+
+> **Bloqueado por una cosa, y no es de este repositorio.** El alias
+> `pate-salud-familiar.vercel.app` sigue apuntando a un despliegue anterior a
+> E9: el commit `ca76879` está construido y `READY` en producción, pero sin
+> promover. Medido el 20 de septiembre: el alias da 404 en `/invitacion` y el
+> despliegue directo da 200.
 
 ---
 

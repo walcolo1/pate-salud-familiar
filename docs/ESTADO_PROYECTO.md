@@ -4,7 +4,7 @@
 paso está en [TABLERO.md](TABLERO.md); esto es dónde estamos, qué sostiene lo
 hecho y qué falta.*
 
-Última actualización: **19 de septiembre de 2026**, al cerrar **E9**.
+Última actualización: **20 de septiembre de 2026**, al cerrar **E9** en vivo.
 
 ---
 
@@ -16,7 +16,7 @@ hecho y qué falta.*
 | **B** | OAuth y retirada de Gmail | cerrado |
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
-| **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9; E0–E6 y E8 validados en vivo |
+| **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9, todos con validación en vivo |
 | **G** | Corte seco de Firebase | pendiente |
 | **H** | Eliminar el autoguardado global de PHI | pendiente |
 
@@ -115,9 +115,8 @@ cada módulo. Las que más condicionan lo que venga:
 | Las cinco capturas de la pantalla de «app no verificada», sobre una copia de usar y tirar | `PLANTILLA_PRODUCCION.md` · paso 6 |
 | La carpeta `Temporal` existe y **nadie la vacía** hasta que E11 implemente la tarea diaria | `planInstalacion.ts` · `EVIDENCIA_E2.md` |
 | Actualizar una copia ya repartida cuando cambie el código: la maestra no actualiza a nadie hacia atrás | `PLANTILLA_PRODUCCION.md` |
-| El recorrido en vivo de la invitación, con la comprobación que sostiene el bloque: que el familiar no vea ninguna pantalla de permisos | `EVIDENCIA_E9.md` |
-| `URL_PWA` y `URL_BACKEND` sin configurar en la hoja de pruebas: hasta entonces `invitar` falla cerrado | `EVIDENCIA_E9.md` |
-| Puede hacer falta autorizar el origen de la PWA en el cliente OAuth. **No se toca sin decisión explícita** | `EVIDENCIA_E9.md` |
+| El alias `pate-salud-familiar.vercel.app` apunta a un despliegue anterior a E9: `ca76879` está construido y `READY`, sin promover | Consola de Vercel |
+| Cuatro comprobaciones de E9 sin cerrar en vivo: el enlace tal y como llega, reabrirlo, la cuenta equivocada y el cuerpo del correo | `EVIDENCIA_E9.md` |
 | Validación de consentimiento OAuth limpio | `TESTING.md` §6.11 |
 | `/members/:id/edit` y `/login` fuera de la red de axe | `ACCESIBILIDAD.md`, puerta de C9 |
 | 23 `alert` de error siguen sin migrar al sistema de avisos | `src/` |
@@ -144,9 +143,9 @@ cuentas de Google, no de reglas que alguien pueda escribir al revés.
 | **E5** | Matriz de permisos por rol | ✅ por la cadena, en E6-live |
 | **E6 · E6-live** | Router: puerta única y `aplicar()` por lotes | ✅ · 9 de 9 |
 | **E6-bis** | Normalización simétrica de correos | Probado en frío |
-| **E7** | Invitaciones | Probado en frío · guion en `EVIDENCIA_E9.md` |
+| **E7** | Invitaciones | ✅ · correo enviado y canjeado de verdad |
 | **E8** | Plantilla maestra y guion de publicación | ✅ · molde publicado y `/copy` probado |
-| **E9** | Ruta `/invitacion` en la PWA | Probado en frío · guion en `EVIDENCIA_E9.md` |
+| **E9** | Ruta `/invitacion` en la PWA | ✅ · **un familiar entró sin ver una sola pantalla de permisos** |
 
 **Lo que queda del bloque no es código**: armar la hoja maestra, capturar la
 pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
@@ -156,8 +155,11 @@ pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
 
 ## Siguiente paso
 
-**El recorrido en vivo de E9** —una invitación de verdad, de un correo a una
-sesión— y después el **Bloque G**, el corte seco de Firebase.
+**El Bloque G**, el corte seco de Firebase.
+
+Antes, dos cosas de diez minutos: promover `ca76879` en Vercel y volver a
+recorrer la invitación **con el enlace sin tocar**, que cierra las cuatro
+comprobaciones que quedaron abiertas.
 
 Las dos comprobaciones de `aplicar()` que siguen abiertas en `ROUTER.md` no se
 desbloquean aceptando una invitación: hacen falta dos peticiones simultáneas y
