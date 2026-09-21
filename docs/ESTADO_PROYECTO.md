@@ -17,7 +17,7 @@ hecho y qué falta.*
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
 | **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9, todos con validación en vivo |
-| **G** | Corte seco de Firebase | **en curso** · G1 cerrado · ver [PLAN_BLOQUE_G.md](PLAN_BLOQUE_G.md) |
+| **G** | Corte seco de Firebase | **en curso** · G1 cerrado · G0 **parado** por la brecha de modelo |
 | **H** | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
 
 El Bloque D cierra con cuatro pasos y una fase de convención:
@@ -116,6 +116,7 @@ cada módulo. Las que más condicionan lo que venga:
 | La carpeta `Temporal` existe y **nadie la vacía** hasta que E11 implemente la tarea diaria | `planInstalacion.ts` · `EVIDENCIA_E2.md` |
 | Actualizar una copia ya repartida cuando cambie el código: la maestra no actualiza a nadie hacia atrás | `PLANTILLA_PRODUCCION.md` |
 | Mirar el cuerpo del correo de invitación recibido: es lo único que queda de E9 | `EVIDENCIA_E9.md` |
+| La brecha entre el modelo y el esquema: 4 colecciones con más campos que columnas, y 4 escrituras sin pestaña ninguna | `G0-BRECHA-DE-MODELO.md` |
 | `SheetsRepository` tiene **las 31 escrituras mudas**: girar la bandera a `sheets` hoy perdería datos en silencio. Medido y acotado por G1; lo arregla **G0** | `scripts/escrituras-mudas.json` |
 | Validación de consentimiento OAuth limpio | `TESTING.md` §6.11 |
 | `/members/:id/edit` y `/login` fuera de la red de axe | `ACCESIBILIDAD.md`, puerta de C9 |
@@ -155,9 +156,13 @@ pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
 
 ## Siguiente paso
 
-**G0 · el repositorio nuevo contra el router de E**. Se construye al lado, sin
-girar ninguna bandera: al terminar, la aplicación funciona exactamente igual
-que hoy, y la línea base de escrituras mudas ha bajado de 31 a 0.
+**Decidir la brecha de modelo**, que dejó G0 parado a mitad: el esquema de la
+hoja y el modelo de la aplicación no son el mismo modelo, y mapear sin decidir
+tiraría campos que hoy un usuario ve. El análisis con la tabla campo por campo
+está en [G0-BRECHA-DE-MODELO.md](G0-BRECHA-DE-MODELO.md).
+
+La recomendación es un paso **E10** que amplíe el esquema —unas 18 columnas en
+6 pestañas— antes de seguir con el mapeo de G0.
 
 El plan completo, con los seis pasos y sus puertas, está en
 [PLAN_BLOQUE_G.md](PLAN_BLOQUE_G.md).
