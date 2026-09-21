@@ -5,8 +5,8 @@
 Un familiar entró en un expediente **sin ver una sola pantalla de permisos de
 Google**. Eso era lo que había que probar y está probado.
 
-Siete de las nueve comprobaciones quedan cerradas. Las dos que faltan están
-marcadas abajo, no dadas por buenas.
+Ocho de las nueve comprobaciones quedan cerradas. La que falta —el cuerpo del
+correo recibido— está marcada abajo, no dada por buena.
 
 El segundo recorrido, con el enlace **tal y como llegó** y ya sobre el dominio
 de producción, encontró además un mensaje mal escrito. Está al final.
@@ -240,7 +240,7 @@ tocar.
 | 1 | `MailApp` envía desde una cuenta gratuita | ✅ el correo llegó de inmediato |
 | 2 | **El familiar no ve ninguna pantalla de permisos** | ✅ **cero advertencias, cero permisos** |
 | 3 | El enlace sobrevive al cliente de correo | ✅ abierto tal cual, sin un parámetro truncado |
-| 4 | La cuenta equivocada da `INVITACION_DESTINATARIO_INVALIDO` | ⬜ sin probar en vivo · cubierto por `I5` con dobles |
+| 4 | La cuenta equivocada da `INVITACION_DESTINATARIO_INVALIDO` | ✅ otra cuenta de Google, con el token vivo: rechazada |
 | 5 | El token queda consumido: reabrir el enlace se rechaza | ✅ rechazado · **pero con otro código del previsto, ver abajo** |
 | 6 | El correo no lleva ningún nombre ni nada clínico | ⬜ **sin revisar el cuerpo recibido** · trinquete en `invitaciones.test.ts` |
 | 7 | En la hoja va el hash, nunca el token | ✅ `token_hash` y `token_expira` con la forma esperada |
@@ -304,17 +304,30 @@ clínico está atado con un trinquete sobre la plantilla, pero nadie ha mirado
 todavía el correo que llegó de verdad. Un vistazo de un minuto a la bandeja, y
 conviene darlo antes de que se borre.
 
-**4 · La cuenta equivocada.** `I5` lo cubre con dobles, pero lo que decide de
-verdad es el backend comparando el correo del `id_token` con el de la fila, y
-eso no lo ejercita ninguna prueba. **Ya no se puede comprobar con esta
-invitación**: el token se gastó al aceptarla. Hace falta emitir una nueva y
-abrirla desde la cuenta del titular, que son cinco minutos con
-`--solo-invitar`.
+No bloquea el Bloque G, pero conviene darlo antes de que el correo se borre.
 
-Ninguna de las dos bloquea el Bloque G. La 4 es la que de verdad conviene
-cerrar antes de que esto lo use alguien: es la decisión de E7 —una invitación
-reenviada no funciona— y es la única de las nueve que protege a una familia de
-un correo que acabó en la bandeja equivocada.
+### La comprobación 4, cerrada con una invitación nueva
+
+Es la decisión de E7 —una invitación reenviada no funciona— y la única de las
+nueve que protege a una familia de un correo que acabó en la bandeja
+equivocada. Se abrió el enlace desde una tercera cuenta de Google y la
+aplicación respondió «Estás en la cuenta equivocada», con el botón para
+reintentar.
+
+El código devuelto lo confirma por sí solo: `INVITACION_DESTINATARIO_INVALIDO`
+**solo se alcanza con el token vivo**. Si la invitación hubiera estado gastada,
+`buscarPorHash_` no habría encontrado la fila y la respuesta habría sido
+`INVITACION_DESCONOCIDA`. Que saliera este código prueba las dos cosas a la
+vez: que la fila se encontró por su hash y que la comparación de correos la
+rechazó.
+
+Y el mensaje **no dice para quién era** la invitación, que es lo que no puede
+salir de ahí.
+
+> **Queda una invitación viva.** La que se emitió para esta prueba no se
+> canjeó: sigue en `ACCESO` como `INVITADO`, con su hash y siete días de
+> vigencia. Un token vivo en una bandeja es una puerta abierta. Conviene
+> revocarla desde la aplicación o vaciar su fila a mano.
 
 > **El alias ya está promovido.** `pate-salud-familiar.vercel.app/invitacion`
 > responde 200 y sirve E9. Fue lo que permitió la segunda pasada.
