@@ -141,7 +141,12 @@ var PESTANAS = [
     {
         nombre: 'EXAMENES_RESULTADOS',
         descripcion: 'Valores de un examen. `verificado_por` es obligatorio antes de leerlos como dato.',
-        encabezados: conSincronizacion('id', 'examen_id', 'parametro', 'valor', 'unidad', 'rango_referencia', 'fuera_de_rango', 'confianza_extraccion', 'verificado_por'),
+        encabezados: ampliado(conSincronizacion('id', 'examen_id', 'parametro', 'valor', 'unidad', 'rango_referencia', 'fuera_de_rango', 'confianza_extraccion', 'verificado_por'), 
+        // v4 · La unica pestana de datos que colgaba de otra fila y no de un
+        // paciente. Sin esta columna no se podia escribir —el router deniega
+        // toda mutacion que no diga sobre quien actua, tambien al titular— ni
+        // leer, porque `consultar` filtra justamente por aqui.
+        'paciente_id'),
     },
     {
         nombre: 'DOCUMENTOS',
@@ -224,7 +229,7 @@ var PESTANAS = [
 /** Los nombres, en el mismo orden en que se crean las pestañas. */
 var NOMBRES_PESTANAS = PESTANAS.map((p) => p.nombre);
 /** Versión del esquema. Cambiarla obliga a una migración en `instalar()`. */
-var VERSION_ESQUEMA = 3;
+var VERSION_ESQUEMA = 4;
 function pestanaPorNombre(nombre) {
     var _a;
     return (_a = PESTANAS.find((p) => p.nombre === nombre)) !== null && _a !== void 0 ? _a : null;

@@ -134,7 +134,14 @@ cambio de bandera es seguro por construcción.
 `FirebaseRepository` queda fuera: inicializa Firebase al importarse y no se
 puede instanciar en las pruebas. No es un agujero que dure — **G4 lo borra**.
 
-### G2 · La sincronización híbrida
+### G2 · La sincronización híbrida ✅
+
+**Hecho el 21 de septiembre de 2026.** 120 s en primer plano, nada en segundo,
+y el regreso como disparador primario. Las dos cosas que había que medir antes
+de fijar el intervalo están resueltas: la cuota (20.000 llamadas/día en cuenta
+@gmail.com; el sondeo gasta el 1,2 %) y qué hacer cuando cambia la revisión
+—que sigue **abierta a propósito**, con `alCambiar` como llamada de vuelta—.
+Ver [G2-SINCRONIZACION.md](G2-SINCRONIZACION.md).
 
 `obtenerRevision` al abrir y al recuperar el foco (`visibilitychange`), y
 sondeo cada 90–120 s **solo con la pestaña visible**. En segundo plano se

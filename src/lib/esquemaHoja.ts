@@ -219,16 +219,23 @@ export const PESTANAS: readonly DefinicionPestana[] = [
   {
     nombre: 'EXAMENES_RESULTADOS',
     descripcion: 'Valores de un examen. `verificado_por` es obligatorio antes de leerlos como dato.',
-    encabezados: conSincronizacion(
-      'id',
-      'examen_id',
-      'parametro',
-      'valor',
-      'unidad',
-      'rango_referencia',
-      'fuera_de_rango',
-      'confianza_extraccion',
-      'verificado_por',
+    encabezados: ampliado(
+      conSincronizacion(
+        'id',
+        'examen_id',
+        'parametro',
+        'valor',
+        'unidad',
+        'rango_referencia',
+        'fuera_de_rango',
+        'confianza_extraccion',
+        'verificado_por',
+      ),
+      // v4 · La unica pestana de datos que colgaba de otra fila y no de un
+      // paciente. Sin esta columna no se podia escribir —el router deniega
+      // toda mutacion que no diga sobre quien actua, tambien al titular— ni
+      // leer, porque `consultar` filtra justamente por aqui.
+      'paciente_id',
     ),
   },
   {
@@ -432,7 +439,7 @@ export const PESTANAS: readonly DefinicionPestana[] = [
 export const NOMBRES_PESTANAS: readonly string[] = PESTANAS.map((p) => p.nombre);
 
 /** Versión del esquema. Cambiarla obliga a una migración en `instalar()`. */
-export const VERSION_ESQUEMA = 3;
+export const VERSION_ESQUEMA = 4;
 
 export function pestanaPorNombre(nombre: string): DefinicionPestana | null {
   return PESTANAS.find((p) => p.nombre === nombre) ?? null;

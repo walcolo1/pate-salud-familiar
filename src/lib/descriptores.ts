@@ -159,8 +159,13 @@ export const DESCRIPTORES: Record<string, readonly Descriptor[]> = {
   examResults: [
     {
       pestana: 'EXAMENES_RESULTADOS',
+      // v4 · `memberId` no es un campo de `ExamResult`: lo pone quien guarda,
+      // que sabe de quién es el examen. Sin él la fila no se puede escribir ni
+      // volver a encontrar.
+      pacienteDesde: 'memberId',
       campos: {
         id: c('id'),
+        memberId: c('paciente_id'),
         examId: c('examen_id'),
         parameterName: c('parametro'),
         value: c('valor'),

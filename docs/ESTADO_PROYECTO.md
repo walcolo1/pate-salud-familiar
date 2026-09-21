@@ -17,7 +17,7 @@ hecho y qué falta.*
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
 | **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10/E10-bis** llevan el esquema a v3 |
-| **G** | Corte seco de Firebase | **en curso** · G1 y G0 cerrados · siguiente, G2 |
+| **G** | Corte seco de Firebase | **en curso** · G1, G0 y G2 cerrados · siguiente, G3 |
 | **H** | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
 
 El Bloque D cierra con cuatro pasos y una fase de convención:
@@ -116,10 +116,11 @@ cada módulo. Las que más condicionan lo que venga:
 | La carpeta `Temporal` existe y **nadie la vacía** hasta que E11 implemente la tarea diaria | `planInstalacion.ts` · `EVIDENCIA_E2.md` |
 | Actualizar una copia ya repartida cuando cambie el código: la maestra no actualiza a nadie hacia atrás | `PLANTILLA_PRODUCCION.md` |
 | Mirar el cuerpo del correo de invitación recibido: es lo único que queda de E9 | `EVIDENCIA_E9.md` |
-| Pegar el consolidado **v3** en la plantilla maestra y repetir `instalar()` en la hoja de pruebas, que sigue en v2 | `E10-ESQUEMA-V2.md` |
 | Las **tareas genéricas** (`FollowUpTask`) dejarán de guardarse al girar la bandera de G: `SEGUIMIENTOS` es otra cosa y no tienen pestaña | `descriptores.ts` · `SIN_PESTANA` |
 | Las 4 escrituras de E11 siguen sin pestaña: **lanzan** un error explícito en vez de callar | `G0-REPOSITORIO.md` |
-| `EXAMENES_RESULTADOS` no tiene columna de paciente: los valores de examen **no se escriben ni se leen** contra el backend. Decisión pendiente: columna `paciente_id` (esquema v4) | `G0-REPOSITORIO.md` |
+| Qué hacer cuando la revisión cambia —recargar, avisar o recargar lo que no está en edición— sigue **sin decidir**: `alCambiar` es una llamada de vuelta | `G2-SINCRONIZACION.md` |
+| El sondeo de G2 **no está conectado**: no puede estarlo hasta que G3 dé el `id_token` | `sondeoRevision.ts` |
+| Pegar el consolidado **v4** y repetir `instalar()`: la hoja de pruebas quedó en v3 | `E10-ESQUEMA-V2.md` |
 | El repositorio de G0 no tiene de dónde sacar el `id_token`: `sesionDelNavegador()` devuelve `null` hasta **G3** | `repositorioBackend.ts` |
 | `version_esquema` dice en qué versión está una hoja, pero **nadie actúa** en consecuencia todavía | `E10-ESQUEMA-V2.md` |
 | Validación de consentimiento OAuth limpio | `TESTING.md` §6.11 |
@@ -160,13 +161,13 @@ pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
 
 ## Siguiente paso
 
-**G2, la sincronización híbrida**. G0 está cerrado: los 31 métodos escriben de
-verdad y el contador de escrituras mudas está en **0**
-([G0-REPOSITORIO.md](G0-REPOSITORIO.md)).
+**G3, salir de Firebase Auth**. Es lo que desbloquea todo lo demás: G0 y G2
+están escritos y **ninguno de los dos puede encenderse** sin un `id_token` al
+alcance de la aplicación.
 
-Antes, dos cosas: pegar el consolidado **v3** en la plantilla maestra y repetir
-`instalar()` en la hoja de pruebas; y decidir la columna `paciente_id` de
-`EXAMENES_RESULTADOS`, que es lo único que G0 devuelve sin resolver.
+Antes, pegar el consolidado **v4** y repetir `instalar()`: la columna
+`paciente_id` de `EXAMENES_RESULTADOS` es la única reparación
+([E10-ESQUEMA-V2.md](E10-ESQUEMA-V2.md)).
 
 El plan completo, con los seis pasos y sus puertas, está en
 [PLAN_BLOQUE_G.md](PLAN_BLOQUE_G.md).

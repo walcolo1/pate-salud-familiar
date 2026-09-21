@@ -154,12 +154,12 @@ describe('los descriptores hablan del esquema de verdad', () => {
     }
   });
 
-  it('cada fila dice a qué paciente pertenece, salvo las que cuelgan de otra', () => {
-    // Sin paciente, `aplicar()` no puede comprobar el alcance de quien escribe.
-    // `examResults` es la excepción: cuelga de un examen, y el examen ya dice
-    // de quién es.
+  it('cada fila dice a qué paciente pertenece, sin excepciones', () => {
+    // Sin paciente, `aplicar()` no puede comprobar el alcance de quien escribe
+    // —y lo deniega, también al titular—. `examResults` era la excepción
+    // porque colgaba de un examen; el esquema v4 le dio su `paciente_id` y la
+    // excepción desapareció, que es justo lo que había que conseguir.
     for (const [coleccion, lista] of Object.entries(DESCRIPTORES)) {
-      if (coleccion === 'examResults') continue;
       for (const d of lista) {
         expect(d.pacienteDesde, `${coleccion} → ${d.pestana} no dice de quién es`).toBeTruthy();
       }

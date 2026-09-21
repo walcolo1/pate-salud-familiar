@@ -169,6 +169,9 @@ const PESTANAS_POR_PACIENTE: readonly string[] = [
   'ORDENES',
   'MEDICAMENTOS',
   'DOSIS',
+  // v4 · Antes no se podía: sin `paciente_id`, `consultar` no tenía por dónde
+  // filtrar y los valores de un examen no había forma de volver a leerlos.
+  'EXAMENES_RESULTADOS',
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -368,10 +371,17 @@ export class RepositorioBackend implements DataRepository {
       }
     }
 
-    // `EXAMENES_RESULTADOS` no tiene columna de paciente, así que `consultar`
-    // no puede filtrarla y `exportar` la trae sin poder atribuirla. Queda
-    // vacía a la espera de la decisión anotada en G0-BRECHA-DE-MODELO.md.
+    // Los valores de un examen van agrupados por examen, que es como los pide
+    // `AllFamilyData` y como se leen: nadie mira un parámetro suelto.
     datos.examResults = {};
+    const resultados = DESCRIPTORES.examResults?.[0];
+    if (resultados) {
+      for (const resultado of colapsar(resultados, filasDe(resultados.pestana))) {
+        const examId = String(resultado.examId ?? '');
+        if (!examId) continue;
+        (datos.examResults[examId] ??= []).push(resultado as unknown as ExamResult);
+      }
+    }
 
     return datos;
   }
@@ -463,10 +473,11 @@ export class RepositorioBackend implements DataRepository {
   /**
    * Los valores de un examen.
    *
-   * `memberId` es nuevo en el contrato y es opcional por compatibilidad, pero
-   * aquí **hace falta**: `EXAMENES_RESULTADOS` no tiene columna de paciente y
-   * `puede()` deniega toda mutación que no diga sobre quién actúa, incluso al
-   * titular. Sin él no se escribe, y se dice.
+   * `memberId` es opcional en el contrato por compatibilidad con Firestore,
+   * pero aquí **hace falta**: es lo que va a la columna `paciente_id` que el
+   * esquema v4 añadió, y sin la cual el router deniega la mutación —también al
+   * titular— y `consultar` no puede volver a encontrarla. Sin él no se
+   * escribe, y se dice.
    */
   async saveExamResults(
     _ctx: RepositoryContext,
@@ -476,17 +487,18 @@ export class RepositorioBackend implements DataRepository {
   ): Promise<void> {
     const pacienteId = String(memberId ?? '').trim();
     if (pacienteId.length === 0) {
-      throw new ErrorBackend(
-        SIN_PACIENTE,
-        'EXAMENES_RESULTADOS no tiene columna de paciente: hay que decir de quién es el examen',
-      );
+      throw new ErrorBackend(SIN_PACIENTE, 'hay que decir de quién es el examen');
     }
 
     const [descriptor] = this.descriptoresDe('examResults');
     const mutaciones = (results ?? []).map((resultado) =>
       this.mutacion(
         descriptor,
-        aFila(descriptor, { ...(resultado as unknown as Record<string, unknown>), examId }),
+        aFila(descriptor, {
+          ...(resultado as unknown as Record<string, unknown>),
+          examId,
+          memberId: pacienteId,
+        }),
         pacienteId,
       ),
     );

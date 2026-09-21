@@ -10,6 +10,7 @@ import {
 } from './repositorioBackend';
 import { METODOS_ESCRITURA } from './contratoRepositorio';
 import type { RepositoryContext } from './dataRepository';
+import { encabezadosDe } from './planInstalacion';
 
 /**
  * G0 · el repositorio de verdad, probado sin red y sin despliegue.
@@ -181,8 +182,8 @@ describe('lo que no tiene dónde escribirse, lo dice', () => {
   });
 
   it('los resultados de examen no se pueden escribir sin saber de quién son', async () => {
-    // `EXAMENES_RESULTADOS` no tiene columna de paciente, y `puede()` deniega
-    // toda mutación sin paciente. Se dice, no se calla.
+    // `puede()` deniega toda mutación sin paciente, también al titular. Se
+    // dice, no se calla.
     const { repo } = banco();
     await expect(
       repo.saveExamResults(CTX, 'e1', [
@@ -203,6 +204,8 @@ describe('lo que no tiene dónde escribirse, lo dice', () => {
     expect(m?.tabla).toBe('EXAMENES_RESULTADOS');
     expect(m?.pacienteId).toBe('p1');
     expect(m?.fila.examen_id).toBe('e1');
+    // v4 · Y va también EN la fila: es lo que permite volver a encontrarla.
+    expect(m?.fila.paciente_id).toBe('p1');
   });
 });
 
@@ -319,6 +322,35 @@ describe('loadAll', () => {
     expect(datos.members.map((m) => m.id)).toEqual(['p1']);
     // Y a partir de ahí, una consulta por pestaña y paciente.
     expect(envio(espia, 2).accion).toBe('consultar');
+  });
+
+  it('los valores de examen vuelven agrupados por examen', async () => {
+    // Antes de la columna `paciente_id` del esquema v4 esto era imposible:
+    // `consultar` filtra por ahí, y sin ella los valores se escribían y no
+    // había forma de volver a leerlos.
+    const encabezados = encabezadosDe('EXAMENES_RESULTADOS') ?? [];
+    const fila = (id: string, examen: string, parametro: string) =>
+      encabezados.map((columna) => {
+        if (columna === 'id') return id;
+        if (columna === 'examen_id') return examen;
+        if (columna === 'parametro') return parametro;
+        if (columna === 'paciente_id') return 'p1';
+        return '';
+      });
+
+    const { repo } = banco([
+      exportar({
+        EXAMENES_RESULTADOS: [
+          fila('r1', 'e1', 'Hb'),
+          fila('r2', 'e1', 'Hto'),
+          fila('r3', 'e2', 'Glu'),
+        ],
+      }),
+    ]);
+
+    const datos = await repo.loadAll(CTX);
+    expect(Object.keys(datos.examResults).sort()).toEqual(['e1', 'e2']);
+    expect(datos.examResults.e1.map((r) => r.parameterName)).toEqual(['Hb', 'Hto']);
   });
 
   it('un fallo que no es de permiso NO se disfraza de expediente vacío', async () => {

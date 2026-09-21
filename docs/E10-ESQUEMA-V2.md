@@ -217,6 +217,31 @@ pruebas está en v2.
 
 ---
 
+## v4 · la columna que faltaba en `EXAMENES_RESULTADOS`
+
+Era la única pestaña de datos que colgaba de **otra fila** y no de un paciente,
+y G0 se topó con las dos consecuencias, que tienen la misma raíz:
+
+- **No se podía escribir.** `puede()` comprueba el alcance antes de mirar el
+  rol, así que una mutación sin paciente se deniega **también al titular**.
+- **No se podía leer.** `consultar` filtra por `paciente_id`, y ahí no había
+  ninguna.
+
+`paciente_id` va al final, como todo, y `version_esquema` pasa a **4**. Con
+ella, la prueba de descriptores dejó de tener excepción: **cada fila de cada
+pestaña dice a qué paciente pertenece**, sin salvedades.
+
+`scripts/esquema-v3.json` quedó congelado antes de tocar nada. El trinquete
+comprueba v1, v2 y v3 contra los encabezados de hoy.
+
+### Qué hacer con las hojas
+
+Igual que en v3: pegar el consolidado, **publicar versión nueva** y ejecutar
+`instalar()`. La única pestaña que se reparará es `EXAMENES_RESULTADOS`, y su
+fila 1 tiene que terminar en `paciente_id`.
+
+---
+
 ## Lo que E10 NO hace
 
 **No migra datos**, porque no hay nada que migrar: las columnas nuevas nacen
