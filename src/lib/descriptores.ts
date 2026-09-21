@@ -27,6 +27,10 @@ export const DESCRIPTORES: Record<string, readonly Descriptor[]> = {
     {
       pestana: 'PACIENTES',
       pacienteDesde: 'id',
+      // La aplicación solo conoce personas; las mascotas son del Bloque D y no
+      // pasan por `DataRepository`. Sin esto la fila nacería sin especie y
+      // `PERFIL_MASCOTA` dejaría de distinguirse de `PERFIL_HUMANO`.
+      constantes: { tipo: 'HUMANO' },
       campos: {
         id: c('id'),
         fullName: c('nombre'),
@@ -41,7 +45,12 @@ export const DESCRIPTORES: Record<string, readonly Descriptor[]> = {
       // misma fila su parte clínica.
       pestana: 'PERFIL_HUMANO',
       pacienteDesde: 'id',
+      // Esta mitad no tiene identificador propio: **es** la fila del paciente.
+      // Se reconoce por `paciente_id`, y por eso el colapso de lectura no la
+      // confunde con la mitad clínica, que sí tiene `id`.
+      clave: 'paciente_id',
       campos: {
+        id: c('paciente_id'),
         birthDate: c('fecha_nacimiento'),
         bloodType: c('tipo_sangre'),
         documentType: c('documento_tipo'),

@@ -168,13 +168,15 @@ describe('ninguna escritura nueva puede ser muda', () => {
     });
   }
 
-  it('la línea base es la deuda de G0, y se mide', () => {
-    // Este número es el trabajo que queda. Cuando llegue a cero, G1 deja de
-    // tolerar nada y el cambio de bandera es seguro por construcción.
+  it('la línea base está vacía: G0 la pagó entera', () => {
+    // Era 31 el 20 de septiembre de 2026 y es 0 desde el 21. Ahora la
+    // comprobación es exacta, no un techo: cualquier escritura muda nueva
+    // —también una que alguien intentara «tolerar» apuntándola aquí— pone la
+    // suite en rojo.
     const total = Object.values(LINEA_BASE)
       .filter(Array.isArray)
       .reduce((n, lista) => n + lista.length, 0);
 
-    expect(total, 'la línea base debería estar menguando, no creciendo').toBeLessThanOrEqual(31);
+    expect(total, 'la deuda de G0 está pagada: no se vuelve a abrir').toBe(0);
   });
 });

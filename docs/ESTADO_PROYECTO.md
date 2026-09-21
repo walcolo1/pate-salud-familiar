@@ -17,7 +17,7 @@ hecho y qué falta.*
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
 | **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10/E10-bis** llevan el esquema a v3 |
-| **G** | Corte seco de Firebase | **en curso** · G1 cerrado · G0 **parado** por la brecha de modelo |
+| **G** | Corte seco de Firebase | **en curso** · G1 y G0 cerrados · siguiente, G2 |
 | **H** | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
 
 El Bloque D cierra con cuatro pasos y una fase de convención:
@@ -118,9 +118,10 @@ cada módulo. Las que más condicionan lo que venga:
 | Mirar el cuerpo del correo de invitación recibido: es lo único que queda de E9 | `EVIDENCIA_E9.md` |
 | Pegar el consolidado **v3** en la plantilla maestra y repetir `instalar()` en la hoja de pruebas, que sigue en v2 | `E10-ESQUEMA-V2.md` |
 | Las **tareas genéricas** (`FollowUpTask`) dejarán de guardarse al girar la bandera de G: `SEGUIMIENTOS` es otra cosa y no tienen pestaña | `descriptores.ts` · `SIN_PESTANA` |
-| Las 4 escrituras de E11 siguen sin pestaña: lanzarán un error explícito en vez de callar | `G0-BRECHA-DE-MODELO.md` |
+| Las 4 escrituras de E11 siguen sin pestaña: **lanzan** un error explícito en vez de callar | `G0-REPOSITORIO.md` |
+| `EXAMENES_RESULTADOS` no tiene columna de paciente: los valores de examen **no se escriben ni se leen** contra el backend. Decisión pendiente: columna `paciente_id` (esquema v4) | `G0-REPOSITORIO.md` |
+| El repositorio de G0 no tiene de dónde sacar el `id_token`: `sesionDelNavegador()` devuelve `null` hasta **G3** | `repositorioBackend.ts` |
 | `version_esquema` dice en qué versión está una hoja, pero **nadie actúa** en consecuencia todavía | `E10-ESQUEMA-V2.md` |
-| `SheetsRepository` tiene **las 31 escrituras mudas**: girar la bandera a `sheets` hoy perdería datos en silencio. Medido y acotado por G1; lo arregla **G0** | `scripts/escrituras-mudas.json` |
 | Validación de consentimiento OAuth limpio | `TESTING.md` §6.11 |
 | `/members/:id/edit` y `/login` fuera de la red de axe | `ACCESIBILIDAD.md`, puerta de C9 |
 | 23 `alert` de error siguen sin migrar al sistema de avisos | `src/` |
@@ -159,13 +160,13 @@ pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
 
 ## Siguiente paso
 
-**Retomar G0**: el mapeo de modelos a pestañas, ahora sobre base firme. E10
-cerró la brecha añadiendo 23 columnas en 6 pestañas y subiendo el esquema a
-**v2** ([E10-ESQUEMA-V2.md](E10-ESQUEMA-V2.md)).
+**G2, la sincronización híbrida**. G0 está cerrado: los 31 métodos escriben de
+verdad y el contador de escrituras mudas está en **0**
+([G0-REPOSITORIO.md](G0-REPOSITORIO.md)).
 
-Antes conviene pegar el consolidado nuevo en la plantilla maestra y reinstalar
-la hoja de pruebas: `instalar()` ahora repara encabezados de pestañas que ya
-existían, y eso no se ha ejercitado contra Google todavía.
+Antes, dos cosas: pegar el consolidado **v3** en la plantilla maestra y repetir
+`instalar()` en la hoja de pruebas; y decidir la columna `paciente_id` de
+`EXAMENES_RESULTADOS`, que es lo único que G0 devuelve sin resolver.
 
 El plan completo, con los seis pasos y sus puertas, está en
 [PLAN_BLOQUE_G.md](PLAN_BLOQUE_G.md).

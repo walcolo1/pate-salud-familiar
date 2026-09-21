@@ -79,7 +79,13 @@ qué.
 
 Cada uno termina en informe y parada, como en todo el proyecto.
 
-### G0 · El repositorio de verdad, sin tocar nada vivo
+### G0 · El repositorio de verdad, sin tocar nada vivo ✅
+
+**Hecho el 21 de septiembre de 2026.** El contador de escrituras mudas pasó de
+**31 a 0**. Lo que se decidió por el camino —el registro solo-anexa, el colapso
+de lectura, `exportar` frente a once consultas por persona— está en
+[G0-REPOSITORIO.md](G0-REPOSITORIO.md), con la única decisión que devuelve sin
+resolver: la columna de paciente de `EXAMENES_RESULTADOS`.
 
 Escribir `RepositorioBackend`: los 37 métodos contra el router de E, hablando
 `aplicar`, `consultar`, `listarPacientes` y `obtenerRevision`.

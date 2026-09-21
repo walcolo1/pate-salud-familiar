@@ -43,6 +43,22 @@ export interface Descriptor {
   /** Campo del modelo → columna. */
   campos: Record<string, CampoMapeado>;
   /**
+   * Columnas que se escriben siempre con el mismo valor.
+   *
+   * No salen de ningún campo porque el modelo no las tiene: la aplicación solo
+   * conoce personas, y `PACIENTES.tipo` distingue `HUMANO` de `MASCOTA`. Sin
+   * esto la fila nacería sin especie.
+   */
+  constantes?: Record<string, unknown>;
+  /**
+   * La columna por la que se reconoce que dos filas son el mismo registro.
+   *
+   * Por omisión `id`. `PERFIL_HUMANO` es la excepción: la mitad de identidad
+   * que escribe `members` no tiene identificador propio —es la fila del
+   * paciente— y se reconoce por `paciente_id`.
+   */
+  clave?: string;
+  /**
    * De qué campo sale el paciente al que pertenece la fila.
    *
    * El router lo necesita para comprobar el alcance: sin él, `aplicar()` no
@@ -200,7 +216,7 @@ export function celdaAValor(celda: unknown, tipo: CampoMapeado['tipo']): unknown
  * historial de alguien.
  */
 export function aFila(descriptor: Descriptor, modelo: Record<string, unknown>): Record<string, unknown> {
-  const fila: Record<string, unknown> = {};
+  const fila: Record<string, unknown> = { ...(descriptor.constantes ?? {}) };
 
   for (const [campo, mapeo] of Object.entries(descriptor.campos)) {
     if (!(campo in (modelo ?? {}))) continue;
@@ -242,4 +258,99 @@ export function filaDeBaja(id: string, ahoraISO: string): Record<string, unknown
 /** Si esta fila está dada de baja. Las lecturas la saltan. */
 export function estaDadaDeBaja(fila: Record<string, unknown>): boolean {
   return texto((fila ?? {}).borrado_en).trim().length > 0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Leer un registro que se escribió a trozos
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Una fila de `consultar`, que llega como matriz, puesta bajo sus nombres.
+ *
+ * Nunca por posición a secas: una hoja instalada con un esquema anterior
+ * devuelve **menos columnas** que las que el esquema tiene hoy, y eso está
+ * previsto —el crecimiento es solo por el final— pero solo funciona si el
+ * nombre manda.
+ */
+export function filaDesdeCeldas(
+  encabezados: readonly string[],
+  celdas: readonly unknown[],
+): Record<string, unknown> {
+  const fila: Record<string, unknown> = {};
+  for (let i = 0; i < encabezados.length; i++) {
+    fila[encabezados[i]] = i < (celdas ?? []).length ? celdas[i] : '';
+  }
+  return fila;
+}
+
+/**
+ * ¿Esta fila dice algo sobre las columnas de este descriptor?
+ *
+ * La clave no cuenta: la llevan **todas** las filas del registro, incluidas
+ * las que escribió el otro dueño de la pestaña. Contarla haría que cualquier
+ * fila «hablara» y volvería inútil la distinción.
+ */
+function hablaDe(descriptor: Descriptor, fila: Record<string, unknown>): boolean {
+  const clave = descriptor.clave ?? 'id';
+  for (const { columna } of Object.values(descriptor.campos)) {
+    if (columna === clave) continue;
+    if (texto(fila[columna]).trim().length > 0) return true;
+  }
+  return false;
+}
+
+/**
+ * Las filas de una pestaña, convertidas en los registros que de verdad hay.
+ *
+ * EL ROUTER SOLO ANEXA
+ * ────────────────────
+ * `aplicar()` añade filas; no modifica ninguna. Guardar dos veces el mismo
+ * paciente deja **dos filas**, y borrarlo deja una tercera con `borrado_en`.
+ * Leer, por tanto, no es leer filas: es colapsarlas.
+ *
+ * LA REGLA: LA ÚLTIMA QUE HABLA MANDA, ENTERA
+ * ───────────────────────────────────────────
+ * Entera, y no «el último valor no vacío de cada columna». La diferencia se ve
+ * al borrar un dato: con la regla campo a campo, vaciar una nota la haría
+ * reaparecer, porque el valor anterior seguiría ganando. Para quien acaba de
+ * borrarla, eso es el dato volviendo solo.
+ *
+ * Y «que habla» porque una pestaña puede tener **dos dueños**: en
+ * `PERFIL_HUMANO`, `members` escribe la identidad y `healthProfiles` lo
+ * clínico. Cada descriptor solo puede ser pisado por una fila que escriba sus
+ * columnas; si no, la mitad de identidad borraría las alergias cada vez que
+ * alguien corrigiera un apellido.
+ *
+ * Lo que esta regla NO cubre, y queda dicho: dos personas editando a la vez el
+ * mismo registro no se mezclan — gana quien escribió después, con el registro
+ * entero. Es lo mismo que hacía la hoja antes, y G2 decide qué avisar.
+ */
+export function colapsar(
+  descriptor: Descriptor,
+  filas: readonly Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const clave = descriptor.clave ?? 'id';
+  const orden: string[] = [];
+  const vivos = new Map<string, Record<string, unknown> | null>();
+
+  for (const fila of filas ?? []) {
+    const id = texto((fila ?? {})[clave]).trim();
+    // Una fila sin clave no se puede agrupar. Agruparlas todas bajo la cadena
+    // vacía inventaría un registro que nadie escribió.
+    if (id.length === 0) continue;
+    if (!vivos.has(id)) orden.push(id);
+
+    if (estaDadaDeBaja(fila)) {
+      vivos.set(id, null);
+      continue;
+    }
+    if (hablaDe(descriptor, fila)) vivos.set(id, aModelo(descriptor, fila));
+  }
+
+  const salida: Record<string, unknown>[] = [];
+  for (const id of orden) {
+    const modelo = vivos.get(id);
+    if (modelo) salida.push(modelo);
+  }
+  return salida;
 }

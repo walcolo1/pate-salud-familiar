@@ -195,7 +195,18 @@ export interface DataRepository {
   // ── Exams ─────────────────────────────────────────────────────────────────
   saveExam(ctx: RepositoryContext, exam: MedicalExam): Promise<void>;
   deleteExam(ctx: RepositoryContext, examId: string): Promise<void>;
-  saveExamResults(ctx: RepositoryContext, examId: string, results: ExamResult[]): Promise<void>;
+  /**
+   * `memberId` es opcional por compatibilidad y **hace falta** contra el
+   * backend del titular: `EXAMENES_RESULTADOS` no tiene columna de paciente y
+   * el router deniega toda mutación que no diga sobre quién actúa, incluso al
+   * titular. Firestore lo ignora.
+   */
+  saveExamResults(
+    ctx: RepositoryContext,
+    examId: string,
+    results: ExamResult[],
+    memberId?: string,
+  ): Promise<void>;
 
   // ── Documents ─────────────────────────────────────────────────────────────
   saveDocument(ctx: RepositoryContext, doc: ClinicalDocument): Promise<void>;

@@ -1,36 +1,4 @@
 {
-  "_comentario": "G1 · escrituras que hoy no hacen nada. Solo puede MENGUAR: la prueba falla si aparece una nueva y tambien si una de estas ya se arreglo y sigue apuntada. G0 lo vacia.",
-  "SheetsRepository": [
-    "saveMember",
-    "deleteMember",
-    "saveHealthProfile",
-    "saveAppointment",
-    "deleteAppointment",
-    "saveCheckup",
-    "deleteCheckup",
-    "saveVaccine",
-    "deleteVaccine",
-    "saveExam",
-    "deleteExam",
-    "saveExamResults",
-    "saveDocument",
-    "deleteDocument",
-    "saveHistoryEvent",
-    "saveReminder",
-    "saveTask",
-    "saveMedicalOrder",
-    "deleteMedicalOrder",
-    "saveMedication",
-    "deleteMedication",
-    "saveDoseReminder",
-    "deleteDoseReminder",
-    "saveGmailSource",
-    "deleteGmailSource",
-    "saveAppointmentCandidate",
-    "saveSettings",
-    "createFamily",
-    "createInvitation",
-    "acceptInvitation",
-    "revokeInvitation"
-  ]
+  "_comentario": "G1 · escrituras que hoy no hacen nada. Solo puede MENGUAR: la prueba falla si aparece una nueva y tambien si una de estas ya se arreglo y sigue apuntada. G0 la vacio el 21 de septiembre de 2026.",
+  "SheetsRepository": []
 }

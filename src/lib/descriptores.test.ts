@@ -113,6 +113,21 @@ describe('los descriptores hablan del esquema de verdad', () => {
     }
   });
 
+  it('las constantes y la clave también son columnas de verdad', () => {
+    // No pasan por `campos`, así que la comprobación de arriba no las mira. Un
+    // `tipo` mal escrito dejaría a todos los pacientes sin especie, y una
+    // clave inexistente colapsaría todas las filas en una.
+    for (const [coleccion, lista] of Object.entries(DESCRIPTORES)) {
+      for (const d of lista) {
+        const columnas = new Set(encabezadosDe(d.pestana) ?? []);
+        for (const columna of Object.keys(d.constantes ?? {})) {
+          expect(columnas.has(columna), `${coleccion}: constante ${columna}`).toBe(true);
+        }
+        expect(columnas.has(d.clave ?? 'id'), `${coleccion}: clave ${d.clave}`).toBe(true);
+      }
+    }
+  });
+
   it('ningún descriptor escribe las columnas que sella el router', () => {
     // `creado_en`, `actualizado_en` y `borrado_en` las pone el backend. Que el
     // cliente pudiera escribirlas convertiría la marca de tiempo en una
