@@ -472,3 +472,48 @@ describe('validarInvitacion', () => {
     expect(validarInvitacion({ email: '', rol: 'LECTOR' }, ROLES).ok).toBe(false);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lo que pasa DE VERDAD al reabrir un enlace ya usado (medido el 2026-09-20)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('una invitación ya canjeada', () => {
+  /**
+   * `ACEPTAR` vacía `token_hash`. Desde ese momento la fila **no se encuentra**
+   * buscando por hash, que es como la busca `aceptarInvitacion`.
+   *
+   * Consecuencia: reabrir un enlace ya usado NO llega a `INVITACION_YA_USADA`.
+   * Llega a `INVITACION_DESCONOCIDA`, porque para el backend esa invitación
+   * dejó de existir. Se vio abriendo por segunda vez un enlace real.
+   */
+  it('deja la fila sin hash, así que ya no se puede encontrar', () => {
+    const yaCanjeada = filaDe({ estado: 'ACTIVO', token_hash: '', token_expira: '' });
+    expect(estadoInvitacion(yaCanjeada, AHORA)).toBe('ACEPTADA');
+
+    // Pero la búsqueda por hash no la devuelve, así que a `validarAceptacion`
+    // le llega `null` y responde DESCONOCIDA. Es el camino real.
+    expect(
+      validarAceptacion({
+        fila: null,
+        hashRecibido: HASH,
+        emailAceptante: 'invitada@example.invalid',
+        ahoraMs: AHORA,
+      }),
+    ).toEqual({ ok: false, error: 'INVITACION_DESCONOCIDA' });
+  });
+
+  it('YA_USADA solo se alcanza con la hoja editada a mano', () => {
+    // Una fila ACTIVO que conserva su hash no la produce ninguna operación de
+    // la API. El código se queda porque una hoja la puede editar una persona,
+    // y entonces sí hay que rechazar; pero no es el camino que ve un usuario.
+    const aMano = filaDe({ estado: 'ACTIVO', token_hash: HASH });
+    expect(
+      validarAceptacion({
+        fila: aMano,
+        hashRecibido: HASH,
+        emailAceptante: 'invitada@example.invalid',
+        ahoraMs: AHORA,
+      }),
+    ).toEqual({ ok: false, error: 'INVITACION_YA_USADA' });
+  });
+});

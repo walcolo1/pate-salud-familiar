@@ -5,9 +5,11 @@
 Un familiar entró en un expediente **sin ver una sola pantalla de permisos de
 Google**. Eso era lo que había que probar y está probado.
 
-Cinco de las nueve comprobaciones del guion quedan cerradas; cuatro no las
-cubre este recorrido y siguen abiertas. Están marcadas abajo, no dadas por
-buenas.
+Siete de las nueve comprobaciones quedan cerradas. Las dos que faltan están
+marcadas abajo, no dadas por buenas.
+
+El segundo recorrido, con el enlace **tal y como llegó** y ya sobre el dominio
+de producción, encontró además un mensaje mal escrito. Está al final.
 
 Esta es la promesa de la que cuelga el bloque entero, y la única que ninguna
 prueba puede sustituir: **que el familiar no vea ni una sola pantalla de
@@ -228,20 +230,22 @@ Captura: `E9-05-cuenta-equivocada.png`.
 
 ## Resultados
 
-Ejecutado el **20 de septiembre de 2026** contra una compilación de producción
-en `localhost:3000`, con dos cuentas `@gmail.com` personales.
+Ejecutado el **20 de septiembre de 2026** en dos pasadas: la primera contra una
+compilación de producción en `localhost:3000`, la segunda contra
+`pate-salud-familiar.vercel.app` ya promovido, con el enlace del correo sin
+tocar.
 
 | # | Comprobación | Resultado |
 |---|---|---|
 | 1 | `MailApp` envía desde una cuenta gratuita | ✅ el correo llegó de inmediato |
 | 2 | **El familiar no ve ninguna pantalla de permisos** | ✅ **cero advertencias, cero permisos** |
-| 3 | El enlace sobrevive al cliente de correo | ⬜ el recorrido se hizo con el enlace reescrito a `localhost` |
+| 3 | El enlace sobrevive al cliente de correo | ✅ abierto tal cual, sin un parámetro truncado |
 | 4 | La cuenta equivocada da `INVITACION_DESTINATARIO_INVALIDO` | ⬜ sin probar en vivo · cubierto por `I5` con dobles |
-| 5 | El token queda consumido: repetir da `INVITACION_YA_USADA` | ⬜ sin probar en vivo · la hoja **sí** muestra el consumo (ver abajo) |
-| 6 | El correo no lleva ningún nombre ni nada clínico | ⬜ sin revisar el cuerpo recibido · trinquete en `invitaciones.test.ts` |
+| 5 | El token queda consumido: reabrir el enlace se rechaza | ✅ rechazado · **pero con otro código del previsto, ver abajo** |
+| 6 | El correo no lleva ningún nombre ni nada clínico | ⬜ **sin revisar el cuerpo recibido** · trinquete en `invitaciones.test.ts` |
 | 7 | En la hoja va el hash, nunca el token | ✅ `token_hash` y `token_expira` con la forma esperada |
-| 8 | Un `backend` ajeno no recibe ninguna petición | ⬜ sin probar en vivo · cubierto por `I2` |
-| 9 | Solo se guarda la `/exec` en el navegador | ⬜ sin inspeccionar en vivo · cubierto por `I4` |
+| 8 | Un `backend` ajeno no recibe ninguna petición | ✅ `I2`, en un Chromium real contra la compilación de producción |
+| 9 | Solo se guarda la `/exec` en el navegador | ✅ `I4`, sobre el `localStorage` real del navegador |
 
 ### Lo que se vio, en orden
 
@@ -263,30 +267,57 @@ pone `ACTIVO`. Lo que no se ha comprobado es lo otro —que **reabrir** el enlac
 devuelva `INVITACION_YA_USADA`—, que es la mitad que le importa a quien vuelve
 a pulsar el enlace en el correo.
 
-### Por qué cuatro quedan abiertas, y qué cuesta cerrarlas
+### El hallazgo del segundo recorrido
 
-El recorrido se hizo desde `localhost`, con el enlace reescrito a mano. Eso
-valida la aplicación y **no valida el enlace**: el correo apunta al dominio de
-Vercel, y si algún cliente de correo lo parte, esto no lo habría visto.
+Al reabrir el enlace ya usado, la aplicación respondió:
 
-Las cuatro se cierran en un solo recorrido más, en cuanto el alias de
-producción sirva E9:
+> **Este enlace ya no existe.** Puede que esté incompleto o que la invitación se
+> haya retirado. Pide una nueva a quien te invitó.
 
-| Qué hacer | Cierra |
-|---|---|
-| Abrir el enlace **tal y como llegó**, sin tocarlo | 3 |
-| Volver a abrirlo después de haber entrado | 5 |
-| Abrirlo desde la cuenta del titular | 4 |
-| Mirar el cuerpo del correo recibido | 6 |
-| `localStorage` en la consola, y cambiar `backend` a mano | 9 y 8 |
+Rechaza, que es lo que tiene que hacer. Pero **no es el mensaje que el guion
+esperaba** —`INVITACION_YA_USADA`— sino `INVITACION_DESCONOCIDA`, y el consejo
+que da es el equivocado.
 
-Ninguna necesita código nuevo. Son diez minutos con el correo delante.
+La causa está en el diseño y no en un fallo: al aceptar, `escribirMutacion_`
+**vacía `token_hash`**. Desde ese momento `buscarPorHash_` no encuentra la fila,
+así que para el backend esa invitación dejó de existir. `INVITACION_YA_USADA`
+solo se alcanza con una fila `ACTIVO` que conserve su hash, y eso no lo produce
+ninguna operación de la API: solo una hoja editada a mano.
 
-> **Bloqueado por una cosa, y no es de este repositorio.** El alias
-> `pate-salud-familiar.vercel.app` sigue apuntando a un despliegue anterior a
-> E9: el commit `ca76879` está construido y `READY` en producción, pero sin
-> promover. Medido el 20 de septiembre: el alias da 404 en `/invitacion` y el
-> despliegue directo da 200.
+Lo grave no era el código, era el texto: **«pide una nueva» es justo lo que no
+hay que hacer** cuando ya estás dentro y solo tienes que iniciar sesión. El
+mensaje ahora nombra las dos situaciones, porque el backend no puede
+distinguirlas:
+
+> **Este enlace ya no sirve.** Si ya entraste con él, no necesitas otro: inicia
+> sesión con normalidad desde la pantalla de acceso. Si nunca llegaste a
+> entrar, pide una invitación nueva a quien te invitó.
+
+Dos pruebas nuevas fijan el camino real —una invitación canjeada llega como
+`DESCONOCIDA`— y dejan escrito que `YA_USADA` solo vive para la hoja editada a
+mano.
+
+### Lo que sigue abierto
+
+**6 · El cuerpo del correo recibido.** Que no lleve ningún nombre ni nada
+clínico está atado con un trinquete sobre la plantilla, pero nadie ha mirado
+todavía el correo que llegó de verdad. Un vistazo de un minuto a la bandeja, y
+conviene darlo antes de que se borre.
+
+**4 · La cuenta equivocada.** `I5` lo cubre con dobles, pero lo que decide de
+verdad es el backend comparando el correo del `id_token` con el de la fila, y
+eso no lo ejercita ninguna prueba. **Ya no se puede comprobar con esta
+invitación**: el token se gastó al aceptarla. Hace falta emitir una nueva y
+abrirla desde la cuenta del titular, que son cinco minutos con
+`--solo-invitar`.
+
+Ninguna de las dos bloquea el Bloque G. La 4 es la que de verdad conviene
+cerrar antes de que esto lo use alguien: es la decisión de E7 —una invitación
+reenviada no funciona— y es la única de las nueve que protege a una familia de
+un correo que acabó en la bandeja equivocada.
+
+> **El alias ya está promovido.** `pate-salud-familiar.vercel.app/invitacion`
+> responde 200 y sirve E9. Fue lo que permitió la segunda pasada.
 
 ---
 

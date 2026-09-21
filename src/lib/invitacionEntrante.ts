@@ -167,10 +167,23 @@ export const MENSAJES: Record<string, Mensaje> = {
     reintentable: false,
   },
 
+  /*
+   * Este mensaje cubre DOS situaciones que el backend no puede distinguir, y
+   * por eso las nombra las dos.
+   *
+   * Al aceptar, el token se consume: `ACEPTAR` vacía `token_hash`. Desde ese
+   * momento la fila ya no se encuentra buscando por hash, así que **volver a
+   * abrir un enlace ya usado no llega a `INVITACION_YA_USADA`: llega aquí.**
+   *
+   * Se descubrió el 20 de septiembre de 2026, abriendo por segunda vez un
+   * enlace real. La primera versión decía «pide una nueva», que es
+   * exactamente el consejo equivocado para quien ya está dentro y solo tiene
+   * que iniciar sesión.
+   */
   INVITACION_DESCONOCIDA: {
-    titulo: 'Este enlace ya no existe',
+    titulo: 'Este enlace ya no sirve',
     cuerpo:
-      'Puede que esté incompleto o que la invitación se haya retirado. Pide una nueva a quien te invitó.',
+      'Si ya entraste con él, no necesitas otro: inicia sesión con normalidad desde la pantalla de acceso. Si nunca llegaste a entrar, pide una invitación nueva a quien te invitó.',
     reintentable: false,
   },
   INVITACION_EXPIRADA: {
