@@ -17,7 +17,7 @@ hecho y qué falta.*
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
 | **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10/E10-bis** llevan el esquema a v3 |
-| **G** | Corte seco de Firebase | **en curso** · G1, G0 y G2 cerrados · siguiente, G3 |
+| **G** | Corte seco de Firebase | **en curso** · G1, G0, G2 y G3a cerrados · siguiente, G3b (el corte de Auth) |
 | **H** | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
 
 El Bloque D cierra con cuatro pasos y una fase de convención:
@@ -119,7 +119,9 @@ cada módulo. Las que más condicionan lo que venga:
 | Las **tareas genéricas** (`FollowUpTask`) dejarán de guardarse al girar la bandera de G: `SEGUIMIENTOS` es otra cosa y no tienen pestaña | `descriptores.ts` · `SIN_PESTANA` |
 | Las 4 escrituras de E11 siguen sin pestaña: **lanzan** un error explícito en vez de callar | `G0-REPOSITORIO.md` |
 | Qué hacer cuando la revisión cambia —recargar, avisar o recargar lo que no está en edición— sigue **sin decidir**: `alCambiar` es una llamada de vuelta | `G2-SINCRONIZACION.md` |
-| El sondeo de G2 **no está conectado**: no puede estarlo hasta que G3 dé el `id_token` | `sondeoRevision.ts` |
+| El sondeo de G2 **no está conectado**: espera a que G3b inicialice GIS en un solo sitio | `sondeoRevision.ts` |
+| GIS **no renueva el `id_token` en silencio**: la ventana de 50 min es un intento, no una garantía | `G3-IDENTIDAD.md` |
+| Sin Firebase Auth, **recargar la página cerraría la sesión**. Tres salidas, ninguna decidida | `G3-IDENTIDAD.md` |
 | Pegar el consolidado **v4** y repetir `instalar()`: la hoja de pruebas quedó en v3 | `E10-ESQUEMA-V2.md` |
 | El repositorio de G0 no tiene de dónde sacar el `id_token`: `sesionDelNavegador()` devuelve `null` hasta **G3** | `repositorioBackend.ts` |
 | `version_esquema` dice en qué versión está una hoja, pero **nadie actúa** en consecuencia todavía | `E10-ESQUEMA-V2.md` |
@@ -161,13 +163,13 @@ pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
 
 ## Siguiente paso
 
-**G3, salir de Firebase Auth**. Es lo que desbloquea todo lo demás: G0 y G2
-están escritos y **ninguno de los dos puede encenderse** sin un `id_token` al
-alcance de la aplicación.
+**G3b, el corte de Firebase Auth**. G3a dejó la sesión escrita y probada; lo que
+queda es lo que toca el inicio de sesión de todos, y tiene que ir junto:
+inicializar GIS en **un solo sitio**, conectar la renovación y retirar
+`signInWithCredential` y `onAuthStateChanged`.
 
-Antes, pegar el consolidado **v4** y repetir `instalar()`: la columna
-`paciente_id` de `EXAMENES_RESULTADOS` es la única reparación
-([E10-ESQUEMA-V2.md](E10-ESQUEMA-V2.md)).
+Antes hay que decidir **qué es la sesión al recargar**, porque sin Firebase Auth
+no sobrevive a un F5 ([G3-IDENTIDAD.md](G3-IDENTIDAD.md)).
 
 El plan completo, con los seis pasos y sus puertas, está en
 [PLAN_BLOQUE_G.md](PLAN_BLOQUE_G.md).

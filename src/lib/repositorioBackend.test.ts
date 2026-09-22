@@ -405,6 +405,106 @@ describe('sin backend o sin identidad, se corta antes de la red', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// G3 · la identidad que caduca
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('cuando el router dice que el token ya no vale', () => {
+  /** Un banco con renovación, para el reintento de G3. */
+  function bancoConRenovacion(respuestas: unknown[], renovaciones: (string | null)[]) {
+    const cola = [...respuestas];
+    const espia = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => (cola.length > 0 ? cola.shift() : { ok: true, data: {} }),
+    })) as unknown as typeof globalThis.fetch;
+
+    const pendientes = [...renovaciones];
+    const renovar = vi.fn(async () => (pendientes.length > 0 ? pendientes.shift()! : null));
+
+    const repo = new RepositorioBackend({
+      url: () => URL_BUENA,
+      idToken: async () => 'viejo.id.token',
+      renovar,
+      fetch: espia,
+    });
+
+    return { repo, renovar, espia: espia as unknown as ReturnType<typeof vi.fn> };
+  }
+
+  const RECHAZO = { ok: false, error: 'TOKEN_INVALIDO' };
+  const BIEN = { ok: true, data: { aplicadas: 1, revision: 2 } };
+
+  it('renueva y reintenta una vez, con el token nuevo', async () => {
+    // Un token puede dejar de valer ANTES de su `exp` —acceso revocado, reloj
+    // del dispositivo adelantado— y el `exp` no se entera. Sin este reintento,
+    // el usuario vería un error en mitad de un guardado que sí podía hacerse.
+    const { repo, renovar, espia } = bancoConRenovacion([RECHAZO, BIEN], ['nuevo.id.token']);
+    await repo.deleteMember(CTX, 'p1');
+
+    expect(renovar).toHaveBeenCalledTimes(1);
+    expect(espia).toHaveBeenCalledTimes(2);
+
+    const primera = JSON.parse(String((espia.mock.calls[0] as [string, RequestInit])[1].body));
+    const segunda = JSON.parse(String((espia.mock.calls[1] as [string, RequestInit])[1].body));
+    expect(primera.idToken).toBe('viejo.id.token');
+    expect(segunda.idToken).toBe('nuevo.id.token');
+    // Y el reintento manda lo mismo: no se pierde la mutación por el camino.
+    expect(segunda.payload).toEqual(primera.payload);
+  });
+
+  it('el 401 no existe: lo que llega es un 200 con el fallo dentro', async () => {
+    // El router contesta siempre HTTP 200. Un reintento que esperase un código
+    // de estado no se dispararía nunca, y esta prueba es lo que lo fija.
+    const { repo, renovar } = bancoConRenovacion([RECHAZO, BIEN], ['nuevo.id.token']);
+    await repo.deleteMember(CTX, 'p1');
+    expect(renovar).toHaveBeenCalled();
+  });
+
+  it('si no se pudo renovar, sube el error ORIGINAL', async () => {
+    // Decir «falló la renovación» taparía lo que de verdad contestó el router.
+    const { repo, espia } = bancoConRenovacion([RECHAZO], [null]);
+    await expect(repo.deleteMember(CTX, 'p1')).rejects.toMatchObject({
+      codigo: 'TOKEN_INVALIDO',
+    });
+    expect(espia).toHaveBeenCalledTimes(1);
+  });
+
+  it('un reintento y no más', async () => {
+    // Si la credencial recién renovada tampoco vale, el problema no es la
+    // caducidad y repetir solo gasta cuota.
+    const { repo, espia } = bancoConRenovacion([RECHAZO, RECHAZO], ['a', 'b']);
+    await expect(repo.deleteMember(CTX, 'p1')).rejects.toThrow();
+    expect(espia).toHaveBeenCalledTimes(2);
+  });
+
+  it('un error que no es de identidad no se reintenta', async () => {
+    const { repo, renovar, espia } = bancoConRenovacion(
+      [{ ok: false, error: 'PERMISO_INSUFICIENTE' }],
+      ['nuevo'],
+    );
+    await expect(repo.deleteMember(CTX, 'p1')).rejects.toMatchObject({
+      codigo: 'PERMISO_INSUFICIENTE',
+    });
+    expect(renovar).not.toHaveBeenCalled();
+    expect(espia).toHaveBeenCalledTimes(1);
+  });
+
+  it('sin renovación disponible, se comporta como antes', async () => {
+    const { repo } = banco([{ ok: false, error: 'TOKEN_INVALIDO' }]);
+    await expect(repo.deleteMember(CTX, 'p1')).rejects.toMatchObject({ codigo: 'TOKEN_INVALIDO' });
+  });
+
+  it('también protege la lectura', async () => {
+    const { repo, espia } = bancoConRenovacion(
+      [RECHAZO, { ok: true, data: { esquema: 4, revision: 1, tablas: {} } }],
+      ['nuevo.id.token'],
+    );
+    await expect(repo.loadAll(CTX)).resolves.toBeTruthy();
+    expect(espia).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // El barrido
 // ─────────────────────────────────────────────────────────────────────────────
 

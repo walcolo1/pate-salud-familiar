@@ -41,8 +41,10 @@ import {
 import { DESCRIPTORES, MODELO_DE_COLECCION, SIN_PESTANA } from './descriptores';
 import { aFila, colapsar, filaDeBaja, filaDesdeCeldas, type Descriptor } from './mapeoFilas';
 import { encabezadosDe } from './planInstalacion';
-import { leerBackend } from './invitacionEntrante';
 import { normalizarEmail } from './autenticacion';
+// `identidad.ts` solo importa de aquí un **tipo**, que se borra al compilar:
+// no hay ciclo en ejecución.
+import { sesionBackend } from './identidad';
 import { EMPTY_FAMILY_DATA, type AllFamilyData, type DataRepository, type DataUpdate, type RepositoryContext } from './dataRepository';
 import type { FamilyAccess, FamilyInvitation } from './firestoreService';
 import type {
@@ -95,6 +97,15 @@ export interface SesionBackend {
   url(): string | null;
   /** El `id_token` de quien llama, o `null` si no hay sesión. */
   idToken(): Promise<string | null>;
+  /**
+   * Fuerza una credencial nueva. Devuelve `null` si no se pudo.
+   *
+   * Existe porque un token puede dejar de valer **antes** de su `exp` —el
+   * titular revocó el acceso, el reloj del dispositivo va adelantado— y el
+   * `exp` no se entera. Cuando el router contesta `TOKEN_INVALIDO`, esto es lo
+   * que permite reintentar una vez en lugar de echar a alguien de su sesión.
+   */
+  renovar?(): Promise<string | null>;
   /** Inyectable para poder probar sin red. */
   fetch?: typeof globalThis.fetch;
 }
@@ -102,19 +113,13 @@ export interface SesionBackend {
 /**
  * La sesión real del navegador.
  *
- * La URL sale de donde la dejó E9, revalidada al leerla. La identidad **queda
- * pendiente de G3**, que es el paso que saca el `id_token` de Firebase Auth y
- * lo pone al alcance de toda la aplicación. Hasta entonces esto se niega en
- * voz alta en vez de devolver una cadena vacía, que acabaría en un
- * `TOKEN_INVALIDO` lejos de su causa.
+ * Vive en `identidad.ts`, que es donde se instancia la sesión de la aplicación
+ * y se dejan los dos enchufes de G3: cómo pedirle a Google una credencial nueva
+ * y qué hacer cuando ya no hay. Se importa **tarde**, dentro de la función,
+ * para no atar este módulo a un singleton en cuanto alguien lo mire.
  */
 export function sesionDelNavegador(): SesionBackend {
-  return {
-    // `sessionStorage` no existe en el servidor, y este módulo lo importa el
-    // árbol de Next también allí.
-    url: () => (typeof window === 'undefined' ? null : leerBackend(window.sessionStorage)),
-    idToken: async () => null,
-  };
+  return sesionBackend();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -197,6 +202,35 @@ export class RepositorioBackend implements DataRepository {
     if (!idToken) throw new ErrorBackend(SIN_IDENTIDAD, 'no hay sesión con la que firmar');
 
     return { url, idToken, fetch: this.sesion.fetch };
+  }
+
+  /**
+   * Una petición, con **un** reintento si la identidad ya no vale.
+   *
+   * OJO CON EL 401: NO EXISTE
+   * ─────────────────────────
+   * El router contesta siempre **HTTP 200** y mete el fallo en el cuerpo:
+   * `{ ok: false, error: 'TOKEN_INVALIDO' }`. Esperar un código de estado
+   * sería esperar algo que nunca llega, y el reintento no se dispararía jamás.
+   *
+   * Un reintento y no más: si la credencial recién renovada tampoco vale, el
+   * problema no es la caducidad y repetir solo gasta cuota.
+   */
+  private async conSesion<T>(accion: (ctx: ContextoTransporte) => Promise<T>): Promise<T> {
+    const contexto = await this.contexto();
+
+    try {
+      return await accion(contexto);
+    } catch (error) {
+      if ((error as ErrorBackend)?.codigo !== 'TOKEN_INVALIDO' || !this.sesion.renovar) throw error;
+
+      const renovado = await this.sesion.renovar();
+      // Sin credencial nueva, el error que sube es el original: decir
+      // «falló la renovación» taparía lo que de verdad contestó el router.
+      if (!renovado) throw error;
+
+      return accion({ ...contexto, idToken: renovado });
+    }
   }
 
   /** Los descriptores de una colección, o el motivo de que no los haya. */
@@ -283,7 +317,7 @@ export class RepositorioBackend implements DataRepository {
       // pasar es que quien llamó crea que guardó algo.
       throw new ErrorBackend(NADA_QUE_GUARDAR, `${coleccion}: no había nada que escribir`);
     }
-    await aplicar(await this.contexto(), mutaciones);
+    await this.conSesion((contexto) => aplicar(contexto, mutaciones));
   }
 
   private noExisteAqui(que: string, porque: string): never {
@@ -306,8 +340,10 @@ export class RepositorioBackend implements DataRepository {
    * eso es cuota que se nota.
    */
   async loadAll(_ctx: RepositoryContext): Promise<AllFamilyData> {
-    const contexto = await this.contexto();
+    return this.conSesion((contexto) => this.leerTodo(contexto));
+  }
 
+  private async leerTodo(contexto: ContextoTransporte): Promise<AllFamilyData> {
     try {
       const data = await pedir<{ tablas?: Record<string, unknown[][]> }>(contexto, 'exportar');
       return this.desdeTablas(data?.tablas ?? {});
@@ -328,7 +364,7 @@ export class RepositorioBackend implements DataRepository {
 
   /** La revisión del documento, para que G2 sepa si esta copia se quedó vieja. */
   async revision(): Promise<number> {
-    return obtenerRevision(await this.contexto());
+    return this.conSesion((contexto) => obtenerRevision(contexto));
   }
 
   // ── Lectura: de tablas a modelos ──────────────────────────────────────────
@@ -624,11 +660,13 @@ export class RepositorioBackend implements DataRepository {
     }
 
     const email = normalizarEmail(invitedEmail);
-    await pedir(await this.contexto(), 'invitar', {
-      email,
-      rol,
-      pacientes: String(invitedMemberId ?? '').trim(),
-    });
+    await this.conSesion((contexto) =>
+      pedir(contexto, 'invitar', {
+        email,
+        rol,
+        pacientes: String(invitedMemberId ?? '').trim(),
+      }),
+    );
 
     return email;
   }
@@ -661,7 +699,7 @@ export class RepositorioBackend implements DataRepository {
       );
     }
 
-    await pedir(await this.contexto(), 'revocar', { email });
+    await this.conSesion((contexto) => pedir(contexto, 'revocar', { email }));
   }
 
   /**

@@ -159,7 +159,12 @@ Lo pactado, con dos cosas que hay que medir antes de fijar el intervalo:
 **Puertas:** pruebas con reloj y visibilidad simulados —que en segundo plano no
 sale ni una petición— y la medida de cuota, clasificada como real.
 
-### G3 · Salir de Firebase Auth
+### G3 · Salir de Firebase Auth — G3a ✅, G3b pendiente
+
+**G3a, el 21 de septiembre de 2026:** la sesión con su ventana de 50 minutos y
+el reintento del repositorio. Con dos correcciones al diseño aprobado que
+conviene leer antes de seguir —**GIS no renueva en silencio** y **el router no
+devuelve 401**—, en [G3-IDENTIDAD.md](G3-IDENTIDAD.md).
 
 La PWA ya sabe obtener un `id_token`: `/invitacion` lo hace desde E9. Aquí se
 generaliza a toda la sesión y desaparecen `signInWithCredential` y
