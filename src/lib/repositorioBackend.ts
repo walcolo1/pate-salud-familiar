@@ -46,7 +46,7 @@ import { normalizarEmail } from './autenticacion';
 // no hay ciclo en ejecución.
 import { sesionBackend } from './identidad';
 import { EMPTY_FAMILY_DATA, type AllFamilyData, type DataRepository, type DataUpdate, type RepositoryContext } from './dataRepository';
-import type { FamilyAccess, FamilyInvitation } from './firestoreService';
+import type { FamilyAccess, FamilyInvitation } from './tiposAcceso';
 import type {
   ClinicalDocument,
   ExamResult,

@@ -40,7 +40,7 @@ export default function AppointmentsPage() {
     syncAppointmentToCalendar,
     pushToGoogle,
     syncNow,
-    isFirebaseBackend
+    sincronizacionManual
   } = useApp();
 
   const [filter, setFilter] = useState<HealthEventStatus | 'ALL'>('ALL');
@@ -250,7 +250,7 @@ export default function AppointmentsPage() {
                   <h4 className="text-sm font-extrabold text-slate-800 leading-tight mb-0.5">{appt.doctorName}</h4>
                   <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                     <span className="text-[10px] text-slate-500 font-bold">{appt.specialty}</span>
-                    {!isFirebaseBackend && (
+                    {sincronizacionManual && (
                       <>
                         <span className="text-slate-300 text-[10px]">·</span>
                         {getSheetsSyncBadge(appt)}
@@ -334,7 +334,7 @@ export default function AppointmentsPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="flex flex-col gap-1">
                     {/* Google Sheets Sync Info */}
-                    {!isFirebaseBackend && (
+                    {sincronizacionManual && (
                       <div className="flex items-center gap-1.5 text-slate-500">
                         <span className="font-extrabold text-[10px] uppercase text-slate-500">Base de Datos:</span>
                         {appt.syncStatus === 'SYNCED' ? (
@@ -363,7 +363,7 @@ export default function AppointmentsPage() {
 
                   {/* Actions buttons */}
                   <div className="flex flex-wrap gap-1.5 justify-end">
-                    {!isFirebaseBackend && appt.syncStatus !== 'SYNCED' && (
+                    {sincronizacionManual && appt.syncStatus !== 'SYNCED' && (
                       <button
                         onClick={async () => {
                           try {

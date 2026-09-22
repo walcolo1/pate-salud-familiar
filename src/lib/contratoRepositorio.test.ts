@@ -9,7 +9,7 @@ import {
   informeDeMudas,
   nombresDelContrato,
 } from './contratoRepositorio';
-import { SheetsRepository } from './sheetsRepository';
+import { RepositorioBackend } from './repositorioBackend';
 
 /**
  * G1 · la red antes del salto.
@@ -136,17 +136,15 @@ describe('escriturasMudas', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * La línea base recoge lo que hay hoy para que la suite no viva en rojo, y
- * **solo puede menguar**. Es el mismo trato que `lint-baseline.json` y
- * `axe-baseline.json`: lo que ya estaba se tolera y se va reduciendo; lo nuevo
- * se rechaza.
+ * La línea base recogía lo que había para que la suite no viviera en rojo, y
+ * **solo podía menguar**. Llegó a cero en G0 y ahí se queda.
  *
- * `FirebaseRepository` no se puede instanciar aquí —inicializa Firebase al
- * importarse y falla con `auth/invalid-api-key` sin credenciales— así que
- * queda fuera. No es un agujero que vaya a durar: **G4 lo borra**.
+ * `FirebaseRepository` quedaba fuera porque no se podía instanciar sin
+ * credenciales. Ya no hace falta la excusa: **G4 lo borró**, y ahora la única
+ * implementación del contrato es la que se comprueba aquí.
  */
 describe('ninguna escritura nueva puede ser muda', () => {
-  const implementaciones = [{ nombre: 'SheetsRepository', objeto: new SheetsRepository() }];
+  const implementaciones = [{ nombre: 'RepositorioBackend', objeto: new RepositorioBackend() }];
 
   for (const { nombre, objeto } of implementaciones) {
     const permitidas = new Set(LINEA_BASE[nombre] ?? []);

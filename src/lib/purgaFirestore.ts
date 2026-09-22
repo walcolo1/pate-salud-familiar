@@ -1,42 +1,62 @@
 /**
- * Purga de la caché IndexedDB de Firestore — Paté · Salud Familiar (A6-F2)
+ * Purga de la caché IndexedDB de Firestore (A6-F2, reescrita en G4)
  * ════════════════════════════════════════════════════════════════════════════
  *
- * `firebase.ts` habilita `persistentLocalCache`, así que Firestore guarda en
- * IndexedDB una copia de todo documento leído: el expediente completo. Cerrar
- * sesión no la tocaba.
+ * Firestore guardaba en IndexedDB una copia de todo documento leído: el
+ * expediente completo. Cerrar sesión no la tocaba, y **borrar el SDK tampoco
+ * la borra**: los datos siguen en el disco de quien ya abrió la aplicación.
  *
- * EL MARCADOR VA ANTES DEL PRIMER INTENTO
- * ───────────────────────────────────────
- * `pate:purga_firestore_pendiente` se escribe ANTES de llamar a `terminate`,
- * no después de un fallo. Si el navegador se cierra a mitad de la operación,
- * la purga sigue marcada como pendiente y se completa en el próximo arranque.
+ * Por eso este módulo sobrevive a G4 aunque Firebase ya no exista. Es lo único
+ * que queda de él, y tiene que quedarse **una temporada**: hasta que los
+ * navegadores de quienes usaron la versión anterior hayan pasado por aquí.
  *
- * UNA PURGA DIFERIDA NUNCA SE REPORTA COMO ÉXITO
+ * QUÉ CAMBIÓ EN G4
+ * ────────────────
+ * Antes se purgaba con el propio SDK —`terminate()` y
+ * `clearIndexedDbPersistence()`—. Sin SDK hay que ir directo a IndexedDB y
+ * **borrar las bases por su nombre**.
+ *
+ * El marcador va ANTES del primer intento: si el navegador se cierra a mitad,
+ * la purga sigue pendiente y se completa en el próximo arranque.
+ *
+ * UNA PURGA A MEDIAS NUNCA SE REPORTA COMO ÉXITO
  * ──────────────────────────────────────────────
- * `clearIndexedDbPersistence` falla con `failed-precondition` si hay otra
- * pestaña abierta o un listener vivo, que es el caso realista y no el raro.
- * En ese caso se conserva el marcador y se devuelve `diferida`, para que la
- * interfaz pueda decir la verdad en lugar de afirmar que se borró todo.
- *
- * CONSECUENCIA DE `terminate()`
- * ─────────────────────────────
- * Deja la instancia de Firestore inutilizable. Tras una purga con éxito hay
- * que recargar la página: al cerrar sesión eso ya ocurre (paso l), y en el
- * arranque diferido lo provoca quien llama.
+ * `deleteDatabase` se queda **bloqueada** si otra pestaña tiene la base
+ * abierta, que es el caso realista y no el raro. Entonces se conserva el
+ * marcador y se devuelve `diferida`, para que la interfaz pueda decir la
+ * verdad en vez de afirmar que se borró todo.
  */
 
-import { isFirebaseBackend } from './dataBackend';
-
 export const CLAVE_PURGA_PENDIENTE = 'pate:purga_firestore_pendiente';
+
+/** Cuánto se espera a un borrado antes de darlo por bloqueado. */
+export const ESPERA_BORRADO_MS = 3_000;
 
 export type ResultadoPurgaFirestore =
   /** La caché quedó borrada. */
   | 'ok'
   /** No se pudo completar; el marcador sigue puesto y se reintentará. */
   | 'diferida'
-  /** No hay nada que purgar (backend distinto, sin navegador o sin IndexedDB). */
+  /** No hay nada que purgar, o no hay forma de encontrarlo. */
   | 'no_aplica';
+
+/**
+ * Las bases que dejaba Firebase con nombre fijo.
+ *
+ * La de Firestore **no está aquí** porque su nombre lleva dentro el
+ * identificador del proyecto (`firestore/[DEFAULT]/<proyecto>/main`), y ese
+ * identificador se fue con la configuración. Se encuentra enumerando.
+ */
+export const BASES_CONOCIDAS: readonly string[] = [
+  'firebaseLocalStorageDb',
+  'firebase-installations-database',
+  'firebase-heartbeat-database',
+];
+
+/** Si el nombre de una base es de Firebase. */
+export function esBaseDeFirebase(nombre: unknown): boolean {
+  return /firebase|firestore/i.test(String(nombre ?? ''));
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Marcador
@@ -80,86 +100,124 @@ function desmarcarPendiente(): void {
 // Purga
 // ─────────────────────────────────────────────────────────────────────────────
 
-function indexedDbDisponible(): boolean {
+/** Lo poco que se usa de IndexedDB. Inyectable para poder probarlo. */
+export interface AlmacenIndexado {
+  databases?: () => Promise<{ name?: string }[]>;
+  deleteDatabase: (nombre: string) => IDBOpenDBRequest;
+}
+
+function indexadoDelNavegador(): AlmacenIndexado | null {
   try {
-    return typeof indexedDB !== 'undefined' && indexedDB !== null;
+    if (typeof indexedDB === 'undefined' || indexedDB === null) return null;
+    return indexedDB as unknown as AlmacenIndexado;
   } catch {
-    return false;
+    return null;
   }
 }
 
 /**
- * Termina la instancia de Firestore y borra su caché de IndexedDB.
+ * Borra una base. Resuelve `false` si se bloqueó o falló.
  *
- * Nunca lanza. Tras devolver `'ok'` la instancia de Firestore queda
- * inutilizable y quien llama debe recargar la página.
+ * El plazo no es adorno: cuando otra pestaña tiene la base abierta, la petición
+ * **no falla** — se queda esperando indefinidamente a que se cierre. Sin plazo,
+ * el cierre de sesión se colgaría ahí.
  */
-export async function purgarCacheFirestore(): Promise<ResultadoPurgaFirestore> {
+export function borrarBase(
+  indexado: AlmacenIndexado,
+  nombre: string,
+  espera = ESPERA_BORRADO_MS,
+): Promise<boolean> {
+  return new Promise<boolean>((resolver) => {
+    let resuelto = false;
+    const acabar = (bien: boolean) => {
+      if (resuelto) return;
+      resuelto = true;
+      resolver(bien);
+    };
+
+    let peticion: IDBOpenDBRequest;
+    try {
+      peticion = indexado.deleteDatabase(nombre);
+    } catch {
+      acabar(false);
+      return;
+    }
+
+    const plazo = setTimeout(() => acabar(false), espera);
+    const cerrar = (bien: boolean) => {
+      clearTimeout(plazo);
+      acabar(bien);
+    };
+
+    peticion.onsuccess = () => cerrar(true);
+    peticion.onerror = () => cerrar(false);
+    // `onblocked` es otra pestaña con la base abierta. No es un error: es que
+    // todavía no se puede, y por eso la purga queda diferida y no fallida.
+    peticion.onblocked = () => cerrar(false);
+  });
+}
+
+/**
+ * Borra la caché de Firestore que quedara en este navegador.
+ *
+ * Nunca lanza.
+ */
+export async function purgarCacheFirestore(
+  indexado: AlmacenIndexado | null = indexadoDelNavegador(),
+): Promise<ResultadoPurgaFirestore> {
   if (typeof window === 'undefined') return 'no_aplica';
-  if (!isFirebaseBackend) return 'no_aplica';
-  if (!indexedDbDisponible()) return 'no_aplica';
+  if (!indexado) return 'no_aplica';
 
   // 1 · Marcador ANTES de tocar nada.
   marcarPendiente();
 
-  let db: unknown;
-  let terminate: (d: never) => Promise<void>;
-  let clearIndexedDbPersistence: (d: never) => Promise<void>;
-  try {
-    const mod = await import('./firebase');
-    db = mod.db;
-    const fs = await import('firebase/firestore');
-    terminate = fs.terminate as unknown as (d: never) => Promise<void>;
-    clearIndexedDbPersistence = fs.clearIndexedDbPersistence as unknown as (d: never) => Promise<void>;
-  } catch {
-    // No se pudo ni cargar Firestore: se conserva el marcador.
-    return 'diferida';
-  }
-
-  // 2 · terminate(). Si ya estaba terminada, rechaza y se ignora.
-  try {
-    await terminate(db as never);
-  } catch {
-    /* instancia ya terminada o no iniciada: se continúa */
-  }
-
-  // 3 · clearIndexedDbPersistence().
-  try {
-    await clearIndexedDbPersistence(db as never);
-    desmarcarPendiente();
-    return 'ok';
-  } catch (err) {
-    const codigo = (err as { code?: string } | null)?.code;
-    if (codigo === 'unimplemented') {
-      // El navegador no soporta la persistencia: no hay caché que borrar.
-      desmarcarPendiente();
-      return 'no_aplica';
+  let nombres: string[];
+  if (typeof indexado.databases === 'function') {
+    try {
+      const listadas = await indexado.databases();
+      nombres = listadas.map((b) => String(b?.name ?? '')).filter(esBaseDeFirebase);
+    } catch {
+      return 'diferida';
     }
-    // 'failed-precondition' (otra pestaña o listener vivo) y cualquier otro
-    // error se tratan igual: NO se afirma que la caché quedó limpia.
-    return 'diferida';
+  } else {
+    // Sin enumeración no hay forma de dar con la base de Firestore: su nombre
+    // lleva dentro el identificador del proyecto, que se fue con la
+    // configuración. Se borra lo que tiene nombre fijo y **se deja de
+    // reintentar**: volver cada arranque a no encontrar nada no limpia nada y
+    // sí gasta el arranque de todos.
+    for (const nombre of BASES_CONOCIDAS) await borrarBase(indexado, nombre);
+    desmarcarPendiente();
+    return 'no_aplica';
   }
+
+  if (nombres.length === 0) {
+    desmarcarPendiente();
+    return 'no_aplica';
+  }
+
+  const resultados = await Promise.all(nombres.map((n) => borrarBase(indexado, n)));
+  if (resultados.some((bien) => !bien)) return 'diferida';
+
+  desmarcarPendiente();
+  return 'ok';
 }
 
 /**
  * Completa en el arranque una purga que quedó pendiente.
  *
- * Debe invocarse ANTES de crear cualquier watcher, listener, carga remota o
- * sincronización: es el único momento en que `clearIndexedDbPersistence`
- * puede tener éxito con garantías, porque todavía no hay suscripciones vivas.
- *
- * Se memoiza a nivel de módulo para que dos montajes de AppContext —React en
- * modo estricto monta dos veces en desarrollo— no lancen dos purgas.
+ * Se memoiza a nivel de módulo para que dos montajes de `AppContext` —React
+ * monta dos veces en modo estricto— no lancen dos purgas.
  */
 let promesaEnCurso: Promise<ResultadoPurgaFirestore> | null = null;
 
 export function ejecutarPurgaDiferidaSiProcede(): Promise<ResultadoPurgaFirestore> {
   if (promesaEnCurso) return promesaEnCurso;
   if (!hayPurgaPendiente()) return Promise.resolve<ResultadoPurgaFirestore>('no_aplica');
+
   promesaEnCurso = purgarCacheFirestore()
     .then((r) => {
-      // Un marcador que no aplica -por ejemplo, tras cambiar de backend- no
-      // debe quedarse huerfano bloqueando el arranque en cada carga.
+      // Un marcador que ya no aplica no puede quedarse huérfano bloqueando el
+      // arranque en cada carga.
       if (r === 'no_aplica') desmarcarPendiente();
       return r;
     })

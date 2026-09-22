@@ -71,7 +71,7 @@ export default function MemberDetailPage() {
     revokeDocumentShare,
     medicalOrders,
     medicationPrescriptions,
-    isFirebaseBackend
+    sincronizacionManual
   } = useApp();
   const confirmar = useConfirmacion();
   const avisar = useAviso();
@@ -473,7 +473,7 @@ export default function MemberDetailPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {!isFirebaseBackend && (
+            {sincronizacionManual && (
               <>
                 <div className="flex flex-col gap-1 bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
                   <h4 className="text-xs font-extrabold text-slate-700">Canal de seguridad habilitado</h4>

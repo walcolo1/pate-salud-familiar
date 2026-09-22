@@ -39,7 +39,7 @@ export default function DashboardPage() {
     appointmentCandidates,
     pendingSyncCount,
     isLoading,
-    isFirebaseBackend,
+    sincronizacionManual,
     familyId,
     pendingInvitations,
     acceptInvitation,
@@ -61,10 +61,10 @@ export default function DashboardPage() {
   }, [user, isLoading, router]);
 
   useEffect(() => {
-    if (!isLoading && user && isFirebaseBackend && !familyId) {
+    if (!isLoading && user && !sincronizacionManual && !familyId) {
       checkPendingInvitations();
     }
-  }, [user, isLoading, isFirebaseBackend, familyId, checkPendingInvitations]);
+  }, [user, isLoading, sincronizacionManual, familyId, checkPendingInvitations]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -109,7 +109,7 @@ export default function DashboardPage() {
   }
 
   // Guest Onboarding / Invitation acceptance screen
-  if (isFirebaseBackend && !familyId) {
+  if (!sincronizacionManual && !familyId) {
     return (
       <div className="min-h-[75vh] flex flex-col items-center justify-center p-4 text-slate-700">
         <div className="w-full max-w-lg bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-xl shadow-slate-100/40 flex flex-col gap-6">
@@ -422,7 +422,7 @@ export default function DashboardPage() {
   }
 
   // 9. Sync pending changes
-  if (!isFirebaseBackend && pendingSyncCount > 0) {
+  if (sincronizacionManual && pendingSyncCount > 0) {
     dashboardAlerts.push({
       id: 'sync-pending-changes',
       title: 'Sincronización Pendiente',

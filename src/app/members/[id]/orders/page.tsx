@@ -67,7 +67,7 @@ export default function MedicalOrdersPage() {
     driveSyncEnabled,
     driveStatus,
     driveError,
-    isFirebaseBackend
+    sincronizacionManual
   } = useApp();
 
   const [filter, setFilter] = useState<MedicalOrderStatus | 'ALL'>('ALL');
@@ -356,7 +356,7 @@ export default function MedicalOrdersPage() {
                       <span className="text-[10px] text-slate-500 font-bold">{orderTypeMap[order.orderType]}</span>
                       <span className="text-slate-300 text-[10px]">·</span>
                       <span className="text-[10px] text-slate-500 font-semibold">Emitida: {new Date(order.issuedAt).toLocaleDateString('es-CO')}</span>
-                      {!isFirebaseBackend && (
+                      {sincronizacionManual && (
                         <>
                           <span className="text-slate-300 text-[10px]">·</span>
                           {getSheetsSyncBadge(order)}

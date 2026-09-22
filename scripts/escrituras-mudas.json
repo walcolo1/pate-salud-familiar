@@ -1,4 +1,4 @@
 {
-  "_comentario": "G1 · escrituras que hoy no hacen nada. Solo puede MENGUAR: la prueba falla si aparece una nueva y tambien si una de estas ya se arreglo y sigue apuntada. G0 la vacio el 21 de septiembre de 2026.",
-  "SheetsRepository": []
+  "_comentario": "G1 · escrituras que hoy no hacen nada. Solo puede MENGUAR. G0 la vacio el 21 de septiembre de 2026; G4 renombro la clave al borrar SheetsRepository.",
+  "RepositorioBackend": []
 }

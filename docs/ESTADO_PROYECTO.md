@@ -17,7 +17,7 @@ hecho y qué falta.*
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
 | **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10/E10-bis** llevan el esquema a v3 |
-| **G** | Corte seco de Firebase | **en curso** · G1, G0, G2 y G3 cerrados · siguiente, **G4: el corte** |
+| **G** | Corte seco de Firebase | **en curso** · G1, G0, G2, G3 y G4a cerrados · **Firebase ya no está** · siguiente, G4b |
 | **H** | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
 
 El Bloque D cierra con cuatro pasos y una fase de convención:
@@ -119,10 +119,11 @@ cada módulo. Las que más condicionan lo que venga:
 | Las **tareas genéricas** (`FollowUpTask`) dejarán de guardarse al girar la bandera de G: `SEGUIMIENTOS` es otra cosa y no tienen pestaña | `descriptores.ts` · `SIN_PESTANA` |
 | Las 4 escrituras de E11 siguen sin pestaña: **lanzan** un error explícito en vez de callar | `G0-REPOSITORIO.md` |
 | Qué hacer cuando la revisión cambia —recargar, avisar o recargar lo que no está en edición— sigue **sin decidir**: `alCambiar` es una llamada de vuelta | `G2-SINCRONIZACION.md` |
-| El sondeo de G2 sigue **sin instanciar**: lo enciende G4 al girar la bandera | `sondeoRevision.ts` |
+| El sondeo de G2 sigue **sin instanciar**: lo enciende G4b | `sondeoRevision.ts` |
+| `persistirPorMutacion` tiene 28 llamadas y hoy no escribe: la condición se apaga en un sitio, `SINCRONIZACION_MANUAL` | `G4-EL-CORTE.md` |
+| Sin `databases()` en el navegador, la caché de Firestore **no se puede localizar** para borrarla | `purgaFirestore.ts` |
 | GIS **no renueva el `id_token` en silencio**: la ventana de 50 min es un intento, no una garantía | `G3-IDENTIDAD.md` |
 | `auto_select` tras un F5, la renovación a los 50 min y el rechazo de la cuenta equivocada **solo se pueden ver en vivo** | `G3-IDENTIDAD.md` |
-| `onAuthStateChanged` y `signInWithCredential` siguen en pie: Firestore exige `request.auth` mientras la bandera diga `firebase`. Se van con **G4** | `G3-IDENTIDAD.md` |
 | Pegar el consolidado **v4** y repetir `instalar()`: la hoja de pruebas quedó en v3 | `E10-ESQUEMA-V2.md` |
 | El repositorio de G0 no tiene de dónde sacar el `id_token`: `sesionDelNavegador()` devuelve `null` hasta **G3** | `repositorioBackend.ts` |
 | `version_esquema` dice en qué versión está una hoja, pero **nadie actúa** en consecuencia todavía | `E10-ESQUEMA-V2.md` |
@@ -164,14 +165,13 @@ pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
 
 ## Siguiente paso
 
-**G4, el corte.** Girar la bandera —el repositorio de G0 pasa a responder— y,
-en el mismo paso, retirar Firebase entero: Auth, Firestore, reglas y
-dependencia. Va junto porque las reglas de Firestore exigen `request.auth`:
-quitar Auth antes dejaría la aplicación sin poder leer ni escribir
-([G3-IDENTIDAD.md](G3-IDENTIDAD.md)).
+**G4b**, que es el antiguo Bloque H: que el repositorio escriba de verdad y que
+el empuje por lotes se vaya. Incluye encender el sondeo de G2 y el renombre
+`deleteX` → `darDeBajaX` ([G4-EL-CORTE.md](G4-EL-CORTE.md)).
 
-Antes, el recorrido en vivo del familiar invitado: es lo único que puede
-demostrar que el inicio de sesión sin Firebase funciona.
+Firebase ya no está en la aplicación: ni Auth, ni Firestore, ni las reglas, ni
+el SDK, ni la bandera. Lo único que queda es la purga de la caché que dejó en
+los navegadores, y esa tiene que quedarse una temporada.
 
 El plan completo, con los seis pasos y sus puertas, está en
 [PLAN_BLOQUE_G.md](PLAN_BLOQUE_G.md).

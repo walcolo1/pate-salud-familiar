@@ -1,195 +1,208 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  BASES_CONOCIDAS,
+  CLAVE_PURGA_PENDIENTE,
+  ejecutarPurgaDiferidaSiProcede,
+  esBaseDeFirebase,
+  hayPurgaPendiente,
+  purgarCacheFirestore,
+  type AlmacenIndexado,
+} from './purgaFirestore';
 
 /**
- * Pruebas de `purgaFirestore` con DOBLES (stubs).
+ * A6-F2 · la caché que Firebase deja en el disco de quien ya usó la aplicación.
  *
- * HONESTIDAD SOBRE EL ALCANCE
- * ═══════════════════════════
- * Esto NO prueba la limpieza real de la caché de Firestore. `terminate()` y
- * `clearIndexedDbPersistence()` están sustituidos por dobles. Lo que se prueba
- * es la LÓGICA DE DECISIÓN que los rodea: cuándo se escribe el marcador, cuándo
- * se conserva, cuándo se borra, y que un fallo jamás se reporte como éxito.
+ * Borrar el SDK no borra los datos: Firestore guardaba en IndexedDB una copia
+ * de **todo documento leído**, o sea el expediente completo. Por eso este
+ * módulo sobrevive a G4, y por eso se reescribió sobre IndexedDB directamente.
  *
- * `failed-precondition` —el caso de "hay otra pestaña abierta"— no se puede
- * provocar de forma determinista en un navegador real, y por eso se cubre aquí.
- * La limpieza efectiva de IndexedDB queda pendiente de validación manual (M11
- * y M12).
+ * Lo que más importa de todo esto es una sola cosa: **una purga a medias no se
+ * puede reportar como éxito**. Si otra pestaña tiene la base abierta, el
+ * borrado se queda bloqueado, y decirle a alguien que sus datos clínicos se
+ * borraron cuando siguen ahí es la peor forma de fallar que tiene este módulo.
  */
 
-const dobles = vi.hoisted(() => ({
-  esFirebase: true,
-  terminate: vi.fn(async () => {}),
-  clear: vi.fn(async () => {}),
-}));
+function indexadoFalso(opciones: {
+  bases?: string[];
+  sinEnumerar?: boolean;
+  bloqueadas?: string[];
+  fallaEnumerar?: boolean;
+} = {}) {
+  const borradas: string[] = [];
+  const bloqueadas = new Set(opciones.bloqueadas ?? []);
 
-vi.mock('./dataBackend', () => ({
-  get isFirebaseBackend() {
-    return dobles.esFirebase;
-  },
-}));
-vi.mock('./firebase', () => ({ db: { __doble: true } }));
-vi.mock('firebase/firestore', () => ({
-  terminate: (...a: unknown[]) => dobles.terminate(...(a as [])),
-  clearIndexedDbPersistence: (...a: unknown[]) => dobles.clear(...(a as [])),
-}));
+  const indexado: AlmacenIndexado = {
+    databases: opciones.sinEnumerar
+      ? undefined
+      : async () => {
+          if (opciones.fallaEnumerar) throw new Error('sin permiso');
+          return (opciones.bases ?? []).map((name) => ({ name }));
+        },
+    deleteDatabase: (nombre: string) => {
+      const peticion = {} as IDBOpenDBRequest & {
+        onsuccess: (() => void) | null;
+        onerror: (() => void) | null;
+        onblocked: (() => void) | null;
+      };
 
-const CLAVE = 'pate:purga_firestore_pendiente';
+      queueMicrotask(() => {
+        if (bloqueadas.has(nombre)) {
+          peticion.onblocked?.(new Event('blocked') as never);
+          return;
+        }
+        borradas.push(nombre);
+        peticion.onsuccess?.(new Event('success') as never);
+      });
 
-function prepararEntorno(conIndexedDb = true) {
+      return peticion;
+    },
+  };
+
+  return { indexado, borradas };
+}
+
+/**
+ * Un `window` con `localStorage` de mentira.
+ *
+ * No hay navegador en las pruebas de unidad, y este módulo lee el marcador de
+ * `localStorage` en cada llamada.
+ */
+function prepararVentana() {
   const datos = new Map<string, string>();
   const localStorage = {
-    get length() { return datos.size; },
+    get length() {
+      return datos.size;
+    },
     key: (i: number) => Array.from(datos.keys())[i] ?? null,
     getItem: (k: string) => datos.get(k) ?? null,
-    setItem: (k: string, v: string) => { datos.set(k, v); },
-    removeItem: (k: string) => { datos.delete(k); },
+    setItem: (k: string, v: string) => void datos.set(k, v),
+    removeItem: (k: string) => void datos.delete(k),
     clear: () => datos.clear(),
   };
   (globalThis as Record<string, unknown>).window = { localStorage };
-  (globalThis as Record<string, unknown>).indexedDB = conIndexedDb ? {} : undefined;
   return datos;
 }
 
-async function cargarModulo() {
-  vi.resetModules();
-  return import('./purgaFirestore');
-}
+let marcadores: Map<string, string>;
+beforeEach(() => {
+  marcadores = prepararVentana();
+});
 
-describe('purgaCacheFirestore · marcador y resultados', () => {
-  beforeEach(() => {
-    dobles.esFirebase = true;
-    dobles.terminate.mockReset().mockResolvedValue(undefined);
-    dobles.clear.mockReset().mockResolvedValue(undefined);
+describe('qué se considera una base de Firebase', () => {
+  it('las de Firestore y las del SDK, sí', () => {
+    expect(esBaseDeFirebase('firestore/[DEFAULT]/pate-abc123/main')).toBe(true);
+    expect(esBaseDeFirebase('firebaseLocalStorageDb')).toBe(true);
+    expect(esBaseDeFirebase('firebase-heartbeat-database')).toBe(true);
   });
 
-  it('escribe el marcador ANTES de llamar a terminate', async () => {
-    const datos = prepararEntorno();
-    const orden: string[] = [];
-    dobles.terminate.mockImplementation(async () => {
-      orden.push('terminate:marcador=' + datos.get(CLAVE));
-    });
-    const { purgarCacheFirestore } = await cargarModulo();
-    await purgarCacheFirestore();
-    expect(orden[0]).toBe('terminate:marcador=1');
-  });
-
-  it('con limpieza exitosa devuelve ok y BORRA el marcador', async () => {
-    const datos = prepararEntorno();
-    const { purgarCacheFirestore } = await cargarModulo();
-    expect(await purgarCacheFirestore()).toBe('ok');
-    expect(datos.has(CLAVE)).toBe(false);
-    expect(dobles.terminate).toHaveBeenCalledTimes(1);
-    expect(dobles.clear).toHaveBeenCalledTimes(1);
-  });
-
-  it('con failed-precondition devuelve diferida y CONSERVA el marcador', async () => {
-    const datos = prepararEntorno();
-    dobles.clear.mockRejectedValue(Object.assign(new Error('otra pestaña'), { code: 'failed-precondition' }));
-    const { purgarCacheFirestore } = await cargarModulo();
-    const r = await purgarCacheFirestore();
-    expect(r).toBe('diferida');
-    expect(r).not.toBe('ok');           // jamás un éxito falso
-    expect(datos.get(CLAVE)).toBe('1'); // se reintentará en el próximo arranque
-  });
-
-  it('ante un error desconocido tampoco afirma éxito', async () => {
-    const datos = prepararEntorno();
-    dobles.clear.mockRejectedValue(new Error('vaya'));
-    const { purgarCacheFirestore } = await cargarModulo();
-    expect(await purgarCacheFirestore()).toBe('diferida');
-    expect(datos.get(CLAVE)).toBe('1');
-  });
-
-  it('si terminate rechaza (instancia ya terminada) continúa y limpia igual', async () => {
-    const datos = prepararEntorno();
-    dobles.terminate.mockRejectedValue(new Error('ya terminada'));
-    const { purgarCacheFirestore } = await cargarModulo();
-    expect(await purgarCacheFirestore()).toBe('ok');
-    expect(datos.has(CLAVE)).toBe(false);
-  });
-
-  it('con persistencia no soportada devuelve no_aplica y borra el marcador', async () => {
-    const datos = prepararEntorno();
-    dobles.clear.mockRejectedValue(Object.assign(new Error('no'), { code: 'unimplemented' }));
-    const { purgarCacheFirestore } = await cargarModulo();
-    expect(await purgarCacheFirestore()).toBe('no_aplica');
-    expect(datos.has(CLAVE)).toBe(false);
-  });
-
-  it('sin backend Firebase no toca nada', async () => {
-    const datos = prepararEntorno();
-    dobles.esFirebase = false;
-    const { purgarCacheFirestore } = await cargarModulo();
-    expect(await purgarCacheFirestore()).toBe('no_aplica');
-    expect(datos.has(CLAVE)).toBe(false);
-    expect(dobles.terminate).not.toHaveBeenCalled();
-  });
-
-  it('sin IndexedDB (modo privado) no bloquea la salida', async () => {
-    const datos = prepararEntorno(false);
-    const { purgarCacheFirestore } = await cargarModulo();
-    expect(await purgarCacheFirestore()).toBe('no_aplica');
-    expect(datos.has(CLAVE)).toBe(false);
-    expect(dobles.terminate).not.toHaveBeenCalled();
+  it('las de la propia aplicación, NO', () => {
+    // Borrar de más aquí significaría borrar datos de alguien. El filtro es
+    // por nombre y tiene que ser estrecho.
+    expect(esBaseDeFirebase('pate-local')).toBe(false);
+    expect(esBaseDeFirebase('keyval-store')).toBe(false);
+    expect(esBaseDeFirebase('')).toBe(false);
+    expect(esBaseDeFirebase(null)).toBe(false);
   });
 });
 
-describe('ejecutarPurgaDiferidaSiProcede · arranque', () => {
-  beforeEach(() => {
-    dobles.esFirebase = true;
-    dobles.terminate.mockReset().mockResolvedValue(undefined);
-    dobles.clear.mockReset().mockResolvedValue(undefined);
+describe('purgarCacheFirestore', () => {
+  it('escribe el marcador ANTES de borrar nada', async () => {
+    // Si el navegador se cierra a mitad, la purga tiene que seguir pendiente.
+    let visto = false;
+    const { indexado } = indexadoFalso({ bases: ['firestore/[DEFAULT]/x/main'] });
+    const original = indexado.deleteDatabase;
+    indexado.deleteDatabase = (n) => {
+      visto = hayPurgaPendiente();
+      return original(n);
+    };
+
+    await purgarCacheFirestore(indexado);
+    expect(visto).toBe(true);
   });
 
-  it('sin marcador no hace nada', async () => {
-    prepararEntorno();
-    const { ejecutarPurgaDiferidaSiProcede } = await cargarModulo();
-    expect(await ejecutarPurgaDiferidaSiProcede()).toBe('no_aplica');
-    expect(dobles.terminate).not.toHaveBeenCalled();
+  it('borra las de Firebase y deja en paz las demás', async () => {
+    const { indexado, borradas } = indexadoFalso({
+      bases: ['firestore/[DEFAULT]/x/main', 'firebaseLocalStorageDb', 'pate-local'],
+    });
+
+    await expect(purgarCacheFirestore(indexado)).resolves.toBe('ok');
+    expect(borradas.sort()).toEqual(['firebaseLocalStorageDb', 'firestore/[DEFAULT]/x/main']);
+    expect(hayPurgaPendiente()).toBe(false);
   });
 
-  it('con marcador y limpieza exitosa borra el marcador y devuelve ok', async () => {
-    const datos = prepararEntorno();
-    datos.set(CLAVE, '1');
-    const { ejecutarPurgaDiferidaSiProcede, hayPurgaPendiente } = await cargarModulo();
+  it('sin nada que borrar, no hay purga pendiente que arrastrar', async () => {
+    const { indexado } = indexadoFalso({ bases: ['pate-local'] });
+    await expect(purgarCacheFirestore(indexado)).resolves.toBe('no_aplica');
+    expect(hayPurgaPendiente()).toBe(false);
+  });
+
+  it('una base bloqueada por otra pestaña deja la purga DIFERIDA', async () => {
+    // Es el caso realista, no el raro. `deleteDatabase` no falla: se queda
+    // esperando a que la otra pestaña cierre.
+    const { indexado } = indexadoFalso({
+      bases: ['firestore/[DEFAULT]/x/main'],
+      bloqueadas: ['firestore/[DEFAULT]/x/main'],
+    });
+
+    await expect(purgarCacheFirestore(indexado)).resolves.toBe('diferida');
+    expect(hayPurgaPendiente(), 'el marcador tiene que sobrevivir').toBe(true);
+  });
+
+  it('si UNA de varias se bloquea, tampoco se canta victoria', async () => {
+    // Media caché borrada sigue siendo la otra media en el disco.
+    const { indexado } = indexadoFalso({
+      bases: ['firestore/[DEFAULT]/x/main', 'firebaseLocalStorageDb'],
+      bloqueadas: ['firebaseLocalStorageDb'],
+    });
+
+    await expect(purgarCacheFirestore(indexado)).resolves.toBe('diferida');
     expect(hayPurgaPendiente()).toBe(true);
-    expect(await ejecutarPurgaDiferidaSiProcede()).toBe('ok');
-    expect(datos.has(CLAVE)).toBe(false);
   });
 
-  it('con marcador y otra pestaña abierta lo conserva para el siguiente arranque', async () => {
-    const datos = prepararEntorno();
-    datos.set(CLAVE, '1');
-    dobles.clear.mockRejectedValue(Object.assign(new Error('x'), { code: 'failed-precondition' }));
-    const { ejecutarPurgaDiferidaSiProcede } = await cargarModulo();
-    expect(await ejecutarPurgaDiferidaSiProcede()).toBe('diferida');
-    expect(datos.get(CLAVE)).toBe('1');
+  it('si no se puede ni enumerar, se conserva el marcador', async () => {
+    const { indexado } = indexadoFalso({ fallaEnumerar: true });
+    await expect(purgarCacheFirestore(indexado)).resolves.toBe('diferida');
+    expect(hayPurgaPendiente()).toBe(true);
   });
 
-  it('un marcador huérfano de otro backend se limpia en lugar de quedarse', async () => {
-    const datos = prepararEntorno();
-    datos.set(CLAVE, '1');
-    dobles.esFirebase = false;
-    const { ejecutarPurgaDiferidaSiProcede } = await cargarModulo();
-    expect(await ejecutarPurgaDiferidaSiProcede()).toBe('no_aplica');
-    expect(datos.has(CLAVE)).toBe(false);
+  it('sin IndexedDB no se bloquea la salida', async () => {
+    await expect(purgarCacheFirestore(null)).resolves.toBe('no_aplica');
+  });
+});
+
+describe('cuando el navegador no sabe enumerar bases', () => {
+  it('se borra lo que tiene nombre fijo y se deja de reintentar', async () => {
+    // Sin `databases()` no hay forma de dar con la de Firestore: su nombre
+    // lleva dentro el identificador del proyecto, que se fue con la
+    // configuración. Volver cada arranque a no encontrar nada no limpia nada y
+    // sí gasta el arranque de todos.
+    const { indexado, borradas } = indexadoFalso({ sinEnumerar: true });
+
+    await expect(purgarCacheFirestore(indexado)).resolves.toBe('no_aplica');
+    expect(borradas.sort()).toEqual([...BASES_CONOCIDAS].sort());
+    expect(hayPurgaPendiente()).toBe(false);
+  });
+});
+
+describe('ejecutarPurgaDiferidaSiProcede · el arranque', () => {
+  it('sin marcador no hace nada', async () => {
+    await expect(ejecutarPurgaDiferidaSiProcede()).resolves.toBe('no_aplica');
   });
 
-  it('dos llamadas simultáneas producen UNA sola purga (React monta dos veces)', async () => {
-    const datos = prepararEntorno();
-    datos.set(CLAVE, '1');
-    // Promesa diferida: `clear` no resuelve hasta que la prueba lo decida.
-    let liberar!: () => void;
-    const espera = new Promise<void>((res) => { liberar = res; });
-    dobles.clear.mockImplementation(() => espera);
-    const { ejecutarPurgaDiferidaSiProcede } = await cargarModulo();
+  it('dos llamadas simultáneas son UNA purga', async () => {
+    // React monta dos veces en modo estricto, y dos purgas a la vez se
+    // bloquearían entre ellas.
+    marcadores.set(CLAVE_PURGA_PENDIENTE, '1');
 
     const a = ejecutarPurgaDiferidaSiProcede();
     const b = ejecutarPurgaDiferidaSiProcede();
-    liberar();
+    expect(a).toBe(b);
     await Promise.all([a, b]);
+  });
 
-    expect(dobles.terminate).toHaveBeenCalledTimes(1);
-    expect(dobles.clear).toHaveBeenCalledTimes(1);
+  it('un marcador huérfano se limpia en vez de quedarse', async () => {
+    marcadores.set(CLAVE_PURGA_PENDIENTE, '1');
+    await ejecutarPurgaDiferidaSiProcede();
+    expect(hayPurgaPendiente()).toBe(false);
   });
 });

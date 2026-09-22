@@ -26,7 +26,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const {
     user, driveSyncEnabled, databaseSpreadsheetId, isLoading,
-    sessionLocked, unlockSession, isFirebaseBackend,
+    sessionLocked, unlockSession, sincronizacionManual,
     // A6-F2
     estadoCierre, solicitarCierreDeSesion, despacharCierre, reintentarSincronizacion,
     avisoPurgaDiferida, descartarAvisoPurgaDiferida,
@@ -85,10 +85,10 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
   }
 
   React.useEffect(() => {
-    if (!isLoading && user && user.provider === 'google' && !databaseSpreadsheetId && !isFirebaseBackend) {
+    if (!isLoading && user && user.provider === 'google' && !databaseSpreadsheetId && sincronizacionManual) {
       router.replace('/onboarding/setup');
     }
-  }, [user, isLoading, databaseSpreadsheetId, router, isFirebaseBackend]);
+  }, [user, isLoading, databaseSpreadsheetId, router, sincronizacionManual]);
 
   // ── A6-F2 · Aviso de limpieza pendiente ──────────────────────────────────
   // Se muestra tambien en rutas publicas: el usuario acaba de cerrar sesion y

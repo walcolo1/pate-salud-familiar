@@ -138,11 +138,10 @@ export default function SettingsPage() {
     setNightLockEnabled,
     setNightLockStart,
     setNightLockEnd,
-    isFirebaseBackend,
+    sincronizacionManual,
     invitations,
     createInvitation,
     revokeInvitation,
-    testFirebaseConnection
   } = useApp();
   const confirmar = useConfirmacion();
   const avisar = useAviso();
@@ -427,7 +426,7 @@ export default function SettingsPage() {
         <div className="flex flex-col gap-6">
           
           {/* Ficha 1: Diagnóstico General y Estado de Sincronización */}
-          {!isFirebaseBackend && (
+          {sincronizacionManual && (
             <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -627,7 +626,7 @@ export default function SettingsPage() {
             </div>
 
             {/* Sincronización y Hoja Operacional */}
-            {!isFirebaseBackend && (
+            {sincronizacionManual && (
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
                 <div className="flex flex-col gap-2">
                   <div className="flex justify-between border-b border-slate-200/40 pb-2">
@@ -836,7 +835,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Servicio: Google Sheets */}
-              {!isFirebaseBackend && (
+              {sincronizacionManual && (
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -877,8 +876,8 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* Ficha: Invitaciones Familiares (Firebase only, OWNER only) */}
-          {isFirebaseBackend && currentUserRole === 'FAMILY_ADMIN' && (
+          {/* Ficha: Invitaciones Familiares (solo el titular) */}
+          {!sincronizacionManual && currentUserRole === 'FAMILY_ADMIN' && (
             <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-teal-50 text-teal-700 rounded-xl">
@@ -1041,14 +1040,14 @@ export default function SettingsPage() {
             <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                  {isFirebaseBackend ? <Cloud className="h-5 w-5" /> : <Database className="h-5 w-5" />}
+                  {!sincronizacionManual ? <Cloud className="h-5 w-5" /> : <Database className="h-5 w-5" />}
                 </div>
                 <div>
                   <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">
-                    {isFirebaseBackend ? "Conexión de Servicios de Google" : "Acciones Manuales de Respaldo"}
+                    {!sincronizacionManual ? "Conexión de Servicios de Google" : "Acciones Manuales de Respaldo"}
                   </h4>
                   <p className="text-[10px] text-slate-500 font-semibold">
-                    {isFirebaseBackend 
+                    {!sincronizacionManual 
                       ? "Administra la conexión con tu cuenta de Google para Drive y Calendar."
                       : "Ejecuta operaciones de respaldo secundarias para resolver conflictos."}
                   </p>
@@ -1060,7 +1059,7 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                 
                 {/* Botón 1: Sincronizar Ahora */}
-                {!isFirebaseBackend && (
+                {sincronizacionManual && (
                   <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                     <div>
                       <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Sincronizar ahora</span>
@@ -1087,7 +1086,7 @@ export default function SettingsPage() {
                   <div>
                     <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reconectar Google</span>
                     <p className="text-[9px] text-slate-500 leading-normal mb-2">
-                      {isFirebaseBackend 
+                      {!sincronizacionManual 
                         ? "Renueva los permisos de Google Drive y Calendar si expiran."
                         : "Solicita y renueva el token global abriendo la ventana de Google."}
                     </p>
@@ -1103,7 +1102,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Botón 3: Reparar base Google-native */}
-                {!isFirebaseBackend && (
+                {sincronizacionManual && (
                   <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                     <div>
                       <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reparar base Google-native</span>
@@ -1126,7 +1125,7 @@ export default function SettingsPage() {
                 )}
 
                 {/* Botón 3b: Reparar documentos de miembros */}
-                {!isFirebaseBackend && (
+                {sincronizacionManual && (
                   <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                     <div>
                       <span className="font-extrabold text-amber-800 block text-[11px] mb-0.5">Reparar documentos de miembros</span>
@@ -1153,7 +1152,7 @@ export default function SettingsPage() {
                 )}
 
                 {/* Botón 3c: Actualizar este dispositivo desde Google */}
-                {!isFirebaseBackend && (
+                {sincronizacionManual && (
                   <div className="p-3 bg-teal-50 border border-teal-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                     <div>
                       <span className="font-extrabold text-teal-800 block text-[11px] mb-0.5">Actualizar desde Google</span>
@@ -1185,7 +1184,7 @@ export default function SettingsPage() {
                 )}
 
                 {/* Botón 4: Crear base si no existe */}
-                {!isFirebaseBackend && (
+                {sincronizacionManual && (
                   <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                     <div>
                       <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Crear base si no existe</span>
@@ -1203,7 +1202,7 @@ export default function SettingsPage() {
                 )}
 
                 {/* Botón 5: Descargar datos (Pull) */}
-                {!isFirebaseBackend && (
+                {sincronizacionManual && (
                   <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                     <div>
                       <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Cargar desde Google</span>
@@ -1221,7 +1220,7 @@ export default function SettingsPage() {
                 )}
 
                 {/* Botón 6: Enviar datos locales (Push) */}
-                {!isFirebaseBackend && (
+                {sincronizacionManual && (
                   <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
                     <div>
                       <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Subir cambios locales</span>
@@ -1273,13 +1272,13 @@ export default function SettingsPage() {
       {/* Compartición Google-native */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
         <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">
-          {isFirebaseBackend ? "Compartición de Archivos (Drive)" : "Compartición Google-native"}
+          {!sincronizacionManual ? "Compartición de Archivos (Drive)" : "Compartición Google-native"}
         </h4>
         <hr className="border-slate-50" />
         
         <div className="bg-amber-50 p-3 rounded-2xl border border-amber-100 text-amber-700 text-[10px] leading-relaxed font-semibold">
           <p className="font-extrabold mb-1">ℹ Resguardo de Privacidad:</p>
-          {isFirebaseBackend ? (
+          {!sincronizacionManual ? (
             <p>La base de datos de tu familia se comparte de forma segura y automática con los miembros autorizados en tu grupo familiar. Los archivos físicos (PDFs/imágenes) almacenados en Google Drive solo se comparten con destinatarios explícitos.</p>
           ) : (
             <p>La base operacional completa de tu familia <strong>NO se comparte automáticamente por seguridad</strong>. Solo se concede acceso a reportes clínicos individuales o documentos específicos que tú selecciones explícitamente.</p>
@@ -1287,7 +1286,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Shared Reports list */}
-        {!isFirebaseBackend && (
+        {sincronizacionManual && (
           <div className="flex flex-col gap-3">
             <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide px-1">Reportes Clínicos Compartidos (Sheets)</span>
             {sharedReports.length === 0 ? (
@@ -1472,7 +1471,7 @@ export default function SettingsPage() {
           </div>
 
           <p className="text-[9px] font-semibold leading-relaxed text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-100/60">
-            {isFirebaseBackend ? (
+            {!sincronizacionManual ? (
               <span>⚠ Advertencia: La depuración de citas realiza un borrado lógico ocultando los registros del expediente. Los eventos en tu Google Calendar y archivos asociados en Drive <strong>no</strong> se borrarán. Te recomendamos exportar a JSON antes de depurar.</span>
             ) : (
               <span>⚠ Advertencia: La depuración de citas realiza un borrado lógico ocultando los registros del expediente. Los eventos en tu Google Calendar y archivos asociados en Drive <strong>no</strong> se borrarán. Te recomendamos exportar a Sheets o JSON antes de depurar.</span>
@@ -1635,7 +1634,7 @@ export default function SettingsPage() {
                   onClick={async () => {
                     const aceptado = await confirmar({
                       titulo: 'Reiniciar la cuenta en este navegador',
-                      descripcion: isFirebaseBackend
+                      descripcion: !sincronizacionManual
                         ? 'Se borrarán los datos locales de esta cuenta en este navegador. Tus archivos en Google Drive quedan intactos.'
                         : 'Se borrarán los datos locales de esta cuenta en este navegador. Tus archivos en Google Drive y Sheets quedan intactos.',
                       etiquetaConfirmar: 'Reiniciar cuenta',
@@ -1701,29 +1700,17 @@ export default function SettingsPage() {
 
         {showLegal && (
           <div className="flex flex-col gap-3 mt-2 text-[11px] text-slate-500 leading-relaxed font-semibold animate-in fade-in duration-200">
-            {isFirebaseBackend ? (
-              <p>
-                Esta aplicación está diseñada bajo una **arquitectura híbrida segura (Firebase + Google)**. La base de datos operacional se aloja en Firebase Firestore con reglas de seguridad estrictas, mientras que los archivos y agendas siguen vinculados directamente a tus servicios de Google Drive y Calendar para garantizar tu control y privacidad.
-              </p>
-            ) : (
-              <p>
-                Esta aplicación está diseñada bajo una **arquitectura 100% Google-native**. Esto significa que todos tus datos e historial clínico se almacenan directamente en tu cuenta personal de Google, garantizando soberanía absoluta sobre tu información de salud.
-              </p>
-            )}
+            <p>
+              Esta aplicación está diseñada bajo una **arquitectura 100% Google-native**. Esto significa que todos tus datos e historial clínico se almacenan directamente en tu cuenta personal de Google, garantizando soberanía absoluta sobre tu información de salud.
+            </p>
             
             <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 flex flex-col gap-2 text-[10px] text-slate-600">
               <p>
                 <strong>• Google Drive:</strong> Se utiliza exclusivamente para almacenar los archivos físicos (fotos o PDFs) de tus documentos clínicos y órdenes médicas. La aplicación crea una carpeta privada en tu Drive para que mantengas el control absoluto de tus archivos digitalizados.
               </p>
-              {isFirebaseBackend ? (
-                <p>
-                  <strong>• Firebase Firestore:</strong> Funciona como base de datos operacional en tiempo real, almacenando de forma segura tu grupo familiar, citas, vacunas, exámenes y recordatorios con acceso privado restringido a los miembros de tu familia.
-                </p>
-              ) : (
-                <p>
-                  <strong>• Google Sheets:</strong> Funciona como base de datos operacional. Todas tus tablas de datos (miembros, citas, medicamentos, tomas, órdenes) se registran en una hoja de cálculo (`SaludFamiliar_OperationalDB`) dentro de tu Google Drive. Los datos nunca se transmiten a servidores de terceros.
-                </p>
-              )}
+              <p>
+                <strong>• Google Sheets:</strong> Funciona como base de datos operacional. Todas tus tablas de datos (miembros, citas, medicamentos, tomas, órdenes) se registran en una hoja de cálculo (`SaludFamiliar_OperationalDB`) dentro de tu Google Drive. Los datos nunca se transmiten a servidores de terceros.
+              </p>
               <p>
                 <strong>• Google Calendar:</strong> Sincroniza tus citas médicas y recordatorios de medicamentos. Para los tratamientos farmacológicos, la app incluye una alerta preventiva si programas más de 20 tomas/eventos individuales, evitando saturar tu calendario personal.
               </p>
@@ -1736,11 +1723,7 @@ export default function SettingsPage() {
             </div>
 
             <p>
-              {isFirebaseBackend ? (
-                <span><strong>Copia de seguridad adicional:</strong> Aunque tus datos están respaldados de forma segura en la nube de Firebase, te aconsejamos descargar copias manuales en formato JSON con la herramienta a continuación para mayor seguridad.</span>
-              ) : (
-                <span><strong>Copia de seguridad adicional:</strong> Aunque tus datos están respaldados en tu cuenta de Google, te aconsejamos descargar copias manuales en formato JSON con la herramienta a continuación para mayor seguridad.</span>
-              )}
+              <span><strong>Copia de seguridad adicional:</strong> Aunque tus datos están respaldados en tu cuenta de Google, te aconsejamos descargar copias manuales en formato JSON con la herramienta a continuación para mayor seguridad.</span>
             </p>
 
             <p className="italic text-rose-500/90 border-t border-slate-50 pt-2 mt-1">
@@ -1868,15 +1851,6 @@ export default function SettingsPage() {
       </section>
 
       {/* Dev Mode Firebase Health Check Button */}
-      {process.env.NODE_ENV === 'development' && isFirebaseBackend && (
-        <button
-          onClick={() => testFirebaseConnection()}
-          className="w-full h-12 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 border border-slate-700 transition-all duration-200 mb-4"
-        >
-          <span>🧪 Probar Conexión Firebase (Health Check)</span>
-        </button>
-      )}
-
       {/* Logout button */}
       <button
         onClick={() => signOut()}

@@ -187,7 +187,12 @@ nuevo de forma silenciosa, o si la sesión se corta y se vuelve a entrar.
 (A6-F3) sin caídas, y el recorrido real de un familiar invitado otra vez de
 punta a punta.
 
-### G4 · El corte
+### G4 · El corte — G4a ✅, G4b pendiente
+
+**G4a, el 22 de septiembre de 2026.** Firebase fuera: Auth, Firestore, las 577
+líneas de reglas, el SDK, la bandera y 4 200 líneas de código. Lo que queda es
+que el repositorio escriba de verdad, y eso es G4b —el antiguo Bloque H—.
+Ver [G4-EL-CORTE.md](G4-EL-CORTE.md).
 
 Con las dos hebras cortadas:
 

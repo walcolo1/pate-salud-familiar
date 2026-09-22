@@ -1,21 +1,24 @@
 /**
- * DataRepository — Paté Salud Familiar
+ * El contrato del repositorio (Bloque G, G4)
+ * ════════════════════════════════════════════════════════════════════════════
  *
- * Central abstraction layer that decouples AppContext from any specific
- * data backend (Google Sheets or Firebase/Firestore).
+ * La capa que separa `AppContext` de dónde viven los datos. Durante la
+ * migración tuvo **dos** implementaciones y una bandera para elegir; desde G4
+ * tiene **una**: `RepositorioBackend`, contra el router del titular.
  *
- * USAGE
- * ─────
- * const repo = getDataRepository();       // singleton, picked once at startup
- * const data = await repo.loadAll(ctx);
- * const unsub = repo.watchAll(ctx, cb);   // firebase only; no-op for sheets
- * await repo.saveMember(ctx, member);
+ * La bandera no se cambió: **se retiró**. Dejarla puesta era dejar el camino de
+ * vuelta a un sitio al que no queremos volver — un servicio central donde los
+ * expedientes de varias familias se tocan.
  *
- * CONTEXT
- * ───────
- * Every method receives a RepositoryContext so the repository can decide
- * which family / user it is operating on without being a singleton that
- * holds stale auth state.
+ * USO
+ * ───
+ *   const repo = await getDataRepository();
+ *   const datos = await repo.loadAll(ctx);
+ *   await repo.saveMember(ctx, miembro);
+ *
+ * Cada método recibe su `RepositoryContext` en vez de que el repositorio sea un
+ * singleton con estado de sesión dentro, que es como se quedan viejas las
+ * credenciales sin que nadie se entere.
  */
 
 import type {
@@ -36,25 +39,26 @@ import type {
   AppointmentEmailSource,
   ImportedEmailAppointmentCandidate,
 } from '../domain/models';
-import type { FamilySettings, FamilyInvitation, FamilyAccess } from './firestoreService';
-
-import { isFirebaseBackend } from './dataBackend';
+import type { FamilySettings, FamilyInvitation, FamilyAccess } from './tiposAcceso';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION 1: Context passed to every repository call
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Runtime context required by every repository operation.
- * Sheets: `sheetsToken` and `spreadsheetId` are required.
- * Firebase: `familyId` and `uid` are required.
+ * Lo que toda operación necesita saber.
+ *
+ * `uid` y `familyId` son herencia de Firestore y hoy no los usa el backend del
+ * titular: la familia **es la hoja**, y a quien llama lo identifica su
+ * `id_token`. Se conservan porque quitarlos toca `AppContext` entero; queda
+ * anotado como deuda de nombres, no como necesidad.
  */
 export interface RepositoryContext {
-  /** Firebase UID of the authenticated user. */
+  /** Herencia de Firebase Auth. Ya no identifica a nadie. */
   uid: string;
-  /** User's email address. */
+  /** El correo de quien llama. */
   email: string;
-  /** Firebase family document ID (required for firebase backend). */
+  /** Herencia de Firestore. La familia es la hoja del despliegue. */
   familyId: string | null;
   /** Google OAuth token for Sheets API (required for sheets backend). */
   sheetsToken?: string | null;
@@ -150,26 +154,17 @@ export interface DataRepository {
 
   // ── Initialization ────────────────────────────────────────────────────────
 
-  /**
-   * Loads the full family data snapshot.
-   * - Sheets: calls readAllOperationalTables.
-   * - Firebase: calls loadAllFamilyData(familyId). Returns EMPTY_FAMILY_DATA
-   *   when Firestore has no data yet (first-time user scenario).
-   */
+  /** El expediente entero. */
   loadAll(ctx: RepositoryContext): Promise<AllFamilyData>;
 
-  /**
-   * Firebase-only: resolves or creates the family document for the user.
-   * Returns the familyId string.
-   * Sheets: returns null (family is implicit in the spreadsheet).
-   */
+  /** Devuelve `null`: la familia es la hoja y no hay documento que resolver. */
   initFamily(ctx: Omit<RepositoryContext, 'familyId'> & { displayName?: string }): Promise<string | null>;
 
   /**
-   * Firebase-only: subscribes to real-time updates for all collections.
-   * Calls `callback` with a DataUpdate whenever any collection changes.
-   * Returns an unsubscribe function (call on signOut or component unmount).
-   * Sheets: immediately returns a no-op unsubscribe.
+   * La hoja no avisa cuando cambia: devuelve un desuscriptor vacío.
+   *
+   * Lo que sustituye a los eventos en tiempo real es el sondeo de G2
+   * (`sondeoRevision.ts`), que pregunta la revisión y no la hoja.
    */
   watchAll(ctx: RepositoryContext, callback: (update: DataUpdate) => void): () => void;
 
@@ -308,23 +303,20 @@ export interface DataRepository {
 let _instance: DataRepository | null = null;
 
 /**
- * Returns the singleton DataRepository for the active backend.
- * Lazy-initialised: the concrete class is only imported when first called
- * so Next.js can tree-shake the unused backend.
+ * El repositorio. Uno, y siempre el mismo.
  *
- * IMPORTANT: Call this only on the client side (inside useEffect or event
- * handlers) — never at module level or in server components.
+ * Sigue siendo asíncrono y con importación diferida aunque ya no haya nada que
+ * elegir: `RepositorioBackend` arrastra la sesión de Google, y cargarla en el
+ * servidor no tendría sentido.
+ *
+ * Llamar solo desde el cliente —dentro de un efecto o de un manejador—, nunca
+ * al cargar el módulo ni desde un componente de servidor.
  */
 export async function getDataRepository(): Promise<DataRepository> {
   if (_instance) return _instance;
 
-  if (isFirebaseBackend) {
-    const { FirebaseRepository } = await import('./firebaseRepository');
-    _instance = new FirebaseRepository();
-  } else {
-    const { SheetsRepository } = await import('./sheetsRepository');
-    _instance = new SheetsRepository();
-  }
+  const { RepositorioBackend } = await import('./repositorioBackend');
+  _instance = new RepositorioBackend();
 
   return _instance;
 }
