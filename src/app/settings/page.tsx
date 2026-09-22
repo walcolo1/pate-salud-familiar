@@ -41,6 +41,7 @@ import {
   ShieldAlert,
   Timer,
 } from 'lucide-react';
+import TarjetaHojaFamiliar from '@/components/ajustes/TarjetaHojaFamiliar';
 
 
 export default function SettingsPage() {
@@ -365,6 +366,10 @@ export default function SettingsPage() {
           </div>
         </div>
       </section>
+
+      {/* G4b · Dónde está la hoja de la familia. Va arriba del todo: sin ella,
+          nada de lo que se escribe en la aplicación llega a ninguna parte. */}
+      {origenDatos === 'REAL' && <TarjetaHojaFamiliar />}
 
       {/* Ficha: Importación de citas (Bloque B — manual, sin Gmail) */}
         <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">

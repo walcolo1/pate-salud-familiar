@@ -121,6 +121,8 @@ cada módulo. Las que más condicionan lo que venga:
 | Qué hacer cuando la revisión cambia —recargar, avisar o recargar lo que no está en edición— sigue **sin decidir**: `alCambiar` es una llamada de vuelta | `G2-SINCRONIZACION.md` |
 | Tres utilidades de Ajustes reparan la hoja **vieja** por la API de Sheets: ya no es la fuente de verdad | `G4-EL-CORTE.md` |
 | Las cuarenta condiciones de interfaz sobre `sincronizacionManual` sobran: es una limpieza de pantallas | `G4-EL-CORTE.md` |
+| La cola de reenvío vive **en memoria**: un cambio pendiente no sobrevive a una recarga | `G4-EL-CORTE.md` |
+| La CSP todavía abre `connect-src` e `img-src` a servicios de Firebase que ya no se usan | `next.config.ts` |
 | Sin `databases()` en el navegador, la caché de Firestore **no se puede localizar** para borrarla | `purgaFirestore.ts` |
 | GIS **no renueva el `id_token` en silencio**: la ventana de 50 min es un intento, no una garantía | `G3-IDENTIDAD.md` |
 | `auto_select` tras un F5, la renovación a los 50 min y el rechazo de la cuenta equivocada **solo se pueden ver en vivo** | `G3-IDENTIDAD.md` |
@@ -165,7 +167,11 @@ pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
 
 ## Siguiente paso
 
-**La comprobación en vivo de G4b**, que es la que de verdad cierra el bloque:
+**Repetir la comprobación en vivo de G4b.** El primer intento no dejó ni una
+fila en la hoja: el navegador del titular no sabía dónde estaba su hoja, y el
+fallo se volvió silencioso. Ya está arreglado y explicado en
+[G4-EL-CORTE.md](G4-EL-CORTE.md), al final. La comprobación sigue siendo la
+misma:
 guardar una cita o un medicamento y mirar la pestaña. Tiene que aparecer **una
 fila nueva al final**, y las que había no pueden haberse movido.
 

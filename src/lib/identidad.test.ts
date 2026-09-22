@@ -86,3 +86,79 @@ describe('lo que se le entrega al repositorio', () => {
     await expect(sesionBackend().idToken()).resolves.toBe(fresco);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// La URL de la familia: quien la escribe y quien la lee
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { CLAVE_SESION_FAMILIAR } from './invitacionEntrante';
+
+describe('la URL de la familia se lee de donde se escribe', () => {
+  /**
+   * El fallo que encontró la validación en vivo de G4b, con su nombre.
+   *
+   * `/invitacion` la guardaba en `localStorage` e `identidad.ts` la buscaba en
+   * `sessionStorage`. Ninguna prueba lo vio porque las del repositorio inyectan
+   * su propia sesión con la URL puesta, y la suite E2E no tiene backend. El
+   * resultado fue `SIN_BACKEND` en cada guardado, y nada llegó a la hoja.
+   */
+  const URL_BUENA = 'https://script.google.com/macros/s/AKfycbFALSO0123456789abcdefgh/exec';
+
+  function almacen(datos: Record<string, string> = {}) {
+    const m = new Map(Object.entries(datos));
+    return {
+      getItem: (k: string) => m.get(k) ?? null,
+      setItem: (k: string, v: string) => void m.set(k, v),
+      removeItem: (k: string) => void m.delete(k),
+    };
+  }
+
+  afterEach(() => {
+    delete (globalThis as Record<string, unknown>).window;
+  });
+
+  it('una URL guardada en localStorage se encuentra', () => {
+    (globalThis as Record<string, unknown>).window = {
+      localStorage: almacen({ [CLAVE_SESION_FAMILIAR]: URL_BUENA }),
+      sessionStorage: almacen(),
+    };
+    expect(sesionBackend().url()).toBe(URL_BUENA);
+  });
+
+  it('y localStorage, no sessionStorage: el titular abre la PWA cada día', () => {
+    // `sessionStorage` muere al cerrar la pestaña. Guardar ahí la hoja de la
+    // familia obligaría a volver a registrarla en cada apertura. Y la URL no
+    // es una credencial —el `/exec` es público y el acceso lo decide el
+    // `id_token`—, así que no hay motivo de seguridad para lo contrario.
+    (globalThis as Record<string, unknown>).window = {
+      localStorage: almacen(),
+      sessionStorage: almacen({ [CLAVE_SESION_FAMILIAR]: URL_BUENA }),
+    };
+    expect(sesionBackend().url()).toBe(null);
+  });
+
+  it('todo el código que escribe o lee la URL usa el MISMO almacén', () => {
+    // La regla estructural, para que no vuelva: si alguien añade otra lectura
+    // o escritura, tiene que ir contra `localStorage` o esto se pone rojo.
+    const RAIZ = join(process.cwd(), 'src');
+    const ficheros = (dir: string): string[] =>
+      readdirSync(dir).flatMap((n) => {
+        const r = join(dir, n);
+        return statSync(r).isDirectory() ? ficheros(r) : /\.(ts|tsx)$/.test(n) ? [r] : [];
+      });
+
+    const usos: string[] = [];
+    for (const f of ficheros(RAIZ)) {
+      if (f.endsWith('.test.ts')) continue;
+      const fuente = readFileSync(f, 'utf8');
+      for (const m of fuente.matchAll(/(guardarBackend|leerBackend|olvidarBackend)\([^)]*?(window\.\w+Storage)/g)) {
+        usos.push(`${relative(RAIZ, f)} → ${m[2]}`);
+      }
+    }
+
+    expect(usos.length, 'no se encontró ningún uso: la prueba no mira nada').toBeGreaterThan(1);
+    for (const uso of usos) expect(uso).toMatch(/window\.localStorage$/);
+  });
+});

@@ -220,3 +220,80 @@ entera cambió de aspecto, el empuje por lotes sigue vivo en algún sitio.
 | `tsc` | 0 ✅ |
 | `lint:cambiados` | sin regresiones; `AppContext` **baja de 72 errores a 69** ✅ |
 | `build` | ✅ |
+
+---
+
+# La validación en vivo que no llegó a la hoja
+
+**22 de septiembre de 2026.** Se guardaron una cita y un medicamento desde
+`localhost:3000`. La interfaz los enseñaba; las pestañas `CITAS` y
+`MEDICAMENTOS` seguían vacías. No salió ni una petición a `script.google.com`.
+
+## Por qué, en orden
+
+**1 · El navegador del titular no sabía dónde estaba su hoja.** La URL del
+`/exec` solo la escribía `/invitacion`, al aceptar una invitación. El titular
+nunca pasa por ahí: la hoja es suya. **No existía ninguna forma de que el
+titular la registrara.** El router lo esperaba —el comentario de `ping` dice
+que existe «para que la PWA compruebe la URL que acaba de pegar el titular»—,
+pero nadie construyó el otro lado.
+
+**2 · Y aunque se hubiera escrito, se leía de otro sitio.** `/invitacion` la
+guardaba en `localStorage`; `identidad.ts` la buscaba en `sessionStorage`.
+
+**3 · El fallo se volvió silencioso por una decisión mía de G4b.** Clasifiqué
+`SIN_BACKEND` como fallo pasajero —«guardar y reenviar»—, y **escondí el
+contador de pendientes** detrás de `sincronizacionManual`. El resultado fue
+exactamente lo que el Bloque G vino a hacer imposible: una escritura que
+**parece** guardarse y no llega a ninguna parte.
+
+Ninguna prueba lo vio. Las del repositorio inyectan su propia sesión con la URL
+puesta, y la suite E2E no tiene backend: `SIN_BACKEND` era su estado normal.
+
+## Lo que se arregló
+
+| | |
+|---|---|
+| **Registro de la hoja** | Tarjeta en Ajustes: se pega la URL, se comprueba con `ping` —que no pide identidad— y solo se guarda si contesta como Paté **y con el código de hoy** (la lección de E9-bis). Al registrarla, se reenvía en el acto lo que esperaba |
+| **Un solo almacén** | `localStorage`, para quien escribe y quien lee. Una prueba recorre `src/` y lo exige |
+| **Nada en silencio** | Aviso fijo arriba —«este navegador no sabe dónde está la hoja de tu familia»— y el contador de pendientes vuelve al tablero |
+| **El reenvío, de verdad** | «Se reenviarán solos» no lo cumplía nadie: solo reintentaba el diálogo de cierre. Ahora reenvía cada vez que el sondeo consigue contestar y al volver la red |
+
+## Lo que también apareció, y no era esto
+
+**Service Worker.** No toca las escrituras al router —son `POST` de otro origen
+y las deja pasar—, y hay una prueba que lo fija. Pero tenía su propio fallo:
+sin red y sin la portada en caché, entregaba `undefined` a `respondWith`, y el
+navegador lo convertía en *«Failed to convert value to 'Response'»*. Ahora
+devuelve `Response.error()`, y otra prueba carga `sw.js` tal cual para
+comprobar que toda salida es una `Response`.
+
+**CSP.** GIS descarga una hoja de estilos de `accounts.google.com/gsi/style`
+que `style-src` bloqueaba. Se abre **la ruta**, no el dominio: una hoja de
+estilos también puede sacar datos. La suite no lo veía porque bloquea Google a
+propósito.
+
+**La renovación de la sesión se desenchufaba al salir de `/login`.** Su
+`soltar()` ponía la renovación a `null` para toda la aplicación. A los 50
+minutos de esta misma prueba, la sesión no se habría renovado. Ahora solo el
+último arranque vivo la desenchufa.
+
+## Lo que queda, dicho
+
+**La cola de reenvío vive en memoria.** Guarda las mutaciones como funciones, y
+una función no sobrevive a una recarga. Si la aplicación se cierra con cambios
+pendientes, **se pierden** —siguen en pantalla, porque el estado local sí se
+guarda, pero no llegan a la hoja hasta que se vuelvan a guardar—. El aviso lo
+dice así: «se reenvían solos mientras la aplicación siga abierta». Hacerla
+duradera exige guardar el lote de mutaciones y no la función, y es un paso
+propio.
+
+**La cita y el medicamento de la prueba** probablemente estén en ese caso: si
+la pestaña se recargó, no están en la cola. Hay que volver a guardarlos después
+de registrar la hoja.
+
+**La CSP todavía nombra a Firebase.** `firebasestorage.googleapis.com` en
+`img-src`, y los destinos de Firestore e Identity Toolkit en `connect-src`. Ya
+no se usan, y el propio comentario de la CSP dice por qué eso importa:
+permitir conexiones a un servicio que la aplicación no usa solo amplía la
+superficie por la que podrían salir datos clínicos.

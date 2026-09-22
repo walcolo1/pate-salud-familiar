@@ -69,9 +69,14 @@ export function configurarAvisoDeSesion(fn: Aviso | null): void {
  */
 export function sesionBackend(): SesionBackend {
   return {
-    // `sessionStorage` no existe en el servidor, y el árbol de Next importa
-    // este módulo también allí.
-    url: () => (typeof window === 'undefined' ? null : leerBackend(window.sessionStorage)),
+    // `localStorage`, que es donde lo escribe `/invitacion` y donde lo
+    // escribe el registro del titular. Aquí ponía `sessionStorage`, y por eso
+    // la validación en vivo de G4b no llegó a la hoja: la URL se guardaba en
+    // un almacén y se buscaba en otro. Hay una prueba que lo fija.
+    //
+    // No existe en el servidor, y el árbol de Next importa este módulo
+    // también allí.
+    url: () => (typeof window === 'undefined' ? null : leerBackend(window.localStorage)),
     idToken: () => sesionDeLaAplicacion.idToken(),
     renovar: () => sesionDeLaAplicacion.renovarAhora(),
   };

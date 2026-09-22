@@ -4,6 +4,8 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 // ── DataRepository abstraction (Phase 8) ─────────────────────────────────────
 import { arrancarIdentidad } from '../lib/identidadGis';
 import { conectarSondeo, ventanaDelNavegador } from '../lib/sondeoRevision';
+import { comprobarYRegistrar, type ResultadoRegistro } from '../lib/registroBackend';
+import { sesionBackend } from '../lib/identidad';
 import { decodeGoogleToken } from '../lib/googleAuth';
 import { clientIdConfigurado } from '../lib/importacionManual';
 import { getDataRepository, resetDataRepository } from '../lib/dataRepository';
@@ -512,6 +514,16 @@ interface AppContextProps {
   hayCambiosRemotos: boolean;
   /** Trae lo nuevo y baja el aviso. */
   recargarExpediente: () => Promise<void>;
+  /**
+   * Si este navegador sabe dónde está la hoja de la familia.
+   *
+   * Sin ella, ningún cambio llega a ninguna parte: se guarda para reenviarlo,
+   * pero no hay adónde. Es lo que dejó vacía la hoja en la validación en vivo
+   * de G4b, y por eso se enseña en voz alta y no se deduce de un contador.
+   */
+  hojaRegistrada: boolean;
+  /** Comprueba la URL del `/exec` con `ping` y, si cuadra, la guarda. */
+  registrarHojaFamiliar: (url: string) => Promise<ResultadoRegistro>;
   familyId: string | null;
   pendingInvitations: FamilyInvitation[];
   invitations: FamilyInvitation[];
@@ -563,6 +575,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const confirmar = useConfirmacion();
   const avisar = useAviso();
   const [hayCambiosRemotos, setHayCambiosRemotos] = useState<boolean>(false);
+  // Se lee al montar, no al renderizar: `localStorage` no existe en el
+  // servidor y leerlo durante el render descuadraría la hidratación.
+  const [hojaRegistrada, setHojaRegistrada] = useState<boolean>(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- se sincroniza con un almacén externo al montar
+    setHojaRegistrada(sesionBackend().url() !== null);
+  }, []);
 
   const [user, setUser] = useState<UserAccount | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -1423,7 +1442,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const { desconectar } = conectarSondeo(ventana, {
       obtenerRevision: async () => {
         const repo = await getDataRepository();
-        return (repo as { revision?: () => Promise<number> }).revision?.() ?? 0;
+        const revision = await ((repo as { revision?: () => Promise<number> }).revision?.() ?? 0);
+
+        // Si el router acaba de contestar, hay camino: es el momento de
+        // reenviar lo que esperaba. Sin esto, «se reenviarán solos» era una
+        // promesa que nadie cumplía —solo el diálogo de cierre reintentaba—.
+        if (escriturasPendientesRef.current.length > 0) void flushPendingSync();
+
+        return revision;
       },
       programar: (fn, ms) => setTimeout(fn, ms),
       cancelar: (id) => clearTimeout(id as ReturnType<typeof setTimeout>),
@@ -1435,7 +1461,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       },
     });
 
-    return desconectar;
+    // Volver a tener red es la otra señal de que se puede reenviar.
+    const alVolverLaRed = () => {
+      if (escriturasPendientesRef.current.length > 0) void flushPendingSync();
+    };
+    window.addEventListener('online', alVolverLaRed);
+
+    return () => {
+      window.removeEventListener('online', alVolverLaRed);
+      desconectar();
+    };
+    // `flushPendingSync` se recrea en cada render; entrar aquí reiniciaría el
+    // sondeo constantemente. Lee la cola por referencia, así que no se queda
+    // con una copia vieja.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   /**
@@ -5194,6 +5233,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * el momento en que ocurre.
    */
 
+  /**
+   * El titular registra su hoja (G4b).
+   *
+   * Si cuadra, además de guardarla se **reenvían en el acto** los cambios que
+   * esperaban sin destino: esperar al siguiente guardado para descubrir que
+   * había cosas atascadas sería dejar el problema a medio resolver.
+   */
+  const registrarHojaFamiliar = async (url: string): Promise<ResultadoRegistro> => {
+    const resultado = await comprobarYRegistrar(url);
+    if (resultado.ok) {
+      setHojaRegistrada(true);
+      await flushPendingSync();
+    }
+    return resultado;
+  };
+
   /** Trae lo nuevo y baja el aviso de cambios remotos. */
   const recargarExpediente = async () => {
     await pullFromGoogle();
@@ -6573,6 +6628,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       sincronizacionManual: SINCRONIZACION_MANUAL,
       hayCambiosRemotos,
       recargarExpediente,
+      hojaRegistrada,
+      registrarHojaFamiliar,
       pendingInvitations,
       invitations,
       createInvitation,

@@ -62,9 +62,14 @@ export const DIRECTIVAS_CSP: Readonly<Record<string, readonly string[]>> = {
   'script-src-elem': ["'self'", "'unsafe-inline'", 'https://accounts.google.com'],
 
   // El HTML compilado no lleva <style> en línea, pero sí hay un atributo
-  // `style={{ width }}` (barra de progreso de medicamentos) y GIS inyecta sus
-  // propios estilos al dibujar el botón de acceso.
-  'style-src': ["'self'", "'unsafe-inline'"],
+  // `style={{ width }}` (barra de progreso de medicamentos).
+  //
+  // GIS, además, **descarga una hoja externa** para su botón. Se pensó que
+  // `'unsafe-inline'` bastaba y no: la validación en vivo de G4b vio el
+  // bloqueo en consola. Se abre la RUTA exacta, no el dominio: una hoja de
+  // estilos también puede sacar datos, con selectores de atributo que piden
+  // imágenes.
+  'style-src': ["'self'", "'unsafe-inline'", 'https://accounts.google.com/gsi/style'],
 
   // Las fuentes (Geist, vía next/font) quedan autohospedadas en la
   // compilación: el CSS apunta a /_next/static/media/*.woff2. Sin terceros.

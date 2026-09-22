@@ -302,12 +302,18 @@ export default function DashboardPage() {
     });
   }
 
-  // 9. Sync pending changes
-  if (sincronizacionManual && pendingSyncCount > 0) {
+  // 9. Escrituras que no llegaron a la hoja.
+  //
+  // G4b lo escondía detrás de `sincronizacionManual`, pensando que sin empuje
+  // por lotes no quedaban pendientes. Sí quedan: una escritura que no salió
+  // por falta de red —o porque el navegador no sabe dónde está la hoja— se
+  // guarda para reenviarla. Esconder ese contador fue lo que dejó la
+  // validación en vivo sin ninguna pista de por qué la hoja seguía vacía.
+  if (pendingSyncCount > 0) {
     dashboardAlerts.push({
       id: 'sync-pending-changes',
-      title: 'Sincronización Pendiente',
-      description: `Tienes ${pendingSyncCount} cambio(s) guardado(s) localmente pendiente(s) de sincronizar con Google.`,
+      title: 'Cambios sin guardar en la hoja',
+      description: `Hay ${pendingSyncCount} cambio(s) que todavía no han llegado a la hoja de la familia. Se reenvían solos mientras la aplicación siga abierta.`,
       severity: 'info',
       memberName: 'Nube',
       href: '/settings',

@@ -35,6 +35,8 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
     estadoBloqueo, errorRestauracion,
     // G2 · la hoja cambió por otro lado
     hayCambiosRemotos, recargarExpediente,
+    // G4b · ¿sabe este navegador dónde está la hoja?
+    hojaRegistrada, origenDatos,
   } = useApp();
 
   const [recargando, setRecargando] = React.useState(false);
@@ -159,6 +161,36 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
     </div>
   ) : null;
 
+  /**
+   * G4b · este navegador no sabe dónde está la hoja de la familia.
+   *
+   * Sin ella, lo que se escribe se guarda para reenviarlo pero no tiene
+   * adónde ir. La validación en vivo lo encontró mirando la hoja vacía; no
+   * puede volver a hacer falta mirar la hoja para saberlo.
+   *
+   * No se enseña en modo demostración, donde nada se escribe a propósito.
+   */
+  const avisoSinHoja =
+    !hojaRegistrada && origenDatos === 'REAL' ? (
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex items-center gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-amber-900"
+      >
+        <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <p className="flex-1 text-xs font-semibold leading-relaxed">
+          Este navegador no sabe dónde está la hoja de tu familia: los cambios se guardan aquí, pero
+          no llegan a ella.
+        </p>
+        <Link
+          href="/settings#hoja-familiar"
+          className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-[11px] font-extrabold text-white hover:bg-amber-700"
+        >
+          Registrar la hoja
+        </Link>
+      </div>
+    ) : null;
+
   const dialogoCierre = (
     <ConfirmDialog
       abierto={cierreAbierto}
@@ -193,6 +225,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
   return (
     <>
       {avisoLimpieza}
+      {avisoSinHoja}
       {avisoCambiosRemotos}
       {dialogoCierre}
       <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">

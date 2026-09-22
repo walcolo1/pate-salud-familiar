@@ -157,6 +157,19 @@ describe('Content-Security-Policy', () => {
     }
   });
 
+  it('la hoja de estilos de GIS entra, y SOLO ella', () => {
+    // GIS no pinta su botón solo con estilos en línea: descarga una hoja
+    // externa desde `accounts.google.com/gsi/style`. Sin esta fuente el botón
+    // sale sin formato y la consola lo denuncia en cada carga. Lo vio la
+    // validación en vivo de G4b; la suite no, porque bloquea Google a propósito.
+    expect(DIRECTIVAS_CSP['style-src']).toContain('https://accounts.google.com/gsi/style');
+
+    // Con la RUTA, no el dominio entero: `accounts.google.com` a secas dejaría
+    // cargar cualquier hoja de ese host, y una hoja de estilos también puede
+    // exfiltrar datos (selectores de atributo que piden imágenes).
+    expect(DIRECTIVAS_CSP['style-src']).not.toContain('https://accounts.google.com');
+  });
+
   it('no se cuela `data:` ni `blob:` donde podrían ejecutarse', () => {
     // En img-src son necesarios; en script-src serían un agujero.
     for (const d of ['script-src', 'script-src-elem', 'connect-src', 'frame-src']) {

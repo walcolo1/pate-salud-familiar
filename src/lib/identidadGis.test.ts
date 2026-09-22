@@ -238,3 +238,38 @@ describe('dos arranques no son dos inicializaciones', () => {
     dos.soltar();
   });
 });
+
+describe('soltar un arranque no desconecta a los demás', () => {
+  it('cuando /login se desmonta, la renovación de la aplicación sigue viva', async () => {
+    // El caso real: `AppContext` arranca la identidad al montar, `/login` la
+    // suya encima, y al entrar se navega al tablero y `/login` se desmonta.
+    // Si su `soltar()` pusiera la renovación a `null`, la de la aplicación
+    // entera se quedaría sin enchufe, y a los 50 minutos la sesión no se
+    // renovaría. Nadie lo vería hasta que caducara.
+    const e = entorno();
+    e.cargarGis();
+
+    const aplicacion = arrancarIdentidad(e.opciones);
+    const login = arrancarIdentidad(e.opciones);
+    login.soltar();
+
+    const promesa = sesionDeLaAplicacion.renovarAhora();
+    expect(e.llamadas.prompt, 'la renovación tiene que seguir llegando a prompt()').toBe(1);
+
+    e.responder(fresco());
+    await expect(promesa).resolves.not.toBe(null);
+    aplicacion.soltar();
+  });
+
+  it('y cuando se suelta el último, sí se desconecta', async () => {
+    const e = entorno();
+    e.cargarGis();
+    const uno = arrancarIdentidad(e.opciones);
+    const dos = arrancarIdentidad(e.opciones);
+    uno.soltar();
+    dos.soltar();
+
+    await expect(sesionDeLaAplicacion.renovarAhora()).resolves.toBe(null);
+    expect(e.llamadas.prompt).toBe(0);
+  });
+});

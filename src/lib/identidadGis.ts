@@ -39,9 +39,21 @@ const PASO_SONDEO_MS = 100;
  */
 let compartido: { clientId: string; proveedor: ProveedorGis } | null = null;
 
+/**
+ * Cuántos arranques siguen vivos.
+ *
+ * La renovación y el aviso de sesión son **globales**: los usa la aplicación
+ * entera. Cuando `/login` se desmonta al entrar, su `soltar()` no puede
+ * desenchufarlos, porque `AppContext` sigue contando con ellos. Sin esta
+ * cuenta, la sesión dejaba de renovarse en cuanto se salía de `/login`, y a
+ * los 50 minutos nadie lo habría visto hasta que caducara.
+ */
+let arranquesVivos = 0;
+
 /** Para las pruebas: olvida el proveedor compartido. */
 export function olvidarProveedorCompartido(): void {
   compartido = null;
+  arranquesVivos = 0;
 }
 
 export interface OpcionesArranque {
@@ -95,14 +107,25 @@ export function arrancarIdentidad(opciones: OpcionesArranque): Identidad {
   let botonPendiente: { destino: HTMLElement; opciones: Record<string, unknown> } | null = null;
   const desde = ahora();
 
+  let contado = false;
+
   const soltar = () => {
+    if (!vivo) return;
     vivo = false;
     if (sondeo !== null) cancelar(sondeo);
     sondeo = null;
     bajaOyente?.();
     bajaOyente = null;
-    configurarRenovacion(null);
-    configurarAvisoDeSesion(null);
+
+    if (contado) {
+      contado = false;
+      arranquesVivos = Math.max(0, arranquesVivos - 1);
+    }
+    // Solo el último apaga la luz.
+    if (arranquesVivos === 0) {
+      configurarRenovacion(null);
+      configurarAvisoDeSesion(null);
+    }
   };
 
   const conectar = (api: ApiGis) => {
@@ -118,6 +141,8 @@ export function arrancarIdentidad(opciones: OpcionesArranque): Identidad {
 
     const nuevo = compartido.proveedor;
     proveedor = nuevo;
+    contado = true;
+    arranquesVivos += 1;
 
     bajaOyente = nuevo.alRecibir((credencial) => {
       // La sesión primero: si la pantalla hace algo con la credencial, ya la

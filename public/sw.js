@@ -91,11 +91,19 @@ self.addEventListener('fetch', (event) => {
         }
         
         return networkResponse;
-      }).catch(() => {
-        // Soporte offline para navegación de páginas HTML principales
+      }).catch(async () => {
+        // Soporte offline para navegación de páginas HTML principales.
+        //
+        // `respondWith` exige una Response SIEMPRE. Antes, sin red y sin la
+        // portada en caché —o con un recurso que no es HTML—, esto devolvía
+        // `undefined`, y el navegador lo convertía en «Failed to convert value
+        // to 'Response'». Lo vio la validación en vivo de G4b.
+        // `Response.error()` es el fallo de red limpio que el navegador espera.
         if (event.request.headers.get('accept')?.includes('text/html')) {
-          return caches.match('/');
+          const portada = await caches.match('/');
+          if (portada) return portada;
         }
+        return Response.error();
       });
     })
   );
