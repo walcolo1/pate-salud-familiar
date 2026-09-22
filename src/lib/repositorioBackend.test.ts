@@ -124,7 +124,7 @@ describe('guardar un paciente', () => {
 describe('borrar es dar de baja', () => {
   it('escribe la fecha y no borra nada', async () => {
     const { repo, espia } = banco();
-    await repo.deleteMember(CTX, 'p1');
+    await repo.darDeBajaMember(CTX, 'p1');
 
     const m = envio(espia).payload?.mutaciones?.[0];
     expect(m?.tabla).toBe('PACIENTES');
@@ -137,7 +137,7 @@ describe('borrar es dar de baja', () => {
     // Sin paciente el router la rechaza; y como `deleteX` solo recibe un
     // identificador, el paciente tiene que salir de él.
     const { repo, espia } = banco();
-    await repo.deleteAppointment(CTX, 'c1');
+    await repo.darDeBajaAppointment(CTX, 'c1');
     const m = envio(espia).payload?.mutaciones?.[0];
     expect(m?.tabla).toBe('CITAS');
     expect(m?.fila.id).toBe('c1');
@@ -153,7 +153,7 @@ describe('lo que no tiene dónde escribirse, lo dice', () => {
     await expect(
       repo.saveGmailSource(CTX, { id: 'g1' } as Parameters<RepositorioBackend['saveGmailSource']>[1]),
     ).rejects.toMatchObject({ codigo: NO_HAY_DONDE });
-    await expect(repo.deleteGmailSource(CTX, 'g1')).rejects.toMatchObject({ codigo: NO_HAY_DONDE });
+    await expect(repo.darDeBajaGmailSource(CTX, 'g1')).rejects.toMatchObject({ codigo: NO_HAY_DONDE });
     await expect(
       repo.saveAppointmentCandidate(CTX, { id: 'c1' } as Parameters<
         RepositorioBackend['saveAppointmentCandidate']
@@ -388,7 +388,7 @@ describe('sin backend o sin identidad, se corta antes de la red', () => {
       idToken: async () => 'x',
       fetch: espia as unknown as typeof globalThis.fetch,
     });
-    await expect(repo.deleteMember(CTX, 'p1')).rejects.toMatchObject({ codigo: SIN_BACKEND });
+    await expect(repo.darDeBajaMember(CTX, 'p1')).rejects.toMatchObject({ codigo: SIN_BACKEND });
     expect(espia).not.toHaveBeenCalled();
   });
 
@@ -399,7 +399,7 @@ describe('sin backend o sin identidad, se corta antes de la red', () => {
       idToken: async () => null,
       fetch: espia as unknown as typeof globalThis.fetch,
     });
-    await expect(repo.deleteMember(CTX, 'p1')).rejects.toMatchObject({ codigo: SIN_IDENTIDAD });
+    await expect(repo.darDeBajaMember(CTX, 'p1')).rejects.toMatchObject({ codigo: SIN_IDENTIDAD });
     expect(espia).not.toHaveBeenCalled();
   });
 });
@@ -439,7 +439,7 @@ describe('cuando el router dice que el token ya no vale', () => {
     // del dispositivo adelantado— y el `exp` no se entera. Sin este reintento,
     // el usuario vería un error en mitad de un guardado que sí podía hacerse.
     const { repo, renovar, espia } = bancoConRenovacion([RECHAZO, BIEN], ['nuevo.id.token']);
-    await repo.deleteMember(CTX, 'p1');
+    await repo.darDeBajaMember(CTX, 'p1');
 
     expect(renovar).toHaveBeenCalledTimes(1);
     expect(espia).toHaveBeenCalledTimes(2);
@@ -456,14 +456,14 @@ describe('cuando el router dice que el token ya no vale', () => {
     // El router contesta siempre HTTP 200. Un reintento que esperase un código
     // de estado no se dispararía nunca, y esta prueba es lo que lo fija.
     const { repo, renovar } = bancoConRenovacion([RECHAZO, BIEN], ['nuevo.id.token']);
-    await repo.deleteMember(CTX, 'p1');
+    await repo.darDeBajaMember(CTX, 'p1');
     expect(renovar).toHaveBeenCalled();
   });
 
   it('si no se pudo renovar, sube el error ORIGINAL', async () => {
     // Decir «falló la renovación» taparía lo que de verdad contestó el router.
     const { repo, espia } = bancoConRenovacion([RECHAZO], [null]);
-    await expect(repo.deleteMember(CTX, 'p1')).rejects.toMatchObject({
+    await expect(repo.darDeBajaMember(CTX, 'p1')).rejects.toMatchObject({
       codigo: 'TOKEN_INVALIDO',
     });
     expect(espia).toHaveBeenCalledTimes(1);
@@ -473,7 +473,7 @@ describe('cuando el router dice que el token ya no vale', () => {
     // Si la credencial recién renovada tampoco vale, el problema no es la
     // caducidad y repetir solo gasta cuota.
     const { repo, espia } = bancoConRenovacion([RECHAZO, RECHAZO], ['a', 'b']);
-    await expect(repo.deleteMember(CTX, 'p1')).rejects.toThrow();
+    await expect(repo.darDeBajaMember(CTX, 'p1')).rejects.toThrow();
     expect(espia).toHaveBeenCalledTimes(2);
   });
 
@@ -482,7 +482,7 @@ describe('cuando el router dice que el token ya no vale', () => {
       [{ ok: false, error: 'PERMISO_INSUFICIENTE' }],
       ['nuevo'],
     );
-    await expect(repo.deleteMember(CTX, 'p1')).rejects.toMatchObject({
+    await expect(repo.darDeBajaMember(CTX, 'p1')).rejects.toMatchObject({
       codigo: 'PERMISO_INSUFICIENTE',
     });
     expect(renovar).not.toHaveBeenCalled();
@@ -491,7 +491,7 @@ describe('cuando el router dice que el token ya no vale', () => {
 
   it('sin renovación disponible, se comporta como antes', async () => {
     const { repo } = banco([{ ok: false, error: 'TOKEN_INVALIDO' }]);
-    await expect(repo.deleteMember(CTX, 'p1')).rejects.toMatchObject({ codigo: 'TOKEN_INVALIDO' });
+    await expect(repo.darDeBajaMember(CTX, 'p1')).rejects.toMatchObject({ codigo: 'TOKEN_INVALIDO' });
   });
 
   it('también protege la lectura', async () => {

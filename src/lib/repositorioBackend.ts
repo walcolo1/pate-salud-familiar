@@ -451,7 +451,7 @@ export class RepositorioBackend implements DataRepository {
     await this.guardar('members', member as unknown as Record<string, unknown>);
   }
 
-  async deleteMember(_ctx: RepositoryContext, memberId: string): Promise<void> {
+  async darDeBajaMember(_ctx: RepositoryContext, memberId: string): Promise<void> {
     await this.darDeBaja('members', memberId);
   }
 
@@ -472,7 +472,7 @@ export class RepositorioBackend implements DataRepository {
     await this.guardar('appointments', appt as unknown as Record<string, unknown>);
   }
 
-  async deleteAppointment(_ctx: RepositoryContext, apptId: string): Promise<void> {
+  async darDeBajaAppointment(_ctx: RepositoryContext, apptId: string): Promise<void> {
     await this.darDeBaja('appointments', apptId);
   }
 
@@ -482,7 +482,7 @@ export class RepositorioBackend implements DataRepository {
     await this.guardar('checkups', checkup as unknown as Record<string, unknown>);
   }
 
-  async deleteCheckup(_ctx: RepositoryContext, checkupId: string): Promise<void> {
+  async darDeBajaCheckup(_ctx: RepositoryContext, checkupId: string): Promise<void> {
     await this.darDeBaja('checkups', checkupId);
   }
 
@@ -492,7 +492,7 @@ export class RepositorioBackend implements DataRepository {
     await this.guardar('vaccines', vaccine as unknown as Record<string, unknown>);
   }
 
-  async deleteVaccine(_ctx: RepositoryContext, vaccineId: string): Promise<void> {
+  async darDeBajaVaccine(_ctx: RepositoryContext, vaccineId: string): Promise<void> {
     await this.darDeBaja('vaccines', vaccineId);
   }
 
@@ -502,7 +502,7 @@ export class RepositorioBackend implements DataRepository {
     await this.guardar('exams', exam as unknown as Record<string, unknown>);
   }
 
-  async deleteExam(_ctx: RepositoryContext, examId: string): Promise<void> {
+  async darDeBajaExam(_ctx: RepositoryContext, examId: string): Promise<void> {
     await this.darDeBaja('exams', examId);
   }
 
@@ -548,7 +548,7 @@ export class RepositorioBackend implements DataRepository {
     await this.guardar('documents', doc as unknown as Record<string, unknown>);
   }
 
-  async deleteDocument(_ctx: RepositoryContext, docId: string): Promise<void> {
+  async darDeBajaDocument(_ctx: RepositoryContext, docId: string): Promise<void> {
     await this.darDeBaja('documents', docId);
   }
 
@@ -577,7 +577,7 @@ export class RepositorioBackend implements DataRepository {
     await this.guardar('medicalOrders', order as unknown as Record<string, unknown>);
   }
 
-  async deleteMedicalOrder(_ctx: RepositoryContext, orderId: string): Promise<void> {
+  async darDeBajaMedicalOrder(_ctx: RepositoryContext, orderId: string): Promise<void> {
     await this.darDeBaja('medicalOrders', orderId);
   }
 
@@ -587,7 +587,7 @@ export class RepositorioBackend implements DataRepository {
     await this.guardar('medications', prescription as unknown as Record<string, unknown>);
   }
 
-  async deleteMedication(_ctx: RepositoryContext, prescriptionId: string): Promise<void> {
+  async darDeBajaMedication(_ctx: RepositoryContext, prescriptionId: string): Promise<void> {
     await this.darDeBaja('medications', prescriptionId);
   }
 
@@ -595,7 +595,7 @@ export class RepositorioBackend implements DataRepository {
     await this.guardar('doseReminders', reminder as unknown as Record<string, unknown>);
   }
 
-  async deleteDoseReminder(_ctx: RepositoryContext, reminderId: string): Promise<void> {
+  async darDeBajaDoseReminder(_ctx: RepositoryContext, reminderId: string): Promise<void> {
     await this.darDeBaja('doseReminders', reminderId);
   }
 
@@ -605,7 +605,7 @@ export class RepositorioBackend implements DataRepository {
     this.descriptoresDe('gmailSources');
   }
 
-  async deleteGmailSource(_ctx: RepositoryContext, _sourceId: string): Promise<void> {
+  async darDeBajaGmailSource(_ctx: RepositoryContext, _sourceId: string): Promise<void> {
     this.descriptoresDe('gmailSources');
   }
 

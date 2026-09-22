@@ -61,10 +61,9 @@ export default function DashboardPage() {
   }, [user, isLoading, router]);
 
   useEffect(() => {
-    if (!isLoading && user && !sincronizacionManual && !familyId) {
-      checkPendingInvitations();
-    }
-  }, [user, isLoading, sincronizacionManual, familyId, checkPendingInvitations]);
+    // G4b · ya no existe el estado «sin familia»: la familia es la hoja del
+    // despliegue, y quien no tiene acceso no llega hasta aquí.
+  }, [user, isLoading]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -108,137 +107,19 @@ export default function DashboardPage() {
     );
   }
 
-  // Guest Onboarding / Invitation acceptance screen
-  if (!sincronizacionManual && !familyId) {
-    return (
-      <div className="min-h-[75vh] flex flex-col items-center justify-center p-4 text-slate-700">
-        <div className="w-full max-w-lg bg-white rounded-3xl border border-slate-100 p-6 md:p-8 shadow-xl shadow-slate-100/40 flex flex-col gap-6">
-          <div className="flex flex-col items-center text-center gap-2 select-none">
-            <div className="h-14 w-14 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-100 shadow-sm animate-pulse">
-              <Mail className="h-7 w-7" />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-slate-800 leading-tight">Acceso Familiar Pendiente</h2>
-              <p className="text-xs text-slate-500 font-semibold tracking-wider uppercase mt-1">Paté Salud Familiar</p>
-            </div>
-            <p className="text-sm text-slate-500 font-medium max-w-xs mt-1">
-              Hola, <strong>{user.displayName.split(' ')[0]}</strong>. No estás conectado a ninguna familia. Revisa tus invitaciones pendientes o crea una nueva.
-            </p>
-          </div>
+  /*
+   * G4b · aquí estaba la pantalla «Acceso Familiar Pendiente».
+   *
+   * Se enseñaba cuando el backend era Firebase y el usuario todavía no tenía
+   * documento de familia. Con la hoja del titular ese estado **no existe**:
+   * `familyId` es null siempre, y quien no tiene acceso no llega hasta aquí
+   * —lo para el router—.
+   *
+   * La condición se quedó permanentemente cierta al girar la bandera, así que
+   * todo el mundo veía esta pantalla en vez de su expediente. Lo encontró S5,
+   * la prueba del estado vacío.
+   */
 
-          <div className="flex flex-col gap-4">
-            <div className="flex justify-between items-center px-1">
-              <span className="font-extrabold text-slate-800 text-xs tracking-wide uppercase">Invitaciones ({pendingInvitations.length})</span>
-              <button
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="text-xs font-bold text-teal-700 hover:text-teal-800 disabled:text-slate-400 flex items-center gap-1.5 cursor-pointer bg-transparent border-none"
-              >
-                <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span>Actualizar</span>
-              </button>
-            </div>
-
-            {acceptError && (
-              <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-xl text-xs font-bold text-rose-700 flex items-start gap-2">
-                <AlertCircle className="h-4.5 w-4.5 shrink-0 mt-0.5" />
-                <span>{acceptError}</span>
-              </div>
-            )}
-
-            {pendingInvitations.length === 0 ? (
-              <div className="p-6 bg-slate-50 border border-slate-100 rounded-2xl text-center flex flex-col items-center justify-center gap-1.5">
-                <p className="text-xs font-bold text-slate-800">No se encontraron invitaciones</p>
-                <p className="text-[10px] text-slate-500 leading-normal max-w-xs">
-                  Pídele al Titular de tu familia que te envíe una invitación usando tu correo electrónico registrado: <code className="bg-slate-200/60 p-0.5 px-1 rounded font-mono text-slate-600 font-bold">{user.email}</code>.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {pendingInvitations.map((inv) => (
-                  <div
-                    key={inv.id}
-                    className="p-4 bg-teal-50/30 border border-teal-50 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4"
-                  >
-                    <div className="flex flex-col gap-1 min-w-0">
-                      <p className="text-xs font-bold text-slate-850 truncate leading-none mb-1">
-                        Invitado por {inv.createdBy}
-                      </p>
-                      <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-1">
-                        Rol asignado: <strong className="text-teal-700 font-bold uppercase">{inv.role}</strong>
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => handleAcceptInvite(inv.familyId, inv.id)}
-                      disabled={acceptingInviteId !== null}
-                      className="bg-teal-700 hover:bg-teal-800 active:bg-teal-900 disabled:bg-teal-300 text-white font-extrabold text-xs h-10 px-5 rounded-xl shadow-md shadow-teal-900/10 transition-colors flex items-center justify-center gap-1.5 cursor-pointer border-none"
-                    >
-                      {acceptingInviteId === inv.id ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>Aceptando...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-3.5 w-3.5" />
-                          <span>Aceptar y Unirse</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <hr className="border-slate-100 my-1" />
-
-          {/* Form to create a new family */}
-          <form onSubmit={handleCreateFamily} className="flex flex-col gap-3.5">
-            <div className="flex flex-col gap-1">
-              <span className="font-extrabold text-slate-800 text-xs tracking-wide uppercase px-1">¿Prefieres iniciar tu propia familia?</span>
-              <p className="text-[10px] text-slate-500 font-semibold px-1">Se creará un grupo nuevo del cual serás el Administrador principal.</p>
-            </div>
-
-            {familyError && (
-              <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-xl text-xs font-bold text-rose-700 flex items-start gap-2">
-                <AlertCircle className="h-4.5 w-4.5 shrink-0 mt-0.5" />
-                <span>{familyError}</span>
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <input
-                type="text"
-                aria-label="Nombre de la familia"
-                value={newFamilyName}
-                onChange={(e) => setNewFamilyName(e.target.value)}
-                placeholder={`Familia de ${user.displayName.split(' ')[0]}`}
-                className="flex-1 h-11 px-4 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 font-medium"
-              />
-              <button
-                type="submit"
-                disabled={isCreatingFamily || !newFamilyName.trim()}
-                className="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 disabled:bg-slate-300 text-white font-extrabold text-xs h-11 px-5 rounded-xl transition-colors shrink-0 flex items-center justify-center gap-1.5 cursor-pointer border-none"
-              >
-                {isCreatingFamily ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Creando...</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4" />
-                    <span>Crear Familia</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
 
   // Get first name
   const firstName = user.displayName.split(' ')[0];

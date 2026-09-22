@@ -16,6 +16,7 @@ import {
   Lock,
   ShieldCheck,
   AlertTriangle,
+  RefreshCw,
   X
 } from 'lucide-react';
 import ConfirmDialog, { type OpcionDialogo } from '@/components/ui/ConfirmDialog';
@@ -32,7 +33,11 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
     avisoPurgaDiferida, descartarAvisoPurgaDiferida,
     // A6-F3
     estadoBloqueo, errorRestauracion,
+    // G2 · la hoja cambió por otro lado
+    hayCambiosRemotos, recargarExpediente,
   } = useApp();
+
+  const [recargando, setRecargando] = React.useState(false);
 
   const cierreAbierto = dialogoVisible(estadoCierre);
   const cierreOcupado = estaOcupado(estadoCierre);
@@ -115,6 +120,45 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
     </div>
   ) : null;
 
+  /**
+   * G2 · alguien más escribió en la hoja.
+   *
+   * No se recarga solo a propósito: recargar tira lo que el usuario estuviera
+   * escribiendo, y en un expediente clínico perder una consulta a medio
+   * redactar es peor que enseñar un dato de hace un minuto. Se avisa, y decide
+   * quien está delante.
+   */
+  const avisoCambiosRemotos = hayCambiosRemotos ? (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex items-center gap-3 border-b border-sky-200 bg-sky-50 px-4 py-3 text-sky-900"
+    >
+      <RefreshCw
+        className={`h-4 w-4 shrink-0 ${recargando ? 'animate-spin' : ''}`}
+        aria-hidden="true"
+      />
+      <p className="flex-1 text-xs font-semibold leading-relaxed">
+        Hay datos nuevos en el expediente de la familia.
+      </p>
+      <button
+        type="button"
+        disabled={recargando}
+        onClick={async () => {
+          setRecargando(true);
+          try {
+            await recargarExpediente();
+          } finally {
+            setRecargando(false);
+          }
+        }}
+        className="shrink-0 rounded-lg bg-sky-600 px-3 py-1.5 text-[11px] font-extrabold text-white hover:bg-sky-700 disabled:opacity-60"
+      >
+        {recargando ? 'Actualizando…' : 'Actualizar'}
+      </button>
+    </div>
+  ) : null;
+
   const dialogoCierre = (
     <ConfirmDialog
       abierto={cierreAbierto}
@@ -149,6 +193,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
   return (
     <>
       {avisoLimpieza}
+      {avisoCambiosRemotos}
       {dialogoCierre}
       <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
       {/* ── Desktop Sidebar ────────────────────────────────────────────────── */}

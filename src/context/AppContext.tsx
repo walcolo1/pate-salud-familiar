@@ -3,10 +3,11 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 // ── DataRepository abstraction (Phase 8) ─────────────────────────────────────
 import { arrancarIdentidad } from '../lib/identidadGis';
+import { conectarSondeo, ventanaDelNavegador } from '../lib/sondeoRevision';
 import { decodeGoogleToken } from '../lib/googleAuth';
 import { clientIdConfigurado } from '../lib/importacionManual';
 import { getDataRepository, resetDataRepository } from '../lib/dataRepository';
-import type { DataUpdate } from '../lib/dataRepository';
+import type { DataUpdate, RepositoryContext } from '../lib/dataRepository';
 import type { FamilyInvitation, FamilyAccess } from '../lib/tiposAcceso';
 
 import { 
@@ -501,6 +502,16 @@ interface AppContextProps {
    * sobrará entera.
    */
   sincronizacionManual: boolean;
+  /**
+   * La hoja cambió desde que se cargó esta copia (G2).
+   *
+   * No se recarga solo: recargar tira lo que el usuario estuviera escribiendo,
+   * y en un expediente clínico eso es peor que enseñar un dato de hace un
+   * minuto. Se avisa y decide quien está delante.
+   */
+  hayCambiosRemotos: boolean;
+  /** Trae lo nuevo y baja el aviso. */
+  recargarExpediente: () => Promise<void>;
   familyId: string | null;
   pendingInvitations: FamilyInvitation[];
   invitations: FamilyInvitation[];
@@ -529,20 +540,29 @@ interface AppContextProps {
 const AppContext = createContext<AppContextProps | undefined>(undefined);
 
 /**
- * G4 · lo que queda de la bandera de backend.
+ * G4b · la hoja ya no se empuja por lotes.
  *
- * No es una bandera de configuración: es un hecho del código de hoy. La hoja
- * se escribe por lotes cuando el usuario sincroniza, y eso es lo que las
- * pantallas necesitan saber. Pasa a `false` cuando el repositorio escriba por
- * mutación.
+ * Cada cambio sale solo, como una mutación contra el router, en el momento en
+ * que ocurre. Las pantallas lo leen para dejar de ofrecer el botón de
+ * «sincronizar todo», que ya no significa nada: no hay un expediente local
+ * esperando a subirse.
+ *
+ * **Lo que sí sigue existiendo es un pendiente**, y es otra cosa: una escritura
+ * concreta que no salió porque no había red. Esa se reenvía sola y la cuenta
+ * `pendingSyncCount`.
+ *
+ * Queda como constante —y no borrada— mientras esas cuarenta condiciones sigan
+ * en la interfaz: quitarlas es una limpieza de pantallas, no de backend, y
+ * mezclarla aquí escondería este cambio dentro de un diff de JSX.
  */
-const SINCRONIZACION_MANUAL = true;
+const SINCRONIZACION_MANUAL = false;
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   // C1.3b · Ambos proveedores envuelven a este en el layout, de modo que el
   // contexto puede preguntar y avisar sin recurrir a los cuadros del navegador.
   const confirmar = useConfirmacion();
   const avisar = useAviso();
+  const [hayCambiosRemotos, setHayCambiosRemotos] = useState<boolean>(false);
 
   const [user, setUser] = useState<UserAccount | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -670,6 +690,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Auto-sync
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
+  /**
+   * Las escrituras que no salieron por un fallo pasajero.
+   *
+   * Son las mismas mutaciones, guardadas para reenviarlas tal cual. No hay
+   * fusión ni resolución de conflictos: la hoja solo anexa, la última fila
+   * manda, y una repetida dice lo mismo.
+   */
+  const escriturasPendientesRef = useRef<((repo: Awaited<ReturnType<typeof getDataRepository>>, ctx: RepositoryContext) => Promise<void>)[]>([]);
   const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(true);
   const [needsGoogleAuth, setNeedsGoogleAuth] = useState<boolean>(false);
   const autoSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1374,6 +1402,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       runAppointmentRetentionCleanup();
     }
   }, [isLoading]);
+
+  /**
+   * G2 · el sondeo híbrido de revisión, encendido.
+   *
+   * La hoja no avisa cuando cambia, así que se pregunta: al volver a la
+   * pestaña y cada 120 s **solo con ella delante**. Se consulta
+   * `obtenerRevision`, que es la única acción del router que no lee la hoja.
+   *
+   * Ocho horas con la pestaña abierta son 240 peticiones al día: el 1,2 % de
+   * las 20.000 de una cuenta gratuita.
+   */
+  useEffect(() => {
+    if (!user) return;
+    if (origenDatosRef.current === 'DEMO') return;
+
+    const ventana = ventanaDelNavegador();
+    if (!ventana) return;
+
+    const { desconectar } = conectarSondeo(ventana, {
+      obtenerRevision: async () => {
+        const repo = await getDataRepository();
+        return (repo as { revision?: () => Promise<number> }).revision?.() ?? 0;
+      },
+      programar: (fn, ms) => setTimeout(fn, ms),
+      cancelar: (id) => clearTimeout(id as ReturnType<typeof setTimeout>),
+      alCambiar: () => setHayCambiosRemotos(true),
+      registrarFallo: (error) => {
+        // Un sondeo que falla no puede interrumpir a nadie: se reintenta solo,
+        // y si de verdad no hay sesión ya lo dice el aviso de identidad.
+        console.warn('[AppContext] el sondeo de revisión falló:', error);
+      },
+    });
+
+    return desconectar;
+  }, [user]);
 
   /**
    * G3b · la sesión sin Firebase Auth.
@@ -2096,22 +2159,68 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * escribir de verdad; el empuje por lotes se va en el mismo paso.
    */
   const persistirPorMutacion = useCallback(
-    (fn: (repo: Awaited<ReturnType<typeof getDataRepository>>, ctx: { uid: string; email: string; familyId: string }) => Promise<void>) => {
-      // Mientras el empuje por lotes siga vivo, este camino está apagado.
-      if (SINCRONIZACION_MANUAL) return;
-      if (!familyIdRef.current) return;
+    (fn: (repo: Awaited<ReturnType<typeof getDataRepository>>, ctx: RepositoryContext) => Promise<void>) => {
       // A6-F3 · Guarda estructural del modo demostración.
       if (origenDatosRef.current === 'DEMO') return;
-      const fid = familyIdRef.current;
 
-      // Capture the state snapshot before the async operation starts
+      // La instantánea se toma ANTES de salir a la red: es a lo que se vuelve
+      // si el router rechaza la escritura.
       const snap = { ...stateRef.current };
 
       getDataRepository().then(async (repo) => {
         try {
-          await fn(repo, { uid: user?.googleId ?? user?.id ?? '', email: user?.email ?? '', familyId: fid });
-        } catch (err: any) {
-          console.error('[AppContext] persistirPorMutacion: error — rolling back state:', err);
+          await fn(repo, {
+            uid: user?.googleId ?? user?.id ?? '',
+            email: user?.email ?? '',
+            // La familia **es la hoja**: no hay documento que identificar. El
+            // repositorio lo ignora, y queda aquí porque el contrato todavía
+            // lo pide.
+            familyId: null,
+          });
+        } catch (err: unknown) {
+          const codigo = (err as { codigo?: string } | null)?.codigo ?? '';
+
+          // Lo que no tiene dónde guardarse no es un fallo del guardado: es una
+          // pérdida conocida y decidida (`SIN_PESTANA`, en descriptores.ts).
+          // Deshacer la pantalla por eso rompería funciones que no tienen nada
+          // que ver.
+          if (codigo === 'NO_HAY_DONDE_ESCRIBIRLO') {
+            console.warn('[AppContext] sin pestaña donde guardarlo:', (err as Error)?.message);
+            return;
+          }
+
+          /*
+           * UN FALLO PASAJERO NO PUEDE BORRAR LO QUE ALGUIEN ACABA DE ESCRIBIR
+           * ──────────────────────────────────────────────────────────────────
+           * Sin red, con el cerrojo ocupado, o en un navegador que todavía no
+           * tiene registrada la hoja de la familia, deshacer el cambio
+           * significa que quien estaba en el ascensor apuntando una vacuna ve
+           * desaparecer lo que escribió.
+           *
+           * Así que se guarda la escritura y se reintenta. No es una cola de
+           * sincronización con fusión —eso es lo que G4b vino a quitar—: son
+           * las mismas mutaciones, que se reenvían tal cual. Reenviarlas es
+           * inofensivo porque la hoja **solo anexa**: la última fila manda, y
+           * una repetida dice exactamente lo mismo.
+           *
+           * Lo que SÍ se deshace es un rechazo que no va a cambiar
+           * reintentando: un permiso denegado seguirá denegado, y dejar el dato
+           * en pantalla sería prometer un guardado que no va a ocurrir.
+           */
+          const reintentable =
+            (err as { reintentable?: boolean } | null)?.reintentable === true ||
+            codigo === 'SIN_BACKEND' ||
+            codigo === 'SIN_IDENTIDAD';
+
+          if (reintentable) {
+            escriturasPendientesRef.current.push(fn);
+            setPendingSyncCount(escriturasPendientesRef.current.length);
+            pendingSyncCountRef.current = escriturasPendientesRef.current.length;
+            console.warn('[AppContext] guardado aplazado, se reintentará:', codigo || 'sin código');
+            return;
+          }
+
+          console.error('[AppContext] persistirPorMutacion: error — se deshace el cambio:', err);
 
           // Rollback all states
           setMembers(snap.members);
@@ -2129,16 +2238,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setMedicationPrescriptions(snap.medicationPrescriptions);
           setMedicationDoseReminders(snap.medicationDoseReminders);
 
-          alert(`Error al guardar en base de datos Firebase: ${err.message || 'Permisos insuficientes o error de red.'}`);
+          avisar(
+            codigo === 'SIN_BACKEND'
+              ? 'Este navegador todavía no tiene registrada la hoja de la familia.'
+              : codigo === 'SIN_IDENTIDAD'
+                ? 'La sesión caducó. Vuelve a entrar para guardar el cambio.'
+                : 'No se pudo guardar el cambio. Se deshizo para no dejarlo a medias.',
+          );
         }
       }).catch((err) => {
         console.error('[AppContext] persistirPorMutacion: error de preparación:', err);
       });
     },
-    [user],  
+    [user, avisar],
   );
 
-  // ── FIREBASE: Family Invitations & Access Actions ─────────────────────────
+  // ── Invitaciones y accesos ────────────────────────────────────────────────
   const createInvitation = useCallback(async (
     email: string,
     memberId: string,
@@ -2259,86 +2374,66 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ── FUNCIONES DE AUTO-SYNC ────────────────────────────────────────────────
 
-  /**
-   * scheduleAutoSync — Programa sincronización automática con debounce de 4s.
-   * Cancela el timer anterior si existía. No sincroniza si: no hay base de datos,
-   * el auto-sync está deshabilitado, o ya hay una sync en progreso.
-   * Si no hay token disponible, marca como pending_sync en lugar de fallar.
+  /*
+   * G4b · aquí vivía `scheduleAutoSync`.
+   *
+   * Esperaba cuatro segundos y llamaba a `syncNow()`, que **reescribía las 20
+   * pestañas operativas enteras** en cada guardado. Era el punto que el
+   * antiguo Bloque H venía a eliminar, y es incompatible con lo que construyó
+   * E6: `aplicar()` recibe un lote de mutaciones concretas, valida cada una
+   * contra el rol de quien la pide y escribe solo esas filas.
+   *
+   * Reescribir el expediente entero cada cuatro segundos contra el router
+   * habría sido lo peor de los dos mundos: más cuota, más riesgo y ninguna de
+   * las garantías de E5.
+   *
+   * Lo sustituye `persistirPorMutacion`, que ahora sí escribe.
    */
-  const scheduleAutoSync = (reason: string) => {
-    // A6-F3 · Guarda estructural del modo demostración.
-    if (origenDatosRef.current === 'DEMO') return;
-    if (!autoSyncEnabled) return;
-    if (typeof window === 'undefined') return;
-
-    // Cancelar timer anterior
-    if (autoSyncTimerRef.current) {
-      clearTimeout(autoSyncTimerRef.current);
-    }
-
-    autoSyncTimerRef.current = setTimeout(async () => {
-      autoSyncTimerRef.current = null;
-
-      if (isSyncInProgress.current) return;
-
-      try {
-        isSyncInProgress.current = true;
-        
-        // Intentar asegurar el token de forma silenciosa si no está disponible o expiró
-        let token = getOperationalTokenIfValid();
-        if (!token) {
-          try {
-            token = await ensureGoogleNativeReady(true);
-          } catch (_) {
-            token = null;
-          }
-        }
-
-        if (token) {
-          await syncNow();
-          setPendingSyncCount(0);
-          setNeedsGoogleAuth(false);
-        } else {
-          // Sin token disponible: marcar como pendiente
-          setPendingSyncCount(prev => prev + 1);
-          setSyncInitStatus('pending_sync');
-          setSyncInitMessage('Cambios pendientes de sincronizar. Conecta con Google para enviarlos.');
-          setNeedsGoogleAuth(true);
-        }
-      } catch (_) {
-        // Error silencioso en auto-sync — no interrumpir UX
-        setPendingSyncCount(prev => prev + 1);
-        setSyncInitStatus('pending_sync');
-        setNeedsGoogleAuth(true);
-      } finally {
-        isSyncInProgress.current = false;
-      }
-    }, 4000);
-  };
 
   /**
    * flushPendingSync — Sincroniza inmediatamente si hay cambios pendientes y token válido.
+   */
+  /**
+   * Reenvía las escrituras que quedaron pendientes.
+   *
+   * Antes esto pedía un token y empujaba el expediente entero. Ahora reenvía
+   * **las mutaciones que fallaron**, una a una y en el orden en que
+   * ocurrieron: el orden importa porque una cita puede depender de la orden
+   * médica que la originó.
+   *
+   * Las que vuelvan a fallar se quedan en la cola. Nunca se descarta una
+   * escritura por haberla intentado.
    */
   const flushPendingSync = async (): Promise<void> => {
     // A6-F3 · Guarda estructural del modo demostración.
     if (origenDatosRef.current === 'DEMO') return;
     if (isSyncInProgress.current) return;
-    if (pendingSyncCount === 0) return;
+    if (escriturasPendientesRef.current.length === 0) return;
 
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!clientId) return;
-
+    isSyncInProgress.current = true;
     try {
-      isSyncInProgress.current = true;
-      const token = await ensureOperationalToken(clientId, false);
-      if (token) {
-        await syncNow();
-        setPendingSyncCount(0);
-        pendingSyncCountRef.current = 0; // espejo sincrono: el reintento lo consulta de inmediato
-        setNeedsGoogleAuth(false);
+      const repo = await getDataRepository();
+      const ctx: RepositoryContext = {
+        uid: user?.googleId ?? user?.id ?? '',
+        email: user?.email ?? '',
+        familyId: null,
+      };
+
+      const cola = [...escriturasPendientesRef.current];
+      const fallidas: typeof cola = [];
+
+      for (const escritura of cola) {
+        try {
+          await escritura(repo, ctx);
+        } catch {
+          fallidas.push(escritura);
+        }
       }
-    } catch (_) {
-      // Si falla: mantener pending
+
+      escriturasPendientesRef.current = fallidas;
+      setPendingSyncCount(fallidas.length);
+      pendingSyncCountRef.current = fallidas.length;
+      if (fallidas.length === 0) setNeedsGoogleAuth(false);
     } finally {
       isSyncInProgress.current = false;
     }
@@ -2411,7 +2506,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       lastUpdated: new Date().toISOString()
     };
     setHealthProfiles((prev) => ({ ...prev, [newId]: newProfile }));
-    setTimeout(() => scheduleAutoSync('member_added'), 100);
 
     // Registrar hito en el historial clínico
     const newEvent: MedicalHistoryEvent = {
@@ -2475,7 +2569,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return m;
     }));
-    setTimeout(() => scheduleAutoSync('member_updated'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       if (updatedMember) {
@@ -2594,10 +2687,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
       setHistory(prev => [newEvent!, ...prev]);
     }
-    setTimeout(() => scheduleAutoSync('member_deleted'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
-      await repo.deleteMember(ctx, id);
+      await repo.darDeBajaMember(ctx, id);
       if (newEvent) {
         await repo.saveHistoryEvent(ctx, newEvent);
       }
@@ -2630,7 +2722,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory(prev => [newEvent, ...prev]);
-    setTimeout(() => scheduleAutoSync('member_inactivated'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       if (updatedMember) {
@@ -2665,7 +2756,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory(prev => [newEvent, ...prev]);
-    setTimeout(() => scheduleAutoSync('member_reactivated'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       if (updatedMember) {
@@ -2744,7 +2834,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return appt;
     }));
     if (updatedCount > 0) {
-      setTimeout(() => scheduleAutoSync('retention_cleanup'), 100);
     }
   };
 
@@ -2769,7 +2858,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         [memberId]: updatedProfile
       };
     });
-    setTimeout(() => scheduleAutoSync('health_profile_saved'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       if (updatedProfile) {
@@ -2831,7 +2919,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory((prev) => [newEvent, ...prev]);
-    setTimeout(() => scheduleAutoSync('appointment_added'), 100);
 
     // Sincronizar en segundo plano con Google Calendar si está habilitado
     if (calendarSyncEnabled) {
@@ -2884,7 +2971,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return r;
       }));
     }
-    setTimeout(() => scheduleAutoSync('appointment_status_updated'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       if (updatedAppt) {
@@ -2918,7 +3004,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory((prev) => [newEvent, ...prev]);
-    setTimeout(() => scheduleAutoSync('checkup_added'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       await repo.saveCheckup(ctx, newCheckup);
@@ -2962,7 +3047,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory((prev) => [newEvent, ...prev]);
-    setTimeout(() => scheduleAutoSync('vaccine_added'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       await repo.saveVaccine(ctx, newVac);
@@ -3006,11 +3090,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory((prev) => [newEvent, ...prev]);
-    setTimeout(() => scheduleAutoSync('exam_added'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       await repo.saveExam(ctx, newExam);
-      await repo.saveExamResults(ctx, examId, newResults);
+      // El paciente hace falta: `EXAMENES_RESULTADOS` lo lleva en su columna
+      // desde el esquema v4, y sin él el router deniega la mutación.
+      await repo.saveExamResults(ctx, examId, newResults, exam.memberId);
       await repo.saveHistoryEvent(ctx, newEvent);
     });
   };
@@ -3259,7 +3344,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             createdAt: new Date().toISOString()
           };
           setHistory((prev) => [newEvent, ...prev]);
-          setTimeout(() => scheduleAutoSync('document_uploaded'), 100);
 
           persistirPorMutacion(async (repo, ctx) => {
             await repo.saveDocument(ctx, newDoc);
@@ -3307,7 +3391,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: new Date().toISOString()
     };
     setHistory((prev) => [newEvent, ...prev]);
-    setTimeout(() => scheduleAutoSync('document_uploaded_local'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       await repo.saveDocument(ctx, newDoc);
@@ -3319,10 +3402,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const deleteDocument = (id: string) => {
     setDocuments((prev) => prev.filter((d) => d.id !== id));
-    setTimeout(() => scheduleAutoSync('document_deleted'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
-      await repo.deleteDocument(ctx, id);
+      await repo.darDeBajaDocument(ctx, id);
     });
   };
 
@@ -3335,7 +3417,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return t;
     }));
-    setTimeout(() => scheduleAutoSync('task_completed'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       if (updatedTask) {
@@ -3380,7 +3461,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       return updated;
     });
-    setTimeout(() => scheduleAutoSync('reminder_toggled'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       if (updatedReminder) {
@@ -3740,7 +3820,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setHistory(prev => [newEvent, ...prev]);
 
-    setTimeout(() => scheduleAutoSync('medical_order_added'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       await repo.saveMedicalOrder(ctx, newOrder);
@@ -3780,7 +3859,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return o;
     }));
 
-    setTimeout(() => scheduleAutoSync('medical_order_updated'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       if (updatedOrder) {
@@ -3807,10 +3885,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return o;
     }));
-    setTimeout(() => scheduleAutoSync('medical_order_deleted'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
-      await repo.deleteMedicalOrder(ctx, id);
+      await repo.darDeBajaMedicalOrder(ctx, id);
     });
   };
 
@@ -3888,7 +3965,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return o;
     }));
 
-    setTimeout(() => scheduleAutoSync('appointment_created_from_order'), 100);
 
     if (calendarSyncEnabled) {
       setTimeout(() => {
@@ -4020,7 +4096,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setHistory(prev => [newHistoryEvent, ...prev]);
 
-    setTimeout(() => scheduleAutoSync('medication_prescription_added'), 100);
 
     if (calendarSyncEnabled && generatedDoses.length > 0 && generatedDoses.length <= 20) {
       setTimeout(() => {
@@ -4094,7 +4169,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return m;
     }));
-    setTimeout(() => scheduleAutoSync('medication_prescription_updated'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       if (updatedPrescription) {
@@ -4145,14 +4219,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
 
     setReminders(prev => prev.filter(r => r.relatedEventId !== id));
-    setTimeout(() => scheduleAutoSync('medication_prescription_deleted'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       if (deletedPrescription) {
-        await repo.deleteMedication(ctx, id);
+        await repo.darDeBajaMedication(ctx, id);
       }
       for (const d of deletedDoses) {
-        await repo.deleteDoseReminder(ctx, d.id);
+        await repo.darDeBajaDoseReminder(ctx, d.id);
       }
     });
   };
@@ -4192,7 +4265,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return r;
     }));
 
-    setTimeout(() => scheduleAutoSync('medication_dose_marked'), 100);
 
     persistirPorMutacion(async (repo, ctx) => {
       if (updatedDose) {
@@ -4886,7 +4958,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       setSyncInitMessage('Base encontrada. Cargando datos desde Google...');
-      await pullFromGoogleInternal(token, remoteSheetId);
+      await pullFromGoogle();
 
       setSyncInitStatus('loaded_from_google');
       setSyncInitMessage(`✅ Datos cargados desde Google (${new Date().toLocaleTimeString('es-CO')})`);
@@ -4991,7 +5063,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           
           avisar('Se encontró una base operacional en tu cuenta de Google. Se cargará tu historial.');
           // Proceder a jalar el historial
-          await pullFromGoogleInternal(token, foundSheetId);
+          await pullFromGoogle();
           return;
         }
       }
@@ -5033,8 +5105,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const newConfigId = await writeConfigToAppData(token, newConfig, configId);
       setAppDataFileId(newConfigId);
 
-      // 4. Enviar los datos locales actuales a la hoja
-      await pushToGoogleInternal(token, sheetId);
       
       setOpSyncStatus('synced');
       setLastSyncAt(new Date().toISOString());
@@ -5058,838 +5128,95 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const pullFromGoogleInternal = async (token: string, sheetId: string) => {
-    setOpSyncStatus('syncing');
-    try {
-      const remoteState = await readAllOperationalTables(token, sheetId);
-      
-      // Integración y resolución de conflictos mediante Last-Write-Wins (LWW)
-      const mergeEntities = <T extends { id: string; updatedAt?: string; deletedAt?: string | null; syncStatus?: any }>(
-        localArray: T[],
-        remoteArray: T[],
-        tableName: string
-      ): T[] => {
-        const merged: T[] = [...localArray];
-
-        remoteArray.forEach(remoteItem => {
-          const localIdx = merged.findIndex(l => l.id === remoteItem.id);
-          
-          if (localIdx >= 0) {
-            const localItem = merged[localIdx];
-            if (tableName === 'Miembros') {
-              // Fusionar miembros de forma segura usando el helper mergeMemberSafely
-              const localM = localItem as unknown as FamilyMember;
-              const remoteM = remoteItem as unknown as FamilyMember;
-              merged[localIdx] = mergeMemberSafely(localM, remoteM) as unknown as T;
-            } else {
-              const localUpdate = localItem.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
-              const remoteUpdate = remoteItem.updatedAt ? new Date(remoteItem.updatedAt).getTime() : 0;
-
-              if (remoteUpdate > localUpdate) {
-                // Conflicto: Sobrescribir local si el remoto es más reciente
-                if (localItem.syncStatus === 'PENDING_SYNC') {
-                  // Registrar conflicto en historia
-                  const conflictLog: MedicalHistoryEvent = {
-                    id: `hist-conf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-                    memberId: (remoteItem as any).memberId || (localItem as any).memberId || 'family-owner',
-                    eventType: 'OTHER',
-                    title: 'Conflicto de sincronización resuelto',
-                    description: `Conflicto en tabla ${tableName} para ID: ${remoteItem.id} resuelto aplicando versión remota más reciente (LWW).`,
-                    eventDate: new Date().toISOString().split('T')[0],
-                    createdAt: new Date().toISOString()
-                  };
-                  setTimeout(() => setHistory(h => [conflictLog, ...h]), 50);
-                }
-                merged[localIdx] = { ...remoteItem, syncStatus: 'SYNCED' } as T;
-              } else {
-                // El local es más reciente o igual, mantener local
-                merged[localIdx] = { ...localItem };
-              }
-            }
-          } else {
-            // No existe localmente, agregar
-            const isDeleted = remoteItem.deletedAt || (remoteItem as any).status === 'DELETED';
-            if (!isDeleted) {
-              merged.push({ ...remoteItem, syncStatus: 'SYNCED' });
-            }
-          }
-        });
-
-        // Si se borró en Sheets manualmente, quitar del estado local aquellos items que estaban sincronizados
-        return merged.filter(localItem => {
-          if (localItem.syncStatus === 'LOCAL_ONLY' || localItem.syncStatus === 'PENDING_SYNC') {
-            return true;
-          }
-          if (localItem.deletedAt || (localItem as any).status === 'DELETED') {
-            return true;
-          }
-          const existsInRemote = remoteArray.some(r => r.id === localItem.id);
-          return existsInRemote;
-        });
-      };
-
-      // Fusión de tablas
-      if (remoteState.Miembros) {
-        setMembers(prev => mergeEntities(prev, remoteState.Miembros, 'Miembros'));
-      }
-
-      if (remoteState.FichasMedicas) {
-        const remoteProfiles = remoteState.FichasMedicas.reduce((acc: any, hp: any) => {
-          acc[hp.memberId] = hp;
-          return acc;
-        }, {});
-        setHealthProfiles(prev => {
-          const merged = { ...prev };
-          Object.entries(remoteProfiles).forEach(([mId, remoteProf]: [string, any]) => {
-            const localProf = merged[mId];
-            const localUpdate = localProf?.updatedAt ? new Date(localProf.updatedAt).getTime() : 0;
-            const remoteUpdate = remoteProf.updatedAt ? new Date(remoteProf.updatedAt).getTime() : 0;
-            if (!localProf || remoteUpdate > localUpdate) {
-              merged[mId] = { ...remoteProf, syncStatus: 'SYNCED' };
-            }
-          });
-          return merged;
-        });
-      }
-
-      if (remoteState.Citas) {
-        const remoteCitasSanitized = remoteState.Citas.map(sanitizeRemoteAppointment);
-        setAppointments(prev => mergeEntities(prev, remoteCitasSanitized, 'Citas'));
-      }
-      if (remoteState.Controles) {
-        setCheckups(prev => mergeEntities(prev, remoteState.Controles, 'Controles'));
-      }
-      if (remoteState.Vacunas) {
-        setVaccines(prev => mergeEntities(prev, remoteState.Vacunas, 'Vacunas'));
-      }
-      if (remoteState.Examenes) {
-        setExams(prev => mergeEntities(prev, remoteState.Examenes, 'Exámenes'));
-      }
-      if (remoteState.Documentos) {
-        setDocuments(prev => mergeEntities(prev, remoteState.Documentos, 'Documentos'));
-      }
-      if (remoteState.HistorialClinico) {
-        setHistory(prev => mergeEntities(prev, remoteState.HistorialClinico, 'Historial'));
-      }
-      if (remoteState.FuentesCorreoCitas) {
-        setEmailSources(prev => mergeEntities(prev, remoteState.FuentesCorreoCitas, 'FuentesCorreoCitas'));
-      }
-      if (remoteState.CandidatosCorreoCitas) {
-        setAppointmentCandidates(prev => mergeEntities(prev, remoteState.CandidatosCorreoCitas, 'CandidatosCorreoCitas'));
-      }
-      if (remoteState.OrdenesMedicas) {
-        setMedicalOrders(prev => mergeEntities(prev, remoteState.OrdenesMedicas, 'OrdenesMedicas'));
-      }
-      if (remoteState.Medicamentos) {
-        setMedicationPrescriptions(prev => mergeEntities(prev, remoteState.Medicamentos, 'Medicamentos'));
-      }
-      if (remoteState.TomasMedicamentos) {
-        setMedicationDoseReminders(prev => mergeEntities(prev, remoteState.TomasMedicamentos, 'TomasMedicamentos'));
-      }
-
-      setLastPullAt(new Date().toISOString());
-      setLastSyncAt(new Date().toISOString());
-      setOpSyncStatus('synced');
-    } catch (err: any) {
-      console.error('Error jalando datos de Google Sheets:', err);
-      setOpSyncStatus('error');
-      setOpSyncError(err.message || 'Error al descargar datos remotos.');
-      throw err;
-    }
-  };
-
+  /**
+   * Relee el expediente entero desde el backend del titular (G4b).
+   *
+   * QUÉ SE FUE DE AQUÍ, Y POR QUÉ NO SE ECHA DE MENOS
+   * ─────────────────────────────────────────────────
+   * Esto eran 174 líneas de fusión «gana la última escritura»: la copia local
+   * podía tener cambios sin enviar, y había que decidir cuál de las dos
+   * versiones de cada fila sobrevivía —dejando rastro en el historial cuando
+   * se pisaba algo—.
+   *
+   * Con la escritura por mutación **no hay cambios sin enviar**: cada uno sale
+   * en el momento en que ocurre, y si el router lo rechaza la pantalla se
+   * deshace. Así que la hoja es la verdad y se lee entera. La fusión no se ha
+   * simplificado: ha dejado de tener sentido.
+   *
+   * Y había una razón más fuerte para no dejar la lectura donde estaba: leía
+   * **otra hoja**. La que la PWA creó en el alta, por la API de Sheets. El
+   * router escribe en la suya, la del despliegue. Con la escritura ya movida,
+   * mantener esa lectura habría significado guardar en un sitio y mirar en
+   * otro, y el síntoma habría sido «guardo y no aparece».
+   */
   const pullFromGoogle = async () => {
     // A6-F3 · Guarda estructural del modo demostración.
     if (origenDatosRef.current === 'DEMO') return;
-    const token = await requestGoogleNativeToken();
-    if (!token) return;
 
-    let sheetId = databaseSpreadsheetId;
-    if (!sheetId) {
-      // Buscar en appdata
-      const configId = await findConfigInAppData(token);
-      if (configId) {
-        const remoteConfig = await readConfigFromAppData(token, configId);
-        if (remoteConfig && remoteConfig.databaseSpreadsheetId) {
-          sheetId = remoteConfig.databaseSpreadsheetId;
-          setDatabaseSpreadsheetId(sheetId);
-          setDatabaseSpreadsheetUrl(remoteConfig.databaseSpreadsheetUrl);
-          setAppDataFileId(configId);
-          if (remoteConfig.permissionRefs && remoteConfig.permissionRefs.sharedReports) {
-            setSharedReports(remoteConfig.permissionRefs.sharedReports);
-          }
-        }
-      }
-    }
-
-    if (!sheetId) {
-      setOpSyncStatus('error');
-      setOpSyncError('No existe una base operacional configurada.');
-      alert('No se encontró ninguna base operacional de Google. Créala primero en Configuración.');
-      return;
-    }
-
-    await pullFromGoogleInternal(token, sheetId);
-  };
-
-  const pushToGoogleInternal = async (token: string, sheetId: string) => {
     setOpSyncStatus('syncing');
     try {
-      const email = user?.email || 'titular@correo.com';
-      const uid = user?.googleId || user?.id || 'unknown';
+      const repo = await getDataRepository();
+      const datos = await repo.loadAll({
+        uid: user?.googleId ?? user?.id ?? '',
+        email: user?.email ?? '',
+        familyId: null,
+      });
 
-      // 1. Estructura de Snapshot
-      const operationalStateSnapshot = {
-        Config: [
-          { Key: 'ownerEmail', Value: email, Description: 'Dueño de la base', updatedAt: new Date().toISOString() },
-          { Key: 'ownerGoogleId', Value: uid, Description: 'Google ID del dueño', updatedAt: new Date().toISOString() },
-          { Key: 'familyGroupId', Value: 'family-001', Description: 'ID de familia', updatedAt: new Date().toISOString() }
-        ],
-        Usuarios: [
-          { id: user?.id || 'user-01', googleId: uid, displayName: user?.displayName || 'Titular', email: email, photoUrl: user?.photoUrl || '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-        ],
-        Familias: [
-          { id: 'family-001', ownerId: user?.id || 'user-01', name: 'Grupo Familiar', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-        ],
-        Miembros: membersRef.current.map(m => ({
-          ...m,
-          ownerEmail: m.ownerEmail || email,
-          ownerGoogleId: m.ownerGoogleId || uid,
-          sourceDeviceId: m.sourceDeviceId || deviceId,
-          createdAt: m.createdAt || new Date().toISOString(),
-          updatedAt: m.updatedAt || new Date().toISOString(),
-          deletedAt: m.deletedAt || null
-        })),
-        Permisos: membersRef.current.map(m => ({
-          memberId: m.id,
-          canManageOwnProfile: m.permissions?.canManageOwnProfile ?? true,
-          canManageOwnAppointments: m.permissions?.canManageOwnAppointments ?? true,
-          canManageOwnDocuments: m.permissions?.canManageOwnDocuments ?? true,
-          canViewOwnHistory: m.permissions?.canViewOwnHistory ?? true,
-          canUploadDocuments: m.permissions?.canUploadDocuments ?? true,
-          canExportOwnData: m.permissions?.canExportOwnData ?? false,
-          canViewFamilyData: m.permissions?.canViewFamilyData ?? false,
-          canManageFamilyData: m.permissions?.canManageFamilyData ?? false,
-          ownerEmail: m.ownerEmail || email,
-          ownerGoogleId: m.ownerGoogleId || uid,
-          sourceDeviceId: m.sourceDeviceId || deviceId,
-          createdAt: m.createdAt || new Date().toISOString(),
-          updatedAt: m.updatedAt || new Date().toISOString(),
-          deletedAt: m.deletedAt || null
-        })),
-        FichasMedicas: Object.values(healthProfilesRef.current).map(hp => ({
-          ...hp,
-          ownerEmail: hp.ownerEmail || email,
-          ownerGoogleId: hp.ownerGoogleId || uid,
-          sourceDeviceId: hp.sourceDeviceId || deviceId,
-          createdAt: hp.createdAt || new Date().toISOString(),
-          updatedAt: hp.updatedAt || new Date().toISOString(),
-          deletedAt: hp.deletedAt || null
-        })),
-        Citas: appointmentsRef.current.map(a => {
-          let date = '';
-          let time = '';
-          if (a.scheduledAt && a.scheduledAt.includes('T')) {
-            [date, time] = a.scheduledAt.split('T');
-          } else if (a.scheduledAt) {
-            date = a.scheduledAt;
-          }
-          return {
-            ...a,
-            doctor: a.doctor || a.doctorName,
-            date,
-            time,
-            ownerEmail: a.ownerEmail || email,
-            ownerGoogleId: a.ownerGoogleId || uid,
-            sourceDeviceId: a.sourceDeviceId || deviceId,
-            createdAt: a.createdAt || new Date().toISOString(),
-            updatedAt: a.updatedAt || new Date().toISOString(),
-            deletedAt: a.deletedAt || null
-          };
-        }),
-        Controles: checkupsRef.current.map(c => ({
-          ...c,
-          ownerEmail: c.ownerEmail || email,
-          ownerGoogleId: c.ownerGoogleId || uid,
-          sourceDeviceId: c.sourceDeviceId || deviceId,
-          createdAt: c.createdAt || new Date().toISOString(),
-          updatedAt: c.updatedAt || new Date().toISOString(),
-          deletedAt: c.deletedAt || null
-        })),
-        Vacunas: vaccinesRef.current.map(v => ({
-          ...v,
-          ownerEmail: v.ownerEmail || email,
-          ownerGoogleId: v.ownerGoogleId || uid,
-          sourceDeviceId: v.sourceDeviceId || deviceId,
-          createdAt: v.createdAt || new Date().toISOString(),
-          updatedAt: v.updatedAt || new Date().toISOString(),
-          deletedAt: v.deletedAt || null
-        })),
-        Examenes: examsRef.current.map(e => ({
-          ...e,
-          ownerEmail: e.ownerEmail || email,
-          ownerGoogleId: e.ownerGoogleId || uid,
-          sourceDeviceId: e.sourceDeviceId || deviceId,
-          createdAt: e.createdAt || new Date().toISOString(),
-          updatedAt: e.updatedAt || new Date().toISOString(),
-          deletedAt: e.deletedAt || null
-        })),
-        Documentos: documentsRef.current.map(d => ({
-          ...d,
-          ownerEmail: d.ownerEmail || email,
-          ownerGoogleId: d.ownerGoogleId || uid,
-          sourceDeviceId: d.sourceDeviceId || deviceId,
-          createdAt: d.createdAt || new Date().toISOString(),
-          updatedAt: d.updatedAt || new Date().toISOString(),
-          deletedAt: d.deletedAt || null
-        })),
-        HistorialClinico: historyRef.current.map(h => ({
-          ...h,
-          ownerEmail: h.ownerEmail || email,
-          ownerGoogleId: h.ownerGoogleId || uid,
-          sourceDeviceId: h.sourceDeviceId || deviceId,
-          createdAt: h.createdAt || new Date().toISOString(),
-          updatedAt: h.updatedAt || new Date().toISOString(),
-          deletedAt: h.deletedAt || null
-        })),
-        Auditoria: historyRef.current.filter(h => h.title.includes('Miembro') || h.title.includes('Borrado') || h.title.includes('Permisos') || h.title.includes('Cita')).map(h => ({
-          id: h.id,
-          timestamp: h.createdAt || new Date().toISOString(),
-          userId: uid,
-          userEmail: email,
-          action: h.title,
-          details: h.description || '',
-          deviceId: deviceId || 'unknown',
-          createdAt: h.createdAt || new Date().toISOString()
-        })),
-        Retencion: [],
-        SyncLog: historyRef.current.filter(h => h.title.includes('sincronización') || h.title.includes('Conflicto')).map(h => ({
-          id: h.id,
-          timestamp: h.createdAt || new Date().toISOString(),
-          deviceId: deviceId || 'unknown',
-          actorEmail: email,
-          tableName: 'history',
-          entityId: h.id,
-          actionType: 'SYNC',
-          fieldName: 'syncStatus',
-          localValue: h.title,
-          remoteValue: h.description,
-          resolution: 'LWW',
-          createdAt: h.createdAt || new Date().toISOString()
-        })),
-        FuentesCorreoCitas: emailSourcesRef.current.map(s => ({
-          ...s,
-          createdAt: s.createdAt || new Date().toISOString(),
-          updatedAt: s.updatedAt || new Date().toISOString()
-        })),
-        CandidatosCorreoCitas: appointmentCandidatesRef.current.map(c => ({
-          ...c,
-          createdAt: c.createdAt || new Date().toISOString(),
-          updatedAt: c.updatedAt || new Date().toISOString()
-        })),
-        OrdenesMedicas: medicalOrdersRef.current.map(o => ({
-          ...o,
-          ownerEmail: o.ownerEmail || email,
-          ownerGoogleId: o.ownerGoogleId || uid,
-          sourceDeviceId: o.sourceDeviceId || deviceId,
-          createdAt: o.createdAt || new Date().toISOString(),
-          updatedAt: o.updatedAt || new Date().toISOString(),
-          deletedAt: o.deletedAt || null
-        })),
-        Medicamentos: medicationPrescriptionsRef.current.map(m => ({
-          ...m,
-          ownerEmail: m.ownerEmail || email,
-          ownerGoogleId: m.ownerGoogleId || uid,
-          sourceDeviceId: m.sourceDeviceId || deviceId,
-          createdAt: m.createdAt || new Date().toISOString(),
-          updatedAt: m.updatedAt || new Date().toISOString(),
-          deletedAt: m.deletedAt || null
-        })),
-        TomasMedicamentos: medicationDoseRemindersRef.current.map(t => ({
-          ...t,
-          ownerEmail: t.ownerEmail || email,
-          ownerGoogleId: t.ownerGoogleId || uid,
-          sourceDeviceId: t.sourceDeviceId || deviceId,
-          createdAt: t.createdAt || new Date().toISOString(),
-          updatedAt: t.updatedAt || new Date().toISOString(),
-          deletedAt: t.deletedAt || null
-        }))
-      };
-
-      await writeAllOperationalTables(token, sheetId, operationalStateSnapshot);
-
-      // Validación post-push de citas
-      try {
-        const verifyState = await readAllOperationalTables(token, sheetId);
-        const verifyCitas: MedicalAppointment[] = verifyState.Citas ? verifyState.Citas.map(sanitizeRemoteAppointment) : [];
-        const localActiveAppts = appointmentsRef.current.filter(a => !a.deletedAt);
-        for (const localAppt of localActiveAppts) {
-          const found = verifyCitas.some(r => r.id === localAppt.id);
-          if (!found) {
-            throw new Error(`La cita con ID ${localAppt.id} (${localAppt.doctorName}) no fue escrita en Google Sheets.`);
-          }
-        }
-      } catch (verifyErr: any) {
-        console.error('Fallo en la validación post-push de citas:', verifyErr);
-        throw new Error(`Validación post-push fallida: ${verifyErr.message || 'La cita no fue escrita en Google Sheets.'}`);
-      }
-
-      // Actualizar estados locales a synced
-      const updateSyncStatus = <T extends { syncStatus?: any; lastSyncedAt?: string | null }>(arr: T[]): T[] => {
-        return arr.map(item => ({
-          ...item,
-          syncStatus: 'SYNCED' as const,
-          lastSyncedAt: new Date().toISOString()
-        }));
-      };
-
-      setMembers(prev => updateSyncStatus(prev));
-      setAppointments(prev => updateSyncStatus(prev));
-      setCheckups(prev => updateSyncStatus(prev));
-      setVaccines(prev => updateSyncStatus(prev));
-      setExams(prev => updateSyncStatus(prev));
-      setDocuments(prev => updateSyncStatus(prev));
-      setMedicalOrders(prev => updateSyncStatus(prev));
-      setMedicationPrescriptions(prev => updateSyncStatus(prev));
-      setMedicationDoseReminders(prev => updateSyncStatus(prev));
-
-      setLastPushAt(new Date().toISOString());
+      aplicarDatosRemotos(datos);
+      setLastPullAt(new Date().toISOString());
       setLastSyncAt(new Date().toISOString());
       setOpSyncStatus('synced');
-    } catch (err: any) {
-      console.error('Error subiendo datos a Google Sheets:', err);
+    } catch (err: unknown) {
+      const codigo = (err as { codigo?: string } | null)?.codigo ?? '';
+      console.error('[AppContext] no se pudo releer el expediente:', err);
       setOpSyncStatus('error');
-      setOpSyncError(err.message || 'Error al subir datos remotos.');
+      setOpSyncError(
+        codigo === 'SIN_BACKEND'
+          ? 'Este navegador todavía no tiene registrada la hoja de la familia.'
+          : codigo === 'SIN_IDENTIDAD'
+            ? 'La sesión caducó. Vuelve a entrar.'
+            : 'No se pudo descargar el expediente.',
+      );
       throw err;
     }
   };
 
-  const pushToGoogle = async () => {
-    // A6-F3 · Guarda estructural del modo demostración.
-    if (origenDatosRef.current === 'DEMO') return;
-    const token = await requestGoogleNativeToken();
-    if (!token) return;
+  /*
+   * G4b · aquí vivía `pushToGoogleInternal`.
+   *
+   * Reescribía **las 20 pestañas operativas enteras** en cada sincronización,
+   * con `writeAllOperationalTables`. Era el punto que el antiguo Bloque H venía
+   * a eliminar, y era incompatible con lo que construyó E6: `aplicar()` recibe
+   * mutaciones concretas, valida cada una contra el rol de quien la pide y
+   * escribe **solo esas filas**.
+   *
+   * Lo sustituye `persistirPorMutacion`, que manda una mutación por cambio en
+   * el momento en que ocurre.
+   */
 
-    if (!databaseSpreadsheetId) {
-      setOpSyncStatus('error');
-      setOpSyncError('No existe una base operacional configurada.');
-      alert('No se encontró base operacional para subir cambios.');
-      return;
-    }
-
-    // Pull obligatorio antes de push
-    const now = Date.now();
-    const lastPullTime = lastPullAt ? new Date(lastPullAt).getTime() : 0;
-    const isStale = (now - lastPullTime) > MUST_PULL_BEFORE_PUSH_MS;
-
-    if (!lastPullAt || isStale) {
-      // Sincronización automática previa al push por falta de pull reciente
-      await syncNow();
-      return;
-    }
-
-    // Regla: No hacer push si local está vacío y no se ha hecho pull en esta sesión (o nunca)
-    if (!lastPullAt && members.length === 0) {
-      const aceptado = await confirmar({
-        titulo: 'Sincronizar antes de subir',
-        descripcion: 'Este dispositivo aún no ha descargado nada desde Google. Para no sobrescribir lo que ya hay allí, primero se hará una sincronización completa.',
-        etiquetaConfirmar: 'Sincronizar primero',
-        tono: 'primario',
-      });
-      if (aceptado) {
-        await syncNow();
-        return;
-      }
-      return;
-    }
-
-    await pushToGoogleInternal(token, databaseSpreadsheetId);
+  /** Trae lo nuevo y baja el aviso de cambios remotos. */
+  const recargarExpediente = async () => {
+    await pullFromGoogle();
+    setHayCambiosRemotos(false);
   };
 
+  /**
+   * Volver a mirar la hoja.
+   *
+   * Antes esto empujaba los cambios locales; ahora no hay cambios locales que
+   * empujar, porque cada uno se escribe solo en el momento en que ocurre. Lo
+   * único que tiene sentido pedir a mano es **releer**.
+   */
   const syncNow = async () => {
-    // A6-F3 · Guarda estructural del modo demostración.
-    if (origenDatosRef.current === 'DEMO') return;
-    const token = await requestGoogleNativeToken();
-    if (!token) return;
-
-    let sheetId = databaseSpreadsheetId;
-    if (!sheetId) {
-      // Buscar en appdata
-      const configId = await findConfigInAppData(token);
-      if (configId) {
-        const remoteConfig = await readConfigFromAppData(token, configId);
-        if (remoteConfig && remoteConfig.databaseSpreadsheetId) {
-          sheetId = remoteConfig.databaseSpreadsheetId;
-          setDatabaseSpreadsheetId(sheetId);
-          setDatabaseSpreadsheetUrl(remoteConfig.databaseSpreadsheetUrl);
-          setAppDataFileId(configId);
-          if (remoteConfig.permissionRefs?.sharedReports) {
-            setSharedReports(remoteConfig.permissionRefs.sharedReports);
-          }
-        }
-      }
-    }
-
-    if (!sheetId) {
-      setOpSyncStatus('error');
-      setOpSyncError('No existe una base operacional configurada.');
-      alert('No se encontró base operacional para sincronizar. Créala primero en Configuración.');
-      return;
-    }
-
-    try {
-      setOpSyncStatus('syncing');
-      
-      // FASE 1: Pull — Leer el estado remoto y obtener el estado fusionado
-      const remoteState = await readAllOperationalTables(token, sheetId);
-
-      // Sanitizar las citas remotas
-      const remoteCitasSanitized = remoteState.Citas ? remoteState.Citas.map(sanitizeRemoteAppointment) : [];
-
-      // Función de merge LWW reutilizable
-      const mergeEntitiesSync = <T extends { id: string; updatedAt?: string; deletedAt?: string | null; syncStatus?: any }>(
-        localArray: T[],
-        remoteArray: T[],
-        tableName: string
-      ): T[] => {
-        const merged: T[] = [...localArray];
-        remoteArray.forEach(remoteItem => {
-          const localIdx = merged.findIndex(l => l.id === remoteItem.id);
-          if (localIdx >= 0) {
-            const localItem = merged[localIdx];
-            if (tableName === 'Miembros') {
-              // Fusionar miembros de forma segura usando el helper mergeMemberSafely
-              const localM = localItem as unknown as FamilyMember;
-              const remoteM = remoteItem as unknown as FamilyMember;
-              merged[localIdx] = mergeMemberSafely(localM, remoteM) as unknown as T;
-            } else {
-              const localUpdate = localItem.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
-              const remoteUpdate = remoteItem.updatedAt ? new Date(remoteItem.updatedAt).getTime() : 0;
-              if (remoteUpdate > localUpdate) {
-                // Conflicto: Sobrescribir local si el remoto es más reciente
-                if (localItem.syncStatus === 'PENDING_SYNC') {
-                  const conflictLog: MedicalHistoryEvent = {
-                    id: `hist-conf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-                    memberId: (remoteItem as any).memberId || (localItem as any).memberId || 'family-owner',
-                    eventType: 'OTHER',
-                    title: 'Conflicto de sincronización resuelto',
-                    description: `Conflicto en tabla ${tableName} para ID: ${remoteItem.id} resuelto aplicando versión remota más reciente (LWW).`,
-                    eventDate: new Date().toISOString().split('T')[0],
-                    createdAt: new Date().toISOString()
-                  };
-                  setTimeout(() => setHistory(h => [conflictLog, ...h]), 50);
-                }
-                merged[localIdx] = { ...remoteItem, syncStatus: 'SYNCED' } as T;
-              } else {
-                // El local es igual o más reciente
-                merged[localIdx] = { ...localItem };
-              }
-            }
-          } else {
-            // No existe localmente, agregar
-            const isDeleted = remoteItem.deletedAt || (remoteItem as any).status === 'DELETED';
-            if (!isDeleted) {
-              merged.push({ ...remoteItem, syncStatus: 'SYNCED' });
-            }
-          }
-        });
-
-        // Si se borró en Sheets manualmente, quitar del estado local aquellos items que estaban sincronizados
-        return merged.filter(localItem => {
-          if (localItem.syncStatus === 'LOCAL_ONLY' || localItem.syncStatus === 'PENDING_SYNC') {
-            return true;
-          }
-          if (localItem.deletedAt || (localItem as any).status === 'DELETED') {
-            return true;
-          }
-          const existsInRemote = remoteArray.some(r => r.id === localItem.id);
-          return existsInRemote;
-        });
-      };
-
-      // Obtener estados actuales de las referencias (Refs) para evitar stale closures
-      const currentMembers = membersRef.current;
-      const currentAppointments = appointmentsRef.current;
-      const currentCheckups = checkupsRef.current;
-      const currentVaccines = vaccinesRef.current;
-      const currentExams = examsRef.current;
-      const currentDocuments = documentsRef.current;
-      const currentHistory = historyRef.current;
-      const currentHealthProfiles = healthProfilesRef.current;
-      const currentSources = emailSourcesRef.current;
-      const currentCandidates = appointmentCandidatesRef.current;
-      const currentOrders = medicalOrdersRef.current;
-      const currentPrescriptions = medicationPrescriptionsRef.current;
-      const currentDoseReminders = medicationDoseRemindersRef.current;
-
-      const mergedMembers = remoteState.Miembros ? mergeEntitiesSync(currentMembers, remoteState.Miembros, 'Miembros') : currentMembers;
-      const mergedAppointments = remoteState.Citas ? mergeEntitiesSync(currentAppointments, remoteCitasSanitized, 'Citas') : currentAppointments;
-      const mergedCheckups = remoteState.Controles ? mergeEntitiesSync(currentCheckups, remoteState.Controles, 'Controles') : currentCheckups;
-      const mergedVaccines = remoteState.Vacunas ? mergeEntitiesSync(currentVaccines, remoteState.Vacunas, 'Vacunas') : currentVaccines;
-      const mergedExams = remoteState.Examenes ? mergeEntitiesSync(currentExams, remoteState.Examenes, 'Exámenes') : currentExams;
-      const mergedDocuments = remoteState.Documentos ? mergeEntitiesSync(currentDocuments, remoteState.Documentos, 'Documentos') : currentDocuments;
-      const mergedHistory = remoteState.HistorialClinico ? mergeEntitiesSync(currentHistory, remoteState.HistorialClinico, 'Historial') : currentHistory;
-      const mergedSources = remoteState.FuentesCorreoCitas ? mergeEntitiesSync(currentSources, remoteState.FuentesCorreoCitas, 'FuentesCorreoCitas') : currentSources;
-      const mergedCandidates = remoteState.CandidatosCorreoCitas ? mergeEntitiesSync(currentCandidates, remoteState.CandidatosCorreoCitas, 'CandidatosCorreoCitas') : currentCandidates;
-      const mergedOrders = remoteState.OrdenesMedicas ? mergeEntitiesSync(currentOrders, remoteState.OrdenesMedicas, 'OrdenesMedicas') : currentOrders;
-      const mergedPrescriptions = remoteState.Medicamentos ? mergeEntitiesSync(currentPrescriptions, remoteState.Medicamentos, 'Medicamentos') : currentPrescriptions;
-      const mergedDoseReminders = remoteState.TomasMedicamentos ? mergeEntitiesSync(currentDoseReminders, remoteState.TomasMedicamentos, 'TomasMedicamentos') : currentDoseReminders;
-
-      // Merge health profiles (Record<string, HealthProfile>)
-      const mergedProfiles = { ...currentHealthProfiles };
-      if (remoteState.FichasMedicas) {
-        remoteState.FichasMedicas.forEach((remoteProf: any) => {
-          const localProf = mergedProfiles[remoteProf.memberId];
-          const localUpdate = localProf?.updatedAt ? new Date(localProf.updatedAt).getTime() : 0;
-          const remoteUpdate = remoteProf.updatedAt ? new Date(remoteProf.updatedAt).getTime() : 0;
-          if (!localProf || remoteUpdate > localUpdate) {
-            mergedProfiles[remoteProf.memberId] = { ...remoteProf, syncStatus: 'SYNCED' };
-          }
-        });
-      }
-
-      // Actualizar React state con el resultado fusionado
-      setMembers(mergedMembers);
-      setAppointments(mergedAppointments);
-      setCheckups(mergedCheckups);
-      setVaccines(mergedVaccines);
-      setExams(mergedExams);
-      setDocuments(mergedDocuments);
-      setHistory(mergedHistory);
-      setHealthProfiles(mergedProfiles);
-      setEmailSources(mergedSources);
-      setAppointmentCandidates(mergedCandidates);
-      setMedicalOrders(mergedOrders);
-      setMedicationPrescriptions(mergedPrescriptions);
-      setMedicationDoseReminders(mergedDoseReminders);
-      setLastPullAt(new Date().toISOString());
-
-      // FASE 2: Push — Usar el estado fusionado calculado
-      const email = user?.email || 'titular@correo.com';
-      const uid = user?.googleId || user?.id || 'unknown';
-
-      const operationalStateSnapshot = {
-        Config: [
-          { Key: 'ownerEmail', Value: email, Description: 'Dueño de la base', updatedAt: new Date().toISOString() },
-          { Key: 'ownerGoogleId', Value: uid, Description: 'Google ID del dueño', updatedAt: new Date().toISOString() },
-          { Key: 'familyGroupId', Value: 'family-001', Description: 'ID de familia', updatedAt: new Date().toISOString() }
-        ],
-        Usuarios: [
-          { id: user?.id || 'user-01', googleId: uid, displayName: user?.displayName || 'Titular', email: email, photoUrl: user?.photoUrl || '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-        ],
-        Familias: [
-          { id: 'family-001', ownerId: user?.id || 'user-01', name: 'Grupo Familiar', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-        ],
-        Miembros: mergedMembers.map(m => ({
-          ...m,
-          ownerEmail: m.ownerEmail || email,
-          ownerGoogleId: m.ownerGoogleId || uid,
-          sourceDeviceId: m.sourceDeviceId || deviceId,
-          createdAt: m.createdAt || new Date().toISOString(),
-          updatedAt: m.updatedAt || new Date().toISOString(),
-          deletedAt: m.deletedAt || null
-        })),
-        Permisos: mergedMembers.map(m => ({
-          memberId: m.id,
-          canManageOwnProfile: m.permissions?.canManageOwnProfile ?? true,
-          canManageOwnAppointments: m.permissions?.canManageOwnAppointments ?? true,
-          canManageOwnDocuments: m.permissions?.canManageOwnDocuments ?? true,
-          canViewOwnHistory: m.permissions?.canViewOwnHistory ?? true,
-          canUploadDocuments: m.permissions?.canUploadDocuments ?? true,
-          canExportOwnData: m.permissions?.canExportOwnData ?? false,
-          canViewFamilyData: m.permissions?.canViewFamilyData ?? false,
-          canManageFamilyData: m.permissions?.canManageFamilyData ?? false,
-          ownerEmail: m.ownerEmail || email,
-          ownerGoogleId: m.ownerGoogleId || uid,
-          sourceDeviceId: m.sourceDeviceId || deviceId,
-          createdAt: m.createdAt || new Date().toISOString(),
-          updatedAt: m.updatedAt || new Date().toISOString(),
-          deletedAt: m.deletedAt || null
-        })),
-        FichasMedicas: Object.values(mergedProfiles).map(hp => ({
-          ...hp,
-          ownerEmail: (hp as any).ownerEmail || email,
-          ownerGoogleId: (hp as any).ownerGoogleId || uid,
-          sourceDeviceId: (hp as any).sourceDeviceId || deviceId,
-          createdAt: (hp as any).createdAt || new Date().toISOString(),
-          updatedAt: (hp as any).updatedAt || new Date().toISOString(),
-          deletedAt: (hp as any).deletedAt || null
-        })),
-        Citas: mergedAppointments.map(a => {
-          let date = '';
-          let time = '';
-          if (a.scheduledAt && a.scheduledAt.includes('T')) {
-            [date, time] = a.scheduledAt.split('T');
-          } else if (a.scheduledAt) {
-            date = a.scheduledAt;
-          }
-          return {
-            ...a,
-            doctor: a.doctor || a.doctorName,
-            date,
-            time,
-            ownerEmail: a.ownerEmail || email,
-            ownerGoogleId: a.ownerGoogleId || uid,
-            sourceDeviceId: a.sourceDeviceId || deviceId,
-            createdAt: a.createdAt || new Date().toISOString(),
-            updatedAt: a.updatedAt || new Date().toISOString(),
-            deletedAt: a.deletedAt || null
-          };
-        }),
-        Controles: mergedCheckups.map(c => ({
-          ...c,
-          ownerEmail: c.ownerEmail || email,
-          ownerGoogleId: c.ownerGoogleId || uid,
-          sourceDeviceId: c.sourceDeviceId || deviceId,
-          createdAt: c.createdAt || new Date().toISOString(),
-          updatedAt: c.updatedAt || new Date().toISOString(),
-          deletedAt: c.deletedAt || null
-        })),
-        Vacunas: mergedVaccines.map(v => ({
-          ...v,
-          ownerEmail: v.ownerEmail || email,
-          ownerGoogleId: v.ownerGoogleId || uid,
-          sourceDeviceId: v.sourceDeviceId || deviceId,
-          createdAt: v.createdAt || new Date().toISOString(),
-          updatedAt: v.updatedAt || new Date().toISOString(),
-          deletedAt: v.deletedAt || null
-        })),
-        Examenes: mergedExams.map(e => ({
-          ...e,
-          ownerEmail: e.ownerEmail || email,
-          ownerGoogleId: e.ownerGoogleId || uid,
-          sourceDeviceId: e.sourceDeviceId || deviceId,
-          createdAt: e.createdAt || new Date().toISOString(),
-          updatedAt: e.updatedAt || new Date().toISOString(),
-          deletedAt: e.deletedAt || null
-        })),
-        Documentos: mergedDocuments.map(d => ({
-          ...d,
-          ownerEmail: d.ownerEmail || email,
-          ownerGoogleId: d.ownerGoogleId || uid,
-          sourceDeviceId: d.sourceDeviceId || deviceId,
-          createdAt: d.createdAt || new Date().toISOString(),
-          updatedAt: d.updatedAt || new Date().toISOString(),
-          deletedAt: d.deletedAt || null
-        })),
-        HistorialClinico: mergedHistory.map(h => ({
-          ...h,
-          ownerEmail: h.ownerEmail || email,
-          ownerGoogleId: h.ownerGoogleId || uid,
-          sourceDeviceId: h.sourceDeviceId || deviceId,
-          createdAt: h.createdAt || new Date().toISOString(),
-          updatedAt: h.updatedAt || new Date().toISOString(),
-          deletedAt: h.deletedAt || null
-        })),
-        Auditoria: mergedHistory
-          .filter(h => h.title.includes('Miembro') || h.title.includes('Borrado') || h.title.includes('Permisos') || h.title.includes('Cita'))
-          .map(h => ({
-            id: h.id,
-            timestamp: h.createdAt || new Date().toISOString(),
-            userId: uid,
-            userEmail: email,
-            action: h.title,
-            details: h.description || '',
-            deviceId: deviceId || 'unknown',
-            createdAt: h.createdAt || new Date().toISOString()
-          })),
-        Retencion: [],
-        SyncLog: mergedHistory
-          .filter(h => h.title.includes('sincronización') || h.title.includes('Conflicto'))
-          .map(h => ({
-            id: h.id,
-            timestamp: h.createdAt || new Date().toISOString(),
-            deviceId: deviceId || 'unknown',
-            actorEmail: email,
-            tableName: 'history',
-            entityId: h.id,
-            actionType: 'SYNC',
-            fieldName: 'syncStatus',
-            localValue: h.title,
-            remoteValue: h.description,
-            resolution: 'LWW',
-            createdAt: h.createdAt || new Date().toISOString()
-          })),
-        FuentesCorreoCitas: mergedSources.map(s => ({
-          ...s,
-          createdAt: s.createdAt || new Date().toISOString(),
-          updatedAt: s.updatedAt || new Date().toISOString()
-        })),
-        CandidatosCorreoCitas: mergedCandidates.map(c => ({
-          ...c,
-          createdAt: c.createdAt || new Date().toISOString(),
-          updatedAt: c.updatedAt || new Date().toISOString()
-        })),
-        OrdenesMedicas: mergedOrders.map(o => ({
-          ...o,
-          ownerEmail: o.ownerEmail || email,
-          ownerGoogleId: o.ownerGoogleId || uid,
-          sourceDeviceId: o.sourceDeviceId || deviceId,
-          createdAt: o.createdAt || new Date().toISOString(),
-          updatedAt: o.updatedAt || new Date().toISOString(),
-          deletedAt: o.deletedAt || null
-        })),
-        Medicamentos: mergedPrescriptions.map(m => ({
-          ...m,
-          ownerEmail: m.ownerEmail || email,
-          ownerGoogleId: m.ownerGoogleId || uid,
-          sourceDeviceId: m.sourceDeviceId || deviceId,
-          createdAt: m.createdAt || new Date().toISOString(),
-          updatedAt: m.updatedAt || new Date().toISOString(),
-          deletedAt: m.deletedAt || null
-        })),
-        TomasMedicamentos: mergedDoseReminders.map(t => ({
-          ...t,
-          ownerEmail: t.ownerEmail || email,
-          ownerGoogleId: t.ownerGoogleId || uid,
-          sourceDeviceId: t.sourceDeviceId || deviceId,
-          createdAt: t.createdAt || new Date().toISOString(),
-          updatedAt: t.updatedAt || new Date().toISOString(),
-          deletedAt: t.deletedAt || null
-        }))
-      };
-
-      await writeAllOperationalTables(token, sheetId, operationalStateSnapshot);
-
-      // Validación post-push de citas
-      try {
-        const verifyState = await readAllOperationalTables(token, sheetId);
-        const verifyCitas: MedicalAppointment[] = verifyState.Citas ? verifyState.Citas.map(sanitizeRemoteAppointment) : [];
-        const localActiveAppts = mergedAppointments.filter(a => !a.deletedAt);
-        for (const localAppt of localActiveAppts) {
-          const found = verifyCitas.some(r => r.id === localAppt.id);
-          if (!found) {
-            throw new Error(`La cita con ID ${localAppt.id} (${localAppt.doctorName}) no fue escrita en Google Sheets.`);
-          }
-        }
-      } catch (verifyErr: any) {
-        console.error('Fallo en la validación post-push de citas:', verifyErr);
-        throw new Error(`Validación post-push fallida: ${verifyErr.message || 'La cita no fue escrita en Google Sheets.'}`);
-      }
-
-      // Marcar todos como SYNCED
-      const now = new Date().toISOString();
-      setMembers(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
-      setAppointments(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
-      setCheckups(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
-      setVaccines(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
-      setExams(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
-      setDocuments(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
-      setEmailSources(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
-      setAppointmentCandidates(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
-      setMedicalOrders(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
-      setMedicationPrescriptions(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
-      setMedicationDoseReminders(prev => prev.map(item => ({ ...item, syncStatus: 'SYNCED' as const, lastSyncedAt: now })));
-
-      setLastPushAt(now);
-      setLastSyncAt(now);
-      setOpSyncStatus('synced');
-    } catch (err: any) {
-      console.error('Error durante la sincronización total:', err);
-      setOpSyncStatus('error');
-      setOpSyncError(err.message || 'Error de sincronización.');
-    }
+    await pullFromGoogle();
   };
+
+  const pushToGoogle = async () => {
+    // Se conserva mientras la interfaz lo ofrezca en algún sitio. Releer es lo
+    // más parecido a lo que hacía, y no miente sobre lo que ocurre.
+    await pullFromGoogle();
+  };
+
 
   const repairGoogleNativeDatabase = async () => {
     const token = await requestGoogleNativeToken();
@@ -5956,7 +5283,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAppDataFileId(newConfigId);
 
       // 4. Forzar la escritura del estado local para reparar cualquier dato
-      await pushToGoogleInternal(token, sheetId);
       
       setOpSyncStatus('synced');
       setLastSyncAt(new Date().toISOString());
@@ -6045,7 +5371,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setSyncInitMessage('Hemos encontrado tu base de datos de Paté Salud en Google Drive. Descargando...');
           
           // Pull de los datos remotos existentes
-          await pullFromGoogleInternal(token, remoteSheetId);
+          await pullFromGoogle();
           
           setLastSyncAt(new Date().toISOString());
           setOpSyncStatus('synced');
@@ -6093,7 +5419,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAppDataFileId(newConfigId);
       
       // Guardar el estado local (incluyendo el admin/titular) en Google Sheets
-      await pushToGoogleInternal(token, sheetId);
       
       setLastSyncAt(new Date().toISOString());
       setOpSyncStatus('synced');
@@ -6259,7 +5584,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setHistory(prev => [shareEvent, ...prev]);
 
       // Sincronizar en lote a la base operacional Sheets en segundo plano
-      setTimeout(() => scheduleAutoSync('document_shared'), 100);
 
       avisar(`El documento «${doc.fileName}» se compartió correctamente.`);
     } catch (err: any) {
@@ -6336,7 +5660,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
       setHistory(prev => [revokeEvent, ...prev]);
 
-      setTimeout(() => scheduleAutoSync('document_share_revoked'), 100);
 
       avisar(`Se revocó el acceso de ${targetEmail} al documento.`);
     } catch (err: any) {
@@ -6711,8 +6034,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     // 3. Fusionar con mergeMemberSafely
-    // 4. Actualizar LocalStorage local (se gatilla reactivamente al llamar setMembers en pullFromGoogleInternal)
-    await pullFromGoogleInternal(token, sheetId);
+    // 4. El estado local se actualiza al releer el expediente.
+    await pullFromGoogle();
   };
 
   // ─── Session lock / inactivity ────────────────────────────────────────────────
@@ -6813,9 +6136,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (!guardado) throw new Error('sin_estado_demo');
         aplicarEstadoRestaurado(guardado);
       } else {
-        // La fuente de verdad es la hoja. Se relee entera: tras un bloqueo no
-        // se enseña un expediente de memoria que pudo quedarse a medias.
-        await pullFromGoogle();
+        /*
+         * La fuente de verdad es la hoja, y tras un bloqueo se relee entera.
+         *
+         * PERO NO SE DEJA A NADIE FUERA POR UN FALLO DE RED
+         * ─────────────────────────────────────────────────
+         * Si el backend no responde, lo que hay en memoria **no es un
+         * expediente a medias**: es exactamente el mismo que había antes de
+         * bloquear, completo y coherente. Negar el desbloqueo por no poder
+         * refrescarlo dejaría a alguien sin acceso a sus propios datos en un
+         * ascensor.
+         *
+         * Se distingue: un fallo pasajero deja pasar con la copia que ya
+         * estaba; un rechazo del router —acceso revocado— no, y ahí sí sigue
+         * bloqueado.
+         */
+        try {
+          await pullFromGoogle();
+        } catch (err: unknown) {
+          const reintentable =
+            (err as { reintentable?: boolean } | null)?.reintentable === true ||
+            (err as { codigo?: string } | null)?.codigo === 'SIN_BACKEND' ||
+            (err as { codigo?: string } | null)?.codigo === 'SIN_IDENTIDAD';
+          if (!reintentable) throw err;
+
+          console.warn('[AppContext] se desbloquea con la copia local: no se pudo refrescar');
+        }
       }
     } catch (err) {
       console.error('[AppContext] No se pudo restaurar la sesión tras el bloqueo:', err);
@@ -7225,6 +6571,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       validateDataIntegrity,
       importBackupJSON,
       sincronizacionManual: SINCRONIZACION_MANUAL,
+      hayCambiosRemotos,
+      recargarExpediente,
       pendingInvitations,
       invitations,
       createInvitation,

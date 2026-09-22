@@ -17,7 +17,7 @@ hecho y qué falta.*
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
 | **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10/E10-bis** llevan el esquema a v3 |
-| **G** | Corte seco de Firebase | **en curso** · G1, G0, G2, G3 y G4a cerrados · **Firebase ya no está** · siguiente, G4b |
+| **G** | Corte seco de Firebase | **cerrado** · Firebase fuera y cada cambio se escribe solo · queda G5, apagar el proyecto |
 | **H** | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
 
 El Bloque D cierra con cuatro pasos y una fase de convención:
@@ -119,8 +119,8 @@ cada módulo. Las que más condicionan lo que venga:
 | Las **tareas genéricas** (`FollowUpTask`) dejarán de guardarse al girar la bandera de G: `SEGUIMIENTOS` es otra cosa y no tienen pestaña | `descriptores.ts` · `SIN_PESTANA` |
 | Las 4 escrituras de E11 siguen sin pestaña: **lanzan** un error explícito en vez de callar | `G0-REPOSITORIO.md` |
 | Qué hacer cuando la revisión cambia —recargar, avisar o recargar lo que no está en edición— sigue **sin decidir**: `alCambiar` es una llamada de vuelta | `G2-SINCRONIZACION.md` |
-| El sondeo de G2 sigue **sin instanciar**: lo enciende G4b | `sondeoRevision.ts` |
-| `persistirPorMutacion` tiene 28 llamadas y hoy no escribe: la condición se apaga en un sitio, `SINCRONIZACION_MANUAL` | `G4-EL-CORTE.md` |
+| Tres utilidades de Ajustes reparan la hoja **vieja** por la API de Sheets: ya no es la fuente de verdad | `G4-EL-CORTE.md` |
+| Las cuarenta condiciones de interfaz sobre `sincronizacionManual` sobran: es una limpieza de pantallas | `G4-EL-CORTE.md` |
 | Sin `databases()` en el navegador, la caché de Firestore **no se puede localizar** para borrarla | `purgaFirestore.ts` |
 | GIS **no renueva el `id_token` en silencio**: la ventana de 50 min es un intento, no una garantía | `G3-IDENTIDAD.md` |
 | `auto_select` tras un F5, la renovación a los 50 min y el rechazo de la cuenta equivocada **solo se pueden ver en vivo** | `G3-IDENTIDAD.md` |
@@ -165,13 +165,17 @@ pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
 
 ## Siguiente paso
 
-**G4b**, que es el antiguo Bloque H: que el repositorio escriba de verdad y que
-el empuje por lotes se vaya. Incluye encender el sondeo de G2 y el renombre
-`deleteX` → `darDeBajaX` ([G4-EL-CORTE.md](G4-EL-CORTE.md)).
+**La comprobación en vivo de G4b**, que es la que de verdad cierra el bloque:
+guardar una cita o un medicamento y mirar la pestaña. Tiene que aparecer **una
+fila nueva al final**, y las que había no pueden haberse movido.
 
-Firebase ya no está en la aplicación: ni Auth, ni Firestore, ni las reglas, ni
-el SDK, ni la bandera. Lo único que queda es la purga de la caché que dejó en
-los navegadores, y esa tiene que quedarse una temporada.
+Después, **G5**: apagar el proyecto de Firebase desde su consola. Ese paso no lo
+hago yo —toca Google Cloud— y queda escrito con sus comprobaciones.
+
+Y una limpieza que no es de backend: retirar la integración directa con Sheets
+—la hoja que la PWA crea en el alta, el alta misma y el ámbito `spreadsheets`
+de OAuth—, porque tres utilidades de Ajustes siguen reparando una hoja que ya
+nadie lee.
 
 El plan completo, con los seis pasos y sus puertas, está en
 [PLAN_BLOQUE_G.md](PLAN_BLOQUE_G.md).

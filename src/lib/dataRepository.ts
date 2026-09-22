@@ -168,28 +168,40 @@ export interface DataRepository {
    */
   watchAll(ctx: RepositoryContext, callback: (update: DataUpdate) => void): () => void;
 
+  /**
+   * `darDeBajaX`, y no `deleteX` (G4b).
+   *
+   * **Nada se borra.** La baja escribe `borrado_en` y la fila se queda: es una
+   * de las decisiones que sostienen el proyecto, y en las reglas de Firestore
+   * era `allow delete: if false`.
+   *
+   * El nombre viejo decía lo contrario de lo que pasa, y un contrato que
+   * miente sobre lo que hace es el sitio donde alguien escribe un borrado de
+   * verdad creyendo que ya lo era.
+   */
+
   // ── Members ───────────────────────────────────────────────────────────────
   saveMember(ctx: RepositoryContext, member: FamilyMember): Promise<void>;
-  deleteMember(ctx: RepositoryContext, memberId: string): Promise<void>;
+  darDeBajaMember(ctx: RepositoryContext, memberId: string): Promise<void>;
 
   // ── Health Profiles ───────────────────────────────────────────────────────
   saveHealthProfile(ctx: RepositoryContext, memberId: string, profile: HealthProfile): Promise<void>;
 
   // ── Appointments ──────────────────────────────────────────────────────────
   saveAppointment(ctx: RepositoryContext, appt: MedicalAppointment): Promise<void>;
-  deleteAppointment(ctx: RepositoryContext, apptId: string): Promise<void>;
+  darDeBajaAppointment(ctx: RepositoryContext, apptId: string): Promise<void>;
 
   // ── Checkups ──────────────────────────────────────────────────────────────
   saveCheckup(ctx: RepositoryContext, checkup: PeriodicCheckup): Promise<void>;
-  deleteCheckup(ctx: RepositoryContext, checkupId: string): Promise<void>;
+  darDeBajaCheckup(ctx: RepositoryContext, checkupId: string): Promise<void>;
 
   // ── Vaccines ──────────────────────────────────────────────────────────────
   saveVaccine(ctx: RepositoryContext, vaccine: VaccineRecord): Promise<void>;
-  deleteVaccine(ctx: RepositoryContext, vaccineId: string): Promise<void>;
+  darDeBajaVaccine(ctx: RepositoryContext, vaccineId: string): Promise<void>;
 
   // ── Exams ─────────────────────────────────────────────────────────────────
   saveExam(ctx: RepositoryContext, exam: MedicalExam): Promise<void>;
-  deleteExam(ctx: RepositoryContext, examId: string): Promise<void>;
+  darDeBajaExam(ctx: RepositoryContext, examId: string): Promise<void>;
   /**
    * `memberId` es opcional por compatibilidad y **hace falta** contra el
    * backend del titular: `EXAMENES_RESULTADOS` no tiene columna de paciente y
@@ -205,7 +217,7 @@ export interface DataRepository {
 
   // ── Documents ─────────────────────────────────────────────────────────────
   saveDocument(ctx: RepositoryContext, doc: ClinicalDocument): Promise<void>;
-  deleteDocument(ctx: RepositoryContext, docId: string): Promise<void>;
+  darDeBajaDocument(ctx: RepositoryContext, docId: string): Promise<void>;
 
   // ── History ───────────────────────────────────────────────────────────────
   saveHistoryEvent(ctx: RepositoryContext, event: MedicalHistoryEvent): Promise<void>;
@@ -218,19 +230,19 @@ export interface DataRepository {
 
   // ── Medical Orders ────────────────────────────────────────────────────────
   saveMedicalOrder(ctx: RepositoryContext, order: MedicalOrder): Promise<void>;
-  deleteMedicalOrder(ctx: RepositoryContext, orderId: string): Promise<void>;
+  darDeBajaMedicalOrder(ctx: RepositoryContext, orderId: string): Promise<void>;
 
   // ── Medications ───────────────────────────────────────────────────────────
   saveMedication(ctx: RepositoryContext, prescription: MedicationPrescription): Promise<void>;
-  deleteMedication(ctx: RepositoryContext, prescriptionId: string): Promise<void>;
+  darDeBajaMedication(ctx: RepositoryContext, prescriptionId: string): Promise<void>;
 
   // ── Dose Reminders ────────────────────────────────────────────────────────
   saveDoseReminder(ctx: RepositoryContext, reminder: MedicationDoseReminder): Promise<void>;
-  deleteDoseReminder(ctx: RepositoryContext, reminderId: string): Promise<void>;
+  darDeBajaDoseReminder(ctx: RepositoryContext, reminderId: string): Promise<void>;
 
   // ── Gmail Sources ─────────────────────────────────────────────────────────
   saveGmailSource(ctx: RepositoryContext, source: AppointmentEmailSource): Promise<void>;
-  deleteGmailSource(ctx: RepositoryContext, sourceId: string): Promise<void>;
+  darDeBajaGmailSource(ctx: RepositoryContext, sourceId: string): Promise<void>;
 
   // ── Appointment Candidates ────────────────────────────────────────────────
   saveAppointmentCandidate(ctx: RepositoryContext, candidate: ImportedEmailAppointmentCandidate): Promise<void>;
