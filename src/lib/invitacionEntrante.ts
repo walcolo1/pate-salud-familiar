@@ -24,6 +24,9 @@
  * `id_token`, ni el identificador de la hoja, ni el token de invitación.**
  */
 
+// **Antes que `zod`**, y el orden importa: apaga el tanteo de `new Function`
+// que dispara una violación de CSP aunque zod lo capture. Ver `zodSinEval.ts`.
+import './zodSinEval';
 import { z } from 'zod';
 import { esTokenBienFormado } from './invitaciones';
 

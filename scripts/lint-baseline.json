@@ -1,7 +1,7 @@
 {
   "src/app/appointments/import/page.tsx": 3,
   "src/app/dashboard/page.tsx": 6,
-  "src/app/login/page.tsx": 5,
+  "src/app/login/page.tsx": 1,
   "src/app/members/[id]/appts/page.tsx": 3,
   "src/app/members/[id]/checkups/page.tsx": 1,
   "src/app/members/[id]/edit/page.tsx": 6,

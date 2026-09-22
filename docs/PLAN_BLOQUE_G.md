@@ -159,10 +159,16 @@ Lo pactado, con dos cosas que hay que medir antes de fijar el intervalo:
 **Puertas:** pruebas con reloj y visibilidad simulados —que en segundo plano no
 sale ni una petición— y la medida de cuota, clasificada como real.
 
-### G3 · Salir de Firebase Auth — G3a ✅, G3b pendiente
+### G3 · Salir de Firebase Auth ✅
 
-**G3a, el 21 de septiembre de 2026:** la sesión con su ventana de 50 minutos y
-el reintento del repositorio. Con dos correcciones al diseño aprobado que
+**Hecho el 21 de septiembre de 2026.** La sesión con su ventana de 50 minutos,
+el reintento del repositorio, un solo propietario de GIS y la reentrada
+automática que devuelve la sesión tras un F5 sin guardar el token en ninguna
+parte.
+
+El corte de `onAuthStateChanged` **se traslada a G4**, y no por comodidad: las
+reglas de Firestore comprueban `request.auth` 27 veces, así que mientras la
+bandera diga `firebase` quitar Auth deja la aplicación sin datos. Con dos correcciones al diseño aprobado que
 conviene leer antes de seguir —**GIS no renueva en silencio** y **el router no
 devuelve 401**—, en [G3-IDENTIDAD.md](G3-IDENTIDAD.md).
 

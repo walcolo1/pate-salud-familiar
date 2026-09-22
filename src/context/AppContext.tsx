@@ -3,6 +3,9 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 // ── DataRepository abstraction (Phase 8) ─────────────────────────────────────
 import { isFirebaseBackend } from '../lib/dataBackend';
+import { arrancarIdentidad } from '../lib/identidadGis';
+import { decodeGoogleToken } from '../lib/googleAuth';
+import { clientIdConfigurado } from '../lib/importacionManual';
 import { getDataRepository, resetDataRepository } from '../lib/dataRepository';
 import type { DataUpdate } from '../lib/dataRepository';
 import type { FamilyInvitation, FamilyAccess } from '../lib/firestoreService';
@@ -551,6 +554,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [invitations, setInvitations] = useState<FamilyInvitation[]>([]);
 
   // Refs to prevent React state stale closures during async sync/pull operations
+  /**
+   * El usuario de la sesión, para leerlo desde un efecto sin depender de él.
+   *
+   * G3b lo necesita: la renovación entrega una credencial cada hora y hay que
+   * poder distinguirla de un inicio de sesión sin que el efecto se vuelva a
+   * montar con cada cambio de usuario.
+   */
+  const usuarioActivoRef = useRef<UserAccount | null>(null);
+  useEffect(() => {
+    usuarioActivoRef.current = user;
+  }, [user]);
+
   const membersRef = useRef<FamilyMember[]>(members);
   const healthProfilesRef = useRef<Record<string, HealthProfile>>(healthProfiles);
   const appointmentsRef = useRef<MedicalAppointment[]>(appointments);
@@ -1340,6 +1355,59 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       runAppointmentRetentionCleanup();
     }
   }, [isLoading]);
+
+  /**
+   * G3b · la sesión sin Firebase Auth.
+   *
+   * Es el equivalente de `onAuthStateChanged` para el camino del titular: un
+   * solo propietario de GIS que, con `auto_select`, devuelve la credencial al
+   * cargar. Sin esto, **un F5 cerraría la sesión**, porque la decisión de G3b
+   * fue no guardar el `id_token` en ningún almacén del navegador.
+   *
+   * NO SE ENCIENDE EN `/invitacion`, Y NO ES UN DETALLE
+   * ───────────────────────────────────────────────────
+   * Esa ruta pide GIS **sin** reentrada automática: la invitación es para una
+   * cuenta concreta y entrar con la que hubiera abierta es el error más
+   * probable de todo el flujo —está comprobado en vivo—. Como el propietario
+   * se comparte y lo fija el primero que llega, arrancar aquí la reentrada
+   * automática volvería a abrir justo ese agujero.
+   */
+  useEffect(() => {
+    if (isFirebaseBackend) return;
+    if (purgaDiferidaPendiente) return;
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/invitacion')) return;
+
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientIdConfigurado(clientId)) return;
+
+    const identidad = arrancarIdentidad({
+      clientId: String(clientId).trim(),
+      alRecibirCredencial: (credencial) => {
+        const perfil = decodeGoogleToken(credencial);
+        if (!perfil) return;
+
+        // Si ya hay sesión abierta con este mismo correo, esto es una
+        // renovación y no un inicio: repetir `signIn` recargaría el expediente
+        // entero cada hora.
+        if (usuarioActivoRef.current?.email === perfil.email) return;
+
+        void signIn(
+          {
+            googleId: perfil.sub,
+            displayName: perfil.name,
+            email: perfil.email,
+            photoUrl: perfil.picture || null,
+          },
+          credencial,
+        );
+      },
+    });
+
+    return () => identidad.soltar();
+    // `signIn` se recrea en cada render y no puede entrar aquí: reinicializaría
+    // la identidad constantemente.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [purgaDiferidaPendiente]);
 
   // Sincronizar el estado de Firebase Auth SDK con el React Context
   useEffect(() => {

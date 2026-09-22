@@ -6,6 +6,7 @@ import { useApp } from '@/context/AppContext';
 import { decodeGoogleToken } from '@/lib/googleAuth';
 import { Activity, ShieldAlert, Heart, AlertTriangle } from 'lucide-react';
 import { clientIdConfigurado, MENSAJE_SIN_CLIENT_ID } from '@/lib/importacionManual';
+import { arrancarIdentidad } from '@/lib/identidadGis';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,52 +33,46 @@ export default function LoginPage() {
     }
   }, [user, router]);
 
-  // Efecto para inicializar Google Identity Services y renderizar el botón nativo
+  /**
+   * G3b · el botón, pedido al propietario único de GIS.
+   *
+   * Antes esta pantalla llamaba a `google.accounts.id.initialize` por su
+   * cuenta, y `/invitacion` también. Dos inicializaciones son un solo dueño de
+   * la devolución de llamada: el último se queda las credenciales y al otro
+   * deja de llamársele, sin error y sin rastro. Ahora hay un solo dueño, y
+   * esta pantalla solo se suscribe y pide su botón.
+   */
   useEffect(() => {
     if (!clientId) return;
 
-    // Sondeo de 100ms para esperar que la librería global window.google se cargue asíncronamente
-    const checkGSI = setInterval(() => {
-      if (typeof window !== 'undefined' && (window as any).google?.accounts?.id) {
-        clearInterval(checkGSI);
-        
-        try {
-          (window as any).google.accounts.id.initialize({
-            client_id: clientId,
-            callback: async (response: any) => {
-              setLocalLoading(true);
-              const decoded = decodeGoogleToken(response.credential);
-              if (decoded) {
-                await signIn({
-                  googleId: decoded.sub,
-                  displayName: decoded.name,
-                  email: decoded.email,
-                  photoUrl: decoded.picture || null
-                }, response.credential);
-              } else {
-                console.error('No se pudo decodificar la credencial de Google.');
-                setLocalLoading(false);
-              }
-            }
-          });
+    const identidad = arrancarIdentidad({
+      clientId,
+      alRecibirCredencial: (credencial) => {
+        const decoded = decodeGoogleToken(credencial);
+        if (!decoded) return;
 
-          (window as any).google.accounts.id.renderButton(
-            document.getElementById('googleBtnParent'),
-            { 
-              theme: 'filled_blue', 
-              size: 'large', 
-              width: 320, 
-              shape: 'pill',
-              logo_alignment: 'left'
-            }
-          );
-        } catch (err) {
-          console.error('Error al inicializar el SDK de Google Identity Services:', err);
-        }
-      }
-    }, 100);
+        setLocalLoading(true);
+        void signIn(
+          {
+            googleId: decoded.sub,
+            displayName: decoded.name,
+            email: decoded.email,
+            photoUrl: decoded.picture || null,
+          },
+          credencial,
+        );
+      },
+    });
 
-    return () => clearInterval(checkGSI);
+    identidad.renderizarBoton(document.getElementById('googleBtnParent'), {
+      theme: 'filled_blue',
+      size: 'large',
+      width: 320,
+      shape: 'pill',
+      logo_alignment: 'left',
+    });
+
+    return () => identidad.soltar();
   }, [clientId, signIn]);
 
   const handleSignIn = async () => {

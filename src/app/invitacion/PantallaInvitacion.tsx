@@ -22,6 +22,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Activity, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
+import { arrancarIdentidad } from '@/lib/identidadGis';
 import {
   cuerpoAceptacion,
   guardarBackend,
@@ -42,9 +43,6 @@ type Fase = 'IDENTIFICANDO' | 'ENVIANDO' | 'ACEPTADA' | 'RECHAZADA';
 const CLIENT_ID = clientIdConfigurado(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)
   ? String(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID).trim()
   : null;
-
-/** Cuánto se espera a que el script de Google aparezca antes de rendirse. */
-const ESPERA_GIS_MS = 10000;
 
 export default function PantallaInvitacion() {
   const router = useRouter();
@@ -117,51 +115,31 @@ export default function PantallaInvitacion() {
     [token, backend, setMensaje, setFase],
   );
 
-  // 3 · El botón de Google. Mismo patrón que `/login`: el script se carga de
-  //     forma asíncrona desde el armazón y hay que esperarlo.
+  // 3 · El botón de Google, pedido al propietario único de GIS (G3b).
+  //
+  //     `autoSeleccionar: false` no es un detalle: la invitación es para una
+  //     cuenta concreta, y entrar con la que hubiera abierta es el error más
+  //     probable de todo el flujo. Está comprobado en vivo, y por eso el
+  //     propietario único admite los dos modos en vez de imponer el suyo.
   useEffect(() => {
     if (fase !== 'IDENTIFICANDO' || !clientId) return;
 
-    const desde = Date.now();
-    const sondeo = setInterval(() => {
-      const google = (window as unknown as { google?: GoogleIdentity }).google;
+    const identidad = arrancarIdentidad({
+      clientId,
+      autoSeleccionar: false,
+      alRecibirCredencial: (credencial) => void aceptar(credencial),
+      alFaltarGis: () => rechazar('SIN_RED'),
+    });
 
-      if (!google?.accounts?.id) {
-        if (Date.now() - desde > ESPERA_GIS_MS) {
-          clearInterval(sondeo);
-          rechazar('SIN_RED');
-        }
-        return;
-      }
+    identidad.renderizarBoton(document.getElementById('boton-google-invitacion'), {
+      theme: 'filled_blue',
+      size: 'large',
+      width: 300,
+      shape: 'pill',
+      text: 'signin_with',
+    });
 
-      clearInterval(sondeo);
-      try {
-        google.accounts.id.initialize({
-          client_id: clientId,
-          callback: (respuesta) => void aceptar(respuesta.credential),
-          auto_select: false,
-        });
-        // Sin esto, Google reutilizaría la sesión anterior. Aquí importa más
-        // que en ningún otro sitio: la invitación es para una cuenta concreta
-        // y entrar con la que hubiera abierta es el error más probable.
-        google.accounts.id.disableAutoSelect();
-
-        const destino = document.getElementById('boton-google-invitacion');
-        if (destino) {
-          google.accounts.id.renderButton(destino, {
-            theme: 'filled_blue',
-            size: 'large',
-            width: 300,
-            shape: 'pill',
-            text: 'signin_with',
-          });
-        }
-      } catch {
-        rechazar('SIN_RED');
-      }
-    }, 100);
-
-    return () => clearInterval(sondeo);
+    return () => identidad.soltar();
   }, [fase, clientId, aceptar, rechazar, intento]);
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -265,17 +243,6 @@ function Cargando({ texto }: { texto: string }) {
   );
 }
 
-/** Lo poco que usamos de Google Identity Services. */
-interface GoogleIdentity {
-  accounts?: {
-    id?: {
-      initialize(opciones: {
-        client_id: string;
-        callback: (respuesta: { credential: string }) => void;
-        auto_select?: boolean;
-      }): void;
-      disableAutoSelect(): void;
-      renderButton(destino: HTMLElement, opciones: Record<string, unknown>): void;
-    };
-  };
-}
+// La forma de `google.accounts.id` vive ahora en `gis.ts`, con su propietario
+// único. Tenerla declarada aquí también era la señal de que esta pantalla
+// hablaba con Google por su cuenta.
