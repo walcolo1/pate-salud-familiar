@@ -178,3 +178,22 @@ export async function obtenerRevision(contexto: ContextoTransporte): Promise<num
   const revision = Number(data?.revision);
   return Number.isFinite(revision) && revision >= 0 ? revision : 0;
 }
+
+/** La única forma que puede tener la dirección de una hoja de Google. */
+const URL_HOJA = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[\w-]+\/edit$/;
+
+/**
+ * La dirección de la hoja de la familia (cierre de G4). Solo el titular.
+ *
+ * Se valida lo que vuelve porque se abre en una pestaña: un despliegue que
+ * contestara otra cosa no puede mandar a nadie a otra parte desde Ajustes. No
+ * se guarda en ningún sitio: se pide al pulsar el botón.
+ */
+export async function urlDeLaHoja(contexto: ContextoTransporte): Promise<string> {
+  const data = await pedir<{ url?: unknown }>(contexto, 'verHoja');
+  const url = data?.url;
+  if (typeof url !== 'string' || !URL_HOJA.test(url)) {
+    throw new ErrorBackend(FALLO_TRANSPORTE, 'la respuesta no es una hoja de Google');
+  }
+  return url;
+}

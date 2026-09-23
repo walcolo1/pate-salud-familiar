@@ -1,12 +1,10 @@
 /**
- * Google Sheets API Client Layer
- * Handles authentication requests, spreadsheet creation, tabular mapping, and batch updates.
- * Scope: https://www.googleapis.com/auth/spreadsheets
+ * El libro de exportación familiar: un documento de salida en el Drive del
+ * titular, no la base de datos.
+ *
+ * Basta `drive.file` para crearlo y escribirlo, porque lo crea la propia
+ * aplicación. El token lo da `googleTokenManager`.
  */
-
-let tokenClient: any = null;
-let tokenCallback: ((token: string) => void) | null = null;
-let tokenErrorCallback: ((err: any) => void) | null = null;
 
 // Translation mappings for user-friendly sheets output
 const relationshipMap: Record<string, string> = {
@@ -56,46 +54,6 @@ const docTypeMap: Record<string, string> = {
   OTHER: 'Otro'
 };
 
-/**
- * Triggers the Google Identity Services popup to request spreadsheets permissions.
- * Keeps the token in memory and returns it via a Promise.
- */
-export function requestSheetsPermission(clientId: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined') {
-      return reject(new Error('Cannot request permission on server side.'));
-    }
-
-    if (!(window as any).google?.accounts?.oauth2) {
-      return reject(new Error('Google Identity Services library is not loaded.'));
-    }
-
-    tokenCallback = resolve;
-    tokenErrorCallback = reject;
-
-    try {
-      if (!tokenClient) {
-        tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/spreadsheets',
-          callback: (response: any) => {
-            if (response.error) {
-              tokenErrorCallback?.(response);
-            } else if (response.access_token) {
-              tokenCallback?.(response.access_token);
-            } else {
-              tokenErrorCallback?.(new Error('No access token returned.'));
-            }
-          },
-        });
-      }
-
-      tokenClient.requestAccessToken();
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
 
 /**
  * Exports all family clinical logs into a formatted multi-tab Google Sheet.

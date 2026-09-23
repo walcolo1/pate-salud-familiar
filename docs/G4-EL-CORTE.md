@@ -202,6 +202,8 @@ pantallas, no de backend — pero hay que resolverlo, y la salida natural es
 retirar la integración directa con Sheets entera: la hoja que la PWA crea en el
 alta, el alta misma y el ámbito `spreadsheets` de OAuth.
 
+> **Resuelto en el cierre de G4** (al final de este documento).
+
 ---
 
 ## La comprobación en vivo, que es la que importa
@@ -297,3 +299,106 @@ de registrar la hoja.
 no se usan, y el propio comentario de la CSP dice por qué eso importa:
 permitir conexiones a un servicio que la aplicación no usa solo amplía la
 superficie por la que podrían salir datos clínicos.
+
+> **Resuelto en el cierre de G4.** `connect-src` es ahora la lista exacta de
+> hosts que usa el código, y una prueba lo mide.
+
+---
+
+# Cierre de G4
+
+Dos partes: lo que encontró la segunda validación en vivo, y la limpieza que
+quedaba pendiente.
+
+## PERMISO_INSUFICIENTE: el titular no podía escribir historial
+
+La validación en vivo de G4b-bis dio `ErrorBackend: PERMISO_INSUFICIENTE` al
+guardar, y el cambio se revertía. Se sospechó de la fila del titular en
+`ACCESO` —`paciente_propio` vacío— y de las mayúsculas del correo, con buen
+criterio. No era ninguna de las dos.
+
+`HISTORIAL` exigía `ESCRIBIR_HISTORIAL_VET`, un verbo **solo para mascotas**:
+el Bloque D era el único que escribía historial. G0 mapeó el historial de las
+personas a esa misma pestaña. Como `puede()` comprueba la especie **antes** de
+mirar el rol, se denegaba **también al titular**. Dos piezas probadas por
+separado y nunca juntas.
+
+- El verbo pasa a `ESCRIBIR_HISTORIAL`, especie `CUALQUIERA`, con los mismos
+  roles que tenía (cuidador y miembro, que ya podían escribir citas, controles
+  y vacunas de personas). El lector sigue sin escribir nada.
+- `contratoPermisos.test.ts` cruza las dos piezas: para cada pestaña que
+  escribe el repositorio, pregunta al `puede()` de verdad si el titular puede
+  escribir ahí sobre una persona. Una pestaña nueva mal emparejada se pone roja
+  ahí, no con un dato clínico desapareciendo de la pantalla.
+
+## Medio familiar en la hoja: las transacciones
+
+Dar de alta a un familiar mandaba **tres lotes** (paciente, perfil, historial).
+Con el historial denegado, los dos primeros entraban y el tercero no: filas
+huérfanas en `PACIENTES` y `PERFIL_HUMANO`. El router ya valida un lote entero
+antes de escribir nada; el fallo era partir una acción del usuario en varios.
+
+Ahora una acción del usuario es **un lote**: `persistirPorMutacion` abre
+`repo.transaccion()`, las escrituras se acumulan y `confirmar()` manda un solo
+`aplicar`. O entra todo o no entra nada.
+
+**Las filas huérfanas de los intentos fallidos siguen en la hoja.** No las
+borra nadie: el router solo anexa. Se ven como un familiar sin historial; si
+molestan, se dan de baja desde la aplicación.
+
+## La limpieza que quedaba
+
+**La hoja operacional de antes, fuera.** `repairGoogleNativeDatabase`,
+`repairMemberDocuments`, `updateDeviceFromGoogle`, `createGoogleNativeDatabase`,
+el onboarding `/onboarding/setup` que la creaba, la búsqueda en
+`appDataFolder` y `googleSheetsOperational.ts` entero. `sinHojaVieja.test.ts`
+impide que vuelvan sin que nadie lo decida.
+
+**El ID de esa hoja se guardaba en el navegador.** `databaseSpreadsheetId` y
+`databaseSpreadsheetUrl` viajaban en el estado persistido de `localStorage`.
+Ya no existen en el modelo; un estado antiguo los pierde en el siguiente
+guardado, y la purga del cierre de sesión los borra antes.
+
+**El scope `spreadsheets` ya no se pide.** Es sensible y da acceso a **todas**
+las hojas de la cuenta. La hoja de la familia la abre el Web App con su propio
+permiso —el manifiesto de Apps Script lo sigue llevando, y debe—, y los dos
+documentos de salida que crea la aplicación (la exportación familiar y el
+informe individual) se escriben con `drive.file`, que Google permite para los
+ficheros que crea la propia aplicación y que clasifica como no sensible.
+
+**«Abrir la hoja» abre la del Web App.** El botón viejo abría el ID guardado de
+la hoja anterior. El nuevo está en la tarjeta «Hoja de la familia» y pide la
+dirección al despliegue con una acción nueva del router, `verHoja`: exige
+identidad y el verbo del titular (`ADMINISTRAR_ACCESOS`), y arma la dirección
+con el ID que guardó `instalar()`, sin abrir la hoja. No se guarda en ningún
+sitio. La pestaña se abre **antes** de pedirla —un `window.open` después de un
+`await` lo bloquea el navegador— y se cierra si falla, con el motivo.
+
+## Lo que apareció al quitarla
+
+**La carga del expediente al entrar dependía de la hoja vieja.** Solo ocurría
+por `autoSyncOnLogin → checkForExistingDatabase`, que buscaba el ID viejo en
+`appDataFolder` y **solo leía si lo encontraba**. La validación en vivo
+funcionó porque la cuenta del titular aún guardaba esa configuración; una
+familia que empezara con el Web App no habría cargado nunca su expediente al
+entrar. Ahora basta con que el navegador tenga registrado el despliegue.
+
+Esto no tiene prueba automática: el arranque real con sesión de Google no se
+puede reproducir en el arnés. Va en la lista de la validación en vivo.
+
+## Lo que hace falta del titular
+
+1. **Pegar `apps-script/dist/Pate.gs` y publicar una versión nueva** del
+   despliegue. Lleva el verbo del historial y la acción `verHoja`. Hasta
+   entonces, las altas de familiares siguen fallando y «Abrir la hoja» dice que
+   el despliegue es anterior.
+2. **Comprobar en vivo**: dar de alta un familiar (tiene que aparecer en
+   `PACIENTES`, `PERFIL_HUMANO` e `HISTORIAL`, o en ninguna); pulsar «Abrir la
+   hoja» (tiene que abrir la hoja del Web App, no la antigua); cerrar sesión y
+   volver a entrar (el expediente tiene que cargarse solo).
+3. **`drive.appdata` ya no lo usa nada.** Solo lo usaba la búsqueda de la hoja
+   vieja. No se quitó porque es un cambio de ámbito que no se pidió: es una
+   decisión. Quitarlo de `OPERATIONAL_SCOPES` y de la pantalla de
+   consentimiento no rompe nada que quede.
+4. **La pantalla de consentimiento** puede dejar de declarar `spreadsheets`:
+   el código ya no lo pide. Es un cambio en Google Cloud y lo hace el titular.

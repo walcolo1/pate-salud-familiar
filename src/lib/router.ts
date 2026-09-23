@@ -148,6 +148,13 @@ export const ACCIONES: Record<string, DefinicionAccion> = {
 
   verAuditoria: { verbo: 'VER_AUDITORIA' },
   exportar: { verbo: 'EXPORTAR_EXPEDIENTE' },
+  /**
+   * La dirección de la hoja, para el botón «Abrir la hoja» de Ajustes (cierre
+   * de G4). Es lo que `ping` no puede decir, por ser anónimo: aquí hace falta
+   * identidad y el verbo del titular. Quien administra los accesos administra
+   * la hoja; los demás ven el expediente por la aplicación.
+   */
+  verHoja: { verbo: 'ADMINISTRAR_ACCESOS' },
 };
 
 export const esAccion = (v: unknown): boolean =>
@@ -191,7 +198,7 @@ export const VERBO_POR_TABLA: Record<string, Verbo> = {
   DOSIS: 'MARCAR_DOSIS',
   ORDENES: 'ESCRIBIR_ORDEN',
   RECORDATORIOS: 'ESCRIBIR_CITA',
-  HISTORIAL: 'ESCRIBIR_HISTORIAL_VET',
+  HISTORIAL: 'ESCRIBIR_HISTORIAL',
 };
 
 /** Pestañas que `aplicar` nunca toca, por mucho permiso que se tenga. */

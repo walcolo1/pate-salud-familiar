@@ -26,8 +26,8 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const {
-    user, driveSyncEnabled, databaseSpreadsheetId, isLoading,
-    sessionLocked, unlockSession, sincronizacionManual,
+    user, driveSyncEnabled, isLoading,
+    sessionLocked, unlockSession,
     // A6-F2
     estadoCierre, solicitarCierreDeSesion, despacharCierre, reintentarSincronizacion,
     avisoPurgaDiferida, descartarAvisoPurgaDiferida,
@@ -90,12 +90,6 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
     descripcionCierre = 'Estamos borrando los datos de este dispositivo.';
     opcionesCierre = [];
   }
-
-  React.useEffect(() => {
-    if (!isLoading && user && user.provider === 'google' && !databaseSpreadsheetId && sincronizacionManual) {
-      router.replace('/onboarding/setup');
-    }
-  }, [user, isLoading, databaseSpreadsheetId, router, sincronizacionManual]);
 
   // ── A6-F2 · Aviso de limpieza pendiente ──────────────────────────────────
   // Se muestra tambien en rutas publicas: el usuario acaba de cerrar sesion y
@@ -204,7 +198,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
   );
 
   // If user is not authenticated, we do not render the navigation chrome
-  if (!user || pathname === '/login' || pathname === '/onboarding' || pathname === '/' || pathname.startsWith('/onboarding/setup')) {
+  if (!user || pathname === '/login' || pathname === '/onboarding' || pathname === '/') {
     return (
       <>
         {avisoLimpieza}

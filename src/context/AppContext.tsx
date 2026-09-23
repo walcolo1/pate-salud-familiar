@@ -114,29 +114,16 @@ import {
 } from '../lib/origenDatos';
 import { requestDrivePermission, resolveDrivePath, uploadFile, shareFileWithUser, revokeFileShare } from '../lib/googleDrive';
 import { requestCalendarPermission, createCalendarEvent, createMedicationDoseCalendarEvent } from '../lib/googleCalendar';
-import { requestSheetsPermission, exportFamilyHealthWorkbook } from '../lib/googleSheets';
-import { 
-  findConfigInAppData, 
-  readConfigFromAppData, 
-  writeConfigToAppData 
-} from '../lib/googleAppData';
-import { 
-  createOperationalSpreadsheet, 
-  readAllOperationalTables, 
-  writeAllOperationalTables,
-  createIndividualMemberReport,
-  migrateOperationalSheetHeaders
-} from '../lib/googleSheetsOperational';
+import { exportFamilyHealthWorkbook } from '../lib/googleSheets';
+import { createIndividualMemberReport } from '../lib/informeIndividual';
 import {
   ensureOperationalToken,
   ensureDriveToken,
   ensureCalendarToken,
   invalidateAllTokens,
-  getOperationalTokenIfValid,
   isOperationalTokenValid,
   hasAnyValidToken,
   getTokenRemainingMinutes,
-  ensureAllRequiredTokens,
 } from '../lib/googleTokenManager';
 import {
   crearBorradorDesdeTexto,
@@ -358,25 +345,16 @@ interface AppContextProps {
   exportState: () => void;
 
   // Capa Operacional Google-Native Foundation
-  databaseSpreadsheetId: string | null;
-  databaseSpreadsheetUrl: string | null;
   lastSyncAt: string | null;
   lastPullAt: string | null;
   lastPushAt: string | null;
   deviceId: string | null;
   opSyncStatus: 'disconnected' | 'connected' | 'syncing' | 'synced' | 'error';
   opSyncError: string | null;
-  createGoogleNativeDatabase: () => Promise<void>;
   pullFromGoogle: () => Promise<void>;
   pushToGoogle: () => Promise<void>;
   syncNow: () => Promise<void>;
-  updateDeviceFromGoogle: () => Promise<void>;
-  repairGoogleNativeDatabase: () => Promise<void>;
   exportBackupJSON: () => void;
-  postLoginGoogleSetup: () => Promise<void>;
-  requestInitialGooglePermissions: () => Promise<string | null>;
-  ensureGoogleNativeReady: (silent?: boolean) => Promise<string>;
-  autoCreateOrLoadGoogleNativeBase: (token: string) => Promise<{ exists: boolean }>;
 
   // Estado de inicialización automática Google-native
   syncInitStatus: 'idle' | 'checking' | 'loaded_from_google' | 'no_remote_data' | 'local_only' | 'error' | 'needs_auth' | 'pending_sync';
@@ -389,7 +367,6 @@ interface AppContextProps {
   needsGoogleAuth: boolean;
   reconnectGoogle: () => Promise<void>;
   flushPendingSync: () => Promise<void>;
-  checkForExistingDatabase: (explicitToken?: string, silent?: boolean) => Promise<boolean>;
 
   // Secure Google-Native Sharing Phase 3B
   sharedReports: SharedMemberReport[];
@@ -467,7 +444,6 @@ interface AppContextProps {
   editarPautaMedicacion: (id: string, pauta: Pauta) => ResultadoReprogramacion | null;
 
   // Member document repair
-  repairMemberDocuments: () => Promise<void>;
 
   // Session lock / inactivity
   sessionLocked: boolean;
@@ -524,6 +500,8 @@ interface AppContextProps {
   hojaRegistrada: boolean;
   /** Comprueba la URL del `/exec` con `ping` y, si cuadra, la guarda. */
   registrarHojaFamiliar: (url: string) => Promise<ResultadoRegistro>;
+  /** Cierre de G4 · la dirección de la hoja del Web App. Solo el titular; no se guarda. */
+  urlDeLaHojaFamiliar: () => Promise<string>;
   familyId: string | null;
   pendingInvitations: FamilyInvitation[];
   invitations: FamilyInvitation[];
@@ -690,8 +668,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [simulatedEmail, setSimulatedEmail] = useState<string | null>(null);
 
   // Capa Operacional Google-Native Foundation States
-  const [databaseSpreadsheetId, setDatabaseSpreadsheetId] = useState<string | null>(null);
-  const [databaseSpreadsheetUrl, setDatabaseSpreadsheetUrl] = useState<string | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [lastPullAt, setLastPullAt] = useState<string | null>(null);
   const [lastPushAt, setLastPushAt] = useState<string | null>(null);
@@ -700,7 +676,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [opSyncError, setOpSyncError] = useState<string | null>(null);
   const [syncStrategy, setSyncStrategy] = useState<string>('LAST_WRITE_WINS');
   const [lastKnownRevision, setLastKnownRevision] = useState<number>(0);
-  const [appDataFileId, setAppDataFileId] = useState<string | null>(null);
   const [sharedReports, setSharedReports] = useState<SharedMemberReport[]>([]);
 
   // Estado de inicialización automática desde Google al hacer login
@@ -795,14 +770,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const firebaseUnsubRef = useRef<(() => void) | null>(null);
   const firebaseInvitationsUnsubRef = useRef<(() => void) | null>(null);
 
-
   useEffect(() => { autoLockEnabledRef.current = autoLockEnabled; }, [autoLockEnabled]);
   useEffect(() => { autoLockMinutesRef.current = autoLockMinutes; }, [autoLockMinutes]);
   useEffect(() => { nightLockEnabledRef.current = nightLockEnabled; }, [nightLockEnabled]);
   useEffect(() => { nightLockStartRef.current = nightLockStart; }, [nightLockStart]);
   useEffect(() => { nightLockEndRef.current = nightLockEnd; }, [nightLockEnd]);
   useEffect(() => { sessionLockedRef.current = sessionLocked; }, [sessionLocked]);
-
 
   // ── A6-F2 · Purga diferida · PRIMER EFECTO DEL PROVEEDOR ─────────────────
   // Se declara ANTES que ningún otro para que React lo ejecute primero, y los
@@ -1043,14 +1016,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setGmailOnlyFutureAppointments(savedState.gmailOnlyFutureAppointments ?? true);
 
           // Capa Operacional
-          setDatabaseSpreadsheetId(savedState.databaseSpreadsheetId || null);
-          setDatabaseSpreadsheetUrl(savedState.databaseSpreadsheetUrl || null);
           setLastSyncAt(savedState.lastSyncAt || null);
           setLastPullAt(savedState.lastPullAt || null);
           setLastPushAt(savedState.lastPushAt || null);
           setSyncStrategy(savedState.syncStrategy || 'LAST_WRITE_WINS');
           setLastKnownRevision(savedState.lastKnownRevision || 0);
-          setAppDataFileId(savedState.appDataFileId || null);
           
           let devId = savedState.deviceId;
           if (!devId && typeof window !== 'undefined') {
@@ -1090,14 +1060,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setSimulatedRole(null);
             setSimulatedEmail(null);
             setSharedReports([]);
-            setDatabaseSpreadsheetId(null);
-            setDatabaseSpreadsheetUrl(null);
             setLastSyncAt(null);
             setLastPullAt(null);
             setLastPushAt(null);
             setSyncStrategy('LAST_WRITE_WINS');
             setLastKnownRevision(0);
-            setAppDataFileId(null);
             setEmailSources([
               {
                 id: 'source-default',
@@ -1128,14 +1095,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setLastExportMetadata(null);
             setSimulatedRole(null);
             setSimulatedEmail(null);
-            setDatabaseSpreadsheetId(null);
-            setDatabaseSpreadsheetUrl(null);
             setLastSyncAt(null);
             setLastPullAt(null);
             setLastPushAt(null);
             setSyncStrategy('LAST_WRITE_WINS');
             setLastKnownRevision(0);
-            setAppDataFileId(null);
             setEmailSources([
               {
                 id: 'source-default',
@@ -1186,14 +1150,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSimulatedRole(null);
         setSimulatedEmail(null);
         
-        setDatabaseSpreadsheetId(null);
-        setDatabaseSpreadsheetUrl(null);
         setLastSyncAt(null);
         setLastPullAt(null);
         setLastPushAt(null);
         setSyncStrategy('LAST_WRITE_WINS');
         setLastKnownRevision(0);
-        setAppDataFileId(null);
         setEmailSources([
           {
             id: 'source-default',
@@ -1307,8 +1268,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       lastExportMetadata,
       simulatedRole,
       simulatedEmail,
-      databaseSpreadsheetId,
-      databaseSpreadsheetUrl,
       lastSyncAt,
       lastPullAt,
       lastPushAt,
@@ -1317,7 +1276,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deviceId,
       syncStrategy,
       lastKnownRevision,
-      appDataFileId,
       sharedReports,
       emailSources,
       appointmentCandidates,
@@ -1357,8 +1315,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     lastExportMetadata,
     simulatedRole,
     simulatedEmail,
-    databaseSpreadsheetId,
-    databaseSpreadsheetUrl,
     lastSyncAt,
     lastPullAt,
     lastPushAt,
@@ -1367,7 +1323,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     deviceId,
     syncStrategy,
     lastKnownRevision,
-    appDataFileId,
     sharedReports,
     emailSources,
     appointmentCandidates,
@@ -1611,14 +1566,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Gmail auto-scan config
         setGmailOnlyFutureAppointments(savedState.gmailOnlyFutureAppointments ?? true);
 
-        setDatabaseSpreadsheetId(savedState.databaseSpreadsheetId || null);
-        setDatabaseSpreadsheetUrl(savedState.databaseSpreadsheetUrl || null);
         setLastSyncAt(savedState.lastSyncAt || null);
         setLastPullAt(savedState.lastPullAt || null);
         setLastPushAt(savedState.lastPushAt || null);
         setSyncStrategy(savedState.syncStrategy || 'LAST_WRITE_WINS');
         setLastKnownRevision(savedState.lastKnownRevision || 0);
-        setAppDataFileId(savedState.appDataFileId || null);
         // Marcar como cargado desde caché local; el pull automático se lanza en background
         setSyncInitStatus('local_only');
         setSyncInitMessage('Datos cargados desde caché local. Puedes sincronizar desde Configuración.');
@@ -1645,14 +1597,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setLastExportMetadata(null);
         setSimulatedRole(null);
         setSimulatedEmail(null);
-        setDatabaseSpreadsheetId(null);
-        setDatabaseSpreadsheetUrl(null);
         setLastSyncAt(null);
         setLastPullAt(null);
         setLastPushAt(null);
         setSyncStrategy('LAST_WRITE_WINS');
         setLastKnownRevision(0);
-        setAppDataFileId(null);
         setEmailSources([
           {
             id: 'source-default',
@@ -1742,10 +1691,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Gmail auto-scan config — must be loaded here or defaults overwrite LocalStorage on autosave
         setGmailOnlyFutureAppointments(savedState.gmailOnlyFutureAppointments ?? true);
 
-        setDatabaseSpreadsheetId(savedState.databaseSpreadsheetId || null);
-        setDatabaseSpreadsheetUrl(savedState.databaseSpreadsheetUrl || null);
         setLastSyncAt(savedState.lastSyncAt || null);
-        setAppDataFileId(savedState.appDataFileId || null);
       } else {
         const sanitizedMockMembers = mockMembers.map(m => ({ ...m, status: 'ACTIVE' as const }));
         const sanitizedMockAppointments = mockAppointments.map(a => ({ ...a, retentionStatus: 'ACTIVE' as const }));
@@ -1767,14 +1713,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setLastExportMetadata(null);
         setSimulatedRole(null);
         setSimulatedEmail(null);
-        setDatabaseSpreadsheetId(null);
-        setDatabaseSpreadsheetUrl(null);
         setLastSyncAt(null);
         setLastPullAt(null);
         setLastPushAt(null);
         setSyncStrategy('LAST_WRITE_WINS');
         setLastKnownRevision(0);
-        setAppDataFileId(null);
         setEmailSources([
           {
             id: 'source-default',
@@ -1858,12 +1801,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLastExportMetadata(null);
     setSimulatedRole(null);
     setSimulatedEmail(null);
-    setDatabaseSpreadsheetId(null);
-    setDatabaseSpreadsheetUrl(null);
     setLastSyncAt(null);
     setLastPullAt(null);
     setLastPushAt(null);
-    setAppDataFileId(null);
     setLastKnownRevision(0);
     setPendingSyncCount(0);
     setNeedsGoogleAuth(false);
@@ -2208,7 +2148,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       getDataRepository().then(async (repo) => {
         try {
-          await fn(repo, {
+          // Una acción del usuario, un lote. Dar de alta un familiar son tres
+          // escrituras, y en tres lotes, cuando la tercera se rechazaba las dos
+          // primeras ya estaban en la hoja —la validación en vivo de G4b dejó
+          // así medio familiar—. Dentro de una transacción no sale nada hasta
+          // confirmar, y el router acepta el lote entero o nada.
+          const tx = repo.transaccion?.();
+          await fn(tx ?? repo, {
             uid: user?.googleId ?? user?.id ?? '',
             email: user?.email ?? '',
             // La familia **es la hoja**: no hay documento que identificar. El
@@ -2216,6 +2162,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             // lo pide.
             familyId: null,
           });
+          await tx?.confirmar();
         } catch (err: unknown) {
           const codigo = (err as { codigo?: string } | null)?.codigo ?? '';
 
@@ -2463,7 +2410,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       for (const escritura of cola) {
         try {
-          await escritura(repo, ctx);
+          // El reenvío va en su propia transacción, como la primera vez: un
+          // reintento que se partiera dejaría el mismo medio familiar.
+          const tx = repo.transaccion?.();
+          await escritura(tx ?? repo, ctx);
+          await tx?.confirmar();
         } catch {
           fallidas.push(escritura);
         }
@@ -2495,17 +2446,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const token = await ensureOperationalToken(clientId, false);
       setNeedsGoogleAuth(false);
       
-      // Buscar base remota con el token recién otorgado
-      const found = await checkForExistingDatabase(token, true);
-      
-      if (!found) {
-        // Si no se encontró base remota, pero ya tiene token,
-        // y tiene cambios locales pendientes, sincronizamos.
-        if (pendingSyncCount > 0) {
-          setSyncInitMessage('Sincronizando cambios locales...');
-          await flushPendingSync();
-        }
+      void token;
+      // Cierre de G4 · ya no se busca la hoja vieja en appDataFolder: la de la
+      // familia está registrada aparte. Solo queda reenviar lo que esperaba.
+      if (pendingSyncCount > 0) {
+        setSyncInitMessage('Reenviando cambios pendientes...');
+        await flushPendingSync();
       }
+      setSyncInitStatus('idle');
+      setSyncInitMessage('');
     } catch (err: any) {
       const errMsg = err?.error || err?.message || 'Error desconocido';
       const cancelled = errMsg === 'access_denied' || errMsg === 'popup_closed_by_user';
@@ -3859,7 +3808,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setHistory(prev => [newEvent, ...prev]);
 
-
     persistirPorMutacion(async (repo, ctx) => {
       await repo.saveMedicalOrder(ctx, newOrder);
       await repo.saveHistoryEvent(ctx, newEvent);
@@ -3897,7 +3845,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return o;
     }));
-
 
     persistirPorMutacion(async (repo, ctx) => {
       if (updatedOrder) {
@@ -4003,7 +3950,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return o;
     }));
-
 
     if (calendarSyncEnabled) {
       setTimeout(() => {
@@ -4134,7 +4080,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: nowIso
     };
     setHistory(prev => [newHistoryEvent, ...prev]);
-
 
     if (calendarSyncEnabled && generatedDoses.length > 0 && generatedDoses.length <= 20) {
       setTimeout(() => {
@@ -4303,7 +4248,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return r;
     }));
-
 
     persistirPorMutacion(async (repo, ctx) => {
       if (updatedDose) {
@@ -4732,12 +4676,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSharedReports([]);
     
     // Reset base links
-    setDatabaseSpreadsheetId(null);
-    setDatabaseSpreadsheetUrl(null);
     setLastSyncAt(null);
     setLastPullAt(null);
     setLastPushAt(null);
-    setAppDataFileId(null);
     setLastKnownRevision(0);
     
     setIsLoading(false);
@@ -4797,8 +4738,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       simulatedRole: null,
       simulatedEmail: null,
       sharedReports: [],
-      databaseSpreadsheetId: null,
-      databaseSpreadsheetUrl: null,
       lastSyncAt: null,
       lastPullAt: null,
       lastPushAt: null,
@@ -4807,7 +4746,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deviceId,
       syncStrategy: 'LAST_WRITE_WINS',
       lastKnownRevision: 0,
-      appDataFileId: null,
       medicalOrders: [],
       medicationPrescriptions: [],
       medicationDoseReminders: []
@@ -4889,9 +4827,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (Array.isArray(data.emailSources)) setEmailSources(data.emailSources);
       if (Array.isArray(data.appointmentCandidates)) setAppointmentCandidates(data.appointmentCandidates);
 
-      if (data.databaseSpreadsheetId) setDatabaseSpreadsheetId(data.databaseSpreadsheetId);
-      if (data.databaseSpreadsheetUrl) setDatabaseSpreadsheetUrl(data.databaseSpreadsheetUrl);
-      if (data.appDataFileId) setAppDataFileId(data.appDataFileId);
 
       const nowStr = new Date().toISOString();
       const markPendingSync = <T extends { syncStatus?: any; updatedAt?: string }>(arr: T[]): T[] => {
@@ -4930,118 +4865,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { ok: true };
   };
 
-
-  // ── AUTO-SYNC AL LOGIN (intento silencioso) ───────────────────────────────
-
-  /**
-   * autoSyncOnLogin — Busca automáticamente en Google appDataFolder si existe
-   * una base operacional. Usa prompt:'' para intentar token SILENCIOSO sin popup.
-   * Si Google requiere consentimiento, setea needs_auth y muestra banner.
-   * NO bloquea el UX — el usuario puede usar la app mientras esto corre.
-   */
-  // ── BÚSQUEDA DE BASE EXISTENTE E INICIALIZACIÓN ──────────────────────────
-
-  /**
-   * checkForExistingDatabase — Busca en Google Drive si ya existe una base operacional
-   * vinculada (pate-salud-config.json).
-   * - Si silent=true, intenta obtener el token sin popup (prompt: '').
-   * - Si silent=false, abre el popup de consentimiento si no hay token.
-   * - Si encuentra la base, carga el historial remoto en el cliente.
-   * - Retorna true si encontró base, false si no.
-   */
-  const checkForExistingDatabase = async (explicitToken?: string, silent = true): Promise<boolean> => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!clientId) return false;
-
-    setSyncInitStatus('checking');
-    setSyncInitMessage('Buscando tu base de datos en Google...');
-
-    try {
-      let token = explicitToken || getOperationalTokenIfValid();
-      if (!token) {
-        token = await ensureOperationalToken(clientId, silent);
-      }
-
-      const configFileId = await findConfigInAppData(token);
-      if (!configFileId) {
-        setAppDataFileId(null);
-        setSyncInitStatus('no_remote_data');
-        setSyncInitMessage('No existe base Google-native para esta cuenta.');
-        return false;
-      }
-
-      const remoteConfig = await readConfigFromAppData(token, configFileId);
-      if (!remoteConfig || !remoteConfig.databaseSpreadsheetId) {
-        setAppDataFileId(configFileId);
-        setSyncInitStatus('no_remote_data');
-        setSyncInitMessage('No existe base Google-native para esta cuenta.');
-        return false;
-      }
-
-      const remoteSheetId = remoteConfig.databaseSpreadsheetId as string;
-      const remoteSheetUrl = remoteConfig.databaseSpreadsheetUrl ||
-        `https://docs.google.com/spreadsheets/d/${remoteSheetId}`;
-
-      setAppDataFileId(configFileId);
-      setDatabaseSpreadsheetId(remoteSheetId);
-      setDatabaseSpreadsheetUrl(remoteSheetUrl);
-
-      if (remoteConfig.permissionRefs?.sharedReports) {
-        setSharedReports(remoteConfig.permissionRefs.sharedReports);
-      }
-
-      // Preferencia de citas futuras desde remoto: gana el valor remoto si
-      // viene explícito; si no, se conserva el local.
-      if (remoteConfig.gmailOnlyFutureAppointments !== undefined && remoteConfig.gmailOnlyFutureAppointments !== null) {
-        setGmailOnlyFutureAppointments(remoteConfig.gmailOnlyFutureAppointments);
-      }
-
-      setSyncInitMessage('Base encontrada. Cargando datos desde Google...');
-      await pullFromGoogle();
-
-      setSyncInitStatus('loaded_from_google');
-      setSyncInitMessage(`✅ Datos cargados desde Google (${new Date().toLocaleTimeString('es-CO')})`);
-      setNeedsGoogleAuth(false);
-      setPendingSyncCount(0);
-      return true;
-    } catch (err: any) {
-      const errCode = err?.error || err?.message || '';
-      const errMessage = err?.message || '';
-      const isNotFound = errMessage.includes('Not Found') || errMessage.includes('404') || errMessage.includes('403') || errMessage.includes('not found') || errMessage.includes('deleted');
-
-      const needsInteraction =
-        errCode === 'interaction_required' ||
-        errCode === 'consent_required' ||
-        errCode === 'login_required' ||
-        errCode === 'access_denied' ||
-        errCode === 'popup_closed_by_user' ||
-        errCode === 'popup_failed_to_open';
-
-      if (needsInteraction) {
-        setSyncInitStatus('needs_auth');
-        setSyncInitMessage('Conecta Google para buscar tu base existente.');
-        setNeedsGoogleAuth(true);
-      } else if (isNotFound) {
-        setDatabaseSpreadsheetId(null);
-        setDatabaseSpreadsheetUrl(null);
-        setSyncInitStatus('no_remote_data');
-        setSyncInitMessage('No existe base Google-native para esta cuenta.');
-      } else {
-        setSyncInitStatus('error');
-        setSyncInitMessage(`Error al conectar: ${errCode || 'error desconocido'}.`);
-      }
-      return false;
-    }
-  };
-
-  /**
-   * autoSyncOnLogin — Intenta buscar silenciosamente al iniciar la app/sesión.
-   */
-  const autoSyncOnLogin = async (loggedUser: UserAccount): Promise<void> => {
-    if (!loggedUser || loggedUser.provider !== 'google') return;
-    await checkForExistingDatabase(undefined, true /* silent */);
-  };
-
   // ── CAPA OPERACIONAL GOOGLE-NATIVE FOUNDATION ACTIONS ──────────────────────
 
   /**
@@ -5067,103 +4890,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setOpSyncStatus('error');
       setOpSyncError(errCode);
       return null;
-    }
-  };
-
-  const createGoogleNativeDatabase = async () => {
-    // A6-F3 · Guarda estructural del modo demostración.
-    if (origenDatosRef.current === 'DEMO') return;
-    const token = await requestGoogleNativeToken();
-    if (!token) return;
-
-    try {
-      setOpSyncStatus('syncing');
-      
-      // 1. Verificar si ya existe pate-salud-config.json en appDataFolder
-      const configId = await findConfigInAppData(token);
-      let sheetId = databaseSpreadsheetId;
-      let sheetUrl = databaseSpreadsheetUrl;
-      let remoteConfig: any = null;
-
-      if (configId) {
-        // Si existe en appDataFolder, lo leemos
-        remoteConfig = await readConfigFromAppData(token, configId);
-        if (remoteConfig && remoteConfig.databaseSpreadsheetId) {
-          const foundSheetId = remoteConfig.databaseSpreadsheetId as string;
-          sheetId = foundSheetId;
-          sheetUrl = remoteConfig.databaseSpreadsheetUrl || `https://docs.google.com/spreadsheets/d/${sheetId}`;
-          setAppDataFileId(configId);
-          setDatabaseSpreadsheetId(sheetId);
-          setDatabaseSpreadsheetUrl(sheetUrl);
-          
-          if (remoteConfig.permissionRefs && remoteConfig.permissionRefs.sharedReports) {
-            setSharedReports(remoteConfig.permissionRefs.sharedReports);
-          }
-          
-          avisar('Se encontró una base operacional en tu cuenta de Google. Se cargará tu historial.');
-          // Proceder a jalar el historial
-          await pullFromGoogle();
-          return;
-        }
-      }
-
-      // 2. Si no existe la hoja, la creamos en Drive
-      if (!sheetId) {
-        const result = await createOperationalSpreadsheet(token, user?.email || '');
-        sheetId = result.spreadsheetId;
-        sheetUrl = result.spreadsheetUrl;
-        setDatabaseSpreadsheetId(sheetId);
-        setDatabaseSpreadsheetUrl(sheetUrl);
-      }
-
-      // 3. Crear o actualizar configuración en appDataFolder
-      const newConfig = {
-        schemaVersion: 2,
-        ownerEmail: user?.email || '',
-        ownerGoogleId: user?.googleId || '',
-        databaseSpreadsheetId: sheetId,
-        databaseSpreadsheetUrl: sheetUrl,
-        lastSyncAt: new Date().toISOString(),
-        lastPullAt: new Date().toISOString(),
-        lastPushAt: new Date().toISOString(),
-        deviceId: deviceId || 'unknown',
-        syncStrategy: 'LAST_WRITE_WINS',
-        lastKnownRevision: 1,
-        backupRefs: {},
-        permissionRefs: {
-          sharedReports: sharedReports
-        },
-        // Bloque B · Valores inertes: el escaneo ya no existe, pero el esquema
-        // remoto no se altera para no forzar una migración.
-        gmailAutoScanEnabled: false,
-        gmailScanTime: '00:00',
-        gmailScanRangeDays: 90,
-        gmailOnlyFutureAppointments: gmailOnlyFutureRef.current
-      };
-
-      const newConfigId = await writeConfigToAppData(token, newConfig, configId);
-      setAppDataFileId(newConfigId);
-
-      
-      setOpSyncStatus('synced');
-      setLastSyncAt(new Date().toISOString());
-
-      // Registrar auditoría
-      const newAudit: MedicalHistoryEvent = {
-        id: `hist-${Date.now()}`,
-        memberId: members[0]?.id || 'family-owner',
-        eventType: 'OTHER',
-        title: 'Base operacional Google creada',
-        description: `Base Google-native creada exitosamente con ID: ${sheetId}`,
-        eventDate: new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString()
-      };
-      setHistory(h => [newAudit, ...h]);
-
-    } catch (err: any) {
-      console.error('Error creando base operacional Google:', err);
-      setOpSyncStatus('error');
-      setOpSyncError(err.message || 'Error al crear la base operacional.');
     }
   };
 
@@ -5240,6 +4966,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * esperaban sin destino: esperar al siguiente guardado para descubrir que
    * había cosas atascadas sería dejar el problema a medio resolver.
    */
+  const urlDeLaHojaFamiliar = async (): Promise<string> => {
+    const repo = await getDataRepository();
+    if (!repo.urlDeLaHoja) throw Object.assign(new Error('sin repositorio'), { codigo: 'SIN_BACKEND' });
+    return repo.urlDeLaHoja();
+  };
+
   const registrarHojaFamiliar = async (url: string): Promise<ResultadoRegistro> => {
     const resultado = await comprobarYRegistrar(url);
     if (resultado.ok) {
@@ -5253,6 +4985,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const recargarExpediente = async () => {
     await pullFromGoogle();
     setHayCambiosRemotos(false);
+  };
+
+  /**
+   * Al entrar se lee la hoja de la familia (cierre de G4).
+   *
+   * Antes esto buscaba en appDataFolder el ID de la hoja operacional vieja y
+   * **solo leía si lo encontraba**: la validación en vivo funcionó porque la
+   * cuenta del titular aún guardaba esa configuración, pero una familia que
+   * empezara con el Web App no habría cargado nunca su expediente al entrar.
+   * Ahora basta con que este navegador tenga registrado el despliegue.
+   *
+   * Un fallo no molesta a nadie: la copia local sigue ahí, `pullFromGoogle`
+   * deja el motivo en el diagnóstico y el sondeo avisará cuando haya algo.
+   */
+  const autoSyncOnLogin = async (loggedUser: UserAccount): Promise<void> => {
+    if (!loggedUser || loggedUser.provider !== 'google') return;
+    if (sesionBackend().url() === null) return;
+    try {
+      await pullFromGoogle();
+    } catch {
+      /* el motivo ya está en opSyncError */
+    }
   };
 
   /**
@@ -5272,243 +5026,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await pullFromGoogle();
   };
 
-
-  const repairGoogleNativeDatabase = async () => {
-    const token = await requestGoogleNativeToken();
-    if (!token) return;
-
-    try {
-      setOpSyncStatus('syncing');
-      setOpSyncError(null);
-
-      const configId = await findConfigInAppData(token);
-      let sheetId = databaseSpreadsheetId;
-      let sheetUrl = databaseSpreadsheetUrl;
-
-      // 1. Intentar validar si la hoja existe y es accesible
-      let sheetExists = false;
-      if (sheetId) {
-        try {
-          await readAllOperationalTables(token, sheetId);
-          sheetExists = true;
-        } catch (e) {
-          console.warn('La hoja de cálculo no existe o no es accesible. Se creará una nueva.', e);
-        }
-      }
-
-      // 2. Si no existe o no es accesible, crearla
-      if (!sheetExists) {
-        const result = await createOperationalSpreadsheet(token, user?.email || '');
-        sheetId = result.spreadsheetId;
-        sheetUrl = result.spreadsheetUrl;
-        setDatabaseSpreadsheetId(sheetId);
-        setDatabaseSpreadsheetUrl(sheetUrl);
-      }
-
-      if (!sheetId) {
-        throw new Error('No se pudo encontrar ni crear una hoja de cálculo.');
-      }
-
-      // 3. Crear o actualizar configuración en appDataFolder
-      const newConfig = {
-        schemaVersion: 2,
-        ownerEmail: user?.email || '',
-        ownerGoogleId: user?.googleId || '',
-        databaseSpreadsheetId: sheetId,
-        databaseSpreadsheetUrl: sheetUrl,
-        lastSyncAt: new Date().toISOString(),
-        lastPullAt: new Date().toISOString(),
-        lastPushAt: new Date().toISOString(),
-        deviceId: deviceId || 'unknown',
-        syncStrategy: 'LAST_WRITE_WINS',
-        lastKnownRevision: 1,
-        backupRefs: {},
-        permissionRefs: {
-          sharedReports: sharedReports
-        },
-        // Bloque B · Valores inertes: el escaneo ya no existe, pero el esquema
-        // remoto no se altera para no forzar una migración.
-        gmailAutoScanEnabled: false,
-        gmailScanTime: '00:00',
-        gmailScanRangeDays: 90,
-        gmailOnlyFutureAppointments: gmailOnlyFutureRef.current
-      };
-
-      const newConfigId = await writeConfigToAppData(token, newConfig, configId || undefined);
-      setAppDataFileId(newConfigId);
-
-      // 4. Forzar la escritura del estado local para reparar cualquier dato
-      
-      setOpSyncStatus('synced');
-      setLastSyncAt(new Date().toISOString());
-
-      // Registrar auditoría
-      const newAudit: MedicalHistoryEvent = {
-        id: `hist-${Date.now()}`,
-        memberId: members[0]?.id || 'family-owner',
-        eventType: 'OTHER',
-        title: 'Base Google reparada',
-        description: `Base Google-native reparada y resincronizada con éxito. Sheets ID: ${sheetId}`,
-        eventDate: new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString()
-      };
-      setHistory(h => [newAudit, ...h]);
-      avisar('Base operacional reparada: se reconstruyó la estructura y se subieron los datos locales.');
-    } catch (err: any) {
-      console.error('Error al reparar base de datos:', err);
-      setOpSyncStatus('error');
-      setOpSyncError(err.message || 'Error al reparar la base.');
-      alert(`Error al reparar la base Google-native: ${err.message}`);
-    }
-  };
-
   const exportBackupJSON = () => {
     exportState();
   };
-
-  const requestInitialGooglePermissions = async (): Promise<string | null> => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      throw new Error('NEXT_PUBLIC_GOOGLE_CLIENT_ID no configurada.');
-    }
-    const token = await ensureAllRequiredTokens(clientId, false);
-    // Rellenar las variables de estado locales para que los badges se actualicen de inmediato
-    setDriveAccessToken(token);
-    setSheetsAccessToken(token);
-    setCalendarAccessToken(token);
-    setLastDriveAuthTime(new Date().toISOString());
-    setLastSheetsAuthTime(new Date().toISOString());
-    setLastCalendarAuthTime(new Date().toISOString());
-    setDriveStatus('connected');
-    setSheetsStatus('connected');
-    setCalendarStatus('connected');
-    return token;
-  };
-
-  const ensureGoogleNativeReady = async (silent = true): Promise<string> => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      throw new Error('NEXT_PUBLIC_GOOGLE_CLIENT_ID no configurada.');
-    }
-    const token = await ensureAllRequiredTokens(clientId, silent);
-    // Mantener sincronizados los tokens
-    setDriveAccessToken(token);
-    setSheetsAccessToken(token);
-    setCalendarAccessToken(token);
-    return token;
-  };
-
-  const autoCreateOrLoadGoogleNativeBase = async (token: string): Promise<{ exists: boolean }> => {
-    setOpSyncStatus('syncing');
-    setSyncInitStatus('checking');
-    setSyncInitMessage('Conectando con tu cuenta Google...');
-    try {
-      const email = user?.email || 'titular@correo.com';
-      const uid = user?.googleId || user?.id || 'unknown';
-
-      // 1. Buscar pate-salud-config.json en appDataFolder
-      const configFileId = await findConfigInAppData(token);
-      if (configFileId) {
-        const remoteConfig = await readConfigFromAppData(token, configFileId);
-        if (remoteConfig && remoteConfig.databaseSpreadsheetId) {
-          const remoteSheetId = remoteConfig.databaseSpreadsheetId;
-          const remoteSheetUrl = remoteConfig.databaseSpreadsheetUrl || `https://docs.google.com/spreadsheets/d/${remoteSheetId}`;
-          
-          setAppDataFileId(configFileId);
-          setDatabaseSpreadsheetId(remoteSheetId);
-          setDatabaseSpreadsheetUrl(remoteSheetUrl);
-          
-          if (remoteConfig.permissionRefs?.sharedReports) {
-            setSharedReports(remoteConfig.permissionRefs.sharedReports);
-          }
-          
-          setSyncInitStatus('checking');
-          setSyncInitMessage('Hemos encontrado tu base de datos de Paté Salud en Google Drive. Descargando...');
-          
-          // Pull de los datos remotos existentes
-          await pullFromGoogle();
-          
-          setLastSyncAt(new Date().toISOString());
-          setOpSyncStatus('synced');
-          setSyncInitStatus('loaded_from_google');
-          setSyncInitMessage(`✅ Datos sincronizados con Google (${new Date().toLocaleTimeString('es-CO')})`);
-          return { exists: true };
-        }
-      }
-      
-      // 2. Si no existe la hoja en Drive, crear una nueva
-      setSyncInitMessage('Creando tu base de datos segura y privada en Google Drive...');
-      const result = await createOperationalSpreadsheet(token, email);
-      const sheetId = result.spreadsheetId;
-      const sheetUrl = result.spreadsheetUrl;
-      
-      setDatabaseSpreadsheetId(sheetId);
-      setDatabaseSpreadsheetUrl(sheetUrl);
-      
-      // Crear estructura inicial de config en appDataFolder
-      const newConfig = {
-        schemaVersion: 2,
-        ownerEmail: email,
-        ownerGoogleId: uid,
-        databaseSpreadsheetId: sheetId,
-        databaseSpreadsheetUrl: sheetUrl,
-        lastSyncAt: new Date().toISOString(),
-        lastPullAt: new Date().toISOString(),
-        lastPushAt: new Date().toISOString(),
-        deviceId: deviceId || 'unknown',
-        syncStrategy: 'LAST_WRITE_WINS',
-        lastKnownRevision: 1,
-        backupRefs: {},
-        permissionRefs: {
-          sharedReports: []
-        },
-        // Bloque B · Valores inertes: el escaneo ya no existe, pero el esquema
-        // remoto no se altera para no forzar una migración.
-        gmailAutoScanEnabled: false,
-        gmailScanTime: '00:00',
-        gmailScanRangeDays: 90,
-        gmailOnlyFutureAppointments: gmailOnlyFutureRef.current
-      };
-      
-      const newConfigId = await writeConfigToAppData(token, newConfig);
-      setAppDataFileId(newConfigId);
-      
-      // Guardar el estado local (incluyendo el admin/titular) en Google Sheets
-      
-      setLastSyncAt(new Date().toISOString());
-      setOpSyncStatus('synced');
-      setSyncInitStatus('loaded_from_google');
-      setSyncInitMessage(`✅ Base de datos configurada y sincronizada`);
-      
-      // Registrar hito
-      const newAudit: MedicalHistoryEvent = {
-        id: `hist-${Date.now()}`,
-        memberId: 'admin',
-        eventType: 'OTHER',
-        title: 'Base operacional Google creada',
-        description: `Base Google-native inicializada automáticamente en Drive. Sheets ID: ${sheetId}`,
-        eventDate: new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString()
-      };
-      setHistory(h => [newAudit, ...h]);
-      
-      return { exists: false };
-    } catch (err: any) {
-      console.error('Error en autoCreateOrLoadGoogleNativeBase:', err);
-      setOpSyncStatus('error');
-      setOpSyncError(err.message || 'Error al configurar base Google-native.');
-      setSyncInitStatus('error');
-      setSyncInitMessage(`Fallo en configuración: ${err.message}`);
-      throw err;
-    }
-  };
-
-  const postLoginGoogleSetup = async () => {
-    const token = await requestInitialGooglePermissions();
-    if (!token) throw new Error('No se concedieron permisos de Google.');
-    await autoCreateOrLoadGoogleNativeBase(token);
-  };
-
 
   // ── ROLE SIMULATION & ACCESS CONTROL FILTERING ──────────────────────────────
   
@@ -5715,7 +5235,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
       setHistory(prev => [revokeEvent, ...prev]);
 
-
       avisar(`Se revocó el acceso de ${targetEmail} al documento.`);
     } catch (err: any) {
       console.error('Error al revocar acceso al documento:', err);
@@ -5797,31 +5316,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const updatedReports = [newReport, ...sharedReports];
       setSharedReports(updatedReports);
 
-      // Actualizar el archivo de configuración en appDataFolder
-      let configId = appDataFileId;
-      if (!configId) {
-        configId = await findConfigInAppData(token);
-      }
-      const existingConfig = {
-        schemaVersion: 2,
-        ownerEmail: user?.email || '',
-        ownerGoogleId: user?.googleId || '',
-        databaseSpreadsheetId: databaseSpreadsheetId || '',
-        databaseSpreadsheetUrl: databaseSpreadsheetUrl || '',
-        lastSyncAt: new Date().toISOString(),
-        lastPullAt: lastPullAt || new Date().toISOString(),
-        lastPushAt: new Date().toISOString(),
-        deviceId: deviceId || 'unknown',
-        syncStrategy: 'LAST_WRITE_WINS',
-        lastKnownRevision: lastKnownRevision || 1,
-        backupRefs: {},
-        permissionRefs: {
-          sharedReports: updatedReports
-        }
-      };
-
-      const newConfigId = await writeConfigToAppData(token, existingConfig, configId || undefined);
-      setAppDataFileId(newConfigId);
 
       // Trazabilidad de Auditoría
       const reportEvent: MedicalHistoryEvent = {
@@ -5891,31 +5385,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setSharedReports(updatedReports);
 
-      // Actualizar configuración en appDataFolder
-      let configId = appDataFileId;
-      if (!configId) {
-        configId = await findConfigInAppData(token);
-      }
-      const existingConfig = {
-        schemaVersion: 2,
-        ownerEmail: user?.email || '',
-        ownerGoogleId: user?.googleId || '',
-        databaseSpreadsheetId: databaseSpreadsheetId || '',
-        databaseSpreadsheetUrl: databaseSpreadsheetUrl || '',
-        lastSyncAt: new Date().toISOString(),
-        lastPullAt: lastPullAt || new Date().toISOString(),
-        lastPushAt: new Date().toISOString(),
-        deviceId: deviceId || 'unknown',
-        syncStrategy: 'LAST_WRITE_WINS',
-        lastKnownRevision: lastKnownRevision || 1,
-        backupRefs: {},
-        permissionRefs: {
-          sharedReports: updatedReports
-        }
-      };
-
-      const newConfigId = await writeConfigToAppData(token, existingConfig, configId || undefined);
-      setAppDataFileId(newConfigId);
 
       // Auditoría
       const revokeEvent: MedicalHistoryEvent = {
@@ -5937,160 +5406,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setOpSyncError(err.message || 'Error al revocar reporte individual.');
       throw err;
     }
-  };
-
-  // ─── repairMemberDocuments ────────────────────────────────────────────────────
-  const repairMemberDocuments = async (): Promise<void> => {
-    const token = await requestGoogleNativeToken();
-    if (!token) throw new Error('No se pudo obtener autorización de Google.');
-
-    let sheetId = databaseSpreadsheetId;
-    if (!sheetId) {
-      sheetId = await findConfigInAppData(token);
-    }
-    if (!sheetId) throw new Error('No hay base de datos operacional configurada.');
-
-    setOpSyncStatus('syncing');
-    setOpSyncError(null);
-
-    try {
-      // 1. Asegurar cabeceras
-      await migrateOperationalSheetHeaders(token, sheetId);
-
-      // 2. Leer miembros remotos
-      const remoteState = await readAllOperationalTables(token, sheetId);
-      const remoteMembers: FamilyMember[] = remoteState.Miembros || [];
-
-      // 1. Leer miembros locales
-      const currentMembers = [...membersRef.current];
-
-      // 3. Fusionar con mergeMemberSafely
-      // 4. Conservar documentos no vacíos
-      // 5. Respetar deletedAt
-      const repairedMembers = currentMembers.map(localMember => {
-        const remoteMember = remoteMembers.find(r => r.id === localMember.id);
-        if (remoteMember) {
-          const merged = mergeMemberSafely(localMember, remoteMember);
-          return {
-            ...merged,
-            syncStatus: ('PENDING_SYNC') as any,
-            updatedAt: new Date().toISOString()
-          };
-        }
-        return {
-          ...localMember,
-          syncStatus: ('PENDING_SYNC') as any,
-          updatedAt: new Date().toISOString()
-        };
-      });
-
-      // Asegurar que si hay remotos no presentes locales se integren (si no están borrados)
-      remoteMembers.forEach(remoteMember => {
-        const localExists = repairedMembers.some(m => m.id === remoteMember.id);
-        const isDeleted = remoteMember.deletedAt || remoteMember.status === 'DELETED';
-        if (!localExists && !isDeleted) {
-          repairedMembers.push({
-            ...remoteMember,
-            syncStatus: ('PENDING_SYNC') as any,
-            updatedAt: new Date().toISOString()
-          });
-        }
-      });
-
-      setMembers(repairedMembers);
-      membersRef.current = repairedMembers;
-
-      // 6. Subir estado consolidado
-      await syncNow();
-
-      // 7. Leer de vuelta desde Sheets
-      const verifiedRemoteState = await readAllOperationalTables(token, sheetId);
-      const verifiedRemoteMembers: FamilyMember[] = verifiedRemoteState.Miembros || [];
-
-      // 8. Confirmar que documentType y documentNumber permanecen
-      let verificationSuccess = true;
-      repairedMembers.forEach(rep => {
-        if (rep.status !== 'DELETED' && rep.documentNumber) {
-          const remoteRep = verifiedRemoteMembers.find(r => r.id === rep.id);
-          if (!remoteRep || remoteRep.documentNumber !== rep.documentNumber || remoteRep.documentType !== rep.documentType) {
-            verificationSuccess = false;
-            console.error(`Verification failed for member ${rep.fullName}: remote has ${remoteRep?.documentNumber} but expected ${rep.documentNumber}`);
-          }
-        }
-      });
-
-      if (verificationSuccess) {
-        setOpSyncStatus('synced');
-        avisar('Reparación completada: los documentos quedaron confirmados en Google Sheets.');
-      } else {
-        throw new Error('La verificación falló. Algunos documentos no se guardaron correctamente en Google Sheets.');
-      }
-    } catch (err: any) {
-      console.error('repairMemberDocuments error:', err);
-      setOpSyncStatus('error');
-      setOpSyncError(err.message || 'Error en reparación de documentos de miembros.');
-      throw err;
-    }
-  };
-
-  const updateDeviceFromGoogle = async (): Promise<void> => {
-    // 1. Exportar backup local automático
-    exportState();
-
-    // 2. Hacer pull desde Google
-    const token = await requestGoogleNativeToken();
-    if (!token) throw new Error('No se pudo obtener autorización de Google.');
-
-    const sheetId = databaseSpreadsheetId;
-    if (!sheetId) throw new Error('No hay base de datos operacional configurada.');
-
-    // 5. No hacer push inmediato si hay conflictos críticos (advertir primero)
-    const remoteState = await readAllOperationalTables(token, sheetId);
-    const remoteMembers: FamilyMember[] = remoteState.Miembros || [];
-    const localMembers = membersRef.current;
-    
-    let criticalConflictFound = false;
-    let conflictDetails = '';
-
-    localMembers.forEach(localM => {
-      const remoteM = remoteMembers.find(r => r.id === localM.id);
-      if (remoteM) {
-        const localDoc = localM.documentNumber?.trim();
-        const remoteDoc = remoteM.documentNumber?.trim();
-        if (localDoc && remoteDoc && localDoc !== remoteDoc) {
-          criticalConflictFound = true;
-          conflictDetails += `\n- ${localM.fullName}: Local "${localDoc}", Remoto "${remoteDoc}"`;
-        }
-      }
-    });
-
-    if (criticalConflictFound) {
-      const proceed = await confirmar({
-        titulo: 'Conflicto de números de documento',
-        descripcion: (
-          <>
-            <p>
-              El número de documento de uno o más familiares no coincide entre este dispositivo y
-              Google.
-            </p>
-            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-2 text-[11px] font-semibold text-slate-700">
-              {conflictDetails.trim()}
-            </pre>
-            <p className="mt-2">
-              Se aplicará la versión más reciente en este dispositivo, pero NO se subirá nada a
-              Google, para no sobrescribir datos allí.
-            </p>
-          </>
-        ),
-        etiquetaConfirmar: 'Aplicar la versión más reciente',
-        tono: 'peligro',
-      });
-      if (!proceed) return;
-    }
-
-    // 3. Fusionar con mergeMemberSafely
-    // 4. El estado local se actualiza al releer el expediente.
-    await pullFromGoogle();
   };
 
   // ─── Session lock / inactivity ────────────────────────────────────────────────
@@ -6556,25 +5871,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       editarPautaMedicacion,
 
       // Capa Operacional Google-Native Foundation Values Expose
-      databaseSpreadsheetId,
-      databaseSpreadsheetUrl,
       lastSyncAt,
       lastPullAt,
       lastPushAt,
       deviceId,
       opSyncStatus,
       opSyncError,
-      createGoogleNativeDatabase,
       pullFromGoogle,
       pushToGoogle,
       syncNow,
-      updateDeviceFromGoogle,
-      repairGoogleNativeDatabase,
       exportBackupJSON,
-      postLoginGoogleSetup,
-      requestInitialGooglePermissions,
-      ensureGoogleNativeReady,
-      autoCreateOrLoadGoogleNativeBase,
 
       // Estado de inicialización automática desde Google
       syncInitStatus,
@@ -6587,7 +5893,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       needsGoogleAuth,
       reconnectGoogle,
       flushPendingSync,
-      checkForExistingDatabase,
 
       // Secure Google-Native Sharing Phase 3B Bindings
       sharedReports,
@@ -6607,7 +5912,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setGmailOnlyFutureAppointments,
 
       // Member document repair
-      repairMemberDocuments,
 
       // Session lock / inactivity
       sessionLocked,
@@ -6630,6 +5934,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       recargarExpediente,
       hojaRegistrada,
       registrarHojaFamiliar,
+      urlDeLaHojaFamiliar,
       pendingInvitations,
       invitations,
       createInvitation,

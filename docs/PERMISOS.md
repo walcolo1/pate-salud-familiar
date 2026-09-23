@@ -47,7 +47,7 @@ Mantener su fila al día sería una forma de olvidarse de actualizarla.
 | `ESCRIBIR_CONTROL` | ✅ | ✅ | — |
 | `SUBIR_DOCUMENTO` | ✅ | ✅ | — |
 | `MARCAR_DOSIS` | ✅ | ✅ | — |
-| `ESCRIBIR_HISTORIAL_VET` | ✅ | ✅ | — |
+| `ESCRIBIR_HISTORIAL` | ✅ | ✅ | — |
 | `ESCRIBIR_MEDICACION` | ✅ | — | — |
 | `ESCRIBIR_ORDEN` | ✅ | — | — |
 | `EDITAR_PACIENTE` | ✅ | — | — |
@@ -111,7 +111,7 @@ Solo dos distinguen:
 
 | Verbo | Especie | Por qué |
 |---|---|---|
-| `ESCRIBIR_HISTORIAL_VET` | MASCOTA | El historial veterinario de D4 |
+| `ESCRIBIR_HISTORIAL` | CUALQUIERA | Lo que le pasó a un paciente. Era `ESCRIBIR_HISTORIAL_VET`, solo de mascotas, hasta G4b: ver `G4-EL-CORTE.md` |
 | `ESCRIBIR_ORDEN` | HUMANO | Una autorización de EPS sobre un perro no significa nada |
 
 **No saber la especie no es permiso.** Si el verbo la exige y no se pasa,

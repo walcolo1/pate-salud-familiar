@@ -129,10 +129,24 @@ var VERBOS = {
         especie: 'HUMANO',
         descripcion: 'Registrar una orden médica y su autorización de EPS.',
     },
-    ESCRIBIR_HISTORIAL_VET: {
+    /**
+     * Apuntar algo que ya le pasó a un paciente, persona o animal.
+     *
+     * Se llamaba `ESCRIBIR_HISTORIAL_VET` y era **solo de mascotas**, porque en
+     * el Bloque D el único historial era el veterinario. Cuando G0 mapeó el
+     * historial de las personas a la misma pestaña —que nunca distinguió
+     * especie: «qué le pasó a un paciente»—, el verbo se quedó estrecho. Como
+     * `puede()` mira la especie antes que el rol, **se lo denegaba también al
+     * titular**, y cada alta de un familiar se deshacía.
+     *
+     * Lo tienen los mismos roles que lo tenían. Ninguno gana nada que importe:
+     * cuidador y miembro ya podían crear citas, controles y vacunas de personas,
+     * que es más que apuntar lo que pasó.
+     */
+    ESCRIBIR_HISTORIAL: {
         ambito: 'PACIENTE',
-        especie: 'MASCOTA',
-        descripcion: 'Registrar una atención veterinaria ya ocurrida.',
+        especie: 'CUALQUIERA',
+        descripcion: 'Apuntar algo que ya le pasó a un paciente, persona o animal.',
     },
     EDITAR_PACIENTE: {
         ambito: 'PACIENTE',
@@ -177,7 +191,7 @@ var MATRIZ_PERMISOS = {
         'ESCRIBIR_MEDICACION',
         'MARCAR_DOSIS',
         'ESCRIBIR_ORDEN',
-        'ESCRIBIR_HISTORIAL_VET',
+        'ESCRIBIR_HISTORIAL',
         'EDITAR_PACIENTE',
     ],
     /**
@@ -195,7 +209,7 @@ var MATRIZ_PERMISOS = {
         'LEER_DOCUMENTO',
         'SUBIR_DOCUMENTO',
         'MARCAR_DOSIS',
-        'ESCRIBIR_HISTORIAL_VET',
+        'ESCRIBIR_HISTORIAL',
     ],
     /**
      * Solo mira. Ni un verbo de escritura, ni siquiera sobre sí mismo.

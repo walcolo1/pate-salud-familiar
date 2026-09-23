@@ -13,12 +13,13 @@
  */
 
 import React, { useId, useState } from 'react';
-import { CheckCircle2, Link2, Loader2 } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Link2, Loader2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { MENSAJES_REGISTRO } from '@/lib/registroBackend';
+import { abrirHojaEnPestana } from '@/lib/abrirHoja';
 
 export default function TarjetaHojaFamiliar() {
-  const { hojaRegistrada, registrarHojaFamiliar, pendingSyncCount } = useApp();
+  const { hojaRegistrada, registrarHojaFamiliar, urlDeLaHojaFamiliar, pendingSyncCount } = useApp();
   const idCampo = useId();
   const idAyuda = useId();
 
@@ -26,6 +27,21 @@ export default function TarjetaHojaFamiliar() {
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hecho, setHecho] = useState(false);
+  const [abriendo, setAbriendo] = useState(false);
+  const [errorAbrir, setErrorAbrir] = useState<string | null>(null);
+
+  // Cierre de G4 · la hoja del Web App, no la operacional de antes. La
+  // dirección se pide al pulsar y no se guarda; la pestaña se abre antes de
+  // pedirla para que el navegador no la trate como ventana emergente.
+  const abrirHoja = async () => {
+    setAbriendo(true);
+    setErrorAbrir(null);
+    try {
+      setErrorAbrir(await abrirHojaEnPestana(urlDeLaHojaFamiliar));
+    } finally {
+      setAbriendo(false);
+    }
+  };
 
   const comprobar = async (evento: React.FormEvent) => {
     evento.preventDefault();
@@ -72,6 +88,30 @@ export default function TarjetaHojaFamiliar() {
           </span>
         )}
       </div>
+
+      {hojaRegistrada && (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={abrirHoja}
+            disabled={abriendo}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-extrabold text-slate-800 hover:border-teal-600 hover:text-teal-800 disabled:opacity-60"
+          >
+            {abriendo ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            )}
+            Abrir la hoja
+            <span className="sr-only"> (se abre en otra pestaña)</span>
+          </button>
+          {errorAbrir && (
+            <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs font-semibold text-red-700">
+              {errorAbrir}
+            </p>
+          )}
+        </div>
+      )}
 
       <form onSubmit={comprobar} className="flex flex-col gap-2">
         <label htmlFor={idCampo} className="text-xs font-extrabold text-slate-700">

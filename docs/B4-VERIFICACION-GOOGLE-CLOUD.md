@@ -84,7 +84,7 @@ Copia la lista completa. La esperada tras el Bloque B:
 | `openid` | No sensible |
 | `.../auth/drive.file` | **No sensible** |
 | `.../auth/drive.appdata` | Sensible |
-| `.../auth/spreadsheets` | Sensible |
+| `.../auth/spreadsheets` | Sensible · **la web ya no lo pide desde el cierre de G4**: se puede retirar de la pantalla de consentimiento |
 | `.../auth/calendar.events` | Sensible |
 
 **Lo que NO debe estar:** `https://www.googleapis.com/auth/gmail.readonly`.

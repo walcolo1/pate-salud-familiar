@@ -37,7 +37,6 @@ export const SCOPES_PERMITIDOS = [
   'email',
   'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/drive.appdata',
-  'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/calendar.events',
 ] as const;
 

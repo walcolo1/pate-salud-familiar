@@ -6,6 +6,7 @@ import {
   aplicar,
   obtenerRevision,
   pedir,
+  urlDeLaHoja,
   type ContextoTransporte,
 } from './transporteBackend';
 
@@ -201,5 +202,36 @@ describe('obtenerRevision', () => {
       const { contexto } = contextoCon({ ok: true, data });
       await expect(obtenerRevision(contexto), JSON.stringify(data)).resolves.toBe(0);
     }
+  });
+});
+
+describe('urlDeLaHoja · el botón de Ajustes abre la hoja del Web App', () => {
+  const HOJA = 'https://docs.google.com/spreadsheets/d/1HojaSinteticaDePruebas0123456789abcdef/edit';
+
+  it('pide verHoja y devuelve la dirección', async () => {
+    const { contexto, espia } = contextoCon({ ok: true, data: { url: HOJA } });
+    expect(await urlDeLaHoja(contexto)).toBe(HOJA);
+    expect(JSON.parse(String((espia.mock.calls[0] as [string, RequestInit])[1].body)).accion).toBe('verHoja');
+  });
+
+  it('rechaza lo que no sea una hoja de Google', async () => {
+    // Lo que vuelve se abre en una pestaña: un despliegue manipulado no puede
+    // mandar a nadie a otra parte con el sello de la aplicación.
+    for (const mala of [
+      'https://docs.google.com.evil.test/spreadsheets/d/x/edit',
+      'http://docs.google.com/spreadsheets/d/abc/edit',
+      'javascript:alert(1)',
+      'https://docs.google.com/document/d/abc/edit',
+      '',
+      undefined,
+    ]) {
+      const { contexto } = contextoCon({ ok: true, data: { url: mala } });
+      await expect(urlDeLaHoja(contexto), String(mala)).rejects.toMatchObject({ codigo: FALLO_TRANSPORTE });
+    }
+  });
+
+  it('un despliegue anterior contesta ACCION_DESCONOCIDA, y se deja pasar tal cual', async () => {
+    const { contexto } = contextoCon({ ok: false, error: 'ACCION_DESCONOCIDA' });
+    await expect(urlDeLaHoja(contexto)).rejects.toMatchObject({ codigo: 'ACCION_DESCONOCIDA' });
   });
 });

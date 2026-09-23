@@ -505,6 +505,111 @@ describe('cuando el router dice que el token ya no vale', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Una acción del usuario, un lote
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('una acción del usuario es UN lote, o nada', () => {
+  /**
+   * Lo que encontró la validación en vivo de G4b.
+   *
+   * Dar de alta un familiar son tres escrituras: el paciente, su perfil y la
+   * entrada en su historial. Iban en **tres lotes**, y cuando el tercero se
+   * rechazó, los dos primeros ya estaban en la hoja. La pantalla dijo «se
+   * deshizo para no dejarlo a medias» con el expediente, justamente, a
+   * medias.
+   *
+   * El router ya sabía hacerlo bien: valida el lote entero antes de escribir
+   * nada. Lo único que había que hacer era mandarle uno.
+   */
+
+  const miembro = { id: 'p1', fullName: 'Ana', birthDate: '1990-01-01' } as Parameters<
+    RepositorioBackend['saveMember']
+  >[1];
+  const evento = {
+    id: 'h1',
+    memberId: 'p1',
+    eventType: 'OTHER',
+    title: 'Alta',
+    eventDate: '2026-09-22',
+  } as Parameters<RepositorioBackend['saveHistoryEvent']>[1];
+
+  it('tres escrituras dentro de una transacción salen en UNA petición', async () => {
+    const { repo, espia } = banco();
+    const tx = repo.transaccion();
+
+    await tx.saveMember(CTX, miembro);
+    await tx.saveHistoryEvent(CTX, evento);
+    expect(espia, 'no sale nada hasta confirmar').not.toHaveBeenCalled();
+
+    await tx.confirmar();
+    expect(espia).toHaveBeenCalledTimes(1);
+    expect(envio(espia).payload?.mutaciones?.map((m) => m.tabla)).toEqual([
+      'PACIENTES',
+      'PERFIL_HUMANO',
+      'HISTORIAL',
+    ]);
+  });
+
+  it('si algo falla ANTES de confirmar, no sale nada', async () => {
+    // Una escritura que no tiene dónde ir —o un modelo sin paciente— lanza
+    // dentro de la transacción. Lo que ya se había acumulado no puede salir
+    // solo: sería la mitad de la acción.
+    const { repo, espia } = banco();
+    const tx = repo.transaccion();
+
+    await tx.saveMember(CTX, miembro);
+    await expect(
+      tx.saveTask(CTX, { id: 't1' } as Parameters<RepositorioBackend['saveTask']>[1]),
+    ).rejects.toThrow();
+
+    expect(espia).not.toHaveBeenCalled();
+  });
+
+  it('una transacción sin nada que escribir no sale a la red ni falla', async () => {
+    // Pasa de verdad: hay acciones que solo escriben si se cumple algo.
+    const { repo, espia } = banco();
+    await expect(repo.transaccion().confirmar()).resolves.toBeUndefined();
+    expect(espia).not.toHaveBeenCalled();
+  });
+
+  it('confirmar dos veces no manda dos veces', async () => {
+    const { repo, espia } = banco();
+    const tx = repo.transaccion();
+    await tx.saveMember(CTX, miembro);
+    await tx.confirmar();
+    await tx.confirmar();
+    expect(espia).toHaveBeenCalledTimes(1);
+  });
+
+  it('dos transacciones a la vez no se mezclan', async () => {
+    // El repositorio es único en la aplicación. Si la transacción viviera en
+    // él y no en su propio objeto, dos guardados simultáneos acabarían en el
+    // mismo lote.
+    const { repo, espia } = banco();
+    const a = repo.transaccion();
+    const b = repo.transaccion();
+
+    await a.saveMember(CTX, miembro);
+    await b.saveHistoryEvent(CTX, evento);
+    await a.confirmar();
+    await b.confirmar();
+
+    expect(espia).toHaveBeenCalledTimes(2);
+    expect(envio(espia, 0).payload?.mutaciones?.map((m) => m.tabla)).toEqual([
+      'PACIENTES',
+      'PERFIL_HUMANO',
+    ]);
+    expect(envio(espia, 1).payload?.mutaciones?.map((m) => m.tabla)).toEqual(['HISTORIAL']);
+  });
+
+  it('fuera de una transacción, cada escritura sigue saliendo sola', async () => {
+    const { repo, espia } = banco();
+    await repo.saveHistoryEvent(CTX, evento);
+    expect(espia).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // El barrido
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -549,4 +654,18 @@ describe('ninguna escritura se queda callada', () => {
       ).toBe(true);
     });
   }
+});
+
+describe('la dirección de la hoja (cierre de G4)', () => {
+  it('la pide al despliegue registrado, con la sesión de siempre', async () => {
+    const HOJA = 'https://docs.google.com/spreadsheets/d/1HojaSintetica0123456789/edit';
+    const { repo, espia } = banco([{ ok: true, data: { url: HOJA } }]);
+    expect(await repo.urlDeLaHoja()).toBe(HOJA);
+    expect(envio(espia).accion).toBe('verHoja');
+  });
+
+  it('sin despliegue registrado no inventa una', async () => {
+    const repo = new RepositorioBackend({ url: () => null, idToken: async () => 't', fetch: vi.fn() as never });
+    await expect(repo.urlDeLaHoja()).rejects.toMatchObject({ codigo: SIN_BACKEND });
+  });
 });

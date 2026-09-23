@@ -57,8 +57,6 @@ export interface SavedAppState {
   lastExportMetadata: LastExportMetadata | null;
   simulatedRole?: 'FAMILY_ADMIN' | 'MEMBER_SELF' | 'VIEWER' | null;
   simulatedEmail?: string | null;
-  databaseSpreadsheetId?: string | null;
-  databaseSpreadsheetUrl?: string | null;
   lastSyncAt?: string | null;
   lastPullAt?: string | null;
   lastPushAt?: string | null;
@@ -67,7 +65,6 @@ export interface SavedAppState {
   deviceId?: string | null;
   syncStrategy?: string | null;
   lastKnownRevision?: number | null;
-  appDataFileId?: string | null;
   sharedReports?: SharedMemberReport[];
   emailSources?: AppointmentEmailSource[];
   appointmentCandidates?: ImportedEmailAppointmentCandidate[];

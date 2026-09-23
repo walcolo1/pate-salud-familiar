@@ -175,6 +175,18 @@ var MANEJADORES = {
     }
     return { esquema: VERSION_ESQUEMA, revision: revisionActual_(), tablas: salida };
   },
+
+  /**
+   * La dirección de la hoja, para el botón de Ajustes. Solo el titular.
+   *
+   * Se arma con el ID que guardó `instalar()` en vez de abrir la hoja: abrirla
+   * cuesta segundos para devolver una cadena que ya se tiene.
+   */
+  verHoja: function () {
+    var id = PropertiesService.getScriptProperties().getProperty(CLAVE_ID_HOJA);
+    if (!id) throw new Error('sin ID_HOJA: la instalación no terminó');
+    return { url: 'https://docs.google.com/spreadsheets/d/' + id + '/edit' };
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

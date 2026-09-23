@@ -302,6 +302,21 @@ export interface DataRepository {
     oldAvatarPath?: string | null
   ): Promise<{ url: string; path: string }>;
 
+  /**
+   * Una acción del usuario como UN lote (G4b).
+   *
+   * Las escrituras hechas sobre lo que devuelve se acumulan y salen juntas al
+   * `confirmar()`. El router valida el lote entero antes de escribir nada, así
+   * que o entra todo o no entra nada: sin familiares a medias en la hoja.
+   */
+  transaccion?(): DataRepository & { confirmar(): Promise<void> };
+
+  /**
+   * La dirección de la hoja de la familia, para «Abrir la hoja» (cierre de G4).
+   * Solo el titular. Se pide cada vez y no se guarda.
+   */
+  urlDeLaHoja?(): Promise<string>;
+
   deleteMemberAvatar?(
     ctx: RepositoryContext,
     avatarPath: string

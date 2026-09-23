@@ -109,6 +109,13 @@ var ACCIONES = {
     aceptarInvitacion: { verbo: null, exigeAcceso: false, muta: true },
     verAuditoria: { verbo: 'VER_AUDITORIA' },
     exportar: { verbo: 'EXPORTAR_EXPEDIENTE' },
+    /**
+     * La dirección de la hoja, para el botón «Abrir la hoja» de Ajustes (cierre
+     * de G4). Es lo que `ping` no puede decir, por ser anónimo: aquí hace falta
+     * identidad y el verbo del titular. Quien administra los accesos administra
+     * la hoja; los demás ven el expediente por la aplicación.
+     */
+    verHoja: { verbo: 'ADMINISTRAR_ACCESOS' },
 };
 var esAccion = (v) => typeof v === 'string' && Object.prototype.hasOwnProperty.call(ACCIONES, v);
 /**
@@ -134,7 +141,7 @@ var VERBO_POR_TABLA = {
     DOSIS: 'MARCAR_DOSIS',
     ORDENES: 'ESCRIBIR_ORDEN',
     RECORDATORIOS: 'ESCRIBIR_CITA',
-    HISTORIAL: 'ESCRIBIR_HISTORIAL_VET',
+    HISTORIAL: 'ESCRIBIR_HISTORIAL',
 };
 /** Pestañas que `aplicar` nunca toca, por mucho permiso que se tenga. */
 var TABLAS_PROHIBIDAS = ['ACCESO', 'AUDITORIA', 'CONFIG'];

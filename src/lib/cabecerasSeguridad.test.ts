@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import nextConfig, {
   CABECERAS_SEGURIDAD,
@@ -93,10 +95,53 @@ describe('Content-Security-Policy', () => {
     expect(DIRECTIVAS_CSP['connect-src']).toContain('https://accounts.google.com');
   });
 
-  it('permite las APIs de Google, que son los destinos que sí se usan', () => {
-    // Firestore, Identity Toolkit, Secure Token, Sheets, Drive y Gmail viven
-    // todos bajo *.googleapis.com.
-    expect(DIRECTIVAS_CSP['connect-src']).toContain('https://*.googleapis.com');
+  it('permite las APIs de Google que se usan, por su nombre y sin comodín', () => {
+    // Hasta G4 aquí había `https://*.googleapis.com`. Cubría Sheets, Drive y
+    // Calendar, que se usan… y también Firestore, Identity Toolkit y Secure
+    // Token, que se fueron con Firebase. Un comodín no se puede recortar: se
+    // sustituye por la lista medida en el código.
+    expect(DIRECTIVAS_CSP['connect-src']).toContain('https://www.googleapis.com');
+    expect(DIRECTIVAS_CSP['connect-src']).toContain('https://sheets.googleapis.com');
+    expect(DIRECTIVAS_CSP['connect-src']).not.toContain('https://*.googleapis.com');
+  });
+
+  it('NO queda ningún destino de Firebase, en ninguna directiva', () => {
+    // G4 retiró Firebase entero. Dejar abiertos sus destinos sería dejar una
+    // vía de salida a un servicio que la aplicación ya no usa.
+    for (const resto of [
+      'firestore.googleapis.com',
+      'identitytoolkit.googleapis.com',
+      'securetoken.googleapis.com',
+      'firebasestorage.googleapis.com',
+      'firebaseio.com',
+      'firebaseapp.com',
+    ]) {
+      expect(csp(), resto).not.toContain(resto);
+    }
+  });
+
+  it('cada host de googleapis que llama el código está permitido', () => {
+    // La otra mitad: quitar el comodín no puede dejar sin red a Drive, a
+    // Calendar ni a Sheets. Se recorre src/ y todo host literal tiene que
+    // estar en la lista. `oauth2.googleapis.com` es la excepción, y está
+    // razonada: lo llama el backend (Auth.gs), nunca el navegador.
+    const RAIZ = join(process.cwd(), 'src');
+    const ficheros = (dir: string): string[] =>
+      readdirSync(dir).flatMap((n) => {
+        const r = join(dir, n);
+        return statSync(r).isDirectory() ? ficheros(r) : /\.(ts|tsx)$/.test(n) && !/\.test\./.test(n) ? [r] : [];
+      });
+
+    const hosts = new Set<string>();
+    for (const f of ficheros(RAIZ)) {
+      for (const m of readFileSync(f, 'utf8').matchAll(/https:\/\/[a-z0-9.-]*googleapis\.com/g)) {
+        hosts.add(m[0]);
+      }
+    }
+    hosts.delete('https://oauth2.googleapis.com');
+
+    expect(hosts.size, 'no se encontró ningún host: la prueba no mira nada').toBeGreaterThan(0);
+    for (const host of hosts) expect(DIRECTIVAS_CSP['connect-src'], host).toContain(host);
   });
 
   it('NO permite Realtime Database: la aplicación no lo usa', () => {
@@ -110,7 +155,7 @@ describe('Content-Security-Policy', () => {
     expect(csp()).not.toContain('apis.google.com');
   });
 
-  it('connect-src se limita a cinco destinos y ni uno más', () => {
+  it('connect-src se limita a seis destinos y ni uno más', () => {
     // Si alguien añade un destino, esta prueba obliga a justificarlo aquí.
     //
     // Los dos últimos entraron en E0-bis y no por comodidad: sin ellos, la PWA
@@ -119,7 +164,8 @@ describe('Content-Security-Policy', () => {
     // clínicos, así que la lista se lee entera antes de tocarla.
     expect([...DIRECTIVAS_CSP['connect-src']]).toEqual([
       "'self'",
-      'https://*.googleapis.com',
+      'https://www.googleapis.com',
+      'https://sheets.googleapis.com',
       'https://accounts.google.com',
       'https://script.google.com',
       'https://script.googleusercontent.com',
@@ -131,7 +177,9 @@ describe('Content-Security-Policy', () => {
     expect(img).toContain('data:');
     expect(img).toContain('blob:');
     expect(img).toContain('https://lh3.googleusercontent.com');
-    expect(img).toContain('https://firebasestorage.googleapis.com');
+    // G4 · Firebase Storage se fue: las fotos de miembros que apuntaban ahí
+    // eran datos de prueba.
+    expect(img).not.toContain('https://firebasestorage.googleapis.com');
   });
 
   it('NO admite eval en ninguna directiva', () => {

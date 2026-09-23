@@ -34,6 +34,7 @@ import {
   ErrorBackend,
   aplicar,
   obtenerRevision,
+  urlDeLaHoja,
   pedir,
   type ContextoTransporte,
   type Mutacion,
@@ -185,9 +186,53 @@ const PESTANAS_POR_PACIENTE: readonly string[] = [
 
 export class RepositorioBackend implements DataRepository {
   private readonly sesion: SesionBackend;
+  /**
+   * Las mutaciones acumuladas, si esta instancia es una transacción.
+   *
+   * `null` en el repositorio normal: cada escritura sale sola.
+   */
+  private readonly acumuladas: Mutacion[] | null;
+  private confirmada = false;
 
-  constructor(sesion: SesionBackend = sesionDelNavegador()) {
+  constructor(sesion: SesionBackend = sesionDelNavegador(), acumuladas: Mutacion[] | null = null) {
     this.sesion = sesion;
+    this.acumuladas = acumuladas;
+  }
+
+  /**
+   * Una acción del usuario, un lote (G4b).
+   *
+   * Dar de alta un familiar son tres escrituras —el paciente, su perfil, la
+   * entrada en el historial—, y en tres lotes, cuando el tercero se rechazaba
+   * los dos primeros **ya estaban en la hoja**. La validación en vivo lo vio:
+   * la pantalla deshacía el alta y la hoja se quedaba con medio familiar.
+   *
+   * El router ya sabía hacerlo bien —valida el lote **entero** antes de
+   * escribir nada, es lo que construyó E6—. Solo había que mandarle uno.
+   *
+   * La transacción es **un objeto propio** y no un estado del repositorio,
+   * porque el repositorio es único en la aplicación: dos guardados a la vez
+   * acabarían en el mismo lote.
+   */
+  transaccion(): RepositorioBackend & { confirmar(): Promise<void> } {
+    return new RepositorioBackend(this.sesion, []) as RepositorioBackend & {
+      confirmar(): Promise<void>;
+    };
+  }
+
+  /**
+   * Manda lo acumulado, en un solo lote.
+   *
+   * Sin nada acumulado no sale a la red ni falla: hay acciones que solo
+   * escriben si se cumple algo. Y solo manda una vez.
+   */
+  async confirmar(): Promise<void> {
+    if (!this.acumuladas || this.confirmada) return;
+    this.confirmada = true;
+    if (this.acumuladas.length === 0) return;
+
+    const lote = [...this.acumuladas];
+    await this.conSesion((contexto) => aplicar(contexto, lote));
   }
 
   // ── Plomería ──────────────────────────────────────────────────────────────
@@ -317,6 +362,14 @@ export class RepositorioBackend implements DataRepository {
       // pasar es que quien llamó crea que guardó algo.
       throw new ErrorBackend(NADA_QUE_GUARDAR, `${coleccion}: no había nada que escribir`);
     }
+
+    // Dentro de una transacción no sale nada todavía: se acumula, y sale todo
+    // junto al confirmar. Si algo lanza antes, no sale nada.
+    if (this.acumuladas) {
+      this.acumuladas.push(...mutaciones);
+      return;
+    }
+
     await this.conSesion((contexto) => aplicar(contexto, mutaciones));
   }
 
@@ -365,6 +418,14 @@ export class RepositorioBackend implements DataRepository {
   /** La revisión del documento, para que G2 sepa si esta copia se quedó vieja. */
   async revision(): Promise<number> {
     return this.conSesion((contexto) => obtenerRevision(contexto));
+  }
+
+  /**
+   * La dirección de la hoja que hay detrás del despliegue registrado. Solo el
+   * titular. Se pide cada vez: guardarla sería guardar el ID de la hoja.
+   */
+  async urlDeLaHoja(): Promise<string> {
+    return this.conSesion((contexto) => urlDeLaHoja(contexto));
   }
 
   // ── Lectura: de tablas a modelos ──────────────────────────────────────────

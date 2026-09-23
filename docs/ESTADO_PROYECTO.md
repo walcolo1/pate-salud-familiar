@@ -119,9 +119,10 @@ cada módulo. Las que más condicionan lo que venga:
 | Las **tareas genéricas** (`FollowUpTask`) dejarán de guardarse al girar la bandera de G: `SEGUIMIENTOS` es otra cosa y no tienen pestaña | `descriptores.ts` · `SIN_PESTANA` |
 | Las 4 escrituras de E11 siguen sin pestaña: **lanzan** un error explícito en vez de callar | `G0-REPOSITORIO.md` |
 | Qué hacer cuando la revisión cambia —recargar, avisar o recargar lo que no está en edición— sigue **sin decidir**: `alCambiar` es una llamada de vuelta | `G2-SINCRONIZACION.md` |
-| Tres utilidades de Ajustes reparan la hoja **vieja** por la API de Sheets: ya no es la fuente de verdad | `G4-EL-CORTE.md` |
 | Las cuarenta condiciones de interfaz sobre `sincronizacionManual` sobran: es una limpieza de pantallas | `G4-EL-CORTE.md` |
 | La cola de reenvío vive **en memoria**: un cambio pendiente no sobrevive a una recarga | `G4-EL-CORTE.md` |
+| `drive.appdata` sigue pidiéndose y ya no lo usa nada: quitarlo es decisión del titular | `G4-EL-CORTE.md`, «Cierre de G4» |
+| La pantalla de consentimiento aún declara `spreadsheets`, que el código ya no pide | `G4-EL-CORTE.md`, «Cierre de G4» |
 | La CSP todavía abre `connect-src` e `img-src` a servicios de Firebase que ya no se usan | `next.config.ts` |
 | Sin `databases()` en el navegador, la caché de Firestore **no se puede localizar** para borrarla | `purgaFirestore.ts` |
 | GIS **no renueva el `id_token` en silencio**: la ventana de 50 min es un intento, no una garantía | `G3-IDENTIDAD.md` |
@@ -167,26 +168,11 @@ pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
 
 ## Siguiente paso
 
-**Repetir la comprobación en vivo de G4b.** El primer intento no dejó ni una
-fila en la hoja: el navegador del titular no sabía dónde estaba su hoja, y el
-fallo se volvió silencioso. Ya está arreglado y explicado en
-[G4-EL-CORTE.md](G4-EL-CORTE.md), al final. La comprobación sigue siendo la
-misma:
-guardar una cita o un medicamento y mirar la pestaña. Tiene que aparecer **una
-fila nueva al final**, y las que había no pueden haberse movido.
+**Publicar el Web App nuevo y validar el cierre de G4 en vivo.** Pegar
+`apps-script/dist/Pate.gs`, publicar una versión nueva del despliegue, y
+comprobar tres cosas: el alta de un familiar entra entera o no entra; «Abrir la
+hoja» abre la del Web App; al volver a entrar, el expediente se carga solo. El
+detalle está en [G4-EL-CORTE.md](G4-EL-CORTE.md), «Cierre de G4».
 
 Después, **G5**: apagar el proyecto de Firebase desde su consola. Ese paso no lo
 hago yo —toca Google Cloud— y queda escrito con sus comprobaciones.
-
-Y una limpieza que no es de backend: retirar la integración directa con Sheets
-—la hoja que la PWA crea en el alta, el alta misma y el ámbito `spreadsheets`
-de OAuth—, porque tres utilidades de Ajustes siguen reparando una hoja que ya
-nadie lee.
-
-El plan completo, con los seis pasos y sus puertas, está en
-[PLAN_BLOQUE_G.md](PLAN_BLOQUE_G.md).
-
-Las dos comprobaciones de `aplicar()` que siguen abiertas en `ROUTER.md` no se
-desbloquean aceptando una invitación: hacen falta dos peticiones simultáneas y
-datos que escribir. Llegan cuando la PWA guarde de verdad contra el backend,
-después de G.

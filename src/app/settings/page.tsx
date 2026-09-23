@@ -83,17 +83,12 @@ export default function SettingsPage() {
     runAppointmentRetentionCleanup,
     appointments,
     members,
-    databaseSpreadsheetId,
-    databaseSpreadsheetUrl,
     lastSyncAt,
     lastPullAt,
     lastPushAt,
     deviceId,
     opSyncStatus,
     opSyncError,
-    createGoogleNativeDatabase,
-    pullFromGoogle,
-    pushToGoogle,
     syncNow,
     exportBackupJSON,
     importBackupJSON,
@@ -112,20 +107,17 @@ export default function SettingsPage() {
     history,
     syncInitMessage,
     pendingSyncCount,
+    hojaRegistrada,
     autoSyncEnabled,
     setAutoSyncEnabled,
     needsGoogleAuth,
     reconnectGoogle,
     flushPendingSync,
-    checkForExistingDatabase,
-    repairGoogleNativeDatabase,
 
     // Importación de citas (Bloque B: manual)
     gmailOnlyFutureAppointments,
     setGmailOnlyFutureAppointments,
     appointmentCandidates,
-    repairMemberDocuments,
-    updateDeviceFromGoogle,
     sessionLocked,
     sessionLockedAt,
     autoLockEnabled,
@@ -152,9 +144,6 @@ export default function SettingsPage() {
   // declara después, React lo llama de forma condicional entre renders.
   const [rechazoImportacion, setRechazoImportacion] = useState<{ titulo: string; descripcion: string } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [isRepairing, setIsRepairing] = useState(false);
-  const [isRepairingDocs, setIsRepairingDocs] = useState(false);
-  const [isUpdatingDevice, setIsUpdatingDevice] = useState(false);
   const [showLegal, setShowLegal] = useState(false);
   const [integrityReport, setIntegrityReport] = useState<any | null>(null);
   const [isCheckingIntegrity, setIsCheckingIntegrity] = useState(false);
@@ -493,19 +482,10 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="flex flex-col">
-                    <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Base Google-Native</span>
+                    <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Hoja de la familia</span>
                     <div className="flex items-center gap-1.5 font-extrabold text-slate-700">
-                      {databaseSpreadsheetId ? (
-                        <>
-                          <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-                          <span>Encontrada (Activa)</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
-                          <span>No encontrada (Falta crear)</span>
-                        </>
-                      )}
+                      <span className={`h-2 w-2 rounded-full shrink-0 ${hojaRegistrada ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                      <span>{hojaRegistrada ? 'Registrada en este navegador' : 'Sin registrar en este navegador'}</span>
                     </div>
                   </div>
 
@@ -629,47 +609,6 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
-
-            {/* Sincronización y Hoja Operacional */}
-            {sincronizacionManual && (
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
-                <div className="flex flex-col gap-2">
-                  <div className="flex justify-between border-b border-slate-200/40 pb-2">
-                    <span>Último pull (descarga):</span>
-                    <span className="font-extrabold text-slate-700">{lastPullAt ? new Date(lastPullAt).toLocaleString('es-CO') : 'Nunca'}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-200/40 pb-2">
-                    <span>Último push (subida):</span>
-                    <span className="font-extrabold text-slate-700">{lastPushAt ? new Date(lastPushAt).toLocaleString('es-CO') : 'Nunca'}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-200/40 pb-2">
-                    <span>Última sincronización:</span>
-                    <span className="font-extrabold text-slate-700">{lastSyncAt ? new Date(lastSyncAt).toLocaleString('es-CO') : 'Nunca'}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-200/40 pb-2">
-                    <span>Cambios pendientes locales:</span>
-                    <span className={`font-black ${pendingSyncCount > 0 ? 'text-amber-700' : 'text-slate-700'}`}>{pendingSyncCount}</span>
-                  </div>
-                  <div className="flex justify-between pb-1">
-                    <span>ID de Hoja Operacional:</span>
-                    <span className="font-mono text-[10px] text-slate-700 truncate max-w-[200px]">{databaseSpreadsheetId || 'Sin vincular'}</span>
-                  </div>
-                </div>
-
-                {databaseSpreadsheetUrl && (
-                  <a
-                    href={databaseSpreadsheetUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-1 py-2 px-3 bg-white border border-slate-200 hover:border-teal-500 hover:text-teal-700 text-slate-700 font-extrabold text-[10px] rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
-                  >
-                    <FileSpreadsheet className="h-3.5 w-3.5" />
-                    <span>Abrir hoja operacional actual</span>
-                    <ExternalLink className="h-2.5 w-2.5" />
-                  </a>
-                )}
-              </div>
-            )}
 
             {/* Ejecución de Validación de Integridad */}
             <div className="flex flex-col gap-3 pt-1">
@@ -1106,169 +1045,7 @@ export default function SettingsPage() {
                   </button>
                 </div>
 
-                {/* Botón 3: Reparar base Google-native */}
-                {sincronizacionManual && (
-                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                    <div>
-                      <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reparar base Google-native</span>
-                      <p className="text-[9px] text-slate-500 leading-normal mb-2">Reconstruye pestañas dañadas en Sheets y fuerza la subida local.</p>
-                    </div>
-                    <button
-                      id="btn-repair-database"
-                      onClick={() => repairGoogleNativeDatabase()}
-                      disabled={opSyncStatus === 'syncing' || isRepairing}
-                      className="py-2.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold rounded-xl transition-all border border-rose-100 flex items-center justify-center gap-1.5 w-full disabled:opacity-50 text-[10px]"
-                    >
-                      {isRepairing ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <RotateCcw className="h-3 w-3" />
-                      )}
-                      <span>Reparar base</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Botón 3b: Reparar documentos de miembros */}
-                {sincronizacionManual && (
-                  <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                    <div>
-                      <span className="font-extrabold text-amber-800 block text-[11px] mb-0.5">Reparar documentos de miembros</span>
-                      <p className="text-[9px] text-amber-700 leading-normal mb-2">Detecta y restaura números de documento que hayan desaparecido al sincronizar con Google Sheets.</p>
-                    </div>
-                    <button
-                      id="btn-repair-member-docs"
-                      onClick={async () => {
-                        setIsRepairingDocs(true);
-                        try { await repairMemberDocuments(); } catch (_) {}
-                        finally { setIsRepairingDocs(false); }
-                      }}
-                      disabled={opSyncStatus === 'syncing' || isRepairingDocs || !databaseSpreadsheetId}
-                      className="py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
-                    >
-                      {isRepairingDocs ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <ShieldAlert className="h-3 w-3" />
-                      )}
-                      <span>Reparar documentos</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Botón 3c: Actualizar este dispositivo desde Google */}
-                {sincronizacionManual && (
-                  <div className="p-3 bg-teal-50 border border-teal-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                    <div>
-                      <span className="font-extrabold text-teal-800 block text-[11px] mb-0.5">Actualizar desde Google</span>
-                      <p className="text-[9px] text-teal-700 leading-normal mb-2">Exporta un backup JSON local, hace pull y fusiona de forma segura sin borrar documentos.</p>
-                    </div>
-                    <button
-                      id="btn-update-device-from-google"
-                      onClick={async () => {
-                        setIsUpdatingDevice(true);
-                        try {
-                          await updateDeviceFromGoogle();
-                        } catch (err: any) {
-                          alert(`Error al actualizar el dispositivo: ${err.message}`);
-                        } finally {
-                          setIsUpdatingDevice(false);
-                        }
-                      }}
-                      disabled={opSyncStatus === 'syncing' || isUpdatingDevice || !databaseSpreadsheetId}
-                      className="py-2.5 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
-                    >
-                      {isUpdatingDevice ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Download className="h-3 w-3" />
-                      )}
-                      <span>Actualizar dispositivo</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Botón 4: Crear base si no existe */}
-                {sincronizacionManual && (
-                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                    <div>
-                      <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Crear base si no existe</span>
-                      <p className="text-[9px] text-slate-500 leading-normal mb-2">Crea una base en blanco en tu Drive si no tienes ninguna.</p>
-                    </div>
-                    <button
-                      id="btn-create-database"
-                      onClick={() => createGoogleNativeDatabase()}
-                      disabled={opSyncStatus === 'syncing' || !!databaseSpreadsheetId}
-                      className="py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 w-full shadow-sm text-[10px]"
-                    >
-                      <span>Crear base</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Botón 5: Descargar datos (Pull) */}
-                {sincronizacionManual && (
-                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                    <div>
-                      <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Cargar desde Google</span>
-                      <p className="text-[9px] text-slate-500 leading-normal mb-2">Sobrescribe el estado local con la versión de Google Sheets.</p>
-                    </div>
-                    <button
-                      id="btn-pull-google"
-                      onClick={() => pullFromGoogle()}
-                      disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
-                      className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
-                    >
-                      <span>Cargar desde Google</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Botón 6: Enviar datos locales (Push) */}
-                {sincronizacionManual && (
-                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                    <div>
-                      <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Subir cambios locales</span>
-                      <p className="text-[9px] text-slate-500 leading-normal mb-2">Sube todos tus datos locales actuales a Google Sheets.</p>
-                    </div>
-                    <button
-                      id="btn-push-google"
-                      onClick={() => pushToGoogle()}
-                      disabled={opSyncStatus === 'syncing' || !databaseSpreadsheetId}
-                      className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 disabled:opacity-50 w-full text-[10px]"
-                    >
-                      <span>Subir cambios locales</span>
-                    </button>
-                  </div>
-                )}
-
               </div>
-
-              {/* Enlaces Rápidos a Google Drive / Sheets */}
-              {databaseSpreadsheetUrl && (
-                <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2.5 font-semibold text-[11px] text-slate-500">
-                  <a
-                    id="btn-open-spreadsheet"
-                    href={databaseSpreadsheetUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="py-2.5 bg-slate-800 hover:bg-slate-900 active:bg-black text-white font-extrabold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 text-center w-full"
-                  >
-                    <Grid3X3 className="h-4.5 w-4.5" />
-                    <span>Abrir hoja operacional actual</span>
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                  
-                  <div className="flex justify-between text-[9px] border-t border-slate-200/50 pt-2.5">
-                    <span>ID Hoja de Cálculo:</span>
-                    <span className="font-bold text-slate-700 truncate max-w-[220px]">{databaseSpreadsheetId || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between text-[9px]">
-                    <span>Dispositivo ID:</span>
-                    <span className="font-bold text-slate-700 truncate max-w-[220px]">{deviceId || 'N/A'}</span>
-                  </div>
-                </div>
-              )}
             </section>
         </div>
       )}

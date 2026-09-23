@@ -86,9 +86,12 @@ test.describe('A7 · cabeceras de seguridad', () => {
     // Servicios que la aplicación NO usa: no se les abre paso.
     expect(csp).not.toContain('firebaseio.com');
     expect(csp).not.toContain('apis.google.com');
+    // G4 · y nada de Firebase, que se fue: ni el comodín que lo cubría.
+    expect(csp).not.toContain('*.googleapis.com');
+    expect(csp).not.toContain('firebasestorage');
 
     expect(csp).toContain(
-      "connect-src 'self' https://*.googleapis.com https://accounts.google.com https://script.google.com https://script.googleusercontent.com",
+      "connect-src 'self' https://www.googleapis.com https://sheets.googleapis.com https://accounts.google.com https://script.google.com https://script.googleusercontent.com",
     );
   });
 

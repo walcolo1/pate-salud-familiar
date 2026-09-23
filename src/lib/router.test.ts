@@ -70,6 +70,7 @@ function deps(over: Partial<Dependencias> = {}): Dependencias {
       aceptarInvitacion: () => ({ aceptada: true }),
       verAuditoria: () => [],
       exportar: () => ({}),
+      verHoja: () => ({ url: 'https://docs.google.com/spreadsheets/d/x/edit' }),
     },
     ...over,
   };

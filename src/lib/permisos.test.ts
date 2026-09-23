@@ -170,9 +170,13 @@ describe('el cruce de verbo y alcance', () => {
 describe('el aislamiento por especie', () => {
   const titular = () => acceso('TITULAR');
 
-  it('un verbo de mascota exige que el paciente sea una mascota', () => {
-    expect(puede(titular(), 'ESCRIBIR_HISTORIAL_VET', 'p_kira', 'MASCOTA')).toBe(true);
-    expect(puede(titular(), 'ESCRIBIR_HISTORIAL_VET', 'p_juan', 'HUMANO')).toBe(false);
+  it('el historial es de cualquiera: persona o animal', () => {
+    // Era el único verbo solo de mascotas, y por eso el aislamiento por
+    // especie tenía dos direcciones. G4b lo generalizó —la pestaña HISTORIAL
+    // nunca distinguió especie— y desde entonces solo queda una: hay verbos
+    // que solo valen para personas, y ninguno que solo valga para animales.
+    expect(puede(titular(), 'ESCRIBIR_HISTORIAL', 'p_kira', 'MASCOTA')).toBe(true);
+    expect(puede(titular(), 'ESCRIBIR_HISTORIAL', 'p_juan', 'HUMANO')).toBe(true);
   });
 
   it('un verbo humano exige que el paciente sea humano', () => {
@@ -182,9 +186,9 @@ describe('el aislamiento por especie', () => {
   });
 
   it('no saber la especie NO es permiso', () => {
-    // Un historial veterinario sobre alguien de quien no se sabe si es un
-    // animal se queda sin escribir. Denegación estricta también aquí.
-    expect(puede(titular(), 'ESCRIBIR_HISTORIAL_VET', 'p_kira')).toBe(false);
+    // Una orden de EPS sobre alguien de quien no se sabe si es una persona se
+    // queda sin escribir. Denegación estricta también aquí.
+    expect(puede(titular(), 'ESCRIBIR_ORDEN', 'p_juan')).toBe(false);
     expect(puede(titular(), 'ESCRIBIR_ORDEN', 'p_juan', undefined)).toBe(false);
     expect(puede(titular(), 'ESCRIBIR_ORDEN', 'p_juan', 'CUALQUIERA')).toBe(false);
   });

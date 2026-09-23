@@ -78,17 +78,12 @@ export const DIRECTIVAS_CSP: Readonly<Record<string, readonly string[]>> = {
   // data:  avatares incrustados como data-URI (≤32 KB)
   // blob:  previsualización de avatar con URL.createObjectURL
   // lh3    foto de perfil que devuelve el id_token de Google
-  // fbst   descargas de Firebase Storage (getDownloadURL)
-  'img-src': [
-    "'self'",
-    'data:',
-    'blob:',
-    'https://lh3.googleusercontent.com',
-    'https://firebasestorage.googleapis.com',
-  ],
+  //
+  // G4 · `firebasestorage.googleapis.com` se fue con Firebase. Las fotos que
+  // apuntaban ahí eran datos de prueba.
+  'img-src': ["'self'", 'data:', 'blob:', 'https://lh3.googleusercontent.com'],
 
-  // Destinos de red confirmados en el código: www./sheets./gmail.googleapis.com,
-  // Firestore, Identity Toolkit y Secure Token (todos *.googleapis.com), y
+  // Destinos de red confirmados en el código: www. y sheets.googleapis.com, y
   // accounts.google.com para GIS.
   //
   // `*.firebaseio.com` NO está: la auditoría de A7 confirmó cero referencias a
@@ -104,9 +99,22 @@ export const DIRECTIVAS_CSP: Readonly<Record<string, readonly string[]>> = {
   // una redirección a `script.googleusercontent.com/macros/echo`, y `connect-src`
   // comprueba también el destino de la redirección. Con solo el primer host, la
   // petición sigue muriendo. Lo fija `e2e/webapp-humo.e2e.ts` (E0b-3).
+  //
+  // G4 · Aquí había `https://*.googleapis.com`. Cubría Sheets, Drive y
+  // Calendar, que se usan, y también Firestore, Identity Toolkit y Secure
+  // Token, que se fueron con Firebase. Un comodín no se recorta: se sustituye
+  // por los hosts que el navegador de verdad llama, medidos en el código:
+  //
+  //   www.googleapis.com     Drive, Calendar y appData
+  //   sheets.googleapis.com  la integración directa con Sheets
+  //
+  // `oauth2.googleapis.com` (tokeninfo) NO entra: lo llama el backend, en
+  // Auth.gs, nunca el navegador. Una prueba recorre src/ y exige que todo host
+  // de googleapis que aparezca en el código esté en esta lista.
   'connect-src': [
     "'self'",
-    'https://*.googleapis.com',
+    'https://www.googleapis.com',
+    'https://sheets.googleapis.com',
     'https://accounts.google.com',
     'https://script.google.com',
     'https://script.googleusercontent.com',

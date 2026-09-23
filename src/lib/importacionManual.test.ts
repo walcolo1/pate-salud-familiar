@@ -61,7 +61,9 @@ describe('ámbitos OAuth · lista cerrada', () => {
       'email',
       'https://www.googleapis.com/auth/drive.file',
       'https://www.googleapis.com/auth/drive.appdata',
-      'https://www.googleapis.com/auth/spreadsheets',
+      // `spreadsheets` salió al cerrar G4: la hoja de la familia la abre el
+      // Web App con su propio permiso, y los informes que crea la aplicación
+      // se escriben con `drive.file`.
       'https://www.googleapis.com/auth/calendar.events',
     ]);
   });

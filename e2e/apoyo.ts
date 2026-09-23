@@ -65,9 +65,6 @@ export async function entrarComoSesionRealSimulada(page: Page) {
         medicalOrders: [], medicationPrescriptions: [], medicationDoseReminders: [],
         appointmentCandidates: [], sharedReports: [], emailSources: [],
         driveSyncEnabled: true, calendarSyncEnabled: true, lastExportMetadata: null,
-        // Evita el desvío a /onboarding/setup, que exige una hoja configurada.
-        databaseSpreadsheetId: 'hoja-e2e-inexistente',
-        databaseSpreadsheetUrl: 'https://docs.google.com/spreadsheets/d/hoja-e2e-inexistente',
       }),
     );
   });
