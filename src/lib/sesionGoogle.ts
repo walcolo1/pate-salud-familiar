@@ -90,6 +90,7 @@ export class SesionGoogle {
   private expira: number | null = null;
   private renovando: Promise<void> | null = null;
   private yaPedido = false;
+  private readonly oyentes = new Set<() => void>();
 
   constructor(entorno: EntornoSesion) {
     this.entorno = entorno;
@@ -105,6 +106,29 @@ export class SesionGoogle {
     // Vuelve a armarse el aviso: si esta sesión caduca, habrá que decirlo otra
     // vez.
     this.yaPedido = false;
+    this.avisarLlegada();
+  }
+
+  /**
+   * Avisa cada vez que llega una credencial válida, del inicio o de una
+   * renovación. Lo usa la carga al entrar: tras un F5 la credencial llega
+   * segundos después de montar, y hay que enterarse entonces. Devuelve la baja.
+   */
+  alRecibir(oyente: () => void): () => void {
+    this.oyentes.add(oyente);
+    return () => {
+      this.oyentes.delete(oyente);
+    };
+  }
+
+  private avisarLlegada(): void {
+    for (const oyente of [...this.oyentes]) {
+      try {
+        oyente();
+      } catch {
+        // Un oyente roto no puede costar la sesión.
+      }
+    }
   }
 
   /** Cierre de sesión. No es una caducidad, así que no se avisa de nada. */
@@ -185,6 +209,7 @@ export class SesionGoogle {
       if (nuevo && expira !== null && expira > this.entorno.ahora()) {
         this.token = nuevo;
         this.expira = expira;
+        this.avisarLlegada();
       }
     } catch (error) {
       // Que no se pueda renovar en silencio es lo esperado en más navegadores

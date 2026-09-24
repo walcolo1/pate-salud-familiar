@@ -5,7 +5,8 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { arrancarIdentidad } from '../lib/identidadGis';
 import { conectarSondeo, ventanaDelNavegador } from '../lib/sondeoRevision';
 import { comprobarYRegistrar, type ResultadoRegistro } from '../lib/registroBackend';
-import { sesionBackend } from '../lib/identidad';
+import { sesionBackend, sesionDeLaAplicacion } from '../lib/identidad';
+import { CargaAlEntrar } from '../lib/cargaAlEntrar';
 import { decodeGoogleToken } from '../lib/googleAuth';
 import { clientIdConfigurado } from '../lib/importacionManual';
 import { getDataRepository, resetDataRepository } from '../lib/dataRepository';
@@ -365,7 +366,6 @@ interface AppContextProps {
   autoSyncEnabled: boolean;
   setAutoSyncEnabled: (v: boolean) => void;
   needsGoogleAuth: boolean;
-  reconnectGoogle: () => Promise<void>;
   flushPendingSync: () => Promise<void>;
 
   // Secure Google-Native Sharing Phase 3B
@@ -498,6 +498,8 @@ interface AppContextProps {
    * de G4b, y por eso se enseña en voz alta y no se deduce de un contador.
    */
   hojaRegistrada: boolean;
+  /** El expediente se está descargando de la hoja al entrar. Para el indicador. */
+  cargandoExpediente: boolean;
   /** Comprueba la URL del `/exec` con `ping` y, si cuadra, la guarda. */
   registrarHojaFamiliar: (url: string) => Promise<ResultadoRegistro>;
   /** Cierre de G4 · la dirección de la hoja del Web App. Solo el titular; no se guarda. */
@@ -600,6 +602,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     usuarioActivoRef.current = user;
   }, [user]);
+
+  /*
+   * La carga del expediente al entrar (tras G4).
+   *
+   * Se intenta cada vez que cambia algo —entra el usuario, llega una
+   * credencial, se registra la hoja— y ocurre una vez por sesión en cuanto
+   * están la hoja y la identidad, sin importar el orden. Tras un F5 la
+   * credencial de GIS llega segundos después de montar: antes, un temporizador
+   * de 500 ms se adelantaba, fallaba sin identidad y no se repetía nunca.
+   *
+   * La identidad solo cuenta con un usuario de Google ya activo: si la carga
+   * empezara al llegar la credencial, antes de que `signIn` restaure el estado
+   * local, ese estado podría pisar lo recién descargado.
+   */
+  const [cargandoExpediente, setCargandoExpediente] = useState(false);
+  const cargarExpedienteRef = useRef<() => Promise<void>>(async () => {});
+  const cargaAlEntrarRef = useRef<CargaAlEntrar | null>(null);
+  if (cargaAlEntrarRef.current === null) {
+    cargaAlEntrarRef.current = new CargaAlEntrar({
+      hayHoja: () => sesionBackend().url() !== null,
+      hayIdentidad: () =>
+        sesionDeLaAplicacion.vigente && usuarioActivoRef.current?.provider === 'google',
+      cargar: () => cargarExpedienteRef.current(),
+      alCambiarCargando: setCargandoExpediente,
+    });
+  }
+  useEffect(
+    () => sesionDeLaAplicacion.alRecibir(() => void cargaAlEntrarRef.current?.intentar()),
+    [],
+  );
 
   const membersRef = useRef<FamilyMember[]>(members);
   const healthProfilesRef = useRef<Record<string, HealthProfile>>(healthProfiles);
@@ -1742,8 +1774,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // es decirle a Google que no vuelva a entrar solo en la siguiente carga:
       // pelearse con quien se acaba de ir a propósito es peor que pedirle el
       // botón otra vez.
-      const { sesionDeLaAplicacion } = await import('../lib/identidad');
       sesionDeLaAplicacion.olvidar();
+      // La siguiente entrada vuelve a cargar el expediente.
+      cargaAlEntrarRef.current?.reiniciar();
     } catch (err) {
       console.error('[AppContext] Error al cerrar la sesión de Google:', err);
     }
@@ -2426,46 +2459,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (fallidas.length === 0) setNeedsGoogleAuth(false);
     } finally {
       isSyncInProgress.current = false;
-    }
-  };
-
-  /**
-   * reconnectGoogle — Solicita token explícitamente con popup y luego flushea cambios pendientes.
-   * Solo se llama cuando el usuario hace clic en "Conectar Google" o "Reconectar".
-   */
-  const reconnectGoogle = async (): Promise<void> => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!clientId) return;
-
-    setSyncInitStatus('checking');
-    setSyncInitMessage('Conectando con Google...');
-    setOpSyncError(null);
-
-    try {
-      // forcePrompt=false usa el popup normal de GIS (select_account)
-      const token = await ensureOperationalToken(clientId, false);
-      setNeedsGoogleAuth(false);
-      
-      void token;
-      // Cierre de G4 · ya no se busca la hoja vieja en appDataFolder: la de la
-      // familia está registrada aparte. Solo queda reenviar lo que esperaba.
-      if (pendingSyncCount > 0) {
-        setSyncInitMessage('Reenviando cambios pendientes...');
-        await flushPendingSync();
-      }
-      setSyncInitStatus('idle');
-      setSyncInitMessage('');
-    } catch (err: any) {
-      const errMsg = err?.error || err?.message || 'Error desconocido';
-      const cancelled = errMsg === 'access_denied' || errMsg === 'popup_closed_by_user';
-      if (!cancelled) {
-        setSyncInitStatus('error');
-        setSyncInitMessage(`Error al conectar: ${errMsg}`);
-        setNeedsGoogleAuth(true);
-      } else {
-        setSyncInitStatus('pending_sync');
-        setSyncInitMessage('Autorización cancelada. Los cambios quedaron pendientes.');
-      }
     }
   };
 
@@ -4827,7 +4820,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (Array.isArray(data.emailSources)) setEmailSources(data.emailSources);
       if (Array.isArray(data.appointmentCandidates)) setAppointmentCandidates(data.appointmentCandidates);
 
-
       const nowStr = new Date().toISOString();
       const markPendingSync = <T extends { syncStatus?: any; updatedAt?: string }>(arr: T[]): T[] => {
         return arr.map(item => ({
@@ -4977,6 +4969,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (resultado.ok) {
       setHojaRegistrada(true);
       await flushPendingSync();
+      // Recién registrada —o cambiada—, el expediente de esa hoja todavía no
+      // se ha leído.
+      cargaAlEntrarRef.current?.reiniciar();
+      await cargaAlEntrarRef.current?.intentar();
     }
     return resultado;
   };
@@ -4999,14 +4995,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * Un fallo no molesta a nadie: la copia local sigue ahí, `pullFromGoogle`
    * deja el motivo en el diagnóstico y el sondeo avisará cuando haya algo.
    */
+  cargarExpedienteRef.current = pullFromGoogle;
   const autoSyncOnLogin = async (loggedUser: UserAccount): Promise<void> => {
     if (!loggedUser || loggedUser.provider !== 'google') return;
-    if (sesionBackend().url() === null) return;
-    try {
-      await pullFromGoogle();
-    } catch {
-      /* el motivo ya está en opSyncError */
-    }
+    // Si todavía no hay credencial, no pasa nada: la carga se repite sola
+    // cuando llegue. Un fallo deja el motivo en opSyncError.
+    await cargaAlEntrarRef.current?.intentar();
   };
 
   /**
@@ -5316,7 +5310,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const updatedReports = [newReport, ...sharedReports];
       setSharedReports(updatedReports);
 
-
       // Trazabilidad de Auditoría
       const reportEvent: MedicalHistoryEvent = {
         id: `hist-rep-${Date.now()}`,
@@ -5384,7 +5377,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } : r);
 
       setSharedReports(updatedReports);
-
 
       // Auditoría
       const revokeEvent: MedicalHistoryEvent = {
@@ -5891,7 +5883,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       autoSyncEnabled,
       setAutoSyncEnabled,
       needsGoogleAuth,
-      reconnectGoogle,
       flushPendingSync,
 
       // Secure Google-Native Sharing Phase 3B Bindings
@@ -5933,6 +5924,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       hayCambiosRemotos,
       recargarExpediente,
       hojaRegistrada,
+      cargandoExpediente,
       registrarHojaFamiliar,
       urlDeLaHojaFamiliar,
       pendingInvitations,

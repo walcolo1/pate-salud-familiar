@@ -423,3 +423,36 @@ cualquier cosa guardada con ese nombre sobreviviría a la purga.
 En un ordenador compartido, quien entre después con otra cuenta hablará con el
 mismo despliegue y recibirá `ACCESO_DENEGADO` si no está invitado. Cambiar la
 dirección se hace desde la misma tarjeta de Ajustes.
+
+## Tras el cierre: el expediente se carga solo al entrar
+
+La validación en vivo: al entrar, «Mi familia: 0», y los datos solo llegaban
+tras pasar por Ajustes y pulsar botones.
+
+**Por qué.** La carga la disparaba un temporizador de 500 ms. Tras un F5,
+AppContext restaura al usuario guardado y el temporizador se adelanta a la
+credencial de GIS, que llega segundos después: la carga fallaba sin identidad
+y el error se callaba. Cuando la credencial llegaba, se tomaba por una
+renovación —mismo correo— y no se volvía a intentar nunca.
+
+**Ahora.** `cargaAlEntrar.ts` lo coordina sin depender del orden: se intenta
+al entrar, al llegar una credencial (`SesionGoogle.alRecibir`) y al registrar
+la hoja, y carga **una vez por sesión** en cuanto están la hoja y la identidad.
+Un fallo pasajero se reintenta en el siguiente disparo; las renovaciones de
+cada hora no recargan nada. La identidad solo cuenta con un usuario de Google
+ya activo: si la carga empezara antes de que `signIn` restaure el estado
+local, ese estado pisaría lo recién descargado.
+
+Mientras carga, el panel enseña «Trayendo el expediente de la hoja de tu
+familia…» en lugar de «Aún no tienes familiares registrados», y no dice «(0)».
+
+**Ajustes sin sincronización manual.** Fuera «Reconectar Google», el aviso
+«Autorizar sincronización», «Sincronizar ahora», el interruptor de
+sincronización en fondo —no controlaba nada desde G4b— y la ficha de permisos
+por servicio con sus «Reconectar Drive/Calendar/Sheets». Subir documentos y
+crear eventos piden su permiso solos cuando hace falta.
+`ajustesSinManuales.test.ts` vigila que no vuelvan.
+
+**Sin prueba automática del arranque real.** El arnés no puede entregar una
+credencial de GIS. La coordinación está probada con dobles; el arranque de
+verdad va en la validación en vivo: entrar, y también F5 con la sesión abierta.

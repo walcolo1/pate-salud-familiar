@@ -89,7 +89,6 @@ export default function SettingsPage() {
     deviceId,
     opSyncStatus,
     opSyncError,
-    syncNow,
     exportBackupJSON,
     importBackupJSON,
     sharedReports,
@@ -108,10 +107,6 @@ export default function SettingsPage() {
     syncInitMessage,
     pendingSyncCount,
     hojaRegistrada,
-    autoSyncEnabled,
-    setAutoSyncEnabled,
-    needsGoogleAuth,
-    reconnectGoogle,
     flushPendingSync,
 
     // Importación de citas (Bloque B: manual)
@@ -433,41 +428,18 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full border uppercase leading-none ${
-                  needsGoogleAuth ? 'bg-amber-50 text-amber-700 border-amber-100' :
                   opSyncStatus === 'synced' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
                   opSyncStatus === 'syncing' ? 'bg-blue-50 text-blue-600 border-blue-100' :
                   opSyncStatus === 'error' ? 'bg-rose-50 text-rose-700 border-rose-100' :
                   'bg-slate-50 text-slate-500 border-slate-200'
                 }`}>
-                  {needsGoogleAuth ? 'Autenticación Requerida' :
-                    opSyncStatus === 'synced' ? 'Sincronizado' :
+                  {opSyncStatus === 'synced' ? 'Sincronizado' :
                     opSyncStatus === 'syncing' ? 'Sincronizando' :
                     opSyncStatus === 'error' ? 'Error de Sincronización' : 'Desconectado'}
                 </span>
               </div>
 
               <hr className="border-slate-50" />
-
-              {/* Banner de alerta de consentimiento */}
-              {needsGoogleAuth && (
-                <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col gap-3 font-semibold text-[10px] text-amber-800 leading-relaxed shadow-sm">
-                  <div className="flex items-start gap-2.5">
-                    <AlertCircle className="h-4.5 w-4.5 text-amber-700 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold text-amber-950 block text-[11px] mb-0.5">Necesitamos permiso para sincronizar tus datos</span>
-                      <p>Por políticas de Google, requerimos tu consentimiento explícito para guardar tus datos en Sheets y Drive. Si no autorizas, tus cambios se guardarán localmente como pendientes.</p>
-                    </div>
-                  </div>
-                  <button
-                    id="btn-reconnect-consent-banner"
-                    onClick={() => reconnectGoogle()}
-                    className="w-full py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <Wifi className="h-3.5 w-3.5" />
-                    <span>Autorizar sincronización</span>
-                  </button>
-                </div>
-              )}
 
               {/* Grid de Diagnóstico */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-4 font-semibold text-[11px] text-slate-500 leading-relaxed">
@@ -519,23 +491,6 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                {/* Toggle de Auto-Sync */}
-                <div className="flex items-center justify-between border-t border-slate-100/70 pt-3.5 mt-1.5">
-                  <div>
-                    <span className="font-extrabold text-slate-700 block text-xs mb-0.5">Sincronización Automática en Fondo</span>
-                    <p className="text-[10px] text-slate-500 font-semibold">Sube cambios de forma silenciosa tras 4 segundos de inactividad.</p>
-                  </div>
-                  <button 
-                    id="btn-toggle-auto-sync"
-                    type="button"
-                    onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
-                    className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
-                      autoSyncEnabled ? 'bg-teal-700 justify-end' : 'bg-slate-200 justify-start'
-                    }`}
-                  >
-                    <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
-                  </button>
-                </div>
               </div>
             </section>
           )}
@@ -688,137 +643,6 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* Ficha 2: Permisos Específicos por Servicio */}
-          <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Permisos de Servicios</h4>
-                <p className="text-[10px] text-slate-500 font-semibold">Verifica el estado individual de consentimiento de las APIs de Google.</p>
-              </div>
-            </div>
-
-            <hr className="border-slate-50" />
-
-            <div className="grid grid-cols-1 gap-4">
-              
-              {/* Servicio: Google Drive */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Cloud className="h-5 w-5 text-blue-600" />
-                    <div>
-                      <span className="font-extrabold text-slate-800 block text-xs mb-0.5">Google Drive (Carpeta de la App)</span>
-                      <span className="text-[9px] text-slate-500 block leading-none">Guardado seguro de PDFs y documentos clínicos</span>
-                    </div>
-                  </div>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
-                    driveStatus === 'connected' || driveStatus === 'subido' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                    driveStatus === 'error' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
-                    'bg-slate-200 text-slate-500'
-                  }`}>
-                    {driveStatus === 'connected' || driveStatus === 'subido' ? 'Autorizado' :
-                     driveStatus === 'connecting' || driveStatus === 'authorizing' || driveStatus === 'subiendo' ? 'Conectando...' :
-                     driveStatus === 'error' ? 'Error' : 'Sin permiso'}
-                  </span>
-                </div>
-                
-                {driveError && (
-                  <p className="text-[9px] text-rose-500 bg-rose-50 p-2 rounded-lg border border-rose-100/50">{driveError}</p>
-                )}
-
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-100/60 pt-2.5 mt-1">
-                  <span className="text-[9px] text-slate-500 font-bold">Último token: {lastDriveAuthTime ? new Date(lastDriveAuthTime).toLocaleTimeString() : 'N/A'}</span>
-                  <button
-                    id="btn-reconnect-drive"
-                    onClick={() => connectDrive()}
-                    className="py-1.5 px-3 bg-white border border-slate-200 hover:border-teal-500 text-slate-700 font-extrabold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
-                  >
-                    <span>Reconectar Drive</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Servicio: Google Calendar */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-teal-700" />
-                    <div>
-                      <span className="font-extrabold text-slate-800 block text-xs mb-0.5">Google Calendar</span>
-                      <span className="text-[9px] text-slate-500 block leading-none">Agendamiento y sincronización de citas médicas</span>
-                    </div>
-                  </div>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
-                    calendarStatus === 'connected' || calendarStatus === 'sincronizado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                    calendarStatus === 'error' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
-                    'bg-slate-200 text-slate-500'
-                  }`}>
-                    {calendarStatus === 'connected' || calendarStatus === 'sincronizado' ? 'Autorizado' :
-                     calendarStatus === 'connecting' || calendarStatus === 'authorizing' || calendarStatus === 'sincronizando' ? 'Conectando...' :
-                     calendarStatus === 'error' ? 'Error' : 'Sin permiso'}
-                  </span>
-                </div>
-
-                {calendarError && (
-                  <p className="text-[9px] text-rose-500 bg-rose-50 p-2 rounded-lg border border-rose-100/50">{calendarError}</p>
-                )}
-
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-100/60 pt-2.5 mt-1">
-                  <span className="text-[9px] text-slate-500 font-bold">Último token: {lastCalendarAuthTime ? new Date(lastCalendarAuthTime).toLocaleTimeString() : 'N/A'}</span>
-                  <button
-                    id="btn-reconnect-calendar"
-                    onClick={() => connectCalendar()}
-                    className="py-1.5 px-3 bg-white border border-slate-200 hover:border-teal-500 text-slate-700 font-extrabold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
-                  >
-                    <span>Reconectar Calendar</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Servicio: Google Sheets */}
-              {sincronizacionManual && (
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3 font-semibold text-[11px] text-slate-500">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileSpreadsheet className="h-5 w-5 text-emerald-700" />
-                      <div>
-                        <span className="font-extrabold text-slate-800 block text-xs mb-0.5">Google Sheets (Base y Exportación)</span>
-                        <span className="text-[9px] text-slate-500 block leading-none">Guardado de tablas operacionales y reportes familiares</span>
-                      </div>
-                    </div>
-                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
-                      sheetsStatus === 'connected' || sheetsStatus === 'exportado' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                      sheetsStatus === 'error' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
-                      'bg-slate-200 text-slate-500'
-                    }`}>
-                      {sheetsStatus === 'connected' || sheetsStatus === 'exportado' ? 'Autorizado' :
-                       sheetsStatus === 'connecting' || sheetsStatus === 'authorizing' || sheetsStatus === 'exportando' ? 'Conectando...' :
-                       sheetsStatus === 'error' ? 'Error' : 'Sin permiso'}
-                    </span>
-                  </div>
-
-                  {sheetsError && (
-                    <p className="text-[9px] text-rose-500 bg-rose-50 p-2 rounded-lg border border-rose-100/50">{sheetsError}</p>
-                  )}
-
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-100/60 pt-2.5 mt-1">
-                    <span className="text-[9px] text-slate-500 font-bold">Último token: {lastSheetsAuthTime ? new Date(lastSheetsAuthTime).toLocaleTimeString() : 'N/A'}</span>
-                    <button
-                      id="btn-reconnect-sheets"
-                      onClick={() => connectSheets()}
-                      className="py-1.5 px-3 bg-white border border-slate-200 hover:border-teal-500 text-slate-700 font-extrabold text-[10px] rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm"
-                    >
-                      <span>Reconectar Sheets</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-            </div>
-          </section>
 
           {/* Ficha: Invitaciones Familiares (solo el titular) */}
           {!sincronizacionManual && currentUserRole === 'FAMILY_ADMIN' && (
@@ -981,72 +805,6 @@ export default function SettingsPage() {
             </section>
           )}
 
-            <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                  {!sincronizacionManual ? <Cloud className="h-5 w-5" /> : <Database className="h-5 w-5" />}
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">
-                    {!sincronizacionManual ? "Conexión de Servicios de Google" : "Acciones Manuales de Respaldo"}
-                  </h4>
-                  <p className="text-[10px] text-slate-500 font-semibold">
-                    {!sincronizacionManual 
-                      ? "Administra la conexión con tu cuenta de Google para Drive y Calendar."
-                      : "Ejecuta operaciones de respaldo secundarias para resolver conflictos."}
-                  </p>
-                </div>
-              </div>
-
-              <hr className="border-slate-50" />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
-                
-                {/* Botón 1: Sincronizar Ahora */}
-                {sincronizacionManual && (
-                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                    <div>
-                      <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Sincronizar ahora</span>
-                      <p className="text-[9px] text-slate-500 leading-normal mb-2">Descarga cambios de la nube y sube tus cambios pendientes.</p>
-                    </div>
-                    <button
-                      id="btn-sync-now"
-                      onClick={() => syncNow()}
-                      disabled={opSyncStatus === 'syncing' || needsGoogleAuth}
-                      className="py-2.5 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 w-full text-[10px]"
-                    >
-                      {opSyncStatus === 'syncing' ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-3 w-3" />
-                      )}
-                      <span>Sincronizar ahora</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Botón 2: Reconectar Google */}
-                <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 font-semibold text-[10px] justify-between">
-                  <div>
-                    <span className="font-extrabold text-slate-800 block text-[11px] mb-0.5">Reconectar Google</span>
-                    <p className="text-[9px] text-slate-500 leading-normal mb-2">
-                      {!sincronizacionManual 
-                        ? "Renueva los permisos de Google Drive y Calendar si expiran."
-                        : "Solicita y renueva el token global abriendo la ventana de Google."}
-                    </p>
-                  </div>
-                  <button
-                    id="btn-reconnect-google"
-                    onClick={() => reconnectGoogle()}
-                    className="py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl transition-all border border-slate-300 flex items-center justify-center gap-1.5 w-full text-[10px]"
-                  >
-                    <Wifi className="h-3 w-3" />
-                    <span>Reconectar Google</span>
-                  </button>
-                </div>
-
-              </div>
-            </section>
         </div>
       )}
 

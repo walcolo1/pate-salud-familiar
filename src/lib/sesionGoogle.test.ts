@@ -244,3 +244,50 @@ describe('lo que NUNCA hace', () => {
     expect(CODIGO).not.toMatch(/console\.(log|info|debug|warn)/);
   });
 });
+
+describe('avisar de que llegó una credencial', () => {
+  // Lo necesita la carga al entrar: tras un F5, la credencial de GIS llega
+  // segundos después de montar, y quien quiere cargar el expediente tiene que
+  // enterarse en ese momento, no adivinarlo con un temporizador.
+  it('avisa a quien escucha cuando llega una credencial válida', () => {
+    const b = banco();
+    const oyente = vi.fn();
+    b.sesion.alRecibir(oyente);
+    b.sesion.recibir(b.nuevoToken(HORA));
+    expect(oyente).toHaveBeenCalledTimes(1);
+  });
+
+  it('no avisa de una credencial que no sirve', () => {
+    const b = banco();
+    const oyente = vi.fn();
+    b.sesion.alRecibir(oyente);
+    b.sesion.recibir('no-es-un-token');
+    b.sesion.recibir(null);
+    expect(oyente).not.toHaveBeenCalled();
+  });
+
+  it('avisa también de las renovaciones silenciosas', async () => {
+    const b = banco();
+    b.sesion.recibir(b.nuevoToken(5 * 60 * 1000)); // a punto de caducar
+    const oyente = vi.fn();
+    b.sesion.alRecibir(oyente);
+    await b.sesion.idToken();
+    expect(oyente).toHaveBeenCalledTimes(1);
+  });
+
+  it('se puede dejar de escuchar, y un oyente que falla no rompe la sesión', () => {
+    const b = banco();
+    const baja = b.sesion.alRecibir(() => {
+      throw new Error('oyente roto');
+    });
+    expect(() => b.sesion.recibir(b.nuevoToken(HORA))).not.toThrow();
+    expect(b.sesion.vigente).toBe(true);
+
+    const oyente = vi.fn();
+    const bajaOyente = b.sesion.alRecibir(oyente);
+    baja();
+    bajaOyente();
+    b.sesion.recibir(b.nuevoToken(HORA));
+    expect(oyente).not.toHaveBeenCalled();
+  });
+});

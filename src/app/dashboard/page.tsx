@@ -38,6 +38,7 @@ export default function DashboardPage() {
     medicationDoseReminders,
     appointmentCandidates,
     pendingSyncCount,
+    cargandoExpediente,
     isLoading,
     sincronizacionManual,
     familyId,
@@ -371,7 +372,16 @@ export default function DashboardPage() {
       {/* ── Family Members Section ───────────────────────────────────────── */}
       <section className="flex flex-col gap-3">
         <div className="flex justify-between items-center px-1">
-          <h3 className="font-extrabold text-slate-800 text-sm tracking-wide uppercase">Mi Familia ({activeMembers.length})</h3>
+          <h3 className="font-extrabold text-slate-800 text-sm tracking-wide uppercase flex items-center gap-2">
+            {/* Mientras llega el expediente, un «(0)» diría algo que no es verdad. */}
+            {cargandoExpediente && activeMembers.length === 0 ? 'Mi Familia' : `Mi Familia (${activeMembers.length})`}
+            {cargandoExpediente && activeMembers.length > 0 && (
+              <span
+                aria-hidden="true"
+                className="h-3 w-3 rounded-full border-2 border-teal-600 border-t-transparent animate-spin"
+              />
+            )}
+          </h3>
           <Link href="/members" className="text-xs font-bold text-teal-700 hover:text-teal-800 flex items-center gap-1">
             <span>Ver todos</span>
             <ArrowRight className="h-3.5 w-3.5" />
@@ -380,7 +390,11 @@ export default function DashboardPage() {
  
         {/* Members row */}
         <div className="flex items-center gap-3.5 overflow-x-auto pb-2 scrollbar-none w-full">
-          {activeMembers.length === 0 ? (
+          {activeMembers.length === 0 && cargandoExpediente ? (
+            <div className="flex-1">
+              <EstadoCarga variante="bloque" mensaje="Trayendo el expediente de la hoja de tu familia…" />
+            </div>
+          ) : activeMembers.length === 0 ? (
             <div className="flex-1">
               <EstadoVacio
                 variante="compacto"
