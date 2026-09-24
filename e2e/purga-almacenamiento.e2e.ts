@@ -41,7 +41,7 @@ test.describe('A6-F2 · purga de localStorage', () => {
     expect(todo).not.toContain(SINTETICOS.documento);
     expect(todo).not.toContain(SINTETICOS.medicamento);
     expect(todo).not.toContain(SINTETICOS.hoja);
-    // 4 · De las claves propias, solo sobreviven las tres permitidas.
+    // 4 · De las claves propias, solo sobreviven las cuatro permitidas.
     const propias = claves.filter((k) => k.startsWith('pate')).sort();
     expect(propias).toEqual([...CLAVES_PRESERVADAS].sort());
     // 5 · Una clave futura desconocida también se elimina.
@@ -63,6 +63,8 @@ test.describe('A6-F2 · purga de localStorage', () => {
     expect(almacen['pate_salud_device_id']).toBe('dispositivo-e2e');
     expect(almacen['pate:prefs:migrado']).toBe('1');
     expect(almacen['pate:prefs:v1']).toBeTruthy();
+    // La hoja de la familia también: reentrar no obliga a registrarla otra vez.
+    expect(almacen['pate:familia:v1']).toBe(SINTETICOS.backend);
     // Las preferencias se reescriben en el paso (e) con la forma completa.
     const prefs = JSON.parse(almacen['pate:prefs:v1']);
     expect(Object.keys(prefs)).toContain('autoLockMinutes');

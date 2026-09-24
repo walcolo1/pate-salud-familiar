@@ -10,6 +10,9 @@ import {
   CLAVE_MIGRACION,
   type AlmacenLike,
 } from './preferencias';
+import { CLAVE_SESION_FAMILIAR } from './invitacionEntrante';
+
+const BACKEND = 'https://script.google.com/macros/s/AKfycbFALSO0123456789abcdefgh/exec';
 
 const CLAVE_DEMO_HEREDADA = 'pate_salud_familiar_app_state_demo';
 
@@ -44,6 +47,7 @@ function escenarioCompleto() {
     [CLAVE_PREFERENCIAS]: '{"autoLockMinutes":15}',
     [CLAVE_DEVICE_ID]: 'dev-123',
     [CLAVE_MIGRACION]: '1',
+    [CLAVE_SESION_FAMILIAR]: BACKEND,
     // Ajenas a Paté
     'otra-app:sesion': 'no tocar',
     'theme': 'dark',
@@ -52,11 +56,12 @@ function escenarioCompleto() {
 }
 
 describe('debeEliminarse', () => {
-  it('preserva exactamente las tres claves permitidas', () => {
+  it('preserva exactamente las cuatro claves permitidas', () => {
     expect(debeEliminarse(CLAVE_PREFERENCIAS)).toBe(false);
     expect(debeEliminarse(CLAVE_DEVICE_ID)).toBe(false);
     expect(debeEliminarse(CLAVE_MIGRACION)).toBe(false);
-    expect(CLAVES_PRESERVADAS.size).toBe(3);
+    expect(debeEliminarse(CLAVE_SESION_FAMILIAR)).toBe(false);
+    expect(CLAVES_PRESERVADAS.size).toBe(4);
   });
 
   it('elimina cualquier clave de la app no preservada', () => {
@@ -92,13 +97,34 @@ describe('purgarPersistenciaLocal', () => {
     expect(r.sinAlmacenamiento).toBe(false);
   });
 
-  it('preserva EXACTAMENTE las tres claves permitidas, con su valor intacto', () => {
+  it('preserva EXACTAMENTE las cuatro claves permitidas, con su valor intacto', () => {
     const { store, datos } = escenarioCompleto();
     purgarPersistenciaLocal(store);
 
     expect(datos.get(CLAVE_PREFERENCIAS)).toBe('{"autoLockMinutes":15}');
     expect(datos.get(CLAVE_DEVICE_ID)).toBe('dev-123');
     expect(datos.get(CLAVE_MIGRACION)).toBe('1');
+    expect(datos.get(CLAVE_SESION_FAMILIAR)).toBe(BACKEND);
+  });
+
+  it('la hoja de la familia sobrevive al cierre de sesión: reentrar no pide registrarla otra vez', () => {
+    // Validación en vivo tras G4: cerrar sesión borraba la URL del Web App, y
+    // al volver a entrar el panel decía «0 familiares» hasta pegarla de nuevo.
+    const { store, datos } = almacenFalso({ [CLAVE_SESION_FAMILIAR]: BACKEND });
+    const r = purgarPersistenciaLocal(store);
+    expect(datos.get(CLAVE_SESION_FAMILIAR)).toBe(BACKEND);
+    expect(r.clavesEliminadas).not.toContain(CLAVE_SESION_FAMILIAR);
+  });
+
+  it('pero solo si lo que hay es una dirección /exec: la excepción no es un escondite', () => {
+    // La lista blanca preserva por NOMBRE. Sin mirar el valor, cualquier cosa
+    // guardada bajo esta clave —un expediente, un correo— sobreviviría a la
+    // purga. Lo que no es una URL de Apps Script se borra como el resto.
+    for (const basura of ['{"members":[{"documentNumber":"10203040"}]}', 'titular@example.invalid', 'https://evil.test/exec', '']) {
+      const { store, datos } = almacenFalso({ [CLAVE_SESION_FAMILIAR]: basura });
+      purgarPersistenciaLocal(store);
+      expect(datos.has(CLAVE_SESION_FAMILIAR), basura).toBe(false);
+    }
   });
 
   it('no elimina ni modifica claves de terceros', () => {

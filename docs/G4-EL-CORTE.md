@@ -402,3 +402,24 @@ puede reproducir en el arnés. Va en la lista de la validación en vivo.
    consentimiento no rompe nada que quede.
 4. **La pantalla de consentimiento** puede dejar de declarar `spreadsheets`:
    el código ya no lo pide. Es un cambio en Google Cloud y lo hace el titular.
+
+## Tras el cierre: la hoja sobrevive al cierre de sesión
+
+La validación en vivo del cierre encontró esto: al cerrar sesión y volver a
+entrar, el aviso ámbar pedía registrar la hoja otra vez y el panel decía
+«0 familiares». La purga del cierre de sesión (A6-F2) borra toda clave `pate*`
+que no esté en su lista blanca, y `pate:familia:v1` no estaba: se había
+decidido que la dirección «desaparece con la sesión».
+
+La decisión cambia: la dirección es la **vinculación del navegador con la
+hoja**, no la sesión de nadie. Conservarla no abre nada, porque la /exec solo
+contesta a `ping` sin un `id_token` de alguien que esté en `ACCESO`, y la
+identidad sigue yéndose con el cierre (vive en memoria).
+
+La lista blanca preserva por nombre, así que para esta clave se comprueba
+también el valor: si no es una /exec válida, se borra como el resto. Si no,
+cualquier cosa guardada con ese nombre sobreviviría a la purga.
+
+En un ordenador compartido, quien entre después con otra cuenta hablará con el
+mismo despliegue y recibirá `ACCESO_DENEGADO` si no está invitado. Cambiar la
+dirección se hace desde la misma tarjeta de Ajustes.

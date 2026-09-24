@@ -293,8 +293,13 @@ export function interpretarRespuesta(cuerpo: RespuestaBackend | null | undefined
  * excepción, porque sin ella la aplicación no sabría a qué hoja hablar en la
  * siguiente visita y habría que pegar el enlace cada vez.
  *
- * Aun así es una URL con capacidad: quien la tenga puede llamar al endpoint.
- * Vive en el mismo sitio que la sesión del navegador y desaparece con ella.
+ * Aun así es una URL con capacidad: quien la tenga puede llamar al endpoint,
+ * aunque sin un `id_token` de alguien en ACCESO solo le contesta `ping`.
+ *
+ * **Sobrevive al cierre de sesión** (tras G4): es la vinculación del navegador
+ * con la hoja, no la sesión de nadie. Borrarla obligaba a registrar la hoja en
+ * cada entrada. La purga la conserva solo si su valor es una /exec válida; ver
+ * `purgaLocal.ts`.
  */
 export const CLAVE_SESION_FAMILIAR = 'pate:familia:v1';
 

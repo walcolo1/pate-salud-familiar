@@ -5,9 +5,12 @@ export const SINTETICOS = {
   documento: 'DOCUMENTO-TEST-A6-99887766',
   medicamento: 'MEDICAMENTO-TEST-A6',
   hoja: 'https://drive.google.com/test-spreadsheet-A6',
+  /** Una /exec con la forma de una real y sin ningún despliegue detrás. */
+  backend: 'https://script.google.com/macros/s/AKfycbSINTETICO0123456789abcd/exec',
 };
 
-export const CLAVES_PRESERVADAS = ['pate:prefs:v1', 'pate_salud_device_id', 'pate:prefs:migrado'];
+export const CLAVES_PRESERVADAS = ['pate:prefs:v1', 'pate_salud_device_id', 'pate:prefs:migrado', 'pate:familia:v1'];
+
 
 /**
  * Corta todo tráfico hacia Google. Garantiza que ninguna prueba pueda iniciar
@@ -89,6 +92,7 @@ export async function sembrarAlmacenamiento(page: Page) {
     // Preservadas
     localStorage.setItem('pate:prefs:v1', JSON.stringify({ autoLockMinutes: 7 }));
     localStorage.setItem('pate_salud_device_id', 'dispositivo-e2e');
+    localStorage.setItem('pate:familia:v1', s.backend);
     localStorage.setItem('pate:prefs:migrado', '1');
     // Ajena a Paté
     localStorage.setItem('otra-app:sesion', 'no tocar');
