@@ -17,7 +17,7 @@ hecho y qué falta.*
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
 | **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10/E10-bis** llevan el esquema a v3 |
-| **G** | Corte seco de Firebase | **cerrado** · Firebase fuera y cada cambio se escribe solo · queda G5, apagar el proyecto |
+| **G** | Corte seco de Firebase | **cerrado y validado en vivo** · Firebase fuera, cada cambio se escribe solo, el expediente carga solo · queda G5, apagar el proyecto |
 | **H** | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
 
 El Bloque D cierra con cuatro pasos y una fase de convención:
@@ -168,11 +168,14 @@ pantalla de permisos y las cinco comprobaciones de E7, que necesitan la ruta
 
 ## Siguiente paso
 
-**Publicar el Web App nuevo y validar el cierre de G4 en vivo.** Pegar
-`apps-script/dist/Pate.gs`, publicar una versión nueva del despliegue, y
-comprobar tres cosas: el alta de un familiar entra entera o no entra; «Abrir la
-hoja» abre la del Web App; al volver a entrar, el expediente se carga solo. El
-detalle está en [G4-EL-CORTE.md](G4-EL-CORTE.md), «Cierre de G4».
+**Validado en vivo (evidencia real, cuenta personal del titular):** el alta de
+un familiar entra en una sola fila; la baja lógica se consolida con una fila
+nueva (`borrado_en`); la hoja sobrevive al cierre de sesión; al entrar y tras
+un F5 el expediente se carga solo, con «Trayendo el expediente…» mientras
+tanto; Ajustes no tiene botones de sincronización manual. Con esto se cierra la
+migración de frontend y backend del Bloque G.
 
-Después, **G5**: apagar el proyecto de Firebase desde su consola. Ese paso no lo
-hago yo —toca Google Cloud— y queda escrito con sus comprobaciones.
+Queda **G5**: apagar el proyecto de Firebase desde su consola. Lo hace el
+titular. Comprobado antes: el cliente OAuth de la aplicación **no** está en el
+proyecto de Firebase (su número de proyecto no coincide), así que borrarlo no
+afecta al inicio de sesión ni al router.
