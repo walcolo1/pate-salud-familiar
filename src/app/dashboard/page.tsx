@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import EstadoVacio from '@/components/ui/EstadoVacio';
 import EstadoCarga from '@/components/ui/EstadoCarga';
 import Link from 'next/link';
@@ -14,14 +14,9 @@ import {
   ArrowRight, 
   Clock, 
   AlertCircle, 
-  ShieldAlert,
   ClipboardList,
   Pill,
-  AlertTriangle,
   Mail,
-  Loader2,
-  RefreshCw,
-  Sparkles
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -31,7 +26,6 @@ export default function DashboardPage() {
     members, 
     appointments, 
     reminders, 
-    tasks,
     documents,
     medicalOrders,
     medicationPrescriptions,
@@ -40,20 +34,11 @@ export default function DashboardPage() {
     pendingSyncCount,
     cargandoExpediente,
     isLoading,
-    sincronizacionManual,
-    familyId,
-    pendingInvitations,
-    acceptInvitation,
-    createNewFamily,
+    
+    
     checkPendingInvitations
   } = useApp();
 
-  const [newFamilyName, setNewFamilyName] = useState('');
-  const [isCreatingFamily, setIsCreatingFamily] = useState(false);
-  const [familyError, setFamilyError] = useState<string | null>(null);
-  const [acceptingInviteId, setAcceptingInviteId] = useState<string | null>(null);
-  const [acceptError, setAcceptError] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -66,41 +51,8 @@ export default function DashboardPage() {
     // despliegue, y quien no tiene acceso no llega hasta aquí.
   }, [user, isLoading]);
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await checkPendingInvitations();
-    setIsRefreshing(false);
-  };
 
-  const handleCreateFamily = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFamilyName.trim()) return;
-    setIsCreatingFamily(true);
-    setFamilyError(null);
-    try {
-      await createNewFamily(newFamilyName.trim());
-      router.refresh();
-    } catch (err: any) {
-      console.error(err);
-      setFamilyError(err.message || 'Error al crear la familia.');
-    } finally {
-      setIsCreatingFamily(false);
-    }
-  };
 
-  const handleAcceptInvite = async (targetFamilyId: string, inviteId: string) => {
-    setAcceptingInviteId(inviteId);
-    setAcceptError(null);
-    try {
-      await acceptInvitation(targetFamilyId, inviteId);
-      router.refresh();
-    } catch (err: any) {
-      console.error(err);
-      setAcceptError(err.message || 'Error al aceptar la invitación.');
-    } finally {
-      setAcceptingInviteId(null);
-    }
-  };
 
   if (isLoading || !user) {
     return (
@@ -314,7 +266,7 @@ export default function DashboardPage() {
     dashboardAlerts.push({
       id: 'sync-pending-changes',
       title: 'Cambios sin guardar en la hoja',
-      description: `Hay ${pendingSyncCount} cambio(s) que todavía no han llegado a la hoja de la familia. Se reenvían solos mientras la aplicación siga abierta.`,
+      description: `Hay ${pendingSyncCount} cambio(s) que todavía no han llegado a la hoja de la familia. Están guardados en este dispositivo y se enviarán solos en cuanto haya conexión y sesión, aunque recargues o cierres la aplicación.`,
       severity: 'info',
       memberName: 'Nube',
       href: '/settings',

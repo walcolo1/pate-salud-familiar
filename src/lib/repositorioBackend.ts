@@ -214,7 +214,7 @@ export class RepositorioBackend implements DataRepository {
    * porque el repositorio es único en la aplicación: dos guardados a la vez
    * acabarían en el mismo lote.
    */
-  transaccion(): RepositorioBackend & { confirmar(): Promise<void> } {
+  transaccion(): RepositorioBackend & { confirmar(): Promise<void>; lote(): Mutacion[] } {
     return new RepositorioBackend(this.sesion, []) as RepositorioBackend & {
       confirmar(): Promise<void>;
     };
@@ -226,6 +226,23 @@ export class RepositorioBackend implements DataRepository {
    * Sin nada acumulado no sale a la red ni falla: hay acciones que solo
    * escriben si se cumple algo. Y solo manda una vez.
    */
+  /**
+   * Lo acumulado en esta transacción, sin enviarlo (Bloque H). La cola
+   * duradera guarda esto en el disco antes de salir a la red.
+   */
+  lote(): Mutacion[] {
+    return this.acumuladas ? [...this.acumuladas] : [];
+  }
+
+  /**
+   * Envía un lote ya construido —el de la cola duradera— con la sesión de
+   * siempre. Un lote vacío no sale: `aplicar` ya lo evita.
+   */
+  async enviarLote(mutaciones: readonly Mutacion[]): Promise<void> {
+    if (mutaciones.length === 0) return;
+    await this.conSesion((contexto) => aplicar(contexto, mutaciones));
+  }
+
   async confirmar(): Promise<void> {
     if (!this.acumuladas || this.confirmada) return;
     this.confirmada = true;

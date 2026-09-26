@@ -17,8 +17,9 @@ hecho y qué falta.*
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
 | **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10/E10-bis** llevan el esquema a v3 |
+| **H** | Endurecimiento: cola duradera y limpieza | **hecho, pendiente de validación en caliente** · ver `H-ENDURECIMIENTO.md` |
 | **G** | Corte seco de Firebase | **cerrado** · validado en vivo; G5 hecho: proyecto de Firebase borrado, variables retiradas, consentimiento sin `spreadsheets` ni `drive.appdata` |
-| **H** | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
+| H (antiguo) | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
 
 El Bloque D cierra con cuatro pasos y una fase de convención:
 
@@ -119,8 +120,6 @@ cada módulo. Las que más condicionan lo que venga:
 | Las **tareas genéricas** (`FollowUpTask`) dejarán de guardarse al girar la bandera de G: `SEGUIMIENTOS` es otra cosa y no tienen pestaña | `descriptores.ts` · `SIN_PESTANA` |
 | Las 4 escrituras de E11 siguen sin pestaña: **lanzan** un error explícito en vez de callar | `G0-REPOSITORIO.md` |
 | Qué hacer cuando la revisión cambia —recargar, avisar o recargar lo que no está en edición— sigue **sin decidir**: `alCambiar` es una llamada de vuelta | `G2-SINCRONIZACION.md` |
-| Las cuarenta condiciones de interfaz sobre `sincronizacionManual` sobran: es una limpieza de pantallas | `G4-EL-CORTE.md` |
-| La cola de reenvío vive **en memoria**: un cambio pendiente no sobrevive a una recarga | `G4-EL-CORTE.md` |
 | La CSP todavía abre `connect-src` e `img-src` a servicios de Firebase que ya no se usan | `next.config.ts` |
 | Sin `databases()` en el navegador, la caché de Firestore **no se puede localizar** para borrarla | `purgaFirestore.ts` |
 | GIS **no renueva el `id_token` en silencio**: la ventana de 50 min es un intento, no una garantía | `G3-IDENTIDAD.md` |
@@ -131,7 +130,9 @@ cada módulo. Las que más condicionan lo que venga:
 | Validación de consentimiento OAuth limpio | `TESTING.md` §6.11 |
 | `/members/:id/edit` y `/login` fuera de la red de axe | `ACCESIBILIDAD.md`, puerta de C9 |
 | 23 `alert` de error siguen sin migrar al sistema de avisos | `src/` |
-| Deuda de lint en `AppContext.tsx` (72 errores en línea base) | `scripts/lint-baseline.json` |
+| Deuda de lint en `AppContext.tsx` (27 errores en línea base, desde 72) | `scripts/lint-baseline.json` |
+| `sharedReports` y `lastExportMetadata` siguen en el esquema local sin que nadie los escriba: quitarlos es una migración | `H-ENDURECIMIENTO.md` |
+| La cola duradera no sabe de quién es: tras un cierre automático, otra cuenta en el mismo navegador la enviaría con su identidad | `H-ENDURECIMIENTO.md` |
 | Adjuntos del historial veterinario: el campo `documentoId` existe y nadie lo rellena | `src/domain/mascotas.ts` |
 | `E0b-4` sin volver a pasar contra el despliegue de E6: el criterio 1 está cerrado desde Node, no desde un navegador | `EVIDENCIA_E6.md` · paso 7 |
 | El cerrojo de `aplicar` y el lote de varias pestañas siguen sin comprobarse en vivo: hacen falta dos peticiones a la vez y datos que escribir | `ROUTER.md` · después del **Bloque G** |

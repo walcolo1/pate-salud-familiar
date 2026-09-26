@@ -212,3 +212,34 @@ describe('purgarPersistenciaLocal', () => {
     expect(restante).not.toContain('titular@example.invalid');
   });
 });
+
+describe('Bloque H · la cola de cambios sin enviar', () => {
+  const COLA = 'pate:cola:v1';
+  const LOTE = JSON.stringify({
+    version: 1,
+    lotes: [{ id: 'l1', creadoEn: '2026-09-25T10:00:00.000Z', mutaciones: [{ tabla: 'CITAS', accion: 'ESCRIBIR', fila: { id: 'c1' } }] }],
+  });
+
+  it('no es una clave preservada: una purga normal la borra', () => {
+    // Solo se llega a una purga normal sin pendientes, o tras descartarlos
+    // explícitamente en el diálogo de cierre. En los dos casos, fuera.
+    expect(CLAVES_PRESERVADAS.has(COLA)).toBe(false);
+    const { store, datos } = almacenFalso({ [COLA]: LOTE });
+    purgarPersistenciaLocal(store);
+    expect(datos.has(COLA)).toBe(false);
+  });
+
+  it('un cierre que nadie ha confirmado la conserva, con su valor intacto', () => {
+    const { store, datos } = almacenFalso({ [COLA]: LOTE, 'pate-salud-state:x': '{}' });
+    purgarPersistenciaLocal(store, { conservarCola: true });
+    expect(datos.get(COLA)).toBe(LOTE);
+    // El resto del expediente se va igual.
+    expect(datos.has('pate-salud-state:x')).toBe(false);
+  });
+
+  it('conservar no es un escondite: lo que no es una cola válida se borra', () => {
+    const { store, datos } = almacenFalso({ [COLA]: '{"members":[{"documentNumber":"10203040"}]}' });
+    purgarPersistenciaLocal(store, { conservarCola: true });
+    expect(datos.has(COLA)).toBe(false);
+  });
+});

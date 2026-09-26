@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import EstadoCarga from '@/components/ui/EstadoCarga';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
@@ -11,34 +11,22 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Link from 'next/link';
 import { 
   Inbox,
-  Cloud, 
-  Grid3X3, 
   ShieldCheck, 
   LogOut, 
   ChevronDown, 
   ChevronUp, 
   Loader2, 
-  FileSpreadsheet,
   CheckCircle2,
   Download,
   Database,
   RotateCcw,
   Trash2,
-  Calendar,
   Clock,
   AlertCircle,
-  Wifi,
-  WifiOff,
-  RefreshCw,
-  ExternalLink,
   Check,
-  Settings,
-  Info,
   Mail,
   Plus,
-  Edit,
   Lock,
-  ShieldAlert,
   Timer,
 } from 'lucide-react';
 import TarjetaHojaFamiliar from '@/components/ajustes/TarjetaHojaFamiliar';
@@ -48,33 +36,15 @@ export default function SettingsPage() {
   const router = useRouter();
   const { 
     user, 
-    driveSyncEnabled, 
-    setDriveSync, 
-    calendarSyncEnabled,
-    setCalendarSync,
-    exportToSheets, 
-    signOut, 
+    
+    
     isLoading,
     clearAllData,
-    cerrarSesionYPurgar,
+    solicitarCierreDeSesion,
     origenDatos,
     restoreDemoData,
     clearDemoData,
     exportState,
-    driveStatus,
-    driveError,
-    lastDriveAuthTime,
-    connectDrive,
-    calendarStatus,
-    calendarError,
-    lastCalendarAuthTime,
-    connectCalendar,
-    sheetsAccessToken,
-    sheetsStatus,
-    sheetsError,
-    lastSheetsAuthTime,
-    lastExportMetadata,
-    connectSheets,
     currentUserRole,
     simulatedRole,
     simulatedEmail,
@@ -83,31 +53,13 @@ export default function SettingsPage() {
     runAppointmentRetentionCleanup,
     appointments,
     members,
-    lastSyncAt,
-    lastPullAt,
-    lastPushAt,
-    deviceId,
-    opSyncStatus,
-    opSyncError,
-    exportBackupJSON,
     importBackupJSON,
-    sharedReports,
-    revokeMemberReportShare,
     documents,
     revokeDocumentShare,
-    syncInitStatus,
     validateDataIntegrity,
     medicalOrders,
     medicationPrescriptions,
     medicationDoseReminders,
-    checkups,
-    vaccines,
-    exams,
-    history,
-    syncInitMessage,
-    pendingSyncCount,
-    hojaRegistrada,
-    flushPendingSync,
 
     // Importación de citas (Bloque B: manual)
     gmailOnlyFutureAppointments,
@@ -126,7 +78,6 @@ export default function SettingsPage() {
     setNightLockEnabled,
     setNightLockStart,
     setNightLockEnd,
-    sincronizacionManual,
     invitations,
     createInvitation,
     revokeInvitation,
@@ -138,7 +89,6 @@ export default function SettingsPage() {
   // Va junto al resto de hooks, ANTES de cualquier retorno temprano: si se
   // declara después, React lo llama de forma condicional entre renders.
   const [rechazoImportacion, setRechazoImportacion] = useState<{ titulo: string; descripcion: string } | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
   const [showLegal, setShowLegal] = useState(false);
   const [integrityReport, setIntegrityReport] = useState<any | null>(null);
   const [isCheckingIntegrity, setIsCheckingIntegrity] = useState(false);
@@ -295,16 +245,6 @@ export default function SettingsPage() {
     e.target.value = '';
   };
 
-  const handleExport = async () => {
-    setIsExporting(true);
-    try {
-      await exportToSheets('family-001');
-    } catch (err) {
-      console.error('Error during Google Sheets export:', err);
-    } finally {
-      setIsExporting(false);
-    }
-  };
 
   return (
     <div className="flex flex-col gap-6 select-none pb-12">
@@ -415,85 +355,6 @@ export default function SettingsPage() {
         <div className="flex flex-col gap-6">
           
           {/* Ficha 1: Diagnóstico General y Estado de Sincronización */}
-          {sincronizacionManual && (
-            <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-teal-50 text-teal-700 rounded-xl">
-                    <Settings className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Diagnóstico de Sincronización</h4>
-                    <p className="text-[10px] text-slate-500 font-semibold">Estado en tiempo real de tu base Google-native.</p>
-                  </div>
-                </div>
-                <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full border uppercase leading-none ${
-                  opSyncStatus === 'synced' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                  opSyncStatus === 'syncing' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                  opSyncStatus === 'error' ? 'bg-rose-50 text-rose-700 border-rose-100' :
-                  'bg-slate-50 text-slate-500 border-slate-200'
-                }`}>
-                  {opSyncStatus === 'synced' ? 'Sincronizado' :
-                    opSyncStatus === 'syncing' ? 'Sincronizando' :
-                    opSyncStatus === 'error' ? 'Error de Sincronización' : 'Desconectado'}
-                </span>
-              </div>
-
-              <hr className="border-slate-50" />
-
-              {/* Grid de Diagnóstico */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-4 font-semibold text-[11px] text-slate-500 leading-relaxed">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3.5 gap-x-6">
-                  
-                  <div className="flex flex-col">
-                    <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Estado de Conexión</span>
-                    <div className="flex items-center gap-1.5 font-extrabold text-slate-700">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-                      <span>Conectado con Google ({user.email})</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col">
-                    <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Hoja de la familia</span>
-                    <div className="flex items-center gap-1.5 font-extrabold text-slate-700">
-                      <span className={`h-2 w-2 rounded-full shrink-0 ${hojaRegistrada ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                      <span>{hojaRegistrada ? 'Registrada en este navegador' : 'Sin registrar en este navegador'}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
-                    <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Última Sincronización</span>
-                    <span className="font-extrabold text-slate-700">{lastSyncAt ? new Date(lastSyncAt).toLocaleString('es-CO') : 'Nunca'}</span>
-                  </div>
-
-                  <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
-                    <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Cambios locales pendientes</span>
-                    <span className={`font-black ${pendingSyncCount > 0 ? 'text-amber-700' : 'text-slate-700'}`}>
-                      {pendingSyncCount} {pendingSyncCount === 1 ? 'cambio' : 'cambios'}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
-                    <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Último Pull (Descarga)</span>
-                    <span className="font-extrabold text-slate-700">{lastPullAt ? new Date(lastPullAt).toLocaleString('es-CO') : 'Nunca'}</span>
-                  </div>
-
-                  <div className="flex flex-col border-t border-slate-100/70 pt-2.5">
-                    <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Último Push (Subida)</span>
-                    <span className="font-extrabold text-slate-700">{lastPushAt ? new Date(lastPushAt).toLocaleString('es-CO') : 'Nunca'}</span>
-                  </div>
-                </div>
-
-                {opSyncError && (
-                  <div className="bg-rose-50 p-3 rounded-xl border border-rose-100/60 text-rose-700 text-[10px] flex flex-col gap-1 font-semibold leading-relaxed">
-                    <strong className="text-rose-700">Último error registrado:</strong>
-                    <p>{opSyncError}</p>
-                  </div>
-                )}
-
-              </div>
-            </section>
-          )}
 
           {/* Ficha Nueva: Diagnóstico de Datos e Integridad */}
           <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
@@ -645,7 +506,7 @@ export default function SettingsPage() {
 
 
           {/* Ficha: Invitaciones Familiares (solo el titular) */}
-          {!sincronizacionManual && currentUserRole === 'FAMILY_ADMIN' && (
+          {currentUserRole === 'FAMILY_ADMIN' && (
             <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-teal-50 text-teal-700 rounded-xl">
@@ -812,69 +673,16 @@ export default function SettingsPage() {
       {/* Compartición Google-native */}
       <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
         <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">
-          {!sincronizacionManual ? "Compartición de Archivos (Drive)" : "Compartición Google-native"}
+          Compartición de Archivos (Drive)
         </h4>
         <hr className="border-slate-50" />
         
         <div className="bg-amber-50 p-3 rounded-2xl border border-amber-100 text-amber-700 text-[10px] leading-relaxed font-semibold">
           <p className="font-extrabold mb-1">ℹ Resguardo de Privacidad:</p>
-          {!sincronizacionManual ? (
-            <p>La base de datos de tu familia se comparte de forma segura y automática con los miembros autorizados en tu grupo familiar. Los archivos físicos (PDFs/imágenes) almacenados en Google Drive solo se comparten con destinatarios explícitos.</p>
-          ) : (
-            <p>La base operacional completa de tu familia <strong>NO se comparte automáticamente por seguridad</strong>. Solo se concede acceso a reportes clínicos individuales o documentos específicos que tú selecciones explícitamente.</p>
-          )}
+          <p>La base de datos de tu familia se comparte de forma segura y automática con los miembros autorizados en tu grupo familiar. Los archivos físicos (PDFs/imágenes) almacenados en Google Drive solo se comparten con destinatarios explícitos.</p>
         </div>
 
         {/* Shared Reports list */}
-        {sincronizacionManual && (
-          <div className="flex flex-col gap-3">
-            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide px-1">Reportes Clínicos Compartidos (Sheets)</span>
-            {sharedReports.length === 0 ? (
-              <p className="text-[10px] text-slate-500 font-semibold italic px-1">No hay reportes de cálculo Sheets compartidos actualmente.</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {sharedReports.map((rep) => (
-                  <div key={rep.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-semibold text-[10px]">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-extrabold text-slate-800">Reporte para {rep.memberName}</p>
-                      <p className="text-[9px] text-slate-500">Destinatario: {rep.sharedWithEmail}</p>
-                      <p className="text-[8px] text-slate-500 font-bold">Fecha: {new Date(rep.sharedAt).toLocaleDateString('es-CO')}</p>
-                      <span className={`inline-block w-fit text-[8px] font-black px-1.5 py-0.5 rounded uppercase mt-1 leading-none ${
-                        rep.shareStatus === 'SHARED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                      }`}>
-                        {rep.shareStatus === 'SHARED' ? 'Compartido' : 'Acceso Revocado'}
-                      </span>
-                    </div>
-                    {rep.shareStatus === 'SHARED' && (
-                      <div className="flex gap-2 shrink-0">
-                        <a 
-                          href={rep.spreadsheetUrl} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="bg-white border border-slate-200 text-slate-700 hover:text-teal-700 px-3 py-1.5 rounded-xl font-bold transition-all text-center flex items-center justify-center animate-none"
-                        >
-                          Abrir
-                        </a>
-                        <button
-                          onClick={async () => {
-                            try {
-                              await revokeMemberReportShare(rep.id);
-                            } catch (err: any) {
-                              alert(`Error al revocar: ${err.message}`);
-                            }
-                          }}
-                          className="bg-rose-50 border border-rose-100 text-rose-700 hover:bg-rose-100 px-3 py-1.5 rounded-xl font-bold transition-all text-center"
-                        >
-                          Revocar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Shared Documents list */}
         <div className="flex flex-col gap-3 mt-2">
@@ -1011,11 +819,7 @@ export default function SettingsPage() {
           </div>
 
           <p className="text-[9px] font-semibold leading-relaxed text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-100/60">
-            {!sincronizacionManual ? (
-              <span>⚠ Advertencia: La depuración de citas realiza un borrado lógico ocultando los registros del expediente. Los eventos en tu Google Calendar y archivos asociados en Drive <strong>no</strong> se borrarán. Te recomendamos exportar a JSON antes de depurar.</span>
-            ) : (
-              <span>⚠ Advertencia: La depuración de citas realiza un borrado lógico ocultando los registros del expediente. Los eventos en tu Google Calendar y archivos asociados en Drive <strong>no</strong> se borrarán. Te recomendamos exportar a Sheets o JSON antes de depurar.</span>
-            )}
+            <span>⚠ Advertencia: La depuración de citas realiza un borrado lógico ocultando los registros del expediente. Los eventos en tu Google Calendar y archivos asociados en Drive <strong>no</strong> se borrarán. Te recomendamos exportar a JSON antes de depurar.</span>
           </p>
 
           <button
@@ -1174,9 +978,7 @@ export default function SettingsPage() {
                   onClick={async () => {
                     const aceptado = await confirmar({
                       titulo: 'Reiniciar la cuenta en este navegador',
-                      descripcion: !sincronizacionManual
-                        ? 'Se borrarán los datos locales de esta cuenta en este navegador. Tus archivos en Google Drive quedan intactos.'
-                        : 'Se borrarán los datos locales de esta cuenta en este navegador. Tus archivos en Google Drive y Sheets quedan intactos.',
+                      descripcion: 'Se borrarán los datos locales de esta cuenta en este navegador. Tus archivos en Google Drive quedan intactos.',
                       etiquetaConfirmar: 'Reiniciar cuenta',
                       tono: 'peligro',
                     });
@@ -1191,9 +993,11 @@ export default function SettingsPage() {
                   <span>Reiniciar Cuenta Actual</span>
                 </button>
 
-                {/* A6-F2 · Cierre de sesión con purga completa del dispositivo */}
+                {/* A6-F2 · Cierre de sesión con purga completa del dispositivo.
+                    Bloque H · pasa por el diálogo de cierre: con cambios sin
+                    enviar, avisa antes de borrar nada. */}
                 <button
-                  onClick={() => { void cerrarSesionYPurgar(); }}
+                  onClick={() => solicitarCierreDeSesion()}
                   className="h-10 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-extrabold text-xs rounded-xl flex flex-col items-center justify-center transition-colors border border-slate-200 px-3 py-6"
                 >
                   <span>Cerrar sesión y borrar datos de este dispositivo</span>
@@ -1390,10 +1194,10 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* Dev Mode Firebase Health Check Button */}
-      {/* Logout button */}
+      {/* Bloque H · el cierre pasa por el diálogo: con cambios sin enviar,
+          avisa antes de nada. Llamar a signOut() directamente lo saltaba. */}
       <button
-        onClick={() => signOut()}
+        onClick={() => solicitarCierreDeSesion()}
         className="w-full h-13.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-rose-600/10 active:translate-y-0.5 transition-all duration-200"
       >
         <LogOut className="h-5 w-5" />
@@ -1401,18 +1205,6 @@ export default function SettingsPage() {
       </button>
 
 
-      {/* Loading Backdrop Overlay for Exporting */}
-      {(isExporting || sheetsStatus === 'exportando') && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
-          <div className="bg-white p-6 rounded-3xl shadow-xl flex flex-col items-center gap-3 border border-slate-100 max-w-xs text-center">
-            <Loader2 className="h-10 w-10 text-emerald-700 animate-spin" />
-            <h4 className="text-sm font-extrabold text-slate-800">Exportando expediente clínico</h4>
-            <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
-              Estamos creando tu libro de cálculo en Google Sheets y aplicando estilos y formatos. Por favor, no cierres la aplicación.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* A6-F3 · Rechazo de importación cruzada, accesible y sin exponer contenido */}
       <ConfirmDialog

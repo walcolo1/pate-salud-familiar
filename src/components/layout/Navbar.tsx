@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
   Home, 
@@ -11,7 +11,6 @@ import {
   CalendarDays,
   Settings, 
   Activity, 
-  CloudCheck, 
   LogOut,
   Lock,
   ShieldCheck,
@@ -24,9 +23,8 @@ import { dialogoVisible, estaOcupado } from '@/lib/cierreSesion';
 
 export default function Navbar({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const {
-    user, driveSyncEnabled, isLoading,
+    user, driveSyncEnabled, 
     sessionLocked, unlockSession,
     // A6-F2
     estadoCierre, solicitarCierreDeSesion, despacharCierre, reintentarSincronizacion,

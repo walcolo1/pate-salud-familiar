@@ -108,3 +108,28 @@ export function reducirCierre(estado: EstadoCierre, accion: AccionCierre): Estad
       return estado;
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque H · quién puede borrar la cola de cambios sin enviar
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Por qué se cierra la sesión con purga. Cada motivo decide, explícitamente,
+ * si la cola de cambios sin enviar se va con el resto.
+ */
+export const MOTIVOS_CIERRE = ['DIALOGO', 'BLOQUEO_8H'] as const;
+export type MotivoCierre = (typeof MOTIVOS_CIERRE)[number];
+
+const DESCARTA_COLA: Record<MotivoCierre, boolean> = {
+  // A `purgando` solo se llega sin pendientes, o tras «Salir y descartar» y su
+  // segunda confirmación. Alguien lo ha decidido.
+  DIALOGO: true,
+  // La pestaña se quedó bloqueada 8 horas y se cierra sola. Nadie ha
+  // confirmado nada: borrar lo que no salió sería perderlo sin decisión. El
+  // resto del expediente sí se purga.
+  BLOQUEO_8H: false,
+};
+
+export function descartaCola(motivo: MotivoCierre): boolean {
+  return DESCARTA_COLA[motivo];
+}

@@ -4,15 +4,12 @@ import React, { useState, useEffect } from 'react';
 import EstadoError from '@/components/ui/EstadoError';
 import EstadoVacio from '@/components/ui/EstadoVacio';
 import EstadoCarga from '@/components/ui/EstadoCarga';
-import Link from 'next/link';
 import Dialog from '@/components/ui/Dialog';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { 
   Plus, 
   Save, 
-  Clock, 
-  MapPin, 
   CheckCircle, 
   XCircle, 
   AlertTriangle, 
@@ -24,7 +21,6 @@ import {
   ShieldCheck, 
   ShieldAlert, 
   Calendar,
-  Sparkles,
   ClipboardList
 } from 'lucide-react';
 import { MedicalOrderType, MedicalOrderStatus, MedicalOrder } from '@/domain/models';
@@ -39,15 +35,6 @@ const orderTypeMap: Record<MedicalOrderType, string> = {
   OTHER: 'Otro Procedimiento'
 };
 
-const statusLabelMap: Record<MedicalOrderStatus, string> = {
-  PENDING_AUTHORIZATION: 'Pendiente Autorización',
-  AUTHORIZED: 'Autorizada',
-  DENIED: 'Negada',
-  APPOINTMENT_PENDING: 'Pendiente Cita',
-  APPOINTMENT_SCHEDULED: 'Cita Agendada',
-  COMPLETED: 'Atendida / Cerrada',
-  CANCELLED: 'Cancelada'
-};
 
 export default function MedicalOrdersPage() {
   const router = useRouter();
@@ -60,14 +47,9 @@ export default function MedicalOrdersPage() {
     documents,
     addMedicalOrder, 
     updateMedicalOrder, 
-    deleteMedicalOrder,
     createAppointmentFromOrder,
     uploadDocument,
     isLoading,
-    driveSyncEnabled,
-    driveStatus,
-    driveError,
-    sincronizacionManual
   } = useApp();
 
   const [filter, setFilter] = useState<MedicalOrderStatus | 'ALL'>('ALL');
@@ -273,21 +255,6 @@ export default function MedicalOrdersPage() {
     }
   };
 
-  const getSheetsSyncBadge = (order: any) => {
-    const status = order.syncStatus || 'PENDING_SYNC';
-    if (status === 'SYNCED') {
-      return (
-        <span className="text-[9px] font-extrabold bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-600/10 uppercase">
-          ✓ Sheets
-        </span>
-      );
-    }
-    return (
-      <span className="text-[9px] font-extrabold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-600/10 uppercase">
-        Pendiente Sheets
-      </span>
-    );
-  };
 
   return (
     <div className="flex flex-col gap-6 select-none pb-12">
@@ -356,12 +323,6 @@ export default function MedicalOrdersPage() {
                       <span className="text-[10px] text-slate-500 font-bold">{orderTypeMap[order.orderType]}</span>
                       <span className="text-slate-300 text-[10px]">·</span>
                       <span className="text-[10px] text-slate-500 font-semibold">Emitida: {new Date(order.issuedAt).toLocaleDateString('es-CO')}</span>
-                      {sincronizacionManual && (
-                        <>
-                          <span className="text-slate-300 text-[10px]">·</span>
-                          {getSheetsSyncBadge(order)}
-                        </>
-                      )}
                     </div>
                   </div>
                   {getStatusBadge(order.status)}

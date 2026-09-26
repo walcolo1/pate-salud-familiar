@@ -15,7 +15,6 @@ import {
   ShieldAlert, 
   Heart, 
   Calendar, 
-  Activity, 
   Plus, 
   ChevronRight, 
   FileText, 
@@ -63,15 +62,10 @@ export default function MemberDetailPage() {
     reactivateMember,
     deleteMember,
     updateMember,
-    sharedReports,
-    generateAndShareMemberReport,
-    revokeMemberReportShare,
     documents,
-    shareDocumentWithMember,
     revokeDocumentShare,
     medicalOrders,
-    medicationPrescriptions,
-    sincronizacionManual
+    medicationPrescriptions
   } = useApp();
   const confirmar = useConfirmacion();
   const avisar = useAviso();
@@ -473,84 +467,6 @@ export default function MemberDetailPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {sincronizacionManual && (
-              <>
-                <div className="flex flex-col gap-1 bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
-                  <h4 className="text-xs font-extrabold text-slate-700">Canal de seguridad habilitado</h4>
-                  <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
-                    Correo destino: <strong className="text-slate-600">{member.email}</strong>
-                  </p>
-                  <p className="text-[9px] text-teal-700 font-bold mt-1 leading-normal">
-                    ℹ Solo se compartirá información de este miembro. No se comparte la base familiar completa por seguridad.
-                  </p>
-                </div>
-
-                <button
-                  onClick={async () => {
-                    try {
-                      await generateAndShareMemberReport(member.id, member.email!);
-                    } catch (err: any) {
-                      alert(`Error: ${err.message}`);
-                    }
-                  }}
-                  className="w-full py-2.5 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors text-center"
-                >
-                  Crear y compartir Reporte Clínico (Sheets)
-                </button>
-
-                {/* List of reports */}
-                {sharedReports.filter(r => r.memberId === member.id).length > 0 && (
-                  <div className="flex flex-col gap-2.5 mt-2">
-                    <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide px-1">Reportes individuales compartidos</span>
-                    <div className="flex flex-col gap-2">
-                      {sharedReports
-                        .filter(r => r.memberId === member.id)
-                        .map((rep) => (
-                          <div key={rep.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex items-center justify-between gap-3">
-                            <div className="flex flex-col gap-0.5 min-w-0">
-                              <span className="text-[10px] font-extrabold text-slate-800 truncate">Reporte {rep.memberName}</span>
-                              <span className="text-[9px] text-slate-500 font-bold">
-                                Compartido: {new Date(rep.sharedAt).toLocaleDateString('es-CO')}
-                              </span>
-                              <span className={`inline-block w-fit text-[8px] font-black px-1.5 py-0.5 rounded uppercase mt-1 leading-none ${
-                                rep.shareStatus === 'SHARED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                              }`}>
-                                {rep.shareStatus === 'SHARED' ? 'Compartido' : 'Acceso Revocado'}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {rep.shareStatus === 'SHARED' && (
-                                <>
-                                  <a
-                                    href={rep.spreadsheetUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="bg-white border border-slate-200 text-slate-600 hover:text-teal-700 p-2 rounded-xl text-[9px] font-black hover:bg-teal-50 transition-colors"
-                                  >
-                                    Abrir
-                                  </a>
-                                  <button
-                                    onClick={async () => {
-                                      try {
-                                        await revokeMemberReportShare(rep.id);
-                                      } catch (err: any) {
-                                        alert(`Error al revocar: ${err.message}`);
-                                      }
-                                    }}
-                                    className="bg-rose-50 border border-rose-100 text-rose-700 hover:bg-rose-100 p-2 rounded-xl text-[9px] font-black transition-colors"
-                                  >
-                                    Revocar
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
 
             {/* List of shared documents */}
             {documents.filter(d => d.memberId === member.id && d.shareStatus === 'SHARED').length > 0 && (

@@ -83,7 +83,7 @@ export const DIRECTIVAS_CSP: Readonly<Record<string, readonly string[]>> = {
   // apuntaban ahí eran datos de prueba.
   'img-src': ["'self'", 'data:', 'blob:', 'https://lh3.googleusercontent.com'],
 
-  // Destinos de red confirmados en el código: www. y sheets.googleapis.com, y
+  // Destinos de red confirmados en el código: www.googleapis.com y
   // accounts.google.com para GIS.
   //
   // `*.firebaseio.com` NO está: la auditoría de A7 confirmó cero referencias a
@@ -105,8 +105,11 @@ export const DIRECTIVAS_CSP: Readonly<Record<string, readonly string[]>> = {
   // Token, que se fueron con Firebase. Un comodín no se recorta: se sustituye
   // por los hosts que el navegador de verdad llama, medidos en el código:
   //
-  //   www.googleapis.com     Drive, Calendar y appData
-  //   sheets.googleapis.com  la integración directa con Sheets
+  //   www.googleapis.com     Drive y Calendar
+  //
+  // Bloque H · `sheets.googleapis.com` salió: la hoja de la familia la escribe
+  // el Web App, y las dos salidas a Sheets del navegador —exportación e
+  // informe individual— no tenían botón desde G4b y se retiraron.
   //
   // `oauth2.googleapis.com` (tokeninfo) NO entra: lo llama el backend, en
   // Auth.gs, nunca el navegador. Una prueba recorre src/ y exige que todo host
@@ -114,7 +117,6 @@ export const DIRECTIVAS_CSP: Readonly<Record<string, readonly string[]>> = {
   'connect-src': [
     "'self'",
     'https://www.googleapis.com',
-    'https://sheets.googleapis.com',
     'https://accounts.google.com',
     'https://script.google.com',
     'https://script.googleusercontent.com',

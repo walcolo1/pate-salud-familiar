@@ -7,6 +7,17 @@ import { conectarSondeo, ventanaDelNavegador } from '../lib/sondeoRevision';
 import { comprobarYRegistrar, type ResultadoRegistro } from '../lib/registroBackend';
 import { sesionBackend, sesionDeLaAplicacion } from '../lib/identidad';
 import { CargaAlEntrar } from '../lib/cargaAlEntrar';
+import { ColaDuradera } from '../lib/colaDuradera';
+import {
+  DespachadorCola,
+  conectarDisparadores,
+  construirLote,
+  enviarConRepositorio,
+  type ConTransaccion,
+  type InformeDespacho,
+} from '../lib/despachadorCola';
+import type { Mutacion } from '../lib/transporteBackend';
+import { descartaCola, type MotivoCierre } from '../lib/cierreSesion';
 import { decodeGoogleToken } from '../lib/googleAuth';
 import { clientIdConfigurado } from '../lib/importacionManual';
 import { getDataRepository, resetDataRepository } from '../lib/dataRepository';
@@ -28,7 +39,6 @@ import {
   Reminder, 
   FollowUpTask,
   ReminderStatus,
-  TaskStatus,
   HealthEventStatus,
   LastExportMetadata,
   MemberPermissions,
@@ -97,7 +107,6 @@ import {
   type AccionCierre,
 } from '../lib/cierreSesion';
 import {
-  CLAVES_ESTADO_CLINICO,
   decidirArranque,
   estaEnVentanaNocturna,
   minutosDelDia,
@@ -113,24 +122,18 @@ import {
   validarImportacion,
   type ResultadoImportacion,
 } from '../lib/origenDatos';
-import { requestDrivePermission, resolveDrivePath, uploadFile, shareFileWithUser, revokeFileShare } from '../lib/googleDrive';
-import { requestCalendarPermission, createCalendarEvent, createMedicationDoseCalendarEvent } from '../lib/googleCalendar';
-import { exportFamilyHealthWorkbook } from '../lib/googleSheets';
-import { createIndividualMemberReport } from '../lib/informeIndividual';
+import { resolveDrivePath, uploadFile, shareFileWithUser, revokeFileShare } from '../lib/googleDrive';
+import { createCalendarEvent, createMedicationDoseCalendarEvent } from '../lib/googleCalendar';
 import {
   ensureOperationalToken,
   ensureDriveToken,
   ensureCalendarToken,
   invalidateAllTokens,
-  isOperationalTokenValid,
-  hasAnyValidToken,
-  getTokenRemainingMinutes,
 } from '../lib/googleTokenManager';
 import {
   crearBorradorDesdeTexto,
 } from '../lib/importacionManual';
 import {
-  parseAppointmentEmail,
 } from '../lib/analizadorCitaTexto';
 import { useConfirmacion } from './Confirmacion';
 import { useAviso } from './Avisos';
@@ -144,28 +147,6 @@ import { useAviso } from './Avisos';
  */
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '';
 
-const sanitizeRemoteAppointment = (appt: any): MedicalAppointment => {
-  const doctorName = appt.doctorName || appt.doctor || 'Médico';
-  const doctor = appt.doctor || doctorName;
-  
-  // Reconstruct scheduledAt if missing but date & time exist
-  let scheduledAt = appt.scheduledAt;
-  if (!scheduledAt && appt.date && appt.time) {
-    scheduledAt = `${appt.date}T${appt.time}`;
-  }
-  
-  return {
-    ...appt,
-    doctorName,
-    doctor,
-    scheduledAt,
-    documentIds: appt.documentIds || [],
-    syncStatus: appt.syncStatus || 'SYNCED',
-    calendarSyncStatus: appt.calendarSyncStatus || 'LOCAL_ONLY',
-    retentionStatus: appt.retentionStatus || 'ACTIVE',
-    deletedAt: appt.deletedAt || null
-  };
-};
 
 export const MUST_PULL_BEFORE_PUSH_MS = 5 * 60 * 1000;
 
@@ -291,10 +272,6 @@ interface AppContextProps {
   lastCalendarAuthTime: string | null;
 
   // Google Sheets specific states
-  sheetsAccessToken: string | null;
-  sheetsStatus: 'disconnected' | 'connected' | 'connecting' | 'authorizing' | 'exportando' | 'exportado' | 'error';
-  sheetsError: string | null;
-  lastSheetsAuthTime: string | null;
   lastExportMetadata: LastExportMetadata | null;
   
   signIn: (googleUser?: Omit<UserAccount, 'id' | 'createdAt'>, idToken?: string) => Promise<void>;
@@ -316,7 +293,6 @@ interface AppContextProps {
   toggleReminder: (id: string) => void;
   setDriveSync: (enabled: boolean) => void;
   setCalendarSync: (enabled: boolean) => void;
-  exportToSheets: (memberId: string) => Promise<string>;
   
   // Google Drive Actions
   connectDrive: () => Promise<string | null>;
@@ -326,7 +302,6 @@ interface AppContextProps {
   syncAppointmentToCalendar: (apptId: string, customAppt?: MedicalAppointment, forcePopup?: boolean) => Promise<void>;
 
   // Google Sheets Actions
-  connectSheets: () => Promise<string | null>;
 
   // Role Simulation and Inactivity/Retention Actions
   currentUserRole: 'FAMILY_ADMIN' | 'MEMBER_SELF' | 'VIEWER';
@@ -372,8 +347,6 @@ interface AppContextProps {
   sharedReports: SharedMemberReport[];
   shareDocumentWithMember: (documentId: string, email: string) => Promise<void>;
   revokeDocumentShare: (documentId: string) => Promise<void>;
-  generateAndShareMemberReport: (memberId: string, email: string) => Promise<void>;
-  revokeMemberReportShare: (reportId: string) => Promise<void>;
 
   // Importación de citas (Bloque B: manual, sin Gmail)
   emailSources: AppointmentEmailSource[];
@@ -468,19 +441,6 @@ interface AppContextProps {
   validateDataIntegrity: () => DataIntegrityReport;
   importBackupJSON: (data: SavedAppState) => ResultadoImportacion;
   /**
-   * Si esta aplicación guarda **cuando el usuario lo pide** y no a cada cambio.
-   *
-   * Era `isFirebaseBackend`, y la pregunta que de verdad hacían las pantallas
-   * no era «¿qué base de datos hay detrás?» sino «¿tengo que enseñar el botón
-   * de sincronizar y el contador de pendientes?». Con Firebase retirado, ese es
-   * el único concepto que quedaba vivo, así que se llama por su nombre.
-   *
-   * Hoy **sí**: el camino de la hoja sigue empujando por lotes. Pasa a `false`
-   * cuando el repositorio escriba por mutación, y entonces esta interfaz
-   * sobrará entera.
-   */
-  sincronizacionManual: boolean;
-  /**
    * La hoja cambió desde que se cargó esta copia (G2).
    *
    * No se recarga solo: recargar tira lo que el usuario estuviera escribiendo,
@@ -522,8 +482,6 @@ interface AppContextProps {
   despacharCierre: (accion: AccionCierre) => void;
   /** Reintenta enviar los cambios pendientes antes de cerrar. */
   reintentarSincronizacion: () => Promise<void>;
-  /** Ejecuta la secuencia completa de limpieza. Usado tambien desde Ajustes. */
-  cerrarSesionYPurgar: () => Promise<void>;
   /** La limpieza de la cache de Firestore quedo pendiente (otra pestana). */
   avisoPurgaDiferida: boolean;
   descartarAvisoPurgaDiferida: () => void;
@@ -531,23 +489,6 @@ interface AppContextProps {
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
 
-/**
- * G4b · la hoja ya no se empuja por lotes.
- *
- * Cada cambio sale solo, como una mutación contra el router, en el momento en
- * que ocurre. Las pantallas lo leen para dejar de ofrecer el botón de
- * «sincronizar todo», que ya no significa nada: no hay un expediente local
- * esperando a subirse.
- *
- * **Lo que sí sigue existiendo es un pendiente**, y es otra cosa: una escritura
- * concreta que no salió porque no había red. Esa se reenvía sola y la cuenta
- * `pendingSyncCount`.
- *
- * Queda como constante —y no borrada— mientras esas cuarenta condiciones sigan
- * en la interfaz: quitarlas es una limpieza de pantallas, no de backend, y
- * mezclarla aquí escondería este cambio dentro de un diff de JSX.
- */
-const SINCRONIZACION_MANUAL = false;
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   // C1.3b · Ambos proveedores envuelven a este en el layout, de modo que el
@@ -616,6 +557,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * empezara al llegar la credencial, antes de que `signIn` restaure el estado
    * local, ese estado podría pisar lo recién descargado.
    */
+  /*
+   * Bloque H · lo que quedó en el disco de la visita anterior cuenta desde el
+   * primer momento, y sale solo en cuanto hay credencial y red.
+   */
+  useEffect(() => {
+    const cola = colaRef.current;
+    if (!cola) return;
+    setPendingSyncCount(cola.longitud);
+    pendingSyncCountRef.current = cola.longitud;
+    return conectarDisparadores({
+      sesion: sesionDeLaAplicacion,
+      ventana: window,
+      vaciar: () => vaciarColaRef.current(),
+    });
+  }, []);
+  const vaciarColaRef = useRef<() => Promise<unknown>>(async () => null);
+
   const [cargandoExpediente, setCargandoExpediente] = useState(false);
   const cargarExpedienteRef = useRef<() => Promise<void>>(async () => {});
   const cargaAlEntrarRef = useRef<CargaAlEntrar | null>(null);
@@ -691,10 +649,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [lastCalendarAuthTime, setLastCalendarAuthTime] = useState<string | null>(null);
 
-  const [sheetsAccessToken, setSheetsAccessToken] = useState<string | null>(null);
-  const [sheetsStatus, setSheetsStatus] = useState<'disconnected' | 'connected' | 'connecting' | 'authorizing' | 'exportando' | 'exportado' | 'error'>('disconnected');
-  const [sheetsError, setSheetsError] = useState<string | null>(null);
-  const [lastSheetsAuthTime, setLastSheetsAuthTime] = useState<string | null>(null);
   const [lastExportMetadata, setLastExportMetadata] = useState<LastExportMetadata | null>(null);
   const [simulatedRole, setSimulatedRole] = useState<'FAMILY_ADMIN' | 'MEMBER_SELF' | 'VIEWER' | null>(null);
   const [simulatedEmail, setSimulatedEmail] = useState<string | null>(null);
@@ -716,14 +670,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Auto-sync
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
-  /**
-   * Las escrituras que no salieron por un fallo pasajero.
+  /*
+   * Bloque H · la cola de cambios sin enviar vive en el disco.
    *
-   * Son las mismas mutaciones, guardadas para reenviarlas tal cual. No hay
-   * fusión ni resolución de conflictos: la hoja solo anexa, la última fila
-   * manda, y una repetida dice lo mismo.
+   * Hasta G4 guardaba funciones en memoria, y un F5 los perdía. Ahora son
+   * lotes de mutaciones en JSON, en `pate:cola:v1`, escritos antes de salir a
+   * la red. Ver `colaDuradera.ts` y `despachadorCola.ts`.
    */
-  const escriturasPendientesRef = useRef<((repo: Awaited<ReturnType<typeof getDataRepository>>, ctx: RepositoryContext) => Promise<void>)[]>([]);
+  const colaRef = useRef<ColaDuradera | null>(null);
+  const despachadorRef = useRef<DespachadorCola | null>(null);
+  const avisoColaVolatilRef = useRef(false);
+  if (colaRef.current === null && typeof window !== 'undefined') {
+    let almacen: Storage | null = null;
+    try {
+      almacen = window.localStorage;
+    } catch {
+      almacen = null;
+    }
+    colaRef.current = new ColaDuradera(almacen);
+    despachadorRef.current = new DespachadorCola({
+      cola: colaRef.current,
+      enviar: async (mutaciones) => {
+        const repo = await getDataRepository();
+        if (!repo.enviarLote) throw new Error('el repositorio no envía lotes');
+        await enviarConRepositorio(repo as { enviarLote(m: Mutacion[]): Promise<void> })(mutaciones);
+      },
+      alCambiar: (n) => {
+        setPendingSyncCount(n);
+        pendingSyncCountRef.current = n;
+      },
+    });
+  }
   const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(true);
   const [needsGoogleAuth, setNeedsGoogleAuth] = useState<boolean>(false);
   const autoSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -855,7 +832,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     if (decision.accion === 'cerrar_sesion') {
       // Ocho horas o más bloqueada: se cierra con purga.
-      void cerrarSesionYPurgar();
+      void cerrarSesionYPurgar('BLOQUEO_8H');
       return;
     }
 
@@ -895,7 +872,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const comprobar = () => {
       if (superoUmbralBloqueo(bloqueadoDesdeRef.current, Date.now())) {
-        void cerrarSesionYPurgar();
+        void cerrarSesionYPurgar('BLOQUEO_8H');
       }
     };
 
@@ -1434,7 +1411,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Si el router acaba de contestar, hay camino: es el momento de
         // reenviar lo que esperaba. Sin esto, «se reenviarán solos» era una
         // promesa que nadie cumplía —solo el diálogo de cierre reintentaba—.
-        if (escriturasPendientesRef.current.length > 0) void flushPendingSync();
+        if ((colaRef.current?.longitud ?? 0) > 0) void flushPendingSync();
 
         return revision;
       },
@@ -1448,14 +1425,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       },
     });
 
-    // Volver a tener red es la otra señal de que se puede reenviar.
-    const alVolverLaRed = () => {
-      if (escriturasPendientesRef.current.length > 0) void flushPendingSync();
-    };
-    window.addEventListener('online', alVolverLaRed);
-
+    // Volver a tener red, y que llegue una credencial, los conecta el efecto
+    // de la cola duradera (Bloque H), que no depende de que haya sondeo.
     return () => {
-      window.removeEventListener('online', alVolverLaRed);
       desconectar();
     };
     // `flushPendingSync` se recrea en cada render; entrar aquí reiniciaría el
@@ -1525,7 +1497,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * de GIS con `auto_select` y el `id_token` en memoria.
    */
 
-  const signIn = async (googleUser?: Omit<UserAccount, 'id' | 'createdAt'>, idToken?: string) => {
+  const signIn = async (googleUser?: Omit<UserAccount, 'id' | 'createdAt'>, _idToken?: string) => {
     setIsLoading(true);
     await new Promise((resolve) => setTimeout(resolve, 800));
 
@@ -1838,7 +1810,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLastPullAt(null);
     setLastPushAt(null);
     setLastKnownRevision(0);
-    setPendingSyncCount(0);
+    setPendingSyncCount(colaRef.current?.longitud ?? 0);
     setNeedsGoogleAuth(false);
     setSyncInitStatus('idle');
     setSyncInitMessage(null);
@@ -1846,7 +1818,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setOpSyncError(null);
     setDriveAccessToken(null);
     setCalendarAccessToken(null);
-    setSheetsAccessToken(null);
     setIsLoading(false);
   };
 
@@ -1870,7 +1841,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * usuario dentro de una vista que muestra el expediente, asi que cada paso
    * va en su propio try/catch y siempre se llega a la recarga final.
    */
-  const cerrarSesionYPurgar = async (): Promise<void> => {
+  const cerrarSesionYPurgar = async (motivo: MotivoCierre): Promise<void> => {
     // (a) Guarda reentrante. Un segundo clic no arranca una segunda purga.
     if (cierreEnCursoRef.current) return;
     cierreEnCursoRef.current = true;
@@ -1917,7 +1888,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // (i) localStorage.
     try {
-      const r = purgarPersistenciaLocal();
+      // Bloque H · la cola de cambios sin enviar solo se va si alguien lo ha
+      // decidido: ver `descartaCola` en cierreSesion.ts.
+      const r = purgarPersistenciaLocal(undefined, { conservarCola: !descartaCola(motivo) });
       if (r.errores.length > 0) fallos.push('localStorage');
     } catch { fallos.push('localStorage'); }
 
@@ -1950,7 +1923,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     estadoCierreRef.current = siguiente;
     setEstadoCierre(siguiente);
     if (siguiente.fase === 'purgando' && anterior.fase !== 'purgando') {
-      void cerrarSesionYPurgar();
+      void cerrarSesionYPurgar('DIALOGO');
     }
   };
 
@@ -2154,121 +2127,139 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     medicationDoseReminders,
   };
 
+  /** Vuelve la pantalla a como estaba antes de un cambio que la hoja rechazó. */
+  const deshacerCambio = (snap: typeof stateRef.current) => {
+    setMembers(snap.members);
+    setHealthProfiles(snap.healthProfiles);
+    setAppointments(snap.appointments);
+    setCheckups(snap.checkups);
+    setVaccines(snap.vaccines);
+    setExams(snap.exams);
+    setExamResults(snap.examResults);
+    setDocuments(snap.documents);
+    setHistory(snap.history);
+    setReminders(snap.reminders);
+    setTasks(snap.tasks);
+    setMedicalOrders(snap.medicalOrders);
+    setMedicationPrescriptions(snap.medicationPrescriptions);
+    setMedicationDoseReminders(snap.medicationDoseReminders);
+  };
+
+  const mensajeDeRechazo = (codigo: string) =>
+    codigo === 'PERMISO_INSUFICIENTE'
+      ? 'La hoja rechazó el cambio: tu rol no permite hacerlo. Se deshizo.'
+      : `La hoja rechazó el cambio (${codigo}). Se deshizo para no dejarlo a medias.`;
+
   /**
-   * Guardar una entidad suelta, sin bloquear la interfaz.
+   * Vacía la cola duradera en orden (Bloque H).
    *
-   * Es el embudo por el que pasarán **todas** las escrituras cuando el
-   * repositorio escriba por mutación. Hoy no escribe: la persistencia sigue
-   * siendo el empuje por lotes de `scheduleAutoSync`, y activar los dos a la
-   * vez sería lo peor de ambos —el router anexa filas y el empuje reescribe
-   * pestañas enteras—.
+   * Los rechazos de lotes que no son `propio` —los que venían de antes de un
+   * F5, sin instantánea a la que volver— se avisan y se ofrece releer la hoja,
+   * que es la verdad sobre lo que entró.
+   */
+  const vaciarCola = async (propio?: string): Promise<InformeDespacho | null> => {
+    // A6-F3 · Guarda estructural del modo demostración.
+    if (origenDatosRef.current === 'DEMO') return null;
+    const despachador = despachadorRef.current;
+    if (!despachador) return null;
+
+    isSyncInProgress.current = true;
+    try {
+      const informe = await despachador.vaciar();
+      const ajenos = informe.rechazados.filter((r) => r.id !== propio);
+      if (ajenos.length > 0) {
+        avisar(
+          ajenos.length === 1
+            ? `Un cambio que estaba pendiente fue rechazado por la hoja (${ajenos[0].codigo}).`
+            : `${ajenos.length} cambios que estaban pendientes fueron rechazados por la hoja.`,
+        );
+        setHayCambiosRemotos(true);
+      }
+      return informe;
+    } finally {
+      isSyncInProgress.current = false;
+    }
+  };
+
+  /**
+   * Guardar una acción del usuario (Bloque H: a través de la cola duradera).
    *
-   * ESTO NO ES UNA ESCRITURA MUDA, Y LA DIFERENCIA IMPORTA
-   * ──────────────────────────────────────────────────────
-   * Una escritura muda es la que **parece** guardar y no guarda. Aquí no lo
-   * parece: la condición tiene nombre, está escrita arriba y se apaga en un
-   * sitio. `SINCRONIZACION_MANUAL` pasa a `false` en G4b y esto empieza a
-   * escribir de verdad; el empuje por lotes se va en el mismo paso.
+   *   1. Se construye el lote **sin tocar la red**: una acción, un lote, para
+   *      que el router lo acepte entero o nada (la lección del medio familiar
+   *      de G4b).
+   *   2. Se guarda en el disco, en `pate:cola:v1`, ANTES de enviarlo. Un F5, o
+   *      cerrar el navegador sin conexión, ya no pierde nada.
+   *   3. Se vacía la cola en orden. Si había cosas esperando, esto sale
+   *      detrás: la hoja resuelve «la última fila manda», y adelantarse
+   *      pisaría un cambio anterior con uno más viejo.
+   *
+   * Un fallo pasajero deja el lote en la cola y la pantalla como está; se
+   * reenvía solo al volver la red, al llegar una credencial o con el sondeo.
+   * Un rechazo del router deshace el cambio: seguirá rechazado por mucho que
+   * se reintente, y dejarlo en pantalla prometería un guardado que no ocurre.
    */
   const persistirPorMutacion = useCallback(
     (fn: (repo: Awaited<ReturnType<typeof getDataRepository>>, ctx: RepositoryContext) => Promise<void>) => {
       // A6-F3 · Guarda estructural del modo demostración.
       if (origenDatosRef.current === 'DEMO') return;
 
-      // La instantánea se toma ANTES de salir a la red: es a lo que se vuelve
-      // si el router rechaza la escritura.
+      // La instantánea se toma ANTES de nada: es a lo que se vuelve si el
+      // router rechaza el cambio.
       const snap = { ...stateRef.current };
+      const ctx: RepositoryContext = {
+        uid: user?.googleId ?? user?.id ?? '',
+        email: user?.email ?? '',
+        // La familia **es la hoja**: no hay documento que identificar.
+        familyId: null,
+      };
 
-      getDataRepository().then(async (repo) => {
+      void (async () => {
+        let lote: Mutacion[];
         try {
-          // Una acción del usuario, un lote. Dar de alta un familiar son tres
-          // escrituras, y en tres lotes, cuando la tercera se rechazaba las dos
-          // primeras ya estaban en la hoja —la validación en vivo de G4b dejó
-          // así medio familiar—. Dentro de una transacción no sale nada hasta
-          // confirmar, y el router acepta el lote entero o nada.
-          const tx = repo.transaccion?.();
-          await fn(tx ?? repo, {
-            uid: user?.googleId ?? user?.id ?? '',
-            email: user?.email ?? '',
-            // La familia **es la hoja**: no hay documento que identificar. El
-            // repositorio lo ignora, y queda aquí porque el contrato todavía
-            // lo pide.
-            familyId: null,
-          });
-          await tx?.confirmar();
+          const repo = await getDataRepository();
+          if (!repo.transaccion) throw new Error('el repositorio no abre transacciones');
+          lote = await construirLote(
+            repo as ConTransaccion<Awaited<ReturnType<typeof getDataRepository>>>,
+            (tx) => fn(tx, ctx),
+          );
         } catch (err: unknown) {
           const codigo = (err as { codigo?: string } | null)?.codigo ?? '';
-
-          // Lo que no tiene dónde guardarse no es un fallo del guardado: es una
-          // pérdida conocida y decidida (`SIN_PESTANA`, en descriptores.ts).
-          // Deshacer la pantalla por eso rompería funciones que no tienen nada
-          // que ver.
+          // Lo que no tiene dónde guardarse es una pérdida conocida y decidida
+          // (`SIN_PESTANA`, en descriptores.ts), no un fallo del guardado.
           if (codigo === 'NO_HAY_DONDE_ESCRIBIRLO') {
             console.warn('[AppContext] sin pestaña donde guardarlo:', (err as Error)?.message);
             return;
           }
-
-          /*
-           * UN FALLO PASAJERO NO PUEDE BORRAR LO QUE ALGUIEN ACABA DE ESCRIBIR
-           * ──────────────────────────────────────────────────────────────────
-           * Sin red, con el cerrojo ocupado, o en un navegador que todavía no
-           * tiene registrada la hoja de la familia, deshacer el cambio
-           * significa que quien estaba en el ascensor apuntando una vacuna ve
-           * desaparecer lo que escribió.
-           *
-           * Así que se guarda la escritura y se reintenta. No es una cola de
-           * sincronización con fusión —eso es lo que G4b vino a quitar—: son
-           * las mismas mutaciones, que se reenvían tal cual. Reenviarlas es
-           * inofensivo porque la hoja **solo anexa**: la última fila manda, y
-           * una repetida dice exactamente lo mismo.
-           *
-           * Lo que SÍ se deshace es un rechazo que no va a cambiar
-           * reintentando: un permiso denegado seguirá denegado, y dejar el dato
-           * en pantalla sería prometer un guardado que no va a ocurrir.
-           */
-          const reintentable =
-            (err as { reintentable?: boolean } | null)?.reintentable === true ||
-            codigo === 'SIN_BACKEND' ||
-            codigo === 'SIN_IDENTIDAD';
-
-          if (reintentable) {
-            escriturasPendientesRef.current.push(fn);
-            setPendingSyncCount(escriturasPendientesRef.current.length);
-            pendingSyncCountRef.current = escriturasPendientesRef.current.length;
-            console.warn('[AppContext] guardado aplazado, se reintentará:', codigo || 'sin código');
-            return;
-          }
-
-          console.error('[AppContext] persistirPorMutacion: error — se deshace el cambio:', err);
-
-          // Rollback all states
-          setMembers(snap.members);
-          setHealthProfiles(snap.healthProfiles);
-          setAppointments(snap.appointments);
-          setCheckups(snap.checkups);
-          setVaccines(snap.vaccines);
-          setExams(snap.exams);
-          setExamResults(snap.examResults);
-          setDocuments(snap.documents);
-          setHistory(snap.history);
-          setReminders(snap.reminders);
-          setTasks(snap.tasks);
-          setMedicalOrders(snap.medicalOrders);
-          setMedicationPrescriptions(snap.medicationPrescriptions);
-          setMedicationDoseReminders(snap.medicationDoseReminders);
-
-          avisar(
-            codigo === 'SIN_BACKEND'
-              ? 'Este navegador todavía no tiene registrada la hoja de la familia.'
-              : codigo === 'SIN_IDENTIDAD'
-                ? 'La sesión caducó. Vuelve a entrar para guardar el cambio.'
-                : 'No se pudo guardar el cambio. Se deshizo para no dejarlo a medias.',
-          );
+          // Construir no toca la red: lo que falle aquí no se arregla
+          // reintentando.
+          console.error('[AppContext] no se pudo preparar el cambio — se deshace:', err);
+          deshacerCambio(snap);
+          avisar('No se pudo guardar el cambio. Se deshizo para no dejarlo a medias.');
+          return;
         }
-      }).catch((err) => {
-        console.error('[AppContext] persistirPorMutacion: error de preparación:', err);
-      });
+
+        const cola = colaRef.current;
+        const encolado = cola?.encolar(lote) ?? null;
+        if (!cola || !encolado) return;
+        setPendingSyncCount(cola.longitud);
+        pendingSyncCountRef.current = cola.longitud;
+        if (!cola.duradera && !avisoColaVolatilRef.current) {
+          avisoColaVolatilRef.current = true;
+          avisar('Este navegador no deja guardar los cambios pendientes: si cierras la pestaña sin conexión, se perderán.');
+        }
+
+        const informe = await vaciarCola(encolado.id);
+        const rechazo = informe?.rechazados.find((r) => r.id === encolado.id);
+        if (rechazo) {
+          console.error('[AppContext] la hoja rechazó el cambio — se deshace:', rechazo.codigo);
+          deshacerCambio(snap);
+          avisar(mensajeDeRechazo(rechazo.codigo));
+        } else if (informe && informe.quedan > 0) {
+          console.warn('[AppContext] guardado aplazado, se reenviará solo:', informe.detenidoPor ?? '');
+        }
+      })();
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, avisar],
   );
 
@@ -2412,54 +2403,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   /**
    * flushPendingSync — Sincroniza inmediatamente si hay cambios pendientes y token válido.
    */
-  /**
-   * Reenvía las escrituras que quedaron pendientes.
-   *
-   * Antes esto pedía un token y empujaba el expediente entero. Ahora reenvía
-   * **las mutaciones que fallaron**, una a una y en el orden en que
-   * ocurrieron: el orden importa porque una cita puede depender de la orden
-   * médica que la originó.
-   *
-   * Las que vuelvan a fallar se quedan en la cola. Nunca se descarta una
-   * escritura por haberla intentado.
-   */
+  /** Reenvía la cola duradera. Lo usan el diálogo de cierre y el registro de la hoja. */
   const flushPendingSync = async (): Promise<void> => {
-    // A6-F3 · Guarda estructural del modo demostración.
-    if (origenDatosRef.current === 'DEMO') return;
-    if (isSyncInProgress.current) return;
-    if (escriturasPendientesRef.current.length === 0) return;
-
-    isSyncInProgress.current = true;
-    try {
-      const repo = await getDataRepository();
-      const ctx: RepositoryContext = {
-        uid: user?.googleId ?? user?.id ?? '',
-        email: user?.email ?? '',
-        familyId: null,
-      };
-
-      const cola = [...escriturasPendientesRef.current];
-      const fallidas: typeof cola = [];
-
-      for (const escritura of cola) {
-        try {
-          // El reenvío va en su propia transacción, como la primera vez: un
-          // reintento que se partiera dejaría el mismo medio familiar.
-          const tx = repo.transaccion?.();
-          await escritura(tx ?? repo, ctx);
-          await tx?.confirmar();
-        } catch {
-          fallidas.push(escritura);
-        }
-      }
-
-      escriturasPendientesRef.current = fallidas;
-      setPendingSyncCount(fallidas.length);
-      pendingSyncCountRef.current = fallidas.length;
-      if (fallidas.length === 0) setNeedsGoogleAuth(false);
-    } finally {
-      isSyncInProgress.current = false;
-    }
+    await vaciarCola();
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -4272,122 +4218,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const connectSheets = async (): Promise<string | null> => {
-    // A6-F3 · Guarda estructural del modo demostración.
-    if (origenDatosRef.current === 'DEMO') return null;
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      setSheetsStatus('error');
-      setSheetsError('NEXT_PUBLIC_GOOGLE_CLIENT_ID no configurada.');
-      return null;
-    }
-
-    setSheetsStatus('authorizing');
-    setSheetsError(null);
-    try {
-      // Usar TokenManager: reusar token operacional si está vigente
-      const token = await ensureOperationalToken(clientId, false);
-      setSheetsAccessToken(token);
-      setSheetsStatus('connected');
-      setLastSheetsAuthTime(new Date().toISOString());
-      return token;
-    } catch (err: any) {
-      const errCode = err?.error || err?.message || 'auth_error';
-      setSheetsStatus('error');
-      setSheetsError(errCode === 'access_denied' ? 'Acceso denegado. Verifica que tu correo esté autorizado como tester.' : (errCode || 'El usuario canceló o falló la autorización'));
-      return null;
-    }
-  };
-
-  const exportToSheets = async (memberId: string): Promise<string> => {
-    // A6-F3 · Guarda estructural del modo demostración.
-    if (origenDatosRef.current === 'DEMO') return '';
-    setSheetsStatus('connecting');
-    setSheetsError(null);
-
-    const clientId3 = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    // Intentar token desde caché del TokenManager primero
-    let token = sheetsAccessToken;
-    if (!token && clientId3) {
-      try {
-        token = await ensureOperationalToken(clientId3, false);
-        setSheetsAccessToken(token);
-        setLastSheetsAuthTime(new Date().toISOString());
-        setSheetsStatus('connected');
-      } catch (_) {
-        token = await connectSheets();
-      }
-    } else if (!token) {
-      token = await connectSheets();
-    }
-
-    if (!token) {
-      setSheetsStatus('error');
-      setSheetsError('Permiso de Google Sheets denegado.');
-      const updatedMeta: LastExportMetadata = {
-        spreadsheetId: null,
-        spreadsheetUrl: null,
-        exportedAt: new Date().toISOString(),
-        exportedBy: user ? user.displayName : 'Usuario',
-        sheetsSyncStatus: 'ERROR',
-        sheetsError: 'Permiso de Google Sheets denegado.'
-      };
-      setLastExportMetadata(updatedMeta);
-      throw new Error('Permiso de Google Sheets denegado.');
-    }
-
-    try {
-      setSheetsStatus('exportando');
-      
-      const currentStateSnapshot = {
-        members,
-        healthProfiles,
-        appointments,
-        checkups,
-        vaccines,
-        exams,
-        examResults,
-        documents,
-        history,
-        reminders,
-        tasks
-      };
-
-      const ownerName = user ? user.displayName : 'Titular';
-      const ownerEmail = user ? user.email : 'titular@correo.com';
-
-      const result = await exportFamilyHealthWorkbook(token, currentStateSnapshot, ownerName, ownerEmail);
-
-      const updatedMeta: LastExportMetadata = {
-        spreadsheetId: result.spreadsheetId,
-        spreadsheetUrl: result.spreadsheetUrl,
-        exportedAt: new Date().toISOString(),
-        exportedBy: user ? user.displayName : 'Usuario',
-        sheetsSyncStatus: 'EXPORTED',
-        sheetsError: null
-      };
-
-      setLastExportMetadata(updatedMeta);
-      setSheetsStatus('exportado');
-      return result.spreadsheetUrl;
-    } catch (err: any) {
-      console.error('Error exportando a Google Sheets:', err.message || err);
-      setSheetsStatus('error');
-      setSheetsError(err.message || 'Error durante la exportación');
-      
-      const updatedMeta: LastExportMetadata = {
-        spreadsheetId: lastExportMetadata?.spreadsheetId || null,
-        spreadsheetUrl: lastExportMetadata?.spreadsheetUrl || null,
-        exportedAt: new Date().toISOString(),
-        exportedBy: user ? user.displayName : 'Usuario',
-        sheetsSyncStatus: 'ERROR',
-        sheetsError: err.message || 'Error durante la exportación'
-      };
-      setLastExportMetadata(updatedMeta);
-      throw err;
-    }
-  };
-
   // ── GMAIL IMPORT MODULE ACTIONS ───────────────────────────────────────────
 
   /**
@@ -4910,6 +4740,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // A6-F3 · Guarda estructural del modo demostración.
     if (origenDatosRef.current === 'DEMO') return;
 
+    /*
+     * Bloque H · antes de leer, lo que está sin enviar. Si no sale, NO se
+     * lee: el expediente de la hoja no tiene esos cambios, y aplicarlo los
+     * quitaría de la pantalla. La copia local, que sí los tiene, es la mejor
+     * vista que hay; se leerá cuando la cola se vacíe.
+     */
+    if ((colaRef.current?.longitud ?? 0) > 0) {
+      await vaciarCola();
+      if ((colaRef.current?.longitud ?? 0) > 0) {
+        setOpSyncError('Hay cambios sin enviar: se leerá la hoja cuando salgan.');
+        throw Object.assign(new Error('cola pendiente'), { codigo: 'COLA_PENDIENTE', reintentable: true });
+      }
+    }
+
     setOpSyncStatus('syncing');
     try {
       const repo = await getDataRepository();
@@ -4996,6 +4840,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * deja el motivo en el diagnóstico y el sondeo avisará cuando haya algo.
    */
   cargarExpedienteRef.current = pullFromGoogle;
+  vaciarColaRef.current = () => vaciarCola();
   const autoSyncOnLogin = async (loggedUser: UserAccount): Promise<void> => {
     if (!loggedUser || loggedUser.provider !== 'google') return;
     // Si todavía no hay credencial, no pasa nada: la carga se repite sola
@@ -5241,165 +5086,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const generateAndShareMemberReport = async (memberId: string, email: string): Promise<void> => {
-    // A6-F3 · Guarda estructural del modo demostración.
-    if (origenDatosRef.current === 'DEMO') return;
-    if (!email) throw new Error('El miembro familiar debe poseer un correo electrónico registrado.');
-
-    const token = await requestGoogleNativeToken();
-    if (!token) throw new Error('No se pudo obtener autorización de Google.');
-
-    const targetMember = members.find(m => m.id === memberId);
-    if (!targetMember) throw new Error('Familiar no encontrado.');
-
-    const aceptadoReporte = await confirmar({
-      titulo: 'Crear y compartir reporte clínico',
-      descripcion: `Se creará una hoja de cálculo con el historial de ${targetMember.fullName} y se compartirá con ${email}.`,
-      etiquetaConfirmar: 'Crear y compartir',
-      tono: 'primario',
-    });
-    if (!aceptadoReporte) return;
-
-    try {
-      setOpSyncStatus('syncing');
-      setOpSyncError(null);
-
-      // Filtrar datos clínico-operativos exclusivos para este familiar (no expone a otros)
-      const filteredProfile = healthProfiles[memberId] || null;
-      const filteredAppts = appointments.filter(a => a.memberId === memberId && (a.retentionStatus || 'ACTIVE') !== 'PURGED');
-      const filteredCheckups = checkups.filter(c => c.memberId === memberId);
-      const filteredVaccines = vaccines.filter(v => v.memberId === memberId);
-      const filteredExams = exams.filter(e => e.memberId === memberId);
-      const filteredDocs = documents.filter(d => d.memberId === memberId);
-      const filteredHistory = history.filter(h => h.memberId === memberId);
-      const filteredReminders = reminders.filter(r => r.memberId === memberId);
-
-      const memberData = {
-        member: targetMember,
-        healthProfile: filteredProfile,
-        appointments: filteredAppts,
-        checkups: filteredCheckups,
-        vaccines: filteredVaccines,
-        exams: filteredExams,
-        documents: filteredDocs,
-        history: filteredHistory,
-        reminders: filteredReminders
-      };
-
-      // Crear el libro individual en Sheets
-      const result = await createIndividualMemberReport(token, targetMember.fullName, memberData);
-
-      // Otorgar permisos de lectura (reader) en Drive al correo destino
-      const permissionId = await shareFileWithUser(token, result.spreadsheetId, email);
-
-      // Registrar el nuevo informe en la lista de reportes compartidos
-      const newReport: SharedMemberReport = {
-        id: `rep-${Date.now()}`,
-        memberId,
-        memberName: targetMember.fullName,
-        spreadsheetId: result.spreadsheetId,
-        spreadsheetUrl: result.spreadsheetUrl,
-        sharedWithEmail: email,
-        sharedAt: new Date().toISOString(),
-        permissionId,
-        shareStatus: 'SHARED',
-        shareError: null
-      };
-
-      // Actualizar estado local
-      const updatedReports = [newReport, ...sharedReports];
-      setSharedReports(updatedReports);
-
-      // Trazabilidad de Auditoría
-      const reportEvent: MedicalHistoryEvent = {
-        id: `hist-rep-${Date.now()}`,
-        memberId,
-        eventType: 'OTHER',
-        title: 'Reporte individual creado',
-        description: `Reporte clínico individual creado y compartido con ${email}. Spreadsheet ID: ${result.spreadsheetId}, Permission ID: ${permissionId}.`,
-        eventDate: new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString()
-      };
-      setHistory(prev => [reportEvent, ...prev]);
-
-      setOpSyncStatus('synced');
-      
-      avisar(`Reporte clínico de ${targetMember.fullName} creado y compartido.`);
-    } catch (err: any) {
-      console.error('Error al generar o compartir reporte individual:', err);
-      setOpSyncStatus('error');
-      setOpSyncError(err.message || 'Error al crear reporte individual.');
-
-      // Registrar error en auditoría
-      const errEvent: MedicalHistoryEvent = {
-        id: `hist-rep-err-${Date.now()}`,
-        memberId,
-        eventType: 'OTHER',
-        title: 'Error de compartición',
-        description: `Fallo al generar reporte clínico individual para ${targetMember.fullName || memberId}. Error: ${err.message}`,
-        eventDate: new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString()
-      };
-      setHistory(prev => [errEvent, ...prev]);
-      throw err;
-    }
-  };
-
-  const revokeMemberReportShare = async (reportId: string): Promise<void> => {
-    const token = await requestGoogleNativeToken();
-    if (!token) throw new Error('No se pudo obtener autorización de Google.');
-
-    const rep = sharedReports.find(r => r.id === reportId);
-    if (!rep) throw new Error('Reporte compartido no encontrado.');
-
-    const aceptadoRevocarRep = await confirmar({
-      titulo: 'Revocar acceso al reporte clínico',
-      descripcion: `${rep.sharedWithEmail} dejará de poder abrir el reporte clínico de ${rep.memberName}.`,
-      etiquetaConfirmar: 'Revocar acceso',
-      tono: 'peligro',
-    });
-    if (!aceptadoRevocarRep) return;
-
-    try {
-      setOpSyncStatus('syncing');
-      setOpSyncError(null);
-
-      // Revocar el permiso si existe el ID de permiso
-      if (rep.permissionId) {
-        await revokeFileShare(token, rep.spreadsheetId, rep.permissionId);
-      }
-
-      // Actualizar estado local
-      const updatedReports = sharedReports.map(r => r.id === reportId ? {
-        ...r,
-        shareStatus: 'REVOKED' as const,
-        revokedAt: new Date().toISOString()
-      } : r);
-
-      setSharedReports(updatedReports);
-
-      // Auditoría
-      const revokeEvent: MedicalHistoryEvent = {
-        id: `hist-rep-rev-${Date.now()}`,
-        memberId: rep.memberId,
-        eventType: 'OTHER',
-        title: 'Reporte individual revocado',
-        description: `Acceso al reporte clínico individual de ${rep.memberName} para ${rep.sharedWithEmail} revocado exitosamente.`,
-        eventDate: new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString()
-      };
-      setHistory(prev => [revokeEvent, ...prev]);
-
-      setOpSyncStatus('synced');
-      avisar(`Se revocó el acceso de ${rep.sharedWithEmail} al reporte.`);
-    } catch (err: any) {
-      console.error('Error al revocar acceso al reporte individual:', err);
-      setOpSyncStatus('error');
-      setOpSyncError(err.message || 'Error al revocar reporte individual.');
-      throw err;
-    }
-  };
-
   // ─── Session lock / inactivity ────────────────────────────────────────────────
 
   /** Vacia las 16 estructuras clinicas. NO toca sesion, preferencias ni pendientes. */
@@ -5472,7 +5158,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const unlockSession = async (): Promise<void> => {
     // (1) Umbral de 8 horas antes que nada.
     if (superoUmbralBloqueo(bloqueadoDesdeRef.current, Date.now())) {
-      void cerrarSesionYPurgar();
+      void cerrarSesionYPurgar('BLOQUEO_8H');
       return;
     }
 
@@ -5712,7 +5398,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     });
     let duplicateGmailAppts = 0;
-    for (const [msgId, ids] of gmailMsgMap.entries()) {
+    for (const ids of gmailMsgMap.values()) {
       if (ids.length > 1) {
         duplicateGmailAppts += (ids.length - 1);
       }
@@ -5784,10 +5470,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       lastCalendarAuthTime,
 
       // Google Sheets states
-      sheetsAccessToken,
-      sheetsStatus,
-      sheetsError,
-      lastSheetsAuthTime,
       lastExportMetadata,
       
       signIn,
@@ -5809,7 +5491,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       toggleReminder,
       setDriveSync,
       setCalendarSync,
-      exportToSheets,
       
       // Google Drive Actions
       connectDrive,
@@ -5819,7 +5500,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       syncAppointmentToCalendar,
 
       // Google Sheets Actions
-      connectSheets,
 
       // Simulated credentials and lifecycle/retention helpers
       currentUserRole,
@@ -5889,8 +5569,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       sharedReports,
       shareDocumentWithMember,
       revokeDocumentShare,
-      generateAndShareMemberReport,
-      revokeMemberReportShare,
 
       // Importación de citas (Bloque B: manual)
       emailSources,
@@ -5920,7 +5598,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setNightLockEnd,
       validateDataIntegrity,
       importBackupJSON,
-      sincronizacionManual: SINCRONIZACION_MANUAL,
       hayCambiosRemotos,
       recargarExpediente,
       hojaRegistrada,
@@ -5938,7 +5615,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       solicitarCierreDeSesion,
       despacharCierre,
       reintentarSincronizacion,
-      cerrarSesionYPurgar,
       avisoPurgaDiferida,
       descartarAvisoPurgaDiferida,
       estadoBloqueo,

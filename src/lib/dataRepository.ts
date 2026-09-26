@@ -21,6 +21,7 @@
  * credenciales sin que nadie se entere.
  */
 
+import type { Mutacion } from './transporteBackend';
 import type {
   FamilyMember,
   HealthProfile,
@@ -309,7 +310,10 @@ export interface DataRepository {
    * `confirmar()`. El router valida el lote entero antes de escribir nada, así
    * que o entra todo o no entra nada: sin familiares a medias en la hoja.
    */
-  transaccion?(): DataRepository & { confirmar(): Promise<void> };
+  transaccion?(): DataRepository & { confirmar(): Promise<void>; lote(): Mutacion[] };
+
+  /** Bloque H · envía un lote ya construido: el de la cola duradera. */
+  enviarLote?(mutaciones: readonly Mutacion[]): Promise<void>;
 
   /**
    * La dirección de la hoja de la familia, para «Abrir la hoja» (cierre de G4).

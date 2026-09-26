@@ -101,8 +101,11 @@ describe('Content-Security-Policy', () => {
     // Token, que se fueron con Firebase. Un comodín no se puede recortar: se
     // sustituye por la lista medida en el código.
     expect(DIRECTIVAS_CSP['connect-src']).toContain('https://www.googleapis.com');
-    expect(DIRECTIVAS_CSP['connect-src']).toContain('https://sheets.googleapis.com');
     expect(DIRECTIVAS_CSP['connect-src']).not.toContain('https://*.googleapis.com');
+    // Bloque H · sin salidas a Sheets desde el navegador: la hoja de la
+    // familia la escribe el Web App, y la exportación y el informe individual,
+    // que no tenían botón desde G4b, se retiraron.
+    expect(DIRECTIVAS_CSP['connect-src']).not.toContain('https://sheets.googleapis.com');
   });
 
   it('NO queda ningún destino de Firebase, en ninguna directiva', () => {
@@ -165,7 +168,6 @@ describe('Content-Security-Policy', () => {
     expect([...DIRECTIVAS_CSP['connect-src']]).toEqual([
       "'self'",
       'https://www.googleapis.com',
-      'https://sheets.googleapis.com',
       'https://accounts.google.com',
       'https://script.google.com',
       'https://script.googleusercontent.com',

@@ -36,3 +36,13 @@ describe('Ajustes sin sincronización manual', () => {
     expect(AJUSTES).not.toMatch(/\bsyncNow\b/);
   });
 });
+
+describe('Bloque H · ningún cierre desde Ajustes se salta el aviso', () => {
+  it('no llama a signOut() ni a la purga directamente: pasa por el diálogo', () => {
+    // Los dos botones de cierre de Ajustes iban directos. Con la cola en el
+    // disco, eso era salir —y purgar— sin avisar de lo que no se envió.
+    expect(AJUSTES).not.toMatch(/onClick=\{\(\) => signOut\(\)\}/);
+    expect(AJUSTES).not.toMatch(/\bcerrarSesionYPurgar\b/);
+    expect(AJUSTES).toMatch(/solicitarCierreDeSesion\(\)/);
+  });
+});

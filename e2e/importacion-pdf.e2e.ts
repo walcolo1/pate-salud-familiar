@@ -231,7 +231,7 @@ test.describe('Bloque B · D1 · lectura de PDF', () => {
     expect(csp).toContain("script-src 'self' 'unsafe-inline' https://accounts.google.com");
     expect(csp).toContain("worker-src 'self'");
     expect(csp).toContain(
-      "connect-src 'self' https://www.googleapis.com https://sheets.googleapis.com https://accounts.google.com https://script.google.com https://script.googleusercontent.com",
+      "connect-src 'self' https://www.googleapis.com https://accounts.google.com https://script.google.com https://script.googleusercontent.com",
     );
     expect(csp).not.toContain('unsafe-eval');
     expect(csp).not.toContain('wasm-unsafe-eval');

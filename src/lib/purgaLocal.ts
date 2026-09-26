@@ -29,6 +29,7 @@ import {
   type AlmacenLike,
 } from './preferencias';
 import { CLAVE_SESION_FAMILIAR, leerBackend } from './invitacionEntrante';
+import { CLAVE_COLA, leerCola } from './colaDuradera';
 
 /** Prefijo que identifica las claves de esta aplicación. */
 export const PREFIJO_APP = 'pate';
@@ -98,8 +99,17 @@ export function debeEliminarse(clave: string): boolean {
  * sesión pueda continuar. Un fallo al limpiar jamás debe dejar al usuario
  * dentro de una vista que muestra el expediente.
  */
+export interface OpcionesPurga {
+  /**
+   * Bloque H · conservar la cola de cambios sin enviar. Solo cuando nadie ha
+   * confirmado descartarlos: ver `descartaCola` en `cierreSesion.ts`.
+   */
+  conservarCola?: boolean;
+}
+
 export function purgarPersistenciaLocal(
   store?: AlmacenLike | null,
+  opciones: OpcionesPurga = {},
 ): ResultadoPurgaLocal {
   const s = store ?? almacenPorDefecto();
   if (!s) {
@@ -125,6 +135,9 @@ export function purgarPersistenciaLocal(
     // La única clave preservada que se lee: es una dirección, no un expediente.
     const hojaValida = clave === CLAVE_SESION_FAMILIAR && leerBackend(s) !== null;
     if (!debeEliminarse(clave) && (clave !== CLAVE_SESION_FAMILIAR || hojaValida)) continue;
+    // La cola se conserva solo si se pidió y si lo que hay es una cola: igual
+    // que la hoja, la excepción mira el valor y no solo el nombre.
+    if (clave === CLAVE_COLA && opciones.conservarCola && leerCola(s).length > 0) continue;
     try {
       // Sin getItem previo: no se lee lo que se va a borrar.
       s.removeItem(clave);

@@ -12,12 +12,9 @@ import {
   Plus, 
   MapPin, 
   Clock, 
-  ChevronDown, 
-  FileText,
   Save,
   CheckCircle,
   XCircle,
-  AlertTriangle,
   ExternalLink,
   Loader2
 } from 'lucide-react';
@@ -34,13 +31,8 @@ export default function AppointmentsPage() {
     addAppointment, 
     updateAppointmentStatus, 
     isLoading,
-    calendarSyncEnabled,
     calendarStatus,
-    calendarError,
     syncAppointmentToCalendar,
-    pushToGoogle,
-    syncNow,
-    sincronizacionManual
   } = useApp();
 
   const [filter, setFilter] = useState<HealthEventStatus | 'ALL'>('ALL');
@@ -125,36 +117,6 @@ export default function AppointmentsPage() {
     }
   };
 
-  const getSheetsSyncBadge = (appt: any) => {
-    const status = appt.syncStatus || 'PENDING_SYNC';
-    switch (status) {
-      case 'SYNCED':
-        return (
-          <span className="text-[9px] font-extrabold bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-600/10 uppercase">
-            ✓ Nube Sheets
-          </span>
-        );
-      case 'PENDING_SYNC':
-        return (
-          <span className="text-[9px] font-extrabold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-600/10 uppercase">
-            Pendiente Sheets
-          </span>
-        );
-      case 'SYNC_ERROR':
-        return (
-          <span className="text-[9px] font-extrabold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full border border-rose-600/10 uppercase">
-            Error Sheets
-          </span>
-        );
-      case 'LOCAL_ONLY':
-      default:
-        return (
-          <span className="text-[9px] font-extrabold bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full border border-slate-200 uppercase">
-            Local Only
-          </span>
-        );
-    }
-  };
 
   const getCalendarSyncBadge = (appt: any) => {
     const status = appt.calendarSyncStatus || 'LOCAL_ONLY';
@@ -250,12 +212,6 @@ export default function AppointmentsPage() {
                   <h4 className="text-sm font-extrabold text-slate-800 leading-tight mb-0.5">{appt.doctorName}</h4>
                   <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                     <span className="text-[10px] text-slate-500 font-bold">{appt.specialty}</span>
-                    {sincronizacionManual && (
-                      <>
-                        <span className="text-slate-300 text-[10px]">·</span>
-                        {getSheetsSyncBadge(appt)}
-                      </>
-                    )}
                     <span className="text-slate-300 text-[10px]">·</span>
                     {getCalendarSyncBadge(appt)}
                   </div>
@@ -334,18 +290,6 @@ export default function AppointmentsPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="flex flex-col gap-1">
                     {/* Google Sheets Sync Info */}
-                    {sincronizacionManual && (
-                      <div className="flex items-center gap-1.5 text-slate-500">
-                        <span className="font-extrabold text-[10px] uppercase text-slate-500">Base de Datos:</span>
-                        {appt.syncStatus === 'SYNCED' ? (
-                          <span className="text-teal-700">✓ Sincronizado en la Base Operacional</span>
-                        ) : appt.syncStatus === 'SYNC_ERROR' ? (
-                          <span className="text-rose-700 font-semibold">Error al sincronizar con Sheets</span>
-                        ) : (
-                          <span className="text-amber-700">Pendiente de sincronizar</span>
-                        )}
-                      </div>
-                    )}
                     {/* Google Calendar Sync Info */}
                     <div className="flex items-center gap-1.5 text-slate-500">
                       <span className="font-extrabold text-[10px] uppercase text-slate-500">Google Calendar:</span>
@@ -363,20 +307,6 @@ export default function AppointmentsPage() {
 
                   {/* Actions buttons */}
                   <div className="flex flex-wrap gap-1.5 justify-end">
-                    {sincronizacionManual && appt.syncStatus !== 'SYNCED' && (
-                      <button
-                        onClick={async () => {
-                          try {
-                            await syncNow();
-                          } catch (err) {
-                            console.error(err);
-                          }
-                        }}
-                        className="text-[10px] font-black text-amber-700 hover:text-amber-800 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-100 transition-colors"
-                      >
-                        Reintentar subir a Google
-                      </button>
-                    )}
                     {appt.calendarSyncStatus !== 'SYNCED' && (
                       <button
                         onClick={() => syncAppointmentToCalendar(appt.id, undefined, true)}

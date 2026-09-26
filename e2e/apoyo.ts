@@ -118,6 +118,9 @@ export async function generarCambiosPendientes(page: Page) {
   await page.getByPlaceholder(/Ej\. 10203/).fill(String(Date.now()).slice(-9));
   await page.getByRole('button', { name: 'Guardar Familiar' }).click();
   await page.waitForURL(/\/members/, { timeout: 20_000 });
-  // scheduleAutoSync usa un debounce de 4 s; sin token incrementa pendingSyncCount.
-  await page.waitForTimeout(5500);
+  // Bloque H · el lote se escribe en la cola duradera antes de salir a la red;
+  // sin hoja o sin credencial se queda ahí. Se espera a verlo en el disco.
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('pate:cola:v1')), { timeout: 15_000 })
+    .not.toBeNull();
 }

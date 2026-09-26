@@ -56,6 +56,13 @@ const RETIRADOS: Record<string, string> = {
   migrateOperationalSheetHeaders: 'la migración de cabeceras de la hoja vieja',
   databaseSpreadsheetId: 'el identificador de la hoja vieja, guardado en el navegador',
   databaseSpreadsheetUrl: 'la URL de la hoja vieja, guardada en el navegador',
+  // Bloque H
+  sincronizacionManual: 'la bandera que valía false desde G4b y ocultaba código muerto',
+  SINCRONIZACION_MANUAL: 'la constante de esa bandera',
+  escriturasPendientesRef: 'la cola en memoria que un F5 vaciaba',
+  exportToSheets: 'la exportación a Sheets, sin botón desde G4b',
+  generateAndShareMemberReport: 'el informe individual, oculto desde G4b',
+  connectSheets: 'el permiso de Sheets que la web ya no pide',
 };
 
 describe('la hoja operacional de antes se fue', () => {
@@ -68,6 +75,11 @@ describe('la hoja operacional de antes se fue', () => {
 
   it('no queda el módulo que hablaba con la hoja vieja', () => {
     expect(existsSync(join(RAIZ, 'lib', 'googleSheetsOperational.ts'))).toBe(false);
+  });
+
+  it('no quedan los módulos de las salidas a Sheets (Bloque H)', () => {
+    expect(existsSync(join(RAIZ, 'lib', 'googleSheets.ts'))).toBe(false);
+    expect(existsSync(join(RAIZ, 'lib', 'informeIndividual.ts'))).toBe(false);
   });
 
   it('no queda la pantalla que la creaba', () => {

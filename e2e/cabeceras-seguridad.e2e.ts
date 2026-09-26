@@ -91,7 +91,7 @@ test.describe('A7 · cabeceras de seguridad', () => {
     expect(csp).not.toContain('firebasestorage');
 
     expect(csp).toContain(
-      "connect-src 'self' https://www.googleapis.com https://sheets.googleapis.com https://accounts.google.com https://script.google.com https://script.googleusercontent.com",
+      "connect-src 'self' https://www.googleapis.com https://accounts.google.com https://script.google.com https://script.googleusercontent.com",
     );
   });
 

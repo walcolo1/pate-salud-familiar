@@ -4,6 +4,8 @@ import {
   dialogoVisible,
   estaOcupado,
   ESTADO_CIERRE_INICIAL,
+  MOTIVOS_CIERRE,
+  descartaCola,
   type EstadoCierre,
   type AccionCierre,
 } from './cierreSesion';
@@ -136,5 +138,22 @@ describe('ayudas de presentación', () => {
     expect(estaOcupado({ fase: 'purgando' })).toBe(true);
     expect(estaOcupado({ fase: 'pendientes', pendientes: 1 })).toBe(false);
     expect(estaOcupado({ fase: 'sincronizando', pendientes: 0 })).toBe(false);
+  });
+});
+
+describe('Bloque H · qué cierres pueden descartar la cola', () => {
+  it('solo el diálogo: a él se llega sin pendientes o tras descartarlos dos veces', () => {
+    expect(descartaCola('DIALOGO')).toBe(true);
+  });
+
+  it('el cierre automático por 8 horas de bloqueo NO: nadie ha confirmado nada', () => {
+    // La pestaña se queda sola y a las 8 horas se cierra. Borrar los cambios
+    // que no salieron sería perderlos sin que nadie lo haya decidido.
+    expect(descartaCola('BLOQUEO_8H')).toBe(false);
+  });
+
+  it('todo motivo está decidido explícitamente', () => {
+    for (const motivo of MOTIVOS_CIERRE) expect(typeof descartaCola(motivo)).toBe('boolean');
+    expect([...MOTIVOS_CIERRE].sort()).toEqual(['BLOQUEO_8H', 'DIALOGO']);
   });
 });
