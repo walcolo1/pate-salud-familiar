@@ -17,7 +17,7 @@ hecho y qué falta.*
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
 | **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10/E10-bis** llevan el esquema a v3 |
-| **G** | Corte seco de Firebase | **cerrado y validado en vivo** · Firebase fuera, cada cambio se escribe solo, el expediente carga solo · queda G5, apagar el proyecto |
+| **G** | Corte seco de Firebase | **cerrado** · validado en vivo; G5 hecho: proyecto de Firebase borrado, variables retiradas, consentimiento sin `spreadsheets` ni `drive.appdata` |
 | **H** | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
 
 El Bloque D cierra con cuatro pasos y una fase de convención:
@@ -121,8 +121,6 @@ cada módulo. Las que más condicionan lo que venga:
 | Qué hacer cuando la revisión cambia —recargar, avisar o recargar lo que no está en edición— sigue **sin decidir**: `alCambiar` es una llamada de vuelta | `G2-SINCRONIZACION.md` |
 | Las cuarenta condiciones de interfaz sobre `sincronizacionManual` sobran: es una limpieza de pantallas | `G4-EL-CORTE.md` |
 | La cola de reenvío vive **en memoria**: un cambio pendiente no sobrevive a una recarga | `G4-EL-CORTE.md` |
-| `drive.appdata` sigue pidiéndose y ya no lo usa nada: quitarlo es decisión del titular | `G4-EL-CORTE.md`, «Cierre de G4» |
-| La pantalla de consentimiento aún declara `spreadsheets`, que el código ya no pide | `G4-EL-CORTE.md`, «Cierre de G4» |
 | La CSP todavía abre `connect-src` e `img-src` a servicios de Firebase que ya no se usan | `next.config.ts` |
 | Sin `databases()` en el navegador, la caché de Firestore **no se puede localizar** para borrarla | `purgaFirestore.ts` |
 | GIS **no renueva el `id_token` en silencio**: la ventana de 50 min es un intento, no una garantía | `G3-IDENTIDAD.md` |
@@ -175,7 +173,13 @@ un F5 el expediente se carga solo, con «Trayendo el expediente…» mientras
 tanto; Ajustes no tiene botones de sincronización manual. Con esto se cierra la
 migración de frontend y backend del Bloque G.
 
-Queda **G5**: apagar el proyecto de Firebase desde su consola. Lo hace el
-titular. Comprobado antes: el cliente OAuth de la aplicación **no** está en el
-proyecto de Firebase (su número de proyecto no coincide), así que borrarlo no
-afecta al inicio de sesión ni al router.
+**G5, hecho por el titular:** proyecto de Firebase borrado desde su consola,
+variables `NEXT_PUBLIC_FIREBASE_*` retiradas de `.env.local` y de Vercel, y la
+pantalla de consentimiento sin `spreadsheets` ni `drive.appdata`. El código
+dejó de pedir `drive.appdata` a la vez, para no pedir un ámbito que la
+pantalla ya no declara. La aplicación entra, opera y escribe contra el Web App
+sin ninguna pieza de la infraestructura anterior.
+
+Los ámbitos que pide la web quedan en `profile`, `email`, `drive.file` (no
+sensible) y `calendar.events`. Todo funciona con cuentas @gmail.com
+personales: ningún paso exige Google Workspace.

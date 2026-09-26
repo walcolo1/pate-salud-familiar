@@ -93,3 +93,19 @@ describe('la web no pide el scope `spreadsheets`', () => {
     expect(donde).toEqual([]);
   });
 });
+
+describe('la web no pide `drive.appdata` (G5)', () => {
+  // Solo lo usaba la búsqueda en appDataFolder del ID de la hoja vieja. El
+  // titular lo retiró de la pantalla de consentimiento: pedir un ámbito que
+  // la pantalla ya no declara es buscarse un aviso de aplicación no verificada.
+  const APPDATA = 'https://www.googleapis.com/auth/drive.appdata';
+
+  it('no está entre los permitidos', () => {
+    expect(SCOPES_PERMITIDOS as readonly string[]).not.toContain(APPDATA);
+  });
+
+  it('ningún fichero de la web lo pide', () => {
+    const donde = fuentes.filter((f) => f.texto.includes(APPDATA)).map((f) => f.ruta);
+    expect(donde).toEqual([]);
+  });
+});

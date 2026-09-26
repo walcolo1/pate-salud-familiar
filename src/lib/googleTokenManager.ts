@@ -13,9 +13,10 @@
 // Cierre de G4 · sin el scope de hojas de cálculo. La hoja de la familia la
 // abre el Web App con su propio permiso, y los informes que crea la aplicación
 // se escriben con `drive.file`, que Google clasifica como no sensible.
+// G5 · sin `drive.appdata`: solo lo usaba la búsqueda de la hoja vieja, y ya
+// no está en la pantalla de consentimiento.
 export const OPERATIONAL_SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
-  'https://www.googleapis.com/auth/drive.appdata',
 ].join(' ');
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';

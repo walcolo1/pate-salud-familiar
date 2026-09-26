@@ -60,10 +60,11 @@ describe('ámbitos OAuth · lista cerrada', () => {
       'profile',
       'email',
       'https://www.googleapis.com/auth/drive.file',
-      'https://www.googleapis.com/auth/drive.appdata',
       // `spreadsheets` salió al cerrar G4: la hoja de la familia la abre el
       // Web App con su propio permiso, y los informes que crea la aplicación
-      // se escriben con `drive.file`.
+      // se escriben con `drive.file`. `drive.appdata` salió con G5: solo lo
+      // usaba la búsqueda de la hoja vieja, y el titular lo retiró de la
+      // pantalla de consentimiento.
       'https://www.googleapis.com/auth/calendar.events',
     ]);
   });
