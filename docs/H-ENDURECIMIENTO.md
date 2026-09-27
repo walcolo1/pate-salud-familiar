@@ -132,3 +132,42 @@ hoja, y que el botón de Ajustes también avisa.
 
 **Lo que no cubre el arnés:** el despacho con una credencial real de GIS contra
 un Web App real. Eso es la validación en caliente.
+
+---
+
+## Cierre: la sesión que se quedaba sin credencial, y callada
+
+**La validación en vivo.** Tras cerrar sesión y volver a entrar, la hoja salía
+«Registrada», pero «Abrir la hoja» decía «La sesión caducó» y el panel se quedaba
+en «Mi familia (0)», sin nada que pulsar.
+
+**Qué pasaba.** El `id_token` solo vive en memoria (G3b) y cualquier recarga
+completa lo tira. Había una recarga que nadie esperaba: si al cerrar sesión
+quedaba caché de Firebase en el disco, el cierre dejaba marcada una **purga
+diferida**, y al terminar en el arranque siguiente AppContext hacía
+`window.location.reload()`, heredado de cuando había que tirar una instancia de
+Firestore. Mientras la purga estaba pendiente, además, AppContext no arrancaba
+la identidad. Tras la recarga el usuario seguía «dentro» —está en el
+almacenamiento local— y GIS tenía que devolver la credencial en silencio; si no
+lo hacía (FedCM limita la reentrada automática), no había credencial **y nada
+lo decía**: el aviso de «vuelve a entrar» existía en `identidadGis`, pero
+AppContext no lo conectaba a nada.
+
+**El arreglo:**
+
+1. **Fuera la recarga tras la purga diferida.** No hay instancia que tirar desde
+   G4. `sesionSinSilencio.test.ts` impide que AppContext vuelva a recargar la
+   página.
+2. **El vigía de la sesión** (`vigiaSesion.ts`). Con un usuario de Google dentro,
+   pide volver a entrar si no llega credencial en 10 s, si GIS avisa de que no
+   pudo renovar (ahora sí conectado) o si una llamada falla por falta de
+   identidad. El Navbar lo enseña con el **botón de Google** dentro del aviso:
+   se vuelve a entrar sin cerrar sesión ni recargar.
+3. **Al llegar una credencial se limpia todo lo que decía «sesión caducada»** —el
+   aviso, el error del diagnóstico, el de «Abrir la hoja»— y se intenta cargar.
+   La carga se dispara con lo que llegue último, el usuario o la credencial.
+
+`cicloEntrada.test.ts` ensambla `SesionGoogle`, `VigiaSesion` y `CargaAlEntrar`
+como en AppContext: sin credencial → aviso → llega → aviso fuera y expediente
+cargado, sin recargar. `e2e/reentrada-sesion.e2e.ts` comprueba en el navegador
+que el aviso aparece con una sesión real sin credencial, y no en modo demo.

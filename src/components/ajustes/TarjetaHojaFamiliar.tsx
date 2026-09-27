@@ -12,7 +12,8 @@
  * la hoja: el navegador del titular no sabía adónde escribir.
  */
 
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
+import { sesionDeLaAplicacion } from '@/lib/identidad';
 import { CheckCircle2, ExternalLink, Link2, Loader2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { MENSAJES_REGISTRO } from '@/lib/registroBackend';
@@ -33,6 +34,10 @@ export default function TarjetaHojaFamiliar() {
   // Cierre de G4 · la hoja del Web App, no la operacional de antes. La
   // dirección se pide al pulsar y no se guarda; la pestaña se abre antes de
   // pedirla para que el navegador no la trate como ventana emergente.
+  // Un «la sesión caducó» de antes no sigue en pantalla cuando ya hay
+  // credencial: se borra en cuanto llega una.
+  useEffect(() => sesionDeLaAplicacion.alRecibir(() => setErrorAbrir(null)), []);
+
   const abrirHoja = async () => {
     setAbriendo(true);
     setErrorAbrir(null);

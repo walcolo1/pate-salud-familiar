@@ -7,6 +7,7 @@ import { conectarSondeo, ventanaDelNavegador } from '../lib/sondeoRevision';
 import { comprobarYRegistrar, type ResultadoRegistro } from '../lib/registroBackend';
 import { sesionBackend, sesionDeLaAplicacion } from '../lib/identidad';
 import { CargaAlEntrar } from '../lib/cargaAlEntrar';
+import { VigiaSesion } from '../lib/vigiaSesion';
 import { ColaDuradera } from '../lib/colaDuradera';
 import {
   DespachadorCola,
@@ -460,6 +461,14 @@ interface AppContextProps {
   hojaRegistrada: boolean;
   /** El expediente se está descargando de la hoja al entrar. Para el indicador. */
   cargandoExpediente: boolean;
+  /**
+   * Hay un usuario de Google dentro pero no hay credencial con la que firmar:
+   * se perdió con una recarga y GIS no la devolvió, o caducó sin renovarse.
+   * El Navbar lo enseña con el botón de Google.
+   */
+  hayQueEntrar: boolean;
+  /** Dibuja el botón de Google para volver a entrar sin salir de la pantalla. */
+  renderizarBotonGoogle: (destino: HTMLElement | null) => void;
   /** Comprueba la URL del `/exec` con `ping` y, si cuadra, la guarda. */
   registrarHojaFamiliar: (url: string) => Promise<ResultadoRegistro>;
   /** Cierre de G4 · la dirección de la hoja del Web App. Solo el titular; no se guarda. */
@@ -575,6 +584,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const vaciarColaRef = useRef<() => Promise<unknown>>(async () => null);
 
   const [cargandoExpediente, setCargandoExpediente] = useState(false);
+
+  /*
+   * Cierre del Bloque H · el vigía de la sesión. Si hay un usuario de Google
+   * dentro y no hay credencial —se perdió con una recarga y GIS no la devolvió
+   * en silencio, o caducó sin renovarse—, se pide volver a entrar en vez de
+   * fallar callado. Ver `vigiaSesion.ts`.
+   */
+  const [hayQueEntrar, setHayQueEntrar] = useState(false);
+  const vigiaRef = useRef<VigiaSesion | null>(null);
+  if (vigiaRef.current === null) {
+    vigiaRef.current = new VigiaSesion({
+      programar: (fn, ms) => setTimeout(fn, ms),
+      cancelar: (id) => clearTimeout(id as ReturnType<typeof setTimeout>),
+      hayCredencial: () => sesionDeLaAplicacion.vigente,
+      alCambiar: setHayQueEntrar,
+    });
+  }
+  const identidadRef = useRef<{ renderizarBoton: (destino: HTMLElement | null, opciones?: Record<string, unknown>) => void } | null>(null);
+  const renderizarBotonGoogle = useCallback((destino: HTMLElement | null) => {
+    identidadRef.current?.renderizarBoton(destino, { theme: 'outline', size: 'medium', shape: 'pill', text: 'continue_with' });
+  }, []);
+
+  /*
+   * Al llegar una credencial —del botón, del regreso silencioso o de una
+   * renovación— se limpia todo lo que decía «sesión caducada» y se intenta
+   * cargar: lo que llegue último, el usuario o la credencial, dispara la
+   * carga.
+   */
+  useEffect(
+    () =>
+      sesionDeLaAplicacion.alRecibir(() => {
+        vigiaRef.current?.llegoCredencial();
+        setOpSyncError(null);
+        void cargaAlEntrarRef.current?.intentar();
+      }),
+    [],
+  );
+  useEffect(() => {
+    const deGoogle = user?.provider === 'google';
+    vigiaRef.current?.usuarioActivo(deGoogle);
+    if (deGoogle) void cargaAlEntrarRef.current?.intentar();
+  }, [user?.email, user?.provider]);
   const cargarExpedienteRef = useRef<() => Promise<void>>(async () => {});
   const cargaAlEntrarRef = useRef<CargaAlEntrar | null>(null);
   if (cargaAlEntrarRef.current === null) {
@@ -586,10 +637,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       alCambiarCargando: setCargandoExpediente,
     });
   }
-  useEffect(
-    () => sesionDeLaAplicacion.alRecibir(() => void cargaAlEntrarRef.current?.intentar()),
-    [],
-  );
 
   const membersRef = useRef<FamilyMember[]>(members);
   const healthProfilesRef = useRef<Record<string, HealthProfile>>(healthProfiles);
@@ -802,10 +849,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ejecutarPurgaDiferidaSiProcede()
       .then((resultado) => {
         if (cancelado) return;
-        if (resultado === 'ok') {
-          window.location.reload();
-          return;
-        }
+        // Cierre del Bloque H · aquí se recargaba la página para tirar una
+        // instancia de Firestore que ya no existe desde G4. Si la purga
+        // terminaba con alguien ya dentro, la recarga se llevaba su
+        // `id_token`, que solo vive en memoria, y la sesión quedaba sin
+        // credencial y sin avisar. No hay nada que tirar: se sigue.
         if (resultado === 'diferida') {
           // No se afirma que los datos se borraron: se avisa y se continúa.
           setAvisoPurgaDiferida(true);
@@ -1461,6 +1509,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const identidad = arrancarIdentidad({
       clientId: String(clientId).trim(),
+      // Cierre del Bloque H · GIS avisa aquí cuando no pudo renovar. Antes no
+      // se conectaba a nada y la sesión caducaba en silencio.
+      alPedirEntrada: () => vigiaRef.current?.sesionPerdida(),
       alRecibirCredencial: (credencial) => {
         const perfil = decodeGoogleToken(credencial);
         if (!perfil) return;
@@ -1482,7 +1533,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       },
     });
 
-    return () => identidad.soltar();
+    identidadRef.current = identidad;
+    return () => {
+      if (identidadRef.current === identidad) identidadRef.current = null;
+      identidad.soltar();
+    };
     // `signIn` se recrea en cada render y no puede entrar aquí: reinicializaría
     // la identidad constantemente.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4769,6 +4824,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setOpSyncStatus('synced');
     } catch (err: unknown) {
       const codigo = (err as { codigo?: string } | null)?.codigo ?? '';
+      if (codigo === 'SIN_IDENTIDAD') vigiaRef.current?.faltoIdentidad();
       console.error('[AppContext] no se pudo releer el expediente:', err);
       setOpSyncStatus('error');
       setOpSyncError(
@@ -4805,7 +4861,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const urlDeLaHojaFamiliar = async (): Promise<string> => {
     const repo = await getDataRepository();
     if (!repo.urlDeLaHoja) throw Object.assign(new Error('sin repositorio'), { codigo: 'SIN_BACKEND' });
-    return repo.urlDeLaHoja();
+    try {
+      return await repo.urlDeLaHoja();
+    } catch (err) {
+      if ((err as { codigo?: string } | null)?.codigo === 'SIN_IDENTIDAD') vigiaRef.current?.faltoIdentidad();
+      throw err;
+    }
   };
 
   const registrarHojaFamiliar = async (url: string): Promise<ResultadoRegistro> => {
@@ -5602,6 +5663,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       recargarExpediente,
       hojaRegistrada,
       cargandoExpediente,
+      hayQueEntrar,
+      renderizarBotonGoogle,
       registrarHojaFamiliar,
       urlDeLaHojaFamiliar,
       pendingInvitations,

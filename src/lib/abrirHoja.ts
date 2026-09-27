@@ -17,7 +17,7 @@ export const MENSAJES_ABRIR_HOJA = {
   ACCION_DESCONOCIDA:
     'El Web App de tu familia es anterior a esta versión. Publica la versión nueva del despliegue en Apps Script.',
   SIN_BACKEND: 'Este navegador todavía no tiene registrada la hoja de la familia.',
-  SIN_IDENTIDAD: 'La sesión caducó. Vuelve a entrar e inténtalo otra vez.',
+  SIN_IDENTIDAD: 'Tu sesión de Google no está activa. Vuelve a entrar con el botón de arriba e inténtalo otra vez.',
   BLOQUEADA: 'El navegador bloqueó la pestaña nueva. Permite las ventanas emergentes de esta aplicación.',
   OTRO: 'No se pudo obtener la dirección de la hoja. Inténtalo en un momento.',
 } as const;

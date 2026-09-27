@@ -35,7 +35,16 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
     hayCambiosRemotos, recargarExpediente,
     // G4b · ¿sabe este navegador dónde está la hoja?
     hojaRegistrada, origenDatos,
+    // Cierre del Bloque H · sesión sin credencial
+    hayQueEntrar, renderizarBotonGoogle,
   } = useApp();
+
+  // El botón de Google se dibuja dentro del aviso cuando aparece. Si GIS no
+  // está cargado, el hueco queda vacío y el texto dice qué hacer.
+  const botonReentradaRef = React.useRef<HTMLDivElement | null>(null);
+  React.useEffect(() => {
+    if (hayQueEntrar) renderizarBotonGoogle(botonReentradaRef.current);
+  }, [hayQueEntrar, renderizarBotonGoogle]);
 
   const [recargando, setRecargando] = React.useState(false);
 
@@ -162,6 +171,22 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
    *
    * No se enseña en modo demostración, donde nada se escribe a propósito.
    */
+  const avisoReentrada =
+    hayQueEntrar && origenDatos === 'REAL' ? (
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex flex-wrap items-center gap-3 border-b border-rose-200 bg-rose-50 px-4 py-3 text-rose-900"
+      >
+        <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <p className="flex-1 min-w-[12rem] text-xs font-semibold leading-relaxed">
+          Tu sesión de Google no está activa: no se puede leer la hoja de tu familia ni enviar los cambios.
+          Vuelve a entrar con Google; no hace falta cerrar sesión.
+        </p>
+        <div ref={botonReentradaRef} className="shrink-0" />
+      </div>
+    ) : null;
+
   const avisoSinHoja =
     !hojaRegistrada && origenDatos === 'REAL' ? (
       <div
@@ -217,6 +242,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
   return (
     <>
       {avisoLimpieza}
+      {avisoReentrada}
       {avisoSinHoja}
       {avisoCambiosRemotos}
       {dialogoCierre}
