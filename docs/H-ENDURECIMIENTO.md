@@ -171,3 +171,10 @@ AppContext no lo conectaba a nada.
 como en AppContext: sin credencial → aviso → llega → aviso fuera y expediente
 cargado, sin recargar. `e2e/reentrada-sesion.e2e.ts` comprueba en el navegador
 que el aviso aparece con una sesión real sin credencial, y no en modo demo.
+
+## Validación en vivo (evidencia real, cuenta personal del titular)
+
+Sobre `38931bf`: al cerrar sesión y volver a entrar, «Trayendo el expediente…»
+y la familia completa sin pasar por Ajustes; «Abrir la hoja» abre el documento
+sin avisar de caducidad; tras un F5 la credencial se enlaza y el expediente
+sigue en pantalla; en ningún momento se queda en «Mi familia (0)» sin aviso.

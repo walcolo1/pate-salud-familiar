@@ -17,7 +17,7 @@ hecho y qué falta.*
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
 | **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10/E10-bis** llevan el esquema a v3 |
-| **H** | Endurecimiento: cola duradera y limpieza | **hecho, pendiente de validación en caliente** · ver `H-ENDURECIMIENTO.md` |
+| **H** | Endurecimiento: cola duradera, limpieza e identidad | **cerrado y validado en vivo** · cola en disco, sin `sincronizacionManual`, la sesión sin credencial avisa · ver `H-ENDURECIMIENTO.md` |
 | **G** | Corte seco de Firebase | **cerrado** · validado en vivo; G5 hecho: proyecto de Firebase borrado, variables retiradas, consentimiento sin `spreadsheets` ni `drive.appdata` |
 | H (antiguo) | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
 
