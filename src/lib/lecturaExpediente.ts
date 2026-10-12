@@ -134,5 +134,42 @@ export function leerExpediente(clave: string, almacen?: AlmacenLike | null): Res
     return { estado: 'ILEGIBLE', motivo: 'FALTAN_CAMPOS' };
   }
 
-  return { estado: 'OK', datos };
+  return { estado: 'OK', datos: retirarObsoletos(clave, datos, store) };
+}
+
+/**
+ * Bloque I · campos que el modelo ya no tiene.
+ *
+ * `sharedReports` y `lastExportMetadata` eran de las salidas a Sheets que se
+ * retiraron en el Bloque H; los otros tres, de la hoja operacional que se fue
+ * en G4. Un estado guardado antes los conserva: aquí se quitan al leerlo.
+ */
+export const CAMPOS_RETIRADOS = [
+  'sharedReports',
+  'lastExportMetadata',
+  'databaseSpreadsheetId',
+  'databaseSpreadsheetUrl',
+  'appDataFileId',
+] as const;
+
+/**
+ * La migración, transparente: quita los campos retirados y, si había alguno,
+ * reescribe el expediente en el acto. Esperar al próximo guardado dejaría el
+ * identificador de una hoja en el disco hasta que alguien tocara algo.
+ *
+ * Si no se puede reescribir —almacén lleno—, se devuelve limpio igual: la
+ * lectura no puede fallar por una limpieza.
+ */
+function retirarObsoletos(clave: string, datos: ExpedienteGuardado, store: AlmacenLike): ExpedienteGuardado {
+  const presentes = CAMPOS_RETIRADOS.filter((c) => Object.prototype.hasOwnProperty.call(datos, c));
+  if (presentes.length === 0) return datos;
+
+  const limpio = { ...datos } as Record<string, unknown>;
+  for (const campo of presentes) delete limpio[campo];
+  try {
+    store.setItem(clave, JSON.stringify(limpio));
+  } catch {
+    /* se volverá a intentar en la próxima lectura o se irá con el próximo guardado */
+  }
+  return limpio as ExpedienteGuardado;
 }

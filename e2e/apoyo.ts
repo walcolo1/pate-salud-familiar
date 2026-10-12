@@ -66,8 +66,8 @@ export async function entrarComoSesionRealSimulada(page: Page) {
         members: [], healthProfiles: {}, appointments: [], checkups: [], vaccines: [],
         exams: [], examResults: {}, documents: [], history: [], reminders: [], tasks: [],
         medicalOrders: [], medicationPrescriptions: [], medicationDoseReminders: [],
-        appointmentCandidates: [], sharedReports: [], emailSources: [],
-        driveSyncEnabled: true, calendarSyncEnabled: true, lastExportMetadata: null,
+        appointmentCandidates: [], emailSources: [],
+        driveSyncEnabled: true, calendarSyncEnabled: true,
       }),
     );
   });

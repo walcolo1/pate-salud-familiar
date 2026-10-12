@@ -79,13 +79,14 @@ describe('minutosDelDia', () => {
 });
 
 describe('CLAVES_ESTADO_CLINICO', () => {
-  it('contiene exactamente las 16 estructuras clínicas acordadas', () => {
-    expect(CLAVES_ESTADO_CLINICO).toHaveLength(16);
+  it('contiene exactamente las 15 estructuras clínicas acordadas', () => {
+    // Bloque I · eran 16: `sharedReports` salió con el informe individual.
+    expect(CLAVES_ESTADO_CLINICO).toHaveLength(15);
     expect([...CLAVES_ESTADO_CLINICO].sort()).toEqual(
       [
         'appointmentCandidates', 'appointments', 'checkups', 'documents', 'examResults',
         'exams', 'healthProfiles', 'history', 'medicalOrders', 'medicationDoseReminders',
-        'medicationPrescriptions', 'members', 'reminders', 'sharedReports', 'tasks', 'vaccines',
+        'medicationPrescriptions', 'members', 'reminders', 'tasks', 'vaccines',
       ].sort(),
     );
   });

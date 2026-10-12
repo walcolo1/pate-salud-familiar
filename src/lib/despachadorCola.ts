@@ -30,7 +30,12 @@ export interface Rechazo {
 export interface InformeDespacho {
   enviados: string[];
   rechazados: Rechazo[];
+  /** Todo lo que queda en la cola, de cualquier cuenta. */
   quedan: number;
+  /** Lo que queda de la cuenta activa. */
+  quedanPropios: number;
+  /** Lotes de otra cuenta, o sin dueño: no se envían con esta credencial. */
+  retenidos: number;
   /** El código del fallo pasajero que detuvo el despacho, si lo hubo. */
   detenidoPor?: string;
 }
@@ -38,6 +43,11 @@ export interface InformeDespacho {
 export interface DependenciasDespacho {
   cola: ColaDuradera;
   enviar(mutaciones: Mutacion[]): Promise<void>;
+  /**
+   * Bloque I · la huella de la cuenta de la credencial con la que se va a
+   * enviar, o `null` si no hay credencial. Solo salen los lotes de esa cuenta.
+   */
+  cuentaActiva(): Promise<string | null>;
   /** Tras cada cambio de tamaño, para el contador de la interfaz. */
   alCambiar?(longitud: number): void;
 }
@@ -66,11 +76,38 @@ export class DespachadorCola {
 
   private async pasada(): Promise<InformeDespacho> {
     const { cola } = this.deps;
-    const informe: InformeDespacho = { enviados: [], rechazados: [], quedan: cola.longitud };
+    const informe: InformeDespacho = {
+      enviados: [],
+      rechazados: [],
+      quedan: cola.longitud,
+      quedanPropios: 0,
+      retenidos: 0,
+    };
+    if (cola.longitud === 0) return informe;
+
+    /*
+     * Bloque I · solo con la credencial de la cuenta que hizo el cambio.
+     *
+     * Si en este navegador entra otra cuenta —tras un cierre automático, que
+     * conserva la cola—, sus lotes no salen con esta credencial: se quedan
+     * retenidos hasta que su dueña vuelva. Sin credencial no sale nada.
+     */
+    let activa: string | null = null;
+    try {
+      activa = await this.deps.cuentaActiva();
+    } catch {
+      activa = null;
+    }
+    if (!activa) {
+      informe.detenidoPor = 'SIN_IDENTIDAD';
+      informe.retenidos = cola.longitud;
+      return informe;
+    }
 
     // Se vuelve a mirar la cabeza en cada vuelta: lo que se encola mientras
-    // tanto sale en la misma pasada, detrás de lo que ya había.
-    for (let lote = cola.primero(); lote; lote = cola.primero()) {
+    // tanto sale en la misma pasada, detrás de lo que ya había. El orden se
+    // respeta dentro de cada cuenta; los lotes de otra no bloquean.
+    for (let lote = cola.primeroDe(activa); lote; lote = cola.primeroDe(activa)) {
       try {
         await this.deps.enviar(paraEnviar(lote));
         cola.quitar(lote.id);
@@ -89,6 +126,8 @@ export class DespachadorCola {
     }
 
     informe.quedan = cola.longitud;
+    informe.quedanPropios = cola.longitudDe(activa);
+    informe.retenidos = cola.longitud - informe.quedanPropios;
     return informe;
   }
 }

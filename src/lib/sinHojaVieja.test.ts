@@ -63,12 +63,26 @@ const RETIRADOS: Record<string, string> = {
   exportToSheets: 'la exportación a Sheets, sin botón desde G4b',
   generateAndShareMemberReport: 'el informe individual, oculto desde G4b',
   connectSheets: 'el permiso de Sheets que la web ya no pide',
+  // Bloque I
+  sharedReports: 'los informes compartidos, sin función desde el Bloque H',
+  lastExportMetadata: 'los datos de la última exportación a Sheets',
+};
+
+/**
+ * Bloque I · la migración del estado local los nombra para BORRARLOS de lo
+ * que quedó guardado en el disco. Es la única excepción, y es por nombre.
+ */
+const MIGRACION: Record<string, string[]> = {
+  'lib/lecturaExpediente.ts': ['databaseSpreadsheetId', 'databaseSpreadsheetUrl', 'sharedReports', 'lastExportMetadata'],
 };
 
 describe('la hoja operacional de antes se fue', () => {
   for (const [nombre, motivo] of Object.entries(RETIRADOS)) {
     it(`${nombre} · ${motivo}`, () => {
-      const donde = fuentes.filter((f) => new RegExp(`\\b${nombre}\\b`).test(codigo(f.texto))).map((f) => f.ruta);
+      const donde = fuentes
+        .filter((f) => !(MIGRACION[f.ruta] ?? []).includes(nombre))
+        .filter((f) => new RegExp(`\\b${nombre}\\b`).test(codigo(f.texto)))
+        .map((f) => f.ruta);
       expect(donde, `\n${nombre} volvió en: ${donde.join(', ')}\n`).toEqual([]);
     });
   }

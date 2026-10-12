@@ -47,7 +47,8 @@ export const MARGEN_RENOVACION_MS = 10 * 60 * 1000;
  * verifica de verdad es el router, contra Google, en cada petición. Un token
  * manipulado para parecer fresco no engaña a nadie: lo rechaza el backend.
  */
-export function expiracionDe(idToken: unknown): number | null {
+/** La carga de un JWT, sin verificar la firma. `null` si no se puede leer. */
+function cargaDe(idToken: unknown): Record<string, unknown> | null {
   const partes = String(idToken ?? '').split('.');
   if (partes.length < 2 || partes[1].length === 0) return null;
 
@@ -58,15 +59,29 @@ export function expiracionDe(idToken: unknown): number | null {
       typeof atob === 'function'
         ? atob(relleno)
         : Buffer.from(relleno, 'base64').toString('binary');
-
-    const carga = JSON.parse(crudo) as { exp?: unknown };
-    const exp = Number(carga?.exp);
-    // El `exp` de un JWT va en **segundos**. Tratarlo como milisegundos daría
-    // una caducidad en 1970 y una renovación en bucle.
-    return Number.isFinite(exp) && exp > 0 ? exp * 1000 : null;
+    const carga = JSON.parse(crudo) as unknown;
+    return carga && typeof carga === 'object' && !Array.isArray(carga) ? (carga as Record<string, unknown>) : null;
   } catch {
     return null;
   }
+}
+
+export function expiracionDe(idToken: unknown): number | null {
+  const exp = Number(cargaDe(idToken)?.exp);
+  // El `exp` de un JWT va en **segundos**. Tratarlo como milisegundos daría
+  // una caducidad en 1970 y una renovación en bucle.
+  return Number.isFinite(exp) && exp > 0 ? exp * 1000 : null;
+}
+
+/**
+ * Bloque I · la cuenta de una credencial: su `sub`, el identificador estable de
+ * Google. Tampoco es una comprobación de seguridad —la hace el router—: sirve
+ * para que la cola no envíe los cambios de una cuenta con la credencial de
+ * otra. Nunca se guarda: se compara su huella (`huellaCuenta.ts`).
+ */
+export function sujetoDe(idToken: unknown): string | null {
+  const sub = cargaDe(idToken)?.sub;
+  return typeof sub === 'string' && sub.length > 0 ? sub : null;
 }
 
 export interface EntornoSesion {
@@ -227,8 +242,8 @@ export class SesionGoogle {
  * **no tiene firma**: no sirve contra Google ni contra el router, que verifica
  * cada token contra `tokeninfo`. Solo sirve para mover el reloj.
  */
-export function tokenFalsoParaPruebas(expiraEnMs: number): string {
-  const carga = JSON.stringify({ sub: 'pruebas', exp: Math.floor(expiraEnMs / 1000) });
+export function tokenFalsoParaPruebas(expiraEnMs: number, sub = 'pruebas'): string {
+  const carga = JSON.stringify({ sub, exp: Math.floor(expiraEnMs / 1000) });
   const base64 =
     typeof btoa === 'function' ? btoa(carga) : Buffer.from(carga, 'binary').toString('base64');
   return ['cabecera', base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''), 'firma'].join(

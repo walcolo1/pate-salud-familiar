@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { ColaDuradera, CLAVE_COLA, type AlmacenCola } from './colaDuradera';
 import { DespachadorCola, conectarDisparadores, construirLote, enviarConRepositorio } from './despachadorCola';
 import { RepositorioBackend, type SesionBackend } from './repositorioBackend';
-import { SesionGoogle, tokenFalsoParaPruebas } from './sesionGoogle';
+import { SesionGoogle, sujetoDe, tokenFalsoParaPruebas } from './sesionGoogle';
+import { huellaCuenta } from './huellaCuenta';
 import type { RepositoryContext } from './dataRepository';
 
 /**
@@ -64,20 +65,33 @@ function pestana(almacen: AlmacenCola, fetch: typeof globalThis.fetch, ahora: ()
   };
   const repo = new RepositorioBackend(sesionBackend);
   const cola = new ColaDuradera(almacen);
-  const despachador = new DespachadorCola({ cola, enviar: enviarConRepositorio(repo) });
+  // Como en AppContext: la cuenta activa es la de la credencial con la que se
+  // va a enviar, y se compara por su huella.
+  const despachador = new DespachadorCola({
+    cola,
+    enviar: enviarConRepositorio(repo),
+    cuentaActiva: async () => {
+      const sub = sujetoDe(await sesion.idToken());
+      return sub ? huellaCuenta(cola.sal, sub) : null;
+    },
+  });
+  /** Encola con la huella de quien hace el cambio, como persistirPorMutacion. */
+  const encolarDe = async (sub: string, lote: Parameters<ColaDuradera['encolar']>[0]) =>
+    cola.encolar(lote, await huellaCuenta(cola.sal, sub));
   const oyentes = new Map<string, () => void>();
   const ventana = {
     addEventListener: (t: string, f: () => void) => void oyentes.set(t, f),
     removeEventListener: (t: string) => void oyentes.delete(t),
   };
   const desconectar = conectarDisparadores({ sesion, ventana, vaciar: () => despachador.vaciar() });
-  return { sesion, repo, cola, despachador, ventana: oyentes, desconectar };
+  return { sesion, repo, cola, despachador, ventana: oyentes, desconectar, encolarDe };
 }
 
 /** Deja correr las promesas pendientes. */
 const drenar = async () => {
-  for (let i = 0; i < 20; i++) await Promise.resolve();
-  await new Promise((r) => setTimeout(r, 0));
+  // La huella usa WebCrypto, que es asíncrono de verdad: hacen falta varias
+  // vueltas del bucle de eventos, no solo de microtareas.
+  for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 5));
 };
 
 describe('el ciclo de vida completo', () => {
@@ -101,7 +115,7 @@ describe('el ciclo de vida completo', () => {
       } as Parameters<RepositorioBackend['saveVaccine']>[1]),
     );
     expect(lote.length).toBeGreaterThan(0);
-    antes.cola.encolar(lote);
+    await antes.encolarDe('pruebas', lote);
     const primerIntento = await antes.despachador.vaciar();
 
     // ── 2 · No salió, y está en el disco.
@@ -151,7 +165,7 @@ describe('el ciclo de vida completo', () => {
           status: 'COMPLETED',
         } as Parameters<RepositorioBackend['saveVaccine']>[1]),
       );
-      p.cola.encolar(lote);
+      await p.encolarDe('pruebas', lote);
     }
 
     net.estado.enLinea = true;
@@ -170,5 +184,83 @@ describe('el ciclo de vida completo', () => {
     p.sesion.recibir(tokenFalsoParaPruebas(1_000_000 + 2 * HORA));
     await drenar();
     expect(net.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('Bloque I · dos cuentas en el mismo navegador', () => {
+  const SUB_A = '108765432109876543210';
+  const SUB_B = '109999999999999999999';
+
+  it('lo que hizo A no sale con la credencial de B; sale cuando A vuelve', async () => {
+    const { almacen } = disco();
+    const net = red();
+    const reloj = () => 1_000_000;
+
+    // ── A apunta una vacuna sin red, y la pestaña se cierra sola (bloqueo de
+    //    8 horas): la cola se conserva, la sesión no.
+    const deA = pestana(almacen, net.fetch, reloj);
+    deA.sesion.recibir(tokenFalsoParaPruebas(reloj() + HORA, SUB_A));
+    const lote = await construirLote(deA.repo, (repo) =>
+      repo.saveVaccine(CTX, {
+        id: 'de-A',
+        memberId: 'p1',
+        vaccineName: 'Tétanos',
+        dateApplied: '2026-09-25',
+        doseNumber: 1,
+        status: 'COMPLETED',
+      } as Parameters<RepositorioBackend['saveVaccine']>[1]),
+    );
+    await deA.encolarDe(SUB_A, lote);
+    deA.desconectar();
+
+    // ── Entra B en el mismo navegador, con red.
+    net.estado.enLinea = true;
+    const deB = pestana(almacen, net.fetch, reloj);
+    expect(deB.cola.longitud).toBe(1);
+    deB.sesion.recibir(tokenFalsoParaPruebas(reloj() + HORA, SUB_B));
+    await drenar();
+
+    // Nada salió con la credencial de B, y el lote de A sigue ahí.
+    expect(net.recibidos).toEqual([]);
+    expect(deB.cola.longitud).toBe(1);
+    const informe = await deB.despachador.vaciar();
+    expect(informe.retenidos).toBe(1);
+    expect(informe.quedanPropios).toBe(0);
+    deB.desconectar();
+
+    // ── Vuelve A.
+    const deNuevoA = pestana(almacen, net.fetch, reloj);
+    deNuevoA.sesion.recibir(tokenFalsoParaPruebas(reloj() + HORA, SUB_A));
+    await drenar();
+    expect(net.recibidos).toHaveLength(1);
+    expect(net.recibidos[0].mutaciones).toEqual(lote);
+    expect(deNuevoA.cola.longitud).toBe(0);
+  });
+
+  it('los cambios propios de B sí salen, aunque haya retenidos de A delante', async () => {
+    const { almacen } = disco();
+    const net = red();
+    net.estado.enLinea = true;
+    const reloj = () => 1_000_000;
+    const p = pestana(almacen, net.fetch, reloj);
+
+    const nuevo = (id: string) =>
+      construirLote(p.repo, (repo) =>
+        repo.saveVaccine(CTX, {
+          id,
+          memberId: 'p1',
+          vaccineName: id,
+          dateApplied: '2026-09-25',
+          doseNumber: 1,
+          status: 'COMPLETED',
+        } as Parameters<RepositorioBackend['saveVaccine']>[1]),
+      );
+    await p.encolarDe(SUB_A, await nuevo('de-A'));
+    await p.encolarDe(SUB_B, await nuevo('de-B'));
+
+    p.sesion.recibir(tokenFalsoParaPruebas(reloj() + HORA, SUB_B));
+    await drenar();
+    expect(net.recibidos.map((r) => r.mutaciones[0].fila.id)).toEqual(['de-B']);
+    expect(p.cola.lotes().map((l) => l.id)).toHaveLength(1);
   });
 });

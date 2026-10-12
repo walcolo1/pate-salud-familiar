@@ -277,29 +277,6 @@ export interface FollowUpTask {
   priority: Priority;
 }
 
-export interface LastExportMetadata {
-  spreadsheetId: string | null;
-  spreadsheetUrl: string | null;
-  exportedAt: string | null;
-  exportedBy: string | null;
-  sheetsSyncStatus: 'NOT_EXPORTED' | 'EXPORTED' | 'ERROR' | null;
-  sheetsError?: string | null;
-}
-
-export interface SharedMemberReport {
-  id: string;
-  memberId: string;
-  memberName: string;
-  spreadsheetId: string;
-  spreadsheetUrl: string;
-  sharedWithEmail: string;
-  sharedAt: string;
-  revokedAt?: string | null;
-  permissionId?: string | null;
-  shareStatus: 'SHARED' | 'REVOKED' | 'ERROR';
-  shareError?: string | null;
-}
-
 export interface AppointmentEmailSource {
   id: string;
   email: string;

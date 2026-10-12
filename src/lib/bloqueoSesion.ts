@@ -46,7 +46,8 @@ const CAMPOS_MARCADOR = ['bloqueado', 'bloqueadoDesde', 'origen'] as const;
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Las 16 estructuras que contienen información clínica.
+ * Las 15 estructuras que contienen información clínica. Eran 16 hasta el
+ * Bloque I: `sharedReports` salió con el informe individual a Sheets.
  *
  * Es una lista cerrada y hay una prueba que verifica que NO incluye `user`,
  * `familyId`, `deviceId`, `pendingSyncCount`, tokens ni preferencias: vaciar de
@@ -68,7 +69,6 @@ export const CLAVES_ESTADO_CLINICO = [
   'medicationPrescriptions',
   'medicationDoseReminders',
   'appointmentCandidates',
-  'sharedReports',
 ] as const;
 
 export type ClaveEstadoClinico = (typeof CLAVES_ESTADO_CLINICO)[number];

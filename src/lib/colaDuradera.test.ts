@@ -46,16 +46,16 @@ describe('guarda en JSON, antes de enviar', () => {
   it('encolar escribe el lote en el almacén en el acto', () => {
     const { almacen, datos } = almacenFalso();
     const cola = nueva(almacen);
-    cola.encolar([CITA]);
+    cola.encolar([CITA], 'A');
 
     const guardado = JSON.parse(datos.get(CLAVE_COLA)!);
-    expect(guardado.version).toBe(1);
+    expect(guardado.version).toBe(2);
     expect(guardado.lotes).toHaveLength(1);
   });
 
   it('cada lote lleva marca de tiempo, y cada mutación entidad, acción y carga', () => {
     const { almacen, datos } = almacenFalso();
-    nueva(almacen).encolar([CITA, BAJA]);
+    nueva(almacen).encolar([CITA, BAJA], 'A');
     const [lote] = JSON.parse(datos.get(CLAVE_COLA)!).lotes;
 
     expect(Date.parse(lote.creadoEn)).not.toBeNaN();
@@ -65,14 +65,14 @@ describe('guarda en JSON, antes de enviar', () => {
 
   it('lo que se envía es exactamente lo que se construyó: la acción no viaja', () => {
     const { almacen } = almacenFalso();
-    const lote = nueva(almacen).encolar([CITA, BAJA]);
+    const lote = nueva(almacen).encolar([CITA, BAJA], 'A');
     expect(paraEnviar(lote!)).toEqual([CITA, BAJA]);
   });
 
   it('un lote vacío no se encola', () => {
     const { almacen, datos } = almacenFalso();
     const cola = nueva(almacen);
-    expect(cola.encolar([])).toBeNull();
+    expect(cola.encolar([], 'A')).toBeNull();
     expect(cola.longitud).toBe(0);
     expect(datos.has(CLAVE_COLA)).toBe(false);
   });
@@ -82,8 +82,8 @@ describe('sobrevive a un F5', () => {
   it('otra instancia sobre el mismo almacén ve los mismos lotes, en el mismo orden', () => {
     const { almacen } = almacenFalso();
     const antes = nueva(almacen);
-    const a = antes.encolar([CITA])!;
-    const b = antes.encolar([BAJA])!;
+    const a = antes.encolar([CITA], 'A')!;
+    const b = antes.encolar([BAJA], 'A')!;
 
     const despues = nueva(almacen); // la pestaña recargada
     expect(despues.lotes().map((l) => l.id)).toEqual([a.id, b.id]);
@@ -93,8 +93,8 @@ describe('sobrevive a un F5', () => {
   it('quitar un lote lo quita también del almacén', () => {
     const { almacen, datos } = almacenFalso();
     const cola = nueva(almacen);
-    const a = cola.encolar([CITA])!;
-    cola.encolar([BAJA]);
+    const a = cola.encolar([CITA], 'A')!;
+    cola.encolar([BAJA], 'A');
     cola.quitar(a.id);
 
     expect(nueva(almacen).lotes()).toHaveLength(1);
@@ -146,14 +146,14 @@ describe('sin almacén utilizable no se pierde nada en esta pestaña', () => {
       removeItem: () => {},
     };
     const cola = nueva(almacen);
-    cola.encolar([CITA]);
+    cola.encolar([CITA], 'A');
     expect(cola.longitud).toBe(1);
     expect(cola.duradera).toBe(false);
   });
 
   it('sin almacén (servidor, modo privado) funciona en memoria', () => {
     const cola = new ColaDuradera(null);
-    cola.encolar([CITA]);
+    cola.encolar([CITA], 'A');
     expect(cola.longitud).toBe(1);
     expect(cola.duradera).toBe(false);
   });
@@ -163,9 +163,76 @@ describe('descartar', () => {
   it('descartarTodo vacía la cola y su clave: solo lo llama un descarte explícito', () => {
     const { almacen, datos } = almacenFalso();
     const cola = nueva(almacen);
-    cola.encolar([CITA]);
+    cola.encolar([CITA], 'A');
     cola.descartarTodo();
     expect(cola.longitud).toBe(0);
     expect(datos.has(CLAVE_COLA)).toBe(false);
+  });
+});
+
+describe('Bloque I · cada lote sabe de qué cuenta es', () => {
+  it('guarda la huella de la cuenta y la sal, nunca el identificador', () => {
+    const { almacen, datos } = almacenFalso();
+    nueva(almacen).encolar([CITA], 'huella-de-A');
+    const guardado = JSON.parse(datos.get(CLAVE_COLA)!);
+    expect(guardado.lotes[0].cuenta).toBe('huella-de-A');
+    expect(guardado.sal).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it('la sal se conserva entre recargas: la huella de la misma cuenta no cambia', () => {
+    const { almacen } = almacenFalso();
+    const antes = nueva(almacen);
+    const sal = antes.sal;
+    antes.encolar([CITA], 'A');
+    expect(nueva(almacen).sal).toBe(sal);
+  });
+
+  it('separa los lotes por cuenta, y dentro de cada una conserva el orden', () => {
+    const { almacen } = almacenFalso();
+    const cola = nueva(almacen);
+    const a1 = cola.encolar([CITA], 'A')!;
+    const b1 = cola.encolar([CITA], 'B')!;
+    const a2 = cola.encolar([BAJA], 'A')!;
+    expect(cola.primeroDe('A')!.id).toBe(a1.id);
+    expect(cola.primeroDe('B')!.id).toBe(b1.id);
+    expect(cola.longitudDe('A')).toBe(2);
+    expect(cola.longitudDe('B')).toBe(1);
+    cola.quitar(a1.id);
+    expect(cola.primeroDe('A')!.id).toBe(a2.id);
+    expect(cola.primeroDe('C')).toBeNull();
+  });
+});
+
+describe('Bloque I · la cola v1, sin dueño, se migra sin perder nada', () => {
+  const V1 = JSON.stringify({
+    version: 1,
+    lotes: [{ id: 'viejo', creadoEn: '2026-09-25T10:00:00.000Z', mutaciones: [{ tabla: 'CITAS', accion: 'ESCRIBIR', fila: { id: 'c1' } }] }],
+  });
+
+  it('los lotes v1 se leen, sin dueño', () => {
+    const { almacen } = almacenFalso({ [CLAVE_COLA]: V1 });
+    const cola = nueva(almacen);
+    expect(cola.longitud).toBe(1);
+    expect(cola.lotes()[0].cuenta).toBeNull();
+    // Sin dueño no lo envía nadie.
+    expect(cola.primeroDe('A')).toBeNull();
+  });
+
+  it('atribuirSinCuenta los asigna a una cuenta y los reescribe como v2', () => {
+    const { almacen, datos } = almacenFalso({ [CLAVE_COLA]: V1 });
+    const cola = nueva(almacen);
+    expect(cola.atribuirSinCuenta('A')).toBe(1);
+    expect(cola.primeroDe('A')!.id).toBe('viejo');
+    const guardado = JSON.parse(datos.get(CLAVE_COLA)!);
+    expect(guardado.version).toBe(2);
+    expect(guardado.lotes[0].cuenta).toBe('A');
+  });
+
+  it('atribuir no toca los lotes que ya tienen dueño', () => {
+    const { almacen } = almacenFalso({ [CLAVE_COLA]: V1 });
+    const cola = nueva(almacen);
+    cola.encolar([CITA], 'B');
+    expect(cola.atribuirSinCuenta('A')).toBe(1);
+    expect(cola.longitudDe('B')).toBe(1);
   });
 });

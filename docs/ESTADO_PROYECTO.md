@@ -17,6 +17,7 @@ hecho y qué falta.*
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
 | **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10/E10-bis** llevan el esquema a v3 |
+| **I** | Deuda técnica y blindaje multicuenta | **hecho, pendiente de validación en caliente** · esquema local sin campos retirados (migración al leer), cada lote de la cola con la huella de su cuenta · ver `I-DEUDA-MULTICUENTA.md` |
 | **H** | Endurecimiento: cola duradera, limpieza e identidad | **cerrado y validado en vivo** · cola en disco, sin `sincronizacionManual`, la sesión sin credencial avisa · ver `H-ENDURECIMIENTO.md` |
 | **G** | Corte seco de Firebase | **cerrado** · validado en vivo; G5 hecho: proyecto de Firebase borrado, variables retiradas, consentimiento sin `spreadsheets` ni `drive.appdata` |
 | H (antiguo) | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
@@ -131,8 +132,6 @@ cada módulo. Las que más condicionan lo que venga:
 | `/members/:id/edit` y `/login` fuera de la red de axe | `ACCESIBILIDAD.md`, puerta de C9 |
 | 23 `alert` de error siguen sin migrar al sistema de avisos | `src/` |
 | Deuda de lint en `AppContext.tsx` (27 errores en línea base, desde 72) | `scripts/lint-baseline.json` |
-| `sharedReports` y `lastExportMetadata` siguen en el esquema local sin que nadie los escriba: quitarlos es una migración | `H-ENDURECIMIENTO.md` |
-| La cola duradera no sabe de quién es: tras un cierre automático, otra cuenta en el mismo navegador la enviaría con su identidad | `H-ENDURECIMIENTO.md` |
 | Adjuntos del historial veterinario: el campo `documentoId` existe y nadie lo rellena | `src/domain/mascotas.ts` |
 | `E0b-4` sin volver a pasar contra el despliegue de E6: el criterio 1 está cerrado desde Node, no desde un navegador | `EVIDENCIA_E6.md` · paso 7 |
 | El cerrojo de `aplicar` y el lote de varias pestañas siguen sin comprobarse en vivo: hacen falta dos peticiones a la vez y datos que escribir | `ROUTER.md` · después del **Bloque G** |

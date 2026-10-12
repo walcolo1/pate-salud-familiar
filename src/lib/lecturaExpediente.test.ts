@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  CAMPOS_RETIRADOS,
   CLAVE_CUARENTENA,
   MENSAJE_ILEGIBLE,
   leerExpediente,
@@ -166,5 +167,65 @@ describe('MENSAJE_ILEGIBLE', () => {
       expect(m.toLowerCase()).not.toContain('no hay datos');
       expect(m.toLowerCase()).not.toContain('sin registros');
     }
+  });
+});
+
+describe('Bloque I · la migración retira los campos que ya no existen', () => {
+  const CON_RESIDUOS = JSON.stringify({
+    schemaVersion: 1,
+    origen: 'REAL',
+    user: null,
+    members: [{ id: 'm1', fullName: 'SINTETICO' }],
+    appointments: [{ id: 'a1' }],
+    sharedReports: [{ id: 'rep-1', spreadsheetId: 'ID-SINTETICO' }],
+    lastExportMetadata: { spreadsheetId: 'ID-SINTETICO' },
+    // Los de G4, por si un estado muy antiguo los conserva todavía.
+    databaseSpreadsheetId: 'ID-SINTETICO',
+    databaseSpreadsheetUrl: 'https://docs.google.com/spreadsheets/d/ID-SINTETICO',
+    appDataFileId: 'ID-SINTETICO',
+  });
+
+  it('el expediente que devuelve ya no los lleva', () => {
+    const { store } = almacenFalso({ [CLAVE]: CON_RESIDUOS });
+    const r = leerExpediente(CLAVE, store);
+    expect(r.estado).toBe('OK');
+    const datos = (r as { datos: Record<string, unknown> }).datos;
+    for (const campo of CAMPOS_RETIRADOS) expect(datos, campo).not.toHaveProperty(campo);
+  });
+
+  it('y el disco tampoco: se reescribe en el acto, sin esperar al próximo guardado', () => {
+    const { store, datos } = almacenFalso({ [CLAVE]: CON_RESIDUOS });
+    leerExpediente(CLAVE, store);
+    const guardado = datos.get(CLAVE)!;
+    expect(guardado).not.toContain('ID-SINTETICO');
+  });
+
+  it('no toca nada más: el expediente sigue entero', () => {
+    const { store, datos } = almacenFalso({ [CLAVE]: CON_RESIDUOS });
+    leerExpediente(CLAVE, store);
+    const guardado = JSON.parse(datos.get(CLAVE)!);
+    expect(guardado).toEqual({
+      schemaVersion: 1,
+      origen: 'REAL',
+      user: null,
+      members: [{ id: 'm1', fullName: 'SINTETICO' }],
+      appointments: [{ id: 'a1' }],
+    });
+  });
+
+  it('un expediente ya limpio no se reescribe', () => {
+    const { store, datos } = almacenFalso({ [CLAVE]: EXPEDIENTE });
+    let escrituras = 0;
+    const espia = { ...store, setItem: (k: string, v: string) => { escrituras++; datos.set(k, v); } };
+    leerExpediente(CLAVE, espia);
+    expect(escrituras).toBe(0);
+  });
+
+  it('si no se puede reescribir, se devuelve limpio igual: la lectura no falla por eso', () => {
+    const { store } = almacenFalso({ [CLAVE]: CON_RESIDUOS });
+    const sinEscritura = { ...store, setItem: () => { throw new Error('QuotaExceededError'); } };
+    const r = leerExpediente(CLAVE, sinEscritura);
+    expect(r.estado).toBe('OK');
+    expect((r as { datos: Record<string, unknown> }).datos).not.toHaveProperty('sharedReports');
   });
 });

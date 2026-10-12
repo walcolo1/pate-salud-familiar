@@ -27,11 +27,17 @@
  * que de todos modos lo rechazaría.
  */
 
+import { nuevaSal } from './huellaCuenta';
 import { verboDeTabla } from './router';
 import type { Mutacion } from './transporteBackend';
 
 export const CLAVE_COLA = 'pate:cola:v1';
-const VERSION = 1;
+/**
+ * v1 (Bloque H): lotes sin dueño. v2 (Bloque I): cada lote lleva la huella de
+ * la cuenta que lo hizo, y la cola guarda la sal con la que se calcula. Se
+ * leen las dos; se escribe siempre la 2.
+ */
+const VERSION = 2;
 
 /** Lo mínimo de `Storage`. */
 export interface AlmacenCola {
@@ -50,6 +56,12 @@ export interface MutacionGuardada extends Mutacion {
 
 export interface LotePendiente {
   id: string;
+  /**
+   * Bloque I · la huella de la cuenta que hizo el cambio (`huellaCuenta.ts`),
+   * nunca el identificador. `null` en los lotes que vienen de la cola v1:
+   * esos no los envía nadie hasta que se atribuyan.
+   */
+  cuenta: string | null;
   /** Cuándo se hizo el cambio. ISO 8601. */
   creadoEn: string;
   mutaciones: MutacionGuardada[];
@@ -86,23 +98,37 @@ function mutacionValida(v: unknown): v is MutacionGuardada {
 function loteValido(v: unknown): v is LotePendiente {
   if (!esObjetoPlano(v)) return false;
   if (typeof v.id !== 'string' || v.id.length === 0) return false;
+  if (v.cuenta !== undefined && v.cuenta !== null && (typeof v.cuenta !== 'string' || v.cuenta.length === 0)) return false;
   if (typeof v.creadoEn !== 'string' || Number.isNaN(Date.parse(v.creadoEn))) return false;
   if (!Array.isArray(v.mutaciones) || v.mutaciones.length === 0) return false;
   return v.mutaciones.every(mutacionValida);
 }
 
-/** Lee y valida lo que hay en el disco. Nunca lanza. */
-export function leerCola(almacen: AlmacenCola | null | undefined): LotePendiente[] {
-  if (!almacen) return [];
+interface Leido {
+  sal: string | null;
+  lotes: LotePendiente[];
+}
+
+function leer(almacen: AlmacenCola | null | undefined): Leido {
+  const vacio: Leido = { sal: null, lotes: [] };
+  if (!almacen) return vacio;
   try {
     const crudo = almacen.getItem(CLAVE_COLA);
-    if (!crudo) return [];
-    const datos = JSON.parse(crudo) as { version?: unknown; lotes?: unknown };
-    if (datos?.version !== VERSION || !Array.isArray(datos.lotes)) return [];
-    return datos.lotes.filter(loteValido);
+    if (!crudo) return vacio;
+    const datos = JSON.parse(crudo) as { version?: unknown; sal?: unknown; lotes?: unknown };
+    if ((datos?.version !== 1 && datos?.version !== VERSION) || !Array.isArray(datos.lotes)) return vacio;
+    const sal = datos.version === VERSION && typeof datos.sal === 'string' && /^[0-9a-f]{32}$/.test(datos.sal) ? datos.sal : null;
+    // Un lote v1 no tiene dueño: se lee como `null` y espera a que se atribuya.
+    const lotes = datos.lotes.filter(loteValido).map((l) => ({ ...l, cuenta: datos.version === VERSION ? (l.cuenta ?? null) : null }));
+    return { sal, lotes };
   } catch {
-    return [];
+    return vacio;
   }
+}
+
+/** Lee y valida lo que hay en el disco. Nunca lanza. */
+export function leerCola(almacen: AlmacenCola | null | undefined): LotePendiente[] {
+  return leer(almacen).lotes;
 }
 
 function idAleatorio(): string {
@@ -118,6 +144,7 @@ export interface OpcionesCola {
 
 export class ColaDuradera {
   private enMemoria: LotePendiente[];
+  private salActual: string | null;
   private escrituraFallida = false;
   private readonly ahora: () => string;
   private readonly generarId: () => string;
@@ -128,7 +155,46 @@ export class ColaDuradera {
   ) {
     this.ahora = opciones.ahora ?? (() => new Date().toISOString());
     this.generarId = opciones.generarId ?? idAleatorio;
-    this.enMemoria = leerCola(almacen);
+    const leido = leer(almacen);
+    this.enMemoria = leido.lotes;
+    this.salActual = leido.sal;
+  }
+
+  /**
+   * La sal de las huellas de este navegador. Se crea la primera vez que hace
+   * falta y se guarda con la cola; si la cola se purga, se va con ella.
+   */
+  get sal(): string {
+    if (this.salActual === null) {
+      this.salActual = nuevaSal();
+      this.persistir();
+    }
+    return this.salActual;
+  }
+
+  /** El primer lote de una cuenta: el orden se respeta dentro de cada una. */
+  primeroDe(cuenta: string): LotePendiente | null {
+    return this.enMemoria.find((l) => l.cuenta === cuenta) ?? null;
+  }
+
+  longitudDe(cuenta: string): number {
+    return this.enMemoria.filter((l) => l.cuenta === cuenta).length;
+  }
+
+  /**
+   * Migración de la cola v1: da dueño a los lotes que no lo tenían. Solo debe
+   * llamarse con la cuenta que estaba dentro cuando se crearon. Devuelve
+   * cuántos atribuyó.
+   */
+  atribuirSinCuenta(cuenta: string): number {
+    let n = 0;
+    this.enMemoria = this.enMemoria.map((l) => {
+      if (l.cuenta !== null) return l;
+      n++;
+      return { ...l, cuenta };
+    });
+    if (n > 0) this.persistir();
+    return n;
   }
 
   get longitud(): number {
@@ -149,10 +215,11 @@ export class ColaDuradera {
   }
 
   /** Guarda un lote al final. Devuelve `null` si no había nada que guardar. */
-  encolar(mutaciones: readonly Mutacion[]): LotePendiente | null {
+  encolar(mutaciones: readonly Mutacion[], cuenta: string | null): LotePendiente | null {
     if (mutaciones.length === 0) return null;
     const lote: LotePendiente = {
       id: this.generarId(),
+      cuenta,
       creadoEn: this.ahora(),
       mutaciones: mutaciones.map((m) => ({ ...m, accion: accionDe(m) })),
     };
@@ -180,7 +247,8 @@ export class ColaDuradera {
         // motivo.
         this.almacen.removeItem(CLAVE_COLA);
       } else {
-        this.almacen.setItem(CLAVE_COLA, JSON.stringify({ version: VERSION, lotes: this.enMemoria }));
+        if (this.salActual === null) this.salActual = nuevaSal();
+        this.almacen.setItem(CLAVE_COLA, JSON.stringify({ version: VERSION, sal: this.salActual, lotes: this.enMemoria }));
       }
       this.escrituraFallida = false;
     } catch {

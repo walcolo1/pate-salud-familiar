@@ -9,6 +9,8 @@ import { sesionBackend, sesionDeLaAplicacion } from '../lib/identidad';
 import { CargaAlEntrar } from '../lib/cargaAlEntrar';
 import { VigiaSesion } from '../lib/vigiaSesion';
 import { ColaDuradera } from '../lib/colaDuradera';
+import { huellaCuenta } from '../lib/huellaCuenta';
+import { sujetoDe } from '../lib/sesionGoogle';
 import {
   DespachadorCola,
   conectarDisparadores,
@@ -41,9 +43,7 @@ import {
   FollowUpTask,
   ReminderStatus,
   HealthEventStatus,
-  LastExportMetadata,
   MemberPermissions,
-  SharedMemberReport,
   AppointmentEmailSource,
   ImportedEmailAppointmentCandidate,
   MedicalOrder,
@@ -273,7 +273,6 @@ interface AppContextProps {
   lastCalendarAuthTime: string | null;
 
   // Google Sheets specific states
-  lastExportMetadata: LastExportMetadata | null;
   
   signIn: (googleUser?: Omit<UserAccount, 'id' | 'createdAt'>, idToken?: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -345,7 +344,6 @@ interface AppContextProps {
   flushPendingSync: () => Promise<void>;
 
   // Secure Google-Native Sharing Phase 3B
-  sharedReports: SharedMemberReport[];
   shareDocumentWithMember: (documentId: string, email: string) => Promise<void>;
   revokeDocumentShare: (documentId: string) => Promise<void>;
 
@@ -467,6 +465,11 @@ interface AppContextProps {
    * El Navbar lo enseña con el botón de Google.
    */
   hayQueEntrar: boolean;
+  /**
+   * Bloque I · cambios pendientes en este navegador que no son de la cuenta que
+   * está dentro: se envían cuando su cuenta vuelva a entrar.
+   */
+  cambiosRetenidos: number;
   /** Dibuja el botón de Google para volver a entrar sin salir de la pantalla. */
   renderizarBotonGoogle: (destino: HTMLElement | null) => void;
   /** Comprueba la URL del `/exec` con `ping` y, si cuadra, la guarda. */
@@ -575,6 +578,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!cola) return;
     setPendingSyncCount(cola.longitud);
     pendingSyncCountRef.current = cola.longitud;
+
+    // Bloque I · migración de la cola v1, que no sabía de quién era cada lote.
+    // Se atribuye a la cuenta que estaba dentro cuando se abrió esta pestaña:
+    // es la que los hizo, porque un cierre de sesión la habría borrado del
+    // almacenamiento. Si no hay nadie —un cierre automático—, se quedan sin
+    // dueño y no los envía nadie; el diálogo de cierre deja descartarlos.
+    if (cola.lotes().some((l) => l.cuenta === null)) {
+      const activo = getActiveUser();
+      const sub = activo && activo !== 'demo' && activo.provider === 'google' ? activo.googleId : null;
+      if (sub) {
+        void huellaCuenta(cola.sal, sub)
+          .then((h) => cola.atribuirSinCuenta(h))
+          .catch(() => {
+            /* sin WebCrypto se quedan sin dueño: retenidos, nunca enviados con otra cuenta */
+          });
+      }
+    }
+
     return conectarDisparadores({
       sesion: sesionDeLaAplicacion,
       ventana: window,
@@ -696,7 +717,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [lastCalendarAuthTime, setLastCalendarAuthTime] = useState<string | null>(null);
 
-  const [lastExportMetadata, setLastExportMetadata] = useState<LastExportMetadata | null>(null);
   const [simulatedRole, setSimulatedRole] = useState<'FAMILY_ADMIN' | 'MEMBER_SELF' | 'VIEWER' | null>(null);
   const [simulatedEmail, setSimulatedEmail] = useState<string | null>(null);
 
@@ -709,7 +729,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [opSyncError, setOpSyncError] = useState<string | null>(null);
   const [syncStrategy, setSyncStrategy] = useState<string>('LAST_WRITE_WINS');
   const [lastKnownRevision, setLastKnownRevision] = useState<number>(0);
-  const [sharedReports, setSharedReports] = useState<SharedMemberReport[]>([]);
 
   // Estado de inicialización automática desde Google al hacer login
   const [syncInitStatus, setSyncInitStatus] = useState<'idle' | 'checking' | 'loaded_from_google' | 'no_remote_data' | 'local_only' | 'error' | 'needs_auth' | 'pending_sync'>('idle');
@@ -725,6 +744,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * la red. Ver `colaDuradera.ts` y `despachadorCola.ts`.
    */
   const colaRef = useRef<ColaDuradera | null>(null);
+  /** Bloque I · lotes de otra cuenta, o sin dueño: no salen con esta credencial. */
+  const [cambiosRetenidos, setCambiosRetenidos] = useState(0);
   const despachadorRef = useRef<DespachadorCola | null>(null);
   const avisoColaVolatilRef = useRef(false);
   if (colaRef.current === null && typeof window !== 'undefined') {
@@ -741,6 +762,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const repo = await getDataRepository();
         if (!repo.enviarLote) throw new Error('el repositorio no envía lotes');
         await enviarConRepositorio(repo as { enviarLote(m: Mutacion[]): Promise<void> })(mutaciones);
+      },
+      // Bloque I · la cuenta de la credencial con la que se va a enviar. Solo
+      // salen los lotes que hizo esa cuenta.
+      cuentaActiva: async () => {
+        const sub = sujetoDe(await sesionDeLaAplicacion.idToken());
+        return sub && colaRef.current ? huellaCuenta(colaRef.current.sal, sub) : null;
       },
       alCambiar: (n) => {
         setPendingSyncCount(n);
@@ -1050,10 +1077,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setPetWeights(savedState.petWeights || []);
           setPetVaccines(savedState.petVaccines || []);
           setPetHistory(savedState.petHistory || []);
-          setSharedReports(savedState.sharedReports || []);
           setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
           setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
-          setLastExportMetadata(savedState.lastExportMetadata !== undefined ? savedState.lastExportMetadata : null);
           setSimulatedRole(savedState.simulatedRole !== undefined ? savedState.simulatedRole : null);
           setSimulatedEmail(savedState.simulatedEmail !== undefined ? savedState.simulatedEmail : null);
 
@@ -1113,10 +1138,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setTasks(mockTasks);
             setDriveSyncEnabled(true);
             setCalendarSyncEnabled(true);
-            setLastExportMetadata(null);
             setSimulatedRole(null);
             setSimulatedEmail(null);
-            setSharedReports([]);
             setLastSyncAt(null);
             setLastPullAt(null);
             setLastPushAt(null);
@@ -1146,10 +1169,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setHistory([]);
             setReminders([]);
             setTasks([]);
-            setSharedReports([]);
             setDriveSyncEnabled(true);
             setCalendarSyncEnabled(true);
-            setLastExportMetadata(null);
             setSimulatedRole(null);
             setSimulatedEmail(null);
             setLastSyncAt(null);
@@ -1200,10 +1221,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setHistory([]);
         setReminders([]);
         setTasks([]);
-        setSharedReports([]);
         setDriveSyncEnabled(true);
         setCalendarSyncEnabled(true);
-        setLastExportMetadata(null);
         setSimulatedRole(null);
         setSimulatedEmail(null);
         
@@ -1322,7 +1341,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       tasks,
       driveSyncEnabled,
       calendarSyncEnabled,
-      lastExportMetadata,
       simulatedRole,
       simulatedEmail,
       lastSyncAt,
@@ -1333,7 +1351,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deviceId,
       syncStrategy,
       lastKnownRevision,
-      sharedReports,
       emailSources,
       appointmentCandidates,
         // Bloque B · El escaneo de Gmail ya no existe. Estos campos se escriben
@@ -1369,7 +1386,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     tasks,
     driveSyncEnabled,
     calendarSyncEnabled,
-    lastExportMetadata,
     simulatedRole,
     simulatedEmail,
     lastSyncAt,
@@ -1380,7 +1396,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     deviceId,
     syncStrategy,
     lastKnownRevision,
-    sharedReports,
     emailSources,
     appointmentCandidates,
     gmailOnlyFutureAppointments,
@@ -1602,10 +1617,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setPetWeights(savedState.petWeights || []);
           setPetVaccines(savedState.petVaccines || []);
           setPetHistory(savedState.petHistory || []);
-        setSharedReports(savedState.sharedReports || []);
         setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
         setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
-        setLastExportMetadata(savedState.lastExportMetadata || null);
         setSimulatedRole(savedState.simulatedRole || null);
         setSimulatedEmail(savedState.simulatedEmail || null);
         
@@ -1650,10 +1663,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setMedicalOrders([]);
         setMedicationPrescriptions([]);
         setMedicationDoseReminders([]);
-        setSharedReports([]);
         setDriveSyncEnabled(true);
         setCalendarSyncEnabled(true);
-        setLastExportMetadata(null);
         setSimulatedRole(null);
         setSimulatedEmail(null);
         setLastSyncAt(null);
@@ -1728,7 +1739,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setPetWeights(savedState.petWeights || []);
           setPetVaccines(savedState.petVaccines || []);
           setPetHistory(savedState.petHistory || []);
-        setSharedReports(savedState.sharedReports || []);
         setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
         setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
         setSimulatedRole(savedState.simulatedRole !== undefined ? savedState.simulatedRole : null);
@@ -1766,10 +1776,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setHistory(mockHistory);
         setReminders(mockReminders);
         setTasks(mockTasks);
-        setSharedReports([]);
         setDriveSyncEnabled(true);
         setCalendarSyncEnabled(true);
-        setLastExportMetadata(null);
         setSimulatedRole(null);
         setSimulatedEmail(null);
         setLastSyncAt(null);
@@ -1844,7 +1852,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setHistory([]);
     setReminders([]);
     setTasks([]);
-    setSharedReports([]);
     setEmailSources([
       {
         id: 'source-default',
@@ -1858,7 +1865,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAppointmentCandidates([]);
     setDriveSyncEnabled(true);
     setCalendarSyncEnabled(true);
-    setLastExportMetadata(null);
     setSimulatedRole(null);
     setSimulatedEmail(null);
     setLastSyncAt(null);
@@ -2221,6 +2227,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     isSyncInProgress.current = true;
     try {
       const informe = await despachador.vaciar();
+      if (informe.detenidoPor !== 'SIN_IDENTIDAD') setCambiosRetenidos(informe.retenidos);
       const ajenos = informe.rechazados.filter((r) => r.id !== propio);
       if (ajenos.length > 0) {
         avisar(
@@ -2294,8 +2301,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
 
         const cola = colaRef.current;
-        const encolado = cola?.encolar(lote) ?? null;
-        if (!cola || !encolado) return;
+        if (!cola) return;
+        // Bloque I · de quién es el cambio: la cuenta que está dentro. Se
+        // guarda su huella, nunca el identificador. Sin cuenta conocida el
+        // lote queda sin dueño: retenido, nunca enviado con otra credencial.
+        let cuenta: string | null = null;
+        try {
+          const sub = user?.googleId || sujetoDe(await sesionDeLaAplicacion.idToken());
+          cuenta = sub ? await huellaCuenta(cola.sal, sub) : null;
+        } catch {
+          cuenta = null;
+        }
+        const encolado = cola.encolar(lote, cuenta);
+        if (!encolado) return;
         setPendingSyncCount(cola.longitud);
         pendingSyncCountRef.current = cola.longitud;
         if (!cola.duradera && !avisoColaVolatilRef.current) {
@@ -4548,10 +4566,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAppointmentCandidates([]);
     setDriveSyncEnabled(false);
     setCalendarSyncEnabled(false);
-    setLastExportMetadata(null);
     setSimulatedRole(null);
     setSimulatedEmail(null);
-    setSharedReports([]);
     
     // Reset base links
     setLastSyncAt(null);
@@ -4592,10 +4608,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMedicationDoseReminders([]);
     setDriveSyncEnabled(true);
     setCalendarSyncEnabled(true);
-    setLastExportMetadata(null);
     setSimulatedRole(null);
     setSimulatedEmail(null);
-    setSharedReports([]);
     
     saveAppState({
       user: fallbackUser,
@@ -4612,10 +4626,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       tasks: mockTasks,
       driveSyncEnabled: true,
       calendarSyncEnabled: true,
-      lastExportMetadata: null,
       simulatedRole: null,
       simulatedEmail: null,
-      sharedReports: [],
       lastSyncAt: null,
       lastPullAt: null,
       lastPushAt: null,
@@ -4652,10 +4664,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       tasks,
       driveSyncEnabled,
       calendarSyncEnabled,
-      lastExportMetadata,
       simulatedRole,
       simulatedEmail,
-      sharedReports,
       medicalOrders,
       medicationPrescriptions,
       medicationDoseReminders,
@@ -4701,7 +4711,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (Array.isArray(data.petWeights)) setPetWeights(data.petWeights);
       if (Array.isArray(data.petVaccines)) setPetVaccines(data.petVaccines);
       if (Array.isArray(data.petHistory)) setPetHistory(data.petHistory);
-      if (Array.isArray(data.sharedReports)) setSharedReports(data.sharedReports);
       if (Array.isArray(data.emailSources)) setEmailSources(data.emailSources);
       if (Array.isArray(data.appointmentCandidates)) setAppointmentCandidates(data.appointmentCandidates);
 
@@ -4802,8 +4811,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
      * vista que hay; se leerá cuando la cola se vacíe.
      */
     if ((colaRef.current?.longitud ?? 0) > 0) {
-      await vaciarCola();
-      if ((colaRef.current?.longitud ?? 0) > 0) {
+      const informe = await vaciarCola();
+      // Bloque I · solo cuenta lo de esta cuenta: lo retenido de otra no sale
+      // con esta credencial, y bloquear la lectura por ello sería para siempre.
+      if ((informe?.quedanPropios ?? 0) > 0) {
         setOpSyncError('Hay cambios sin enviar: se leerá la hoja cuando salgan.');
         throw Object.assign(new Error('cola pendiente'), { codigo: 'COLA_PENDIENTE', reintentable: true });
       }
@@ -5149,7 +5160,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Session lock / inactivity ────────────────────────────────────────────────
 
-  /** Vacia las 16 estructuras clinicas. NO toca sesion, preferencias ni pendientes. */
+  /** Vacia las 15 estructuras clinicas. NO toca sesion, preferencias ni pendientes. */
   const vaciarEstadoClinico = () => {
     setMembers([]);
     setHealthProfiles({});
@@ -5166,7 +5177,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMedicationPrescriptions([]);
     setMedicationDoseReminders([]);
     setAppointmentCandidates([]);
-    setSharedReports([]);
     // Bloque D · Sin esto, los datos de las mascotas sobreviven al bloqueo de
     // sesión, que es exactamente lo que A6-F3 vino a impedir.
     setPets([]);
@@ -5307,7 +5317,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMedicationPrescriptions(g.medicationPrescriptions || []);
     setMedicationDoseReminders(g.medicationDoseReminders || []);
     setAppointmentCandidates(g.appointmentCandidates || []);
-    setSharedReports(g.sharedReports || []);
   };
 
   /** Repuebla el estado clinico desde el backend (REAL con Firebase). */
@@ -5531,7 +5540,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       lastCalendarAuthTime,
 
       // Google Sheets states
-      lastExportMetadata,
       
       signIn,
       signOut,
@@ -5627,7 +5635,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       flushPendingSync,
 
       // Secure Google-Native Sharing Phase 3B Bindings
-      sharedReports,
       shareDocumentWithMember,
       revokeDocumentShare,
 
@@ -5664,6 +5671,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       hojaRegistrada,
       cargandoExpediente,
       hayQueEntrar,
+      cambiosRetenidos,
       renderizarBotonGoogle,
       registrarHojaFamiliar,
       urlDeLaHojaFamiliar,

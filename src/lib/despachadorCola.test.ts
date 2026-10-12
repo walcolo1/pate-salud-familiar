@@ -21,7 +21,7 @@ function montar(enviar: (lote: Mutacion[]) => Promise<void>) {
   let i = 0;
   const cola = new ColaDuradera(almacen(), { generarId: () => `l${++i}` });
   const cambios: number[] = [];
-  const despachador = new DespachadorCola({ cola, enviar: vi.fn(enviar), alCambiar: (n) => cambios.push(n) });
+  const despachador = new DespachadorCola({ cola, enviar: vi.fn(enviar), cuentaActiva: async () => 'A', alCambiar: (n) => cambios.push(n) });
   return { cola, despachador, cambios };
 }
 
@@ -29,9 +29,9 @@ describe('en orden', () => {
   it('envía los lotes en el orden en que se encolaron y vacía la cola', async () => {
     const enviados: string[] = [];
     const { cola, despachador } = montar(async (lote) => void enviados.push(String(lote[0].fila.id)));
-    cola.encolar([m('a')]);
-    cola.encolar([m('b')]);
-    cola.encolar([m('c')]);
+    cola.encolar([m('a')], 'A');
+    cola.encolar([m('b')], 'A');
+    cola.encolar([m('c')], 'A');
 
     const informe = await despachador.vaciar();
     expect(enviados).toEqual(['a', 'b', 'c']);
@@ -47,9 +47,9 @@ describe('en orden', () => {
       if (id === 'b') throw new ErrorBackend(FALLO_TRANSPORTE, 'sin red');
       enviados.push(id);
     });
-    cola.encolar([m('a')]);
-    cola.encolar([m('b')]);
-    cola.encolar([m('c')]);
+    cola.encolar([m('a')], 'A');
+    cola.encolar([m('b')], 'A');
+    cola.encolar([m('c')], 'A');
 
     const informe = await despachador.vaciar();
     expect(enviados).toEqual(['a']); // `c` no sale antes que `b`
@@ -63,7 +63,7 @@ describe('en orden', () => {
       const { cola, despachador } = montar(async () => {
         throw new ErrorBackend(codigo);
       });
-      cola.encolar([m('a')]);
+      cola.encolar([m('a')], 'A');
       const informe = await despachador.vaciar();
       expect(informe.quedan, codigo).toBe(1);
       expect(informe.rechazados, codigo).toEqual([]);
@@ -76,8 +76,8 @@ describe('lo que la hoja rechaza', () => {
     const { cola, despachador } = montar(async (lote) => {
       if (lote[0].fila.id === 'a') throw new ErrorBackend('PERMISO_INSUFICIENTE');
     });
-    cola.encolar([m('a')]);
-    cola.encolar([m('b')]);
+    cola.encolar([m('a')], 'A');
+    cola.encolar([m('b')], 'A');
 
     const informe = await despachador.vaciar();
     expect(informe.rechazados).toEqual([{ id: 'l1', codigo: 'PERMISO_INSUFICIENTE' }]);
@@ -91,10 +91,13 @@ describe('concurrencia', () => {
     let soltar!: () => void;
     const enviar = vi.fn(() => new Promise<void>((r) => (soltar = r)));
     const { cola, despachador } = montar(enviar);
-    cola.encolar([m('a')]);
+    cola.encolar([m('a')], 'A');
 
     const x = despachador.vaciar();
     const y = despachador.vaciar();
+    // Antes de enviar se consulta la cuenta activa (Bloque I): se espera a que
+    // el envío haya empezado.
+    await vi.waitFor(() => expect(enviar).toHaveBeenCalled());
     soltar();
     await Promise.all([x, y]);
     expect(enviar).toHaveBeenCalledTimes(1);
@@ -106,10 +109,10 @@ describe('concurrencia', () => {
     const monta = montar(async (lote) => {
       const id = String(lote[0].fila.id);
       enviados.push(id);
-      if (id === 'a') ref.cola?.encolar([m('b')]); // el usuario guarda otra cosa mientras
+      if (id === 'a') ref.cola?.encolar([m('b')], 'A'); // el usuario guarda otra cosa mientras
     });
     ref.cola = monta.cola;
-    monta.cola.encolar([m('a')]);
+    monta.cola.encolar([m('a')], 'A');
 
     await monta.despachador.vaciar();
     expect(enviados).toEqual(['a', 'b']);
@@ -120,8 +123,94 @@ describe('concurrencia', () => {
     const { cola, despachador, cambios } = montar(async () => {
       throw new Error('algo raro');
     });
-    cola.encolar([m('a')]);
+    cola.encolar([m('a')], 'A');
     await expect(despachador.vaciar()).resolves.toMatchObject({ quedan: 0 });
     expect(cambios.at(-1)).toBe(0);
+  });
+});
+
+describe('Bloque I · nunca con la credencial de otra cuenta', () => {
+  function multicuenta(activa: { valor: string | null }) {
+    let i = 0;
+    const cola = new ColaDuradera(almacen(), { generarId: () => `l${++i}` });
+    const enviados: string[] = [];
+    const despachador = new DespachadorCola({
+      cola,
+      enviar: async (lote) => void enviados.push(String(lote[0].fila.id)),
+      cuentaActiva: async () => activa.valor,
+    });
+    return { cola, despachador, enviados };
+  }
+
+  it('solo envía los lotes de la cuenta activa; los de otra se quedan retenidos', async () => {
+    const activa = { valor: 'B' as string | null };
+    const { cola, despachador, enviados } = multicuenta(activa);
+    cola.encolar([m('de-A')], 'A');
+    cola.encolar([m('de-B')], 'B');
+
+    const informe = await despachador.vaciar();
+    expect(enviados).toEqual(['de-B']);
+    expect(informe.retenidos).toBe(1);
+    expect(cola.lotes().map((l) => l.cuenta)).toEqual(['A']);
+  });
+
+  it('un lote de otra cuenta no bloquea los de la activa, aunque vaya delante', async () => {
+    const activa = { valor: 'B' as string | null };
+    const { cola, despachador, enviados } = multicuenta(activa);
+    cola.encolar([m('a1')], 'A');
+    cola.encolar([m('b1')], 'B');
+    cola.encolar([m('b2')], 'B');
+    await despachador.vaciar();
+    expect(enviados).toEqual(['b1', 'b2']);
+  });
+
+  it('cuando vuelve la cuenta dueña, sale lo suyo, en su orden', async () => {
+    const activa = { valor: 'B' as string | null };
+    const { cola, despachador, enviados } = multicuenta(activa);
+    cola.encolar([m('a1')], 'A');
+    cola.encolar([m('a2')], 'A');
+    await despachador.vaciar();
+    expect(enviados).toEqual([]);
+
+    activa.valor = 'A';
+    await despachador.vaciar();
+    expect(enviados).toEqual(['a1', 'a2']);
+    expect(cola.longitud).toBe(0);
+  });
+
+  it('sin credencial no envía nada, ni siquiera lo propio', async () => {
+    const activa = { valor: null as string | null };
+    const { cola, despachador, enviados } = multicuenta(activa);
+    cola.encolar([m('a1')], 'A');
+    const informe = await despachador.vaciar();
+    expect(enviados).toEqual([]);
+    expect(informe.detenidoPor).toBe('SIN_IDENTIDAD');
+  });
+
+  it('los lotes sin dueño (de la cola v1) no los envía nadie', async () => {
+    const activa = { valor: 'A' as string | null };
+    const { cola, despachador, enviados } = multicuenta(activa);
+    cola.encolar([m('huerfano')], null);
+    const informe = await despachador.vaciar();
+    expect(enviados).toEqual([]);
+    expect(informe.retenidos).toBe(1);
+  });
+
+  it('quedanPropios cuenta solo lo de la cuenta activa', async () => {
+    const activa = { valor: 'A' as string | null };
+    let i = 0;
+    const cola = new ColaDuradera(almacen(), { generarId: () => `l${++i}` });
+    const despachador = new DespachadorCola({
+      cola,
+      enviar: async () => {
+        throw new ErrorBackend(FALLO_TRANSPORTE);
+      },
+      cuentaActiva: async () => activa.valor,
+    });
+    cola.encolar([m('a1')], 'A');
+    cola.encolar([m('b1')], 'B');
+    const informe = await despachador.vaciar();
+    expect(informe.quedanPropios).toBe(1);
+    expect(informe.retenidos).toBe(1);
   });
 });

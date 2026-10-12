@@ -148,7 +148,6 @@ test.describe('C2 · estados de carga, vacío y error', () => {
           medicationPrescriptions: [],
           medicationDoseReminders: [],
           appointmentCandidates: [],
-          sharedReports: [],
           emailSources: [],
         }),
       );

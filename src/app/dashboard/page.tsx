@@ -32,6 +32,7 @@ export default function DashboardPage() {
     medicationDoseReminders,
     appointmentCandidates,
     pendingSyncCount,
+    cambiosRetenidos,
     cargandoExpediente,
     isLoading,
     
@@ -266,7 +267,12 @@ export default function DashboardPage() {
     dashboardAlerts.push({
       id: 'sync-pending-changes',
       title: 'Cambios sin guardar en la hoja',
-      description: `Hay ${pendingSyncCount} cambio(s) que todavía no han llegado a la hoja de la familia. Están guardados en este dispositivo y se enviarán solos en cuanto haya conexión y sesión, aunque recargues o cierres la aplicación.`,
+      description:
+        `Hay ${pendingSyncCount} cambio(s) que todavía no han llegado a la hoja de la familia. Están guardados en este dispositivo y se enviarán solos en cuanto haya conexión y sesión, aunque recargues o cierres la aplicación.` +
+        // Bloque I · los de otra cuenta no salen con esta credencial.
+        (cambiosRetenidos > 0
+          ? ` ${cambiosRetenidos} de ellos son de otra cuenta de Google que usó este navegador: se enviarán cuando esa cuenta vuelva a entrar.`
+          : ''),
       severity: 'info',
       memberName: 'Nube',
       href: '/settings',

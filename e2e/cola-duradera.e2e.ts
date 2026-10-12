@@ -88,3 +88,47 @@ test.describe('Bloque H · cola duradera', () => {
     expect(await lotesEnDisco(page)).toHaveLength(1);
   });
 });
+
+test.describe('Bloque I · de qué cuenta es cada lote', () => {
+  test('el lote lleva la huella de la cuenta, y en el disco no está su identificador', async ({ page }) => {
+    await prepararConCola(page);
+    const crudo = await page.evaluate(() => localStorage.getItem('pate:cola:v1'));
+    const cola = JSON.parse(crudo!);
+    expect(cola.version).toBe(2);
+    expect(cola.sal).toMatch(/^[0-9a-f]{32}$/);
+    expect(cola.lotes[0].cuenta).toMatch(/^[0-9a-f]{64}$/);
+    // Ni el `sub` ni el correo de la sesión simulada.
+    expect(crudo).not.toContain('e2e-google-id');
+    expect(crudo).not.toContain('sesion-e2e@example.invalid');
+  });
+
+  test('una cola v1 sin dueño se migra a v2 y se atribuye a quien estaba dentro', async ({ page }) => {
+    await bloquearGoogle(page);
+    await entrarComoSesionRealSimulada(page);
+    await page.evaluate(() =>
+      localStorage.setItem(
+        'pate:cola:v1',
+        JSON.stringify({
+          version: 1,
+          lotes: [
+            {
+              id: 'lote-v1',
+              creadoEn: '2026-09-25T10:00:00.000Z',
+              mutaciones: [{ tabla: 'CITAS', accion: 'ESCRIBIR', fila: { id: 'c1' } }],
+            },
+          ],
+        }),
+      ),
+    );
+    await page.reload();
+    await expect
+      .poll(async () => JSON.parse((await page.evaluate(() => localStorage.getItem('pate:cola:v1')))!).version, {
+        timeout: 15_000,
+      })
+      .toBe(2);
+    const cola = JSON.parse((await page.evaluate(() => localStorage.getItem('pate:cola:v1')))!);
+    expect(cola.lotes).toHaveLength(1);
+    expect(cola.lotes[0].id).toBe('lote-v1');
+    expect(cola.lotes[0].cuenta).toMatch(/^[0-9a-f]{64}$/);
+  });
+});

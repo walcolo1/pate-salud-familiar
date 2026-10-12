@@ -11,8 +11,6 @@ import {
   MedicalHistoryEvent, 
   Reminder, 
   FollowUpTask,
-  LastExportMetadata,
-  SharedMemberReport,
   AppointmentEmailSource,
   ImportedEmailAppointmentCandidate,
   MedicalOrder,
@@ -54,7 +52,6 @@ export interface SavedAppState {
   tasks: FollowUpTask[];
   driveSyncEnabled: boolean;
   calendarSyncEnabled: boolean;
-  lastExportMetadata: LastExportMetadata | null;
   simulatedRole?: 'FAMILY_ADMIN' | 'MEMBER_SELF' | 'VIEWER' | null;
   simulatedEmail?: string | null;
   lastSyncAt?: string | null;
@@ -65,7 +62,6 @@ export interface SavedAppState {
   deviceId?: string | null;
   syncStrategy?: string | null;
   lastKnownRevision?: number | null;
-  sharedReports?: SharedMemberReport[];
   emailSources?: AppointmentEmailSource[];
   appointmentCandidates?: ImportedEmailAppointmentCandidate[];
   // Gmail auto-scan configuration
