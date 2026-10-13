@@ -157,6 +157,7 @@ const LISTAS: readonly (keyof AllFamilyData)[] = [
   'documents',
   'history',
   'reminders',
+  'tasks',
   'medicalOrders',
   'medications',
   'doseReminders',
@@ -178,6 +179,8 @@ const PESTANAS_POR_PACIENTE: readonly string[] = [
   // v4 · Antes no se podía: sin `paciente_id`, `consultar` no tenía por dónde
   // filtrar y los valores de un examen no había forma de volver a leerlos.
   'EXAMENES_RESULTADOS',
+  // v5 · las tareas de seguimiento.
+  'TAREAS',
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -644,9 +647,9 @@ export class RepositorioBackend implements DataRepository {
 
   // ── Tareas ────────────────────────────────────────────────────────────────
 
-  /** No hay pestaña para tareas genéricas. El motivo está en `SIN_PESTANA`. */
-  async saveTask(_ctx: RepositoryContext, _task: FollowUpTask): Promise<void> {
-    this.descriptoresDe('tasks');
+  /** Bloque J · la pestaña TAREAS, del esquema v5. */
+  async saveTask(_ctx: RepositoryContext, task: FollowUpTask): Promise<void> {
+    await this.guardar('tasks', task as unknown as Record<string, unknown>);
   }
 
   // ── Órdenes ───────────────────────────────────────────────────────────────

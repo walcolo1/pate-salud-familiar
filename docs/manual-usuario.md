@@ -1,164 +1,190 @@
-# Manual de Usuario — Paté Salud Familiar (MVP)
+# Manual de usuario — Paté · Salud Familiar (v1.0.0)
 
-Bienvenido a **Paté Salud Familiar**, tu aplicación personal y privada para la gestión integrada de la salud familiar. Toda la información de tu salud se almacena de forma segura en tu propia cuenta de Google, sin servidores intermediarios.
+Paté guarda el expediente de salud de tu familia —personas y mascotas— en una
+hoja de cálculo **de tu propia cuenta de Google**. No hay un servidor nuestro en
+medio: la aplicación habla con tu hoja a través de un pequeño programa (el «Web
+App») que vive dentro de esa misma hoja.
 
----
+> **Solo hace falta una cuenta `@gmail.com` normal.** Nadie de la familia
+> necesita Google Workspace ni una cuenta de empresa, en ningún paso.
 
 ## Índice
-1. [Cómo Iniciar Sesión](#1-cómo-iniciar-sesión)
-2. [Cómo Configurar la Conexión con Google](#2-cómo-configurar-la-conexión-con-google)
-3. [Cómo Crear Miembros de la Familia](#3-cómo-crear-miembros-de-la-familia)
-4. [Cómo Registrar Documentos de Identidad](#4-cómo-registrar-documentos-de-identidad)
-5. [Cómo Inactivar Miembros](#5-cómo-inactivar-miembros)
-6. [Cómo Crear y Gestionar Citas](#6-cómo-crear-y-gestionar-citas)
-7. [Cómo Importar Citas desde Gmail](#7-cómo-importar-citas-desde-gmail)
-8. [Cómo Registrar Órdenes Médicas y Autorizaciones](#8-cómo-registrar-órdenes-médicas-y-autorizaciones)
-9. [Cómo Registrar Medicamentos Recetados](#9-cómo-registrar-medicamentos-recetados)
-10. [Cómo Revisar Recordatorios Diarios](#10-cómo-revisar-recordatorios-diarios)
-11. [Cómo Solucionar Problemas de Sincronización](#11-cómo-solucionar-problemas-de-sincronización)
+
+1. [Dar de alta a una familia nueva](#1-dar-de-alta-a-una-familia-nueva)
+2. [Entrar](#2-entrar)
+3. [Familiares y mascotas](#3-familiares-y-mascotas)
+4. [Citas, vacunas, exámenes, órdenes y medicamentos](#4-citas-vacunas-exámenes-órdenes-y-medicamentos)
+5. [Importar una cita desde un correo](#5-importar-una-cita-desde-un-correo)
+6. [Recordatorios y tareas](#6-recordatorios-y-tareas)
+7. [Invitar a la familia](#7-invitar-a-la-familia)
+8. [Cómo se guardan tus datos](#8-cómo-se-guardan-tus-datos)
+9. [Los avisos y qué hacer con cada uno](#9-los-avisos-y-qué-hacer-con-cada-uno)
+10. [Seguridad en este dispositivo](#10-seguridad-en-este-dispositivo)
+11. [Actualizar la hoja a una versión nueva](#11-actualizar-la-hoja-a-una-versión-nueva)
 
 ---
 
-## 1. Cómo Iniciar Sesión
+## 1. Dar de alta a una familia nueva
 
-1. Abre la aplicación en tu navegador o instálala como PWA en tu pantalla de inicio.
-2. En la pantalla de bienvenida, haz clic en el botón **"Iniciar Sesión con Google"**.
-3. Se abrirá la ventana oficial de Google OAuth. Selecciona tu cuenta de Google.
-4. Concede los permisos necesarios para que la aplicación acceda a Google Drive, Google Sheets, Google Calendar y Gmail (solo lectura para citas).
-5. Tras confirmar, serás redirigido al panel de control (Dashboard) de la aplicación.
+Lo hace **una sola persona por familia** —el titular—, una sola vez, en unos
+cinco minutos. El detalle con capturas de cada pantalla de permisos está en
+[INSTALACION.md](INSTALACION.md).
 
----
+1. **Copia la plantilla.** Abre el enlace de la plantilla y elige
+   **Archivo ▸ Hacer una copia**. La copia es tuya y vive en tu Drive.
+2. **Instala.** En la copia aparece el menú **Paté**. Elige
+   **Paté ▸ Instalar o actualizar** y acepta los permisos (la pantalla de
+   «Google no ha verificado esta aplicación» es normal: **Configuración
+   avanzada ▸ Ir a …**). Se crean las 22 pestañas del expediente, la carpeta
+   de Drive y las tareas programadas.
+3. **Publica el Web App.** **Extensiones ▸ Apps Script ▸ Implementar ▸ Nueva
+   implementación ▸ Aplicación web**, con **Ejecutar como: Yo** y **Quién tiene
+   acceso: Cualquier usuario**. Copia la URL que termina en `/exec`.
+   Esa URL es la llave de tu expediente: no la publiques.
+4. **Enlaza la URL en la aplicación.** Entra en Paté con tu cuenta de Google,
+   ve a **Ajustes ▸ Hoja de la familia**, pega la URL y pulsa
+   **Comprobar y guardar**. La aplicación comprueba que responde y que es una
+   versión compatible antes de guardarla.
+5. **Invita a tu familia** desde **Ajustes ▸ Invitaciones Familiares**
+   ([sección 7](#7-invitar-a-la-familia)).
 
-## 2. Cómo Configurar la Conexión con Google
+La URL queda guardada en ese navegador, también después de cerrar sesión. En
+cada navegador nuevo desde el que entres como titular hay que enlazarla una vez.
+Los familiares invitados no tienen que hacerlo: su invitación ya la lleva.
 
-Paté Salud Familiar utiliza una hoja de cálculo en tu Google Drive llamada `SaludFamiliar_OperationalDB` para almacenar todos tus datos:
+## 2. Entrar
 
-1. **Onboarding Automático**: Si es tu primera vez, la aplicación creará automáticamente la base de datos en tu Google Drive y una carpeta para tus archivos clínicos.
-2. **Uso de Hoja Existente**: Si ya habías configurado la app con esa misma cuenta de Google, detectará automáticamente la hoja existente para que continúes usando tus datos previos sin perder nada.
-3. Puedes ver el enlace a tu hoja operacional y su identificador único dentro de **Configuración > Estado de Sincronización**.
+Pulsa el botón de **Google** en la pantalla de inicio y elige tu cuenta. Al
+entrar verás «Trayendo el expediente de la hoja de tu familia…» y después tu
+panel con los datos de la hoja.
 
----
+Si recargas la página, Google suele devolver la sesión solo en unos segundos.
+Si no lo hace, aparece arriba el aviso **«Tu sesión de Google no está activa»**
+con el botón de Google: púlsalo y sigues donde estabas, sin cerrar sesión.
 
-## 3. Cómo Crear Miembros de la Familia
+Para probar la aplicación sin tocar datos reales existe la **Sesión Demo**, con
+una familia de ejemplo. Lo que hagas en la demo no se guarda en ninguna hoja.
 
-Cada persona en tu hogar debe tener su propio perfil:
+## 3. Familiares y mascotas
 
-1. Dirígete a la sección **"Miembros"** en el menú de navegación.
-2. Haz clic en **"Agregar Miembro"**.
-3. Completa los datos requeridos:
-   - Nombre completo.
-   - Fecha de nacimiento.
-   - Parentesco o relación (ej. Hijo, Cónyuge, Madre).
-   - Tipo de documento de identidad y su respectivo número.
-   - Grupo sanguíneo.
-4. Haz clic en **"Guardar"**. Los datos se registrarán en tu memoria local y se programarán para subirse a Google Sheets.
+- **Añadir:** **Familia ▸ Agregar familiar**. El número de documento es
+  obligatorio y no se puede repetir.
+- **Editar:** desde la ficha del familiar.
+- **Dar de baja:** nada se borra de la hoja. Una baja añade una fila con fecha
+  de baja (`borrado_en`) y el familiar deja de verse; su historial sigue en la
+  hoja.
+- **Mascotas:** en la ficha de un familiar, **Registrar mascota**. Tienen su
+  propio control de peso, vacunas e historial veterinario.
 
----
+## 4. Citas, vacunas, exámenes, órdenes y medicamentos
 
-## 4. Cómo Registrar Documentos de Identidad
+Todo cuelga de la ficha de cada familiar, en sus pestañas: **Programar cita**,
+**Registrar vacuna**, **Registrar control**, **Registrar examen**, **Nueva
+Orden**, **Registrar Medicamento** y **Subir documento**.
 
-Para asegurar la consistencia en los registros clínicos y trámites ante prestadores de salud, cada miembro debe tener su documento de identidad registrado:
+- Las citas pueden crear un evento en tu **Google Calendar**; la primera vez,
+  Google te pide permiso para ello.
+- Los documentos se guardan en la carpeta **Paté · Salud Familiar** de tu
+  Drive. La aplicación solo ve los archivos que ella misma crea.
+- Los medicamentos generan sus tomas, y el panel avisa de las que vencen.
 
-1. Al crear o editar un perfil de miembro, localiza la sección **"Documento de Identidad"**.
-2. Selecciona el **Tipo de Documento** (por ejemplo: CC - Cédula de Ciudadanía, TI - Tarjeta de Identidad, Registro Civil, PAS - Pasaporte, etc.).
-3. Escribe el **Número de Documento**.
-4. Guarda los cambios. Si necesitas actualizarlo más adelante, haz clic en **"Editar"** en la tarjeta del miembro.
+## 5. Importar una cita desde un correo
 
----
+**Importar una cita** te deja pegar el texto del correo de tu EPS o adjuntar el
+documento. La aplicación **no lee tu correo**: tú decides qué pegar, y el
+análisis ocurre en tu dispositivo.
 
-## 5. Cómo Inactivar Miembros
+Lo que se crea es un **borrador**. Revísalo, corrige lo que haga falta y
+confírmalo: solo entonces la cita se guarda en la hoja.
 
-Si algún familiar ya no requiere seguimiento activo, puedes inactivar su perfil para limpiar tus paneles de control sin borrar su historial médico:
+> **Los borradores solo viven en este navegador.** No se guardan en la hoja, no
+> se ven en otros dispositivos y se borran al cerrar sesión. Confírmalos antes.
 
-1. Ve a **"Miembros"** y selecciona el familiar que deseas modificar.
-2. Haz clic en **"Editar"** en su perfil.
-3. Cambia el estado de **"Activo"** a **"Inactivo"**.
-4. Haz clic en **"Guardar"**.
-5. Los miembros inactivos no aparecerán en las listas desplegables rápidas (como al crear una nueva cita o recetar un medicamento), pero sus datos y citas históricas se conservarán en tu hoja de cálculo.
+## 6. Recordatorios y tareas
 
----
+**Alertas** reúne los recordatorios de tomas, vacunas y citas, y en su segunda
+pestaña las **tareas de seguimiento**. Marca una tarea como hecha y queda
+guardada en la pestaña `TAREAS` de la hoja.
 
-## 6. Cómo Crear y Gestionar Citas
+## 7. Invitar a la familia
 
-1. Dirígete a la sección **"Citas"** del menú.
-2. Haz clic en **"Nueva Cita"**.
-3. Selecciona el miembro de la familia al que pertenece la cita.
-4. Introduce la fecha, hora, especialidad, médico e institución de salud.
-5. *(Opcional)* Si la cita requiere una orden médica aprobada, puedes asociarla en el campo correspondiente.
-6. Haz clic en **"Agendar Cita"**.
-7. La aplicación creará automáticamente un evento en tu **Google Calendar** para que recibas notificaciones estándar del calendario.
+Solo el titular. **Ajustes ▸ Invitaciones Familiares**: elige el familiar,
+escribe su correo de Gmail, elige un **Rol de Acceso** y pulsa
+**Enviar Invitación**.
 
----
+| Rol | Qué puede hacer |
+|---|---|
+| **Cuidador** | Todo lo clínico de los pacientes que tenga asignados |
+| **Miembro** | Ver y gestionar su propia ficha |
+| **Visualizador** | Leer, sin escribir nada |
 
-## 7. Cómo Importar Citas desde Gmail
+El familiar recibe un correo con un enlace. Al abrirlo, entra con **la misma
+cuenta a la que se envió**; con otra cuenta, la invitación no se acepta. No
+tiene que copiar ninguna hoja ni dar permisos a Google.
 
-La app puede escanear tu Gmail para encontrar confirmaciones de citas de tus prestadores de salud configurados:
+Desde la misma sección puedes revocar una invitación o un acceso.
 
-1. Configura tus remitentes habituales en **Configuración > Filtros de Gmail**.
-2. En el Dashboard, verás una sección llamada **"Citas Importadas de Gmail (Pendientes de Revisión)"**.
-3. Si la app detecta un correo de cita, aparecerá como una tarjeta indicando los datos extraídos (fecha, hora, institución).
-4. Haz clic en **"Revisar"** o **"Aprobar"**.
-5. Asigna el miembro de la familia correcto, edita cualquier campo si es necesario y confirma.
-6. Si el correo no correspondía a una cita real o no te interesa guardarlo, haz clic en **"Descartar"**.
+## 8. Cómo se guardan tus datos
 
----
+**Solo.** Cada cambio se envía a la hoja en el momento en que lo haces. No hay
+botón de sincronizar ni hace falta.
 
-## 8. Cómo Registrar Órdenes Médicas y Autorizaciones
+**Sin conexión, también.** Si no hay red, o la sesión de Google no está activa,
+el cambio se guarda en este dispositivo y el panel dice
+**«Cambios sin guardar en la hoja»**. Se envía solo, y en el orden en que los
+hiciste, en cuanto vuelvan la red y la sesión, **aunque recargues o cierres el
+navegador**.
 
-Muchas citas o procedimientos requieren un trámite de autorización previo ante la aseguradora:
+**Con otra cuenta en el mismo navegador.** Los cambios pendientes recuerdan qué
+cuenta los hizo (sin guardar tu correo: guardan una huella anónima). Si entra
+otra persona con su cuenta, tus cambios no se envían con la suya: esperan a que
+vuelvas a entrar tú. El panel indica cuántos son «de otra cuenta».
 
-1. Ve a la sección **"Órdenes Médicas"** (u Órdenes en el menú).
-2. Haz clic en **"Registrar Orden"**.
-3. Completa los datos: miembro, médico emisor, descripción del procedimiento/examen y si requiere autorización.
-4. Toma una foto o sube un PDF de la orden física. Este archivo se guardará en tu carpeta privada de **Google Drive**.
-5. Define el estado inicial como **"Pendiente de Autorización"** (`PENDING_AUTHORIZATION`).
-6. Una vez que tu aseguradora envíe la aprobación, edita la orden, cambia el estado a **"Autorizada"** (`AUTHORIZED`) y sube el soporte de autorización.
-7. Ahora podrás agendar la cita vinculada a esta orden.
+**Lo que hizo otra persona.** Si alguien de la familia cambia algo mientras
+tienes la aplicación abierta, aparece **«Hay datos nuevos»** con un botón para
+actualizar.
 
----
+**Abrir la hoja.** **Ajustes ▸ Hoja de la familia ▸ Abrir la hoja** abre tu
+hoja en otra pestaña (solo el titular).
 
-## 9. Cómo Registrar Medicamentos Recetados
+**Copia de seguridad.** **Ajustes ▸ Exportar Copia (.json)** descarga una copia
+del expediente; **Importar Copia (.json)** la restaura en este navegador.
 
-Para llevar un control estricto del tratamiento farmacológico:
+## 9. Los avisos y qué hacer con cada uno
 
-1. Ve a la sección **"Medicamentos"**.
-2. Haz clic en **"Registrar Tratamiento"**.
-3. Elige al familiar y completa los datos del medicamento: nombre comercial/genérico, dosis (ej. 1 tableta), frecuencia (ej. cada 8 horas) y fecha de inicio.
-4. Indica la duración del tratamiento. Si configuras un tratamiento superior a 180 días, la aplicación te mostrará una advertencia para evitar sobrecargar tu calendario de eventos.
-5. Al guardar, el sistema generará automáticamente las tomas programadas para cada día.
-6. Si deseas sincronizarlas con Google Calendar, puedes presionar el botón de integración (se te advertirá si se generarán más de 20 eventos para evitar saturar tu agenda).
+| Aviso | Qué significa | Qué hacer |
+|---|---|---|
+| **Este navegador no sabe dónde está la hoja de tu familia** | No hay una URL `/exec` enlazada en este navegador | **Registrar la hoja** y pega la URL |
+| **Tu sesión de Google no está activa** | Estás dentro, pero sin credencial con la que firmar | Pulsa el botón de Google del aviso |
+| **Cambios sin guardar en la hoja** | Hay cambios esperando red o sesión | Nada: salen solos |
+| **Hay datos nuevos** | Alguien cambió la hoja desde otro sitio | Pulsa **Actualizar** |
+| **La hoja rechazó el cambio: tu rol no permite hacerlo** | Tu rol no incluye esa acción | Pídeselo al titular; el cambio se deshizo |
+| **El Web App de tu familia es anterior a esta versión** | La hoja tiene un programa más antiguo que la aplicación | El titular sigue la [sección 11](#11-actualizar-la-hoja-a-una-versión-nueva) |
+| **Tienes cambios sin sincronizar** (al cerrar sesión) | Hay cambios que aún no llegaron a la hoja | **Reintentar**, **Cancelar** o, si de verdad quieres perderlos, **Salir y descartar** |
 
----
+## 10. Seguridad en este dispositivo
 
-## 10. Cómo Revisar Recordatorios Diarios
+- **Bloqueo por inactividad** y **Cierre lógico nocturno**, en Ajustes,
+  bloquean la pantalla y piden volver a entrar. Tras 8 horas bloqueada, la
+  sesión se cierra sola y se borran los datos del dispositivo; los cambios que no
+  llegaron a enviarse se conservan para no perderlos.
+- **Cerrar sesión** borra de este navegador el expediente y la sesión. Se
+  quedan solo tus preferencias y la dirección de la hoja de la familia, para no
+  tener que enlazarla otra vez.
+- La sesión de Google vive **solo en memoria**: no se guarda en el navegador.
 
-La aplicación agrupa todo lo que debes hacer hoy en la sección **"Recordatorios"**:
+## 11. Actualizar la hoja a una versión nueva
 
-1. Haz clic en **"Recordatorios"** en el menú principal o revisa la sección de tareas en el **Dashboard**.
-2. Verás dos pestañas o listas principales:
-   - **Citas Médicas**: Las citas programadas para el día de hoy.
-   - **Tomas de Medicamentos**: El listado de medicamentos con la hora exacta a la que deben ser consumidos.
-3. Para las tomas de medicamentos, puedes interactuar directamente usando los botones rápidos:
-   - **Tomado**: Marca la dosis como completada en tu hoja operacional.
-   - **Omitido**: Registra que por alguna razón no se consumió la dosis en la fecha establecida.
-4. El Dashboard también te alertará si tienes tomas vencidas de horas anteriores que no fueron marcadas.
+Cuando haya una versión nueva del programa de la hoja, el titular:
 
----
+1. Abre la hoja ▸ **Extensiones ▸ Apps Script**, borra los ficheros `.gs` que
+   haya, crea uno llamado `Pate` y pega el contenido nuevo de `Pate.gs`.
+   Guarda.
+2. Vuelve a la hoja y ejecuta **Paté ▸ Instalar o actualizar**. Añade lo que
+   falte (pestañas o columnas nuevas) sin tocar lo que ya hay escrito.
+3. **Implementar ▸ Administrar implementaciones ▸ ✏ Editar** la implementación
+   que ya tienes, elige **Versión: Nueva versión** y **Implementar**.
+   Así **la URL `/exec` no cambia** y nadie tiene que volver a enlazarla.
 
-## 11. Cómo Solucionar Problemas de Sincronización
-
-Dado que la aplicación almacena los datos de forma local y luego los envía a Google Sheets, ocasionalmente pueden ocurrir desalineaciones si usas múltiples dispositivos o pierdes la conexión a internet:
-
-### Síntoma: Aparece un círculo rojo o indica "Cambios pendientes de sincronización"
-- **Causa**: Tienes datos registrados localmente que no se han subido a Google.
-- **Solución**: Asegúrate de tener conexión estable a internet y haz clic en el botón de **"Sincronizar Ahora"** en la barra superior o en la sección de configuración.
-
-### Síntoma: Datos modificados en otro dispositivo no aparecen
-- **Solución**: Ve a **Configuración**, localiza la sección de "Diagnóstico de datos" y presiona **"Forzar Sincronización Completa (Pull)"** para traer los datos más recientes desde Google Sheets.
-
-### Síntoma: Columnas faltantes o errores de lectura en Google Sheets
-- **Causa**: Alguien modificó manualmente los nombres de las columnas o eliminó una pestaña en la hoja de cálculo.
-- **Solución**: Ve a **Configuración > Diagnóstico de datos**, y haz clic en **"Reparar Base de Datos Google-Native"** y luego en **"Reparar Encabezados de Sheets"**. Esto agregará las columnas faltantes respetando la información que ya tenías registrada.
-
-### Síntoma: Los documentos de identidad aparecen vacíos tras un pull
-- **Solución**: La aplicación cuenta con un merge seguro que protege tus campos locales de ser sobrescritos por valores vacíos del servidor. Ejecuta la acción **"Reparar documentos de miembros"** en Configuración para forzar una consolidación segura de todos los campos de identidad.
+> No uses «Nueva implementación» para actualizar: crearía otra URL distinta, y
+> todos los navegadores seguirían hablando con la anterior.

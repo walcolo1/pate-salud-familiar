@@ -141,8 +141,6 @@ export interface MedicalHistoryEntry extends Sincronizable {
   diagnostico: string;
   tratamiento?: string | null;
   veterinario?: string | null;
-  /** Identificador de un documento ya subido. Nunca el archivo en sí. */
-  documentoId?: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -3780,7 +3780,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       veterinario: entrada.veterinario?.trim() || null,
       // Los adjuntos llegan con el módulo de documentos: aquí se guardaría la
       // referencia, nunca el archivo.
-      documentoId: null,
       ...marcasDeCreacion(),
     };
 

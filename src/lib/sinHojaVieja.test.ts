@@ -66,6 +66,8 @@ const RETIRADOS: Record<string, string> = {
   // Bloque I
   sharedReports: 'los informes compartidos, sin función desde el Bloque H',
   lastExportMetadata: 'los datos de la última exportación a Sheets',
+  // Bloque J
+  documentoId: 'el adjunto del historial veterinario que nada rellenaba ni tenía columna',
 };
 
 /**

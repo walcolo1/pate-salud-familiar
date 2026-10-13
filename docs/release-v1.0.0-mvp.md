@@ -1,3 +1,5 @@
+> **Sustituido por [release-v1.0.0.md](release-v1.0.0.md).** Este documento describe la versión con Firebase, retirada en el Bloque G. Se conserva como historia.
+
 # Cierre Técnico de Versión Estable — Paté Salud Familiar MVP v1.0.0-mvp
 
 Este documento formaliza el cierre técnico del Producto Mínimo Viable (MVP) en su versión estable `v1.0.0-mvp`, listo para el inicio de pruebas de campo con usuarios reales.

@@ -135,7 +135,7 @@ export default function SettingsPage() {
       await revokeInvitation(inviteId);
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Error al revocar la invitación.');
+      avisar(err.message || 'Error al revocar la invitación.');
     } finally {
       setRevokingInviteId(null);
     }
@@ -189,13 +189,13 @@ export default function SettingsPage() {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (!parsed || typeof parsed !== 'object') {
-          alert('El archivo no tiene un formato JSON válido.');
+          avisar('El archivo no tiene un formato JSON válido.');
           return;
         }
 
         // Validación básica de campos requeridos
         if (!Array.isArray(parsed.members) || !Array.isArray(parsed.appointments)) {
-          alert('El archivo no corresponde a una copia de seguridad válida de Paté Salud Familiar (faltan miembros o citas).');
+          avisar('El archivo no corresponde a una copia de seguridad válida de Paté Salud Familiar (faltan miembros o citas).');
           return;
         }
 
@@ -238,7 +238,7 @@ export default function SettingsPage() {
           }
         }
       } catch (err: any) {
-        alert(`Error al procesar el archivo JSON: ${err.message}`);
+        avisar(`Error al procesar el archivo JSON: ${err.message}`);
       }
     };
     reader.readAsText(file);
@@ -716,7 +716,7 @@ export default function SettingsPage() {
                           try {
                             await revokeDocumentShare(doc.id);
                           } catch (err: any) {
-                            alert(`Error al revocar: ${err.message}`);
+                            avisar(`Error al revocar: ${err.message}`);
                           }
                         }}
                         className="bg-rose-50 border border-rose-100 text-rose-700 hover:bg-rose-100 px-3 py-1.5 rounded-xl font-bold transition-all text-center"

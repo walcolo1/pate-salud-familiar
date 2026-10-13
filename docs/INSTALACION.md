@@ -65,7 +65,7 @@ son unos pocos segundos.
 
 Se han creado:
 
-- las **21 pestañas** del expediente, con sus encabezados;
+- las **22 pestañas** del expediente, con sus encabezados;
 - una carpeta **Paté · Salud Familiar** en tu Drive, con `Documentos`,
   `Respaldos` y `Temporal` dentro;
 - los catálogos de arranque: vacunas de perro y gato, y los dominios de las EPS
@@ -93,8 +93,9 @@ Este es el único paso incómodo, y también es el último.
 
 ## 6 · Pégala en la aplicación
 
-Vuelve a Paté, al asistente de creación de grupo, y pega ahí la URL. La
-aplicación hará una comprobación y te dirá si todo está bien.
+Entra en Paté con tu cuenta de Google, ve a **Ajustes ▸ Hoja de la familia**,
+pega la URL y pulsa **Comprobar y guardar**. La aplicación comprueba que
+responde y que es una versión compatible antes de guardarla.
 
 Ya está. A partir de aquí, invitas a tu familia desde la aplicación y ellos solo
 tienen que abrir un enlace.
@@ -110,6 +111,11 @@ original, con **Archivo ▸ Hacer una copia**.
 **Me equivoqué y quiero volver a empezar.** Ejecuta **Paté ▸ Instalar o
 actualizar** otra vez. Está hecho para poder repetirse: no duplica nada y no
 borra lo que ya tengas escrito.
+
+**Hay una versión nueva del programa.** Pega el `Pate.gs` nuevo en el editor,
+ejecuta **Paté ▸ Instalar o actualizar** y, en **Implementar ▸ Administrar
+implementaciones**, edita la que ya tienes con **Nueva versión**. Así la URL no
+cambia. El detalle está en el manual de usuario, sección 11.
 
 **Quiero parar los avisos.** **Paté ▸ Quitar disparadores**. Deja tu expediente
 intacto y solo apaga las tareas programadas. Para volver a encenderlas, instala

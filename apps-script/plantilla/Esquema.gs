@@ -184,6 +184,14 @@ var PESTANAS = [
         encabezados: ampliado(conSincronizacion('id', 'paciente_id', 'tipo', 'titulo', 'fecha', 'hora', 'estado', 'prioridad', 'entidad_relacionada'), 'descripcion'),
     },
     {
+        // Bloque J · v5. No es SEGUIMIENTOS: aquella habla de los envíos que
+        // genera una orden —orden_id, plantilla, destinatario—; esta, de las
+        // tareas que alguien apunta para no olvidar algo.
+        nombre: 'TAREAS',
+        descripcion: 'Tareas de seguimiento de un paciente: qué hay que hacer y para cuándo.',
+        encabezados: conSincronizacion('id', 'paciente_id', 'titulo', 'descripcion', 'fecha_limite', 'estado', 'prioridad'),
+    },
+    {
         nombre: 'SEGUIMIENTOS',
         descripcion: 'Tareas programadas que consume un solo disparador diario, no uno por orden.',
         encabezados: conSincronizacion('id', 'orden_id', 'paciente_id', 'fecha_programada', 'plantilla', 'destinatario', 'estado', 'enviado_en', 'respuesta_detectada_en'),
@@ -229,7 +237,7 @@ var PESTANAS = [
 /** Los nombres, en el mismo orden en que se crean las pestañas. */
 var NOMBRES_PESTANAS = PESTANAS.map((p) => p.nombre);
 /** Versión del esquema. Cambiarla obliga a una migración en `instalar()`. */
-var VERSION_ESQUEMA = 4;
+var VERSION_ESQUEMA = 5;
 function pestanaPorNombre(nombre) {
     var _a;
     return (_a = PESTANAS.find((p) => p.nombre === nombre)) !== null && _a !== void 0 ? _a : null;

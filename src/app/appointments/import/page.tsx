@@ -220,7 +220,7 @@ export default function AppointmentsImportPage() {
     }
 
     if (!targetMemberId) {
-      alert('Error: Debes asociar un miembro familiar antes de importar la cita.');
+      avisar('Error: Debes asociar un miembro familiar antes de importar la cita.');
       return;
     }
 
@@ -242,7 +242,7 @@ export default function AppointmentsImportPage() {
         setEditingCandidateId(null);
       }
     } catch (err: any) {
-      alert(`Error al importar: ${err.message}`);
+      avisar(`Error al importar: ${err.message}`);
     }
   };
 
@@ -283,6 +283,13 @@ export default function AppointmentsImportPage() {
         <div>
           <span className="font-bold text-blue-950 block text-xs mb-0.5">La aplicación no lee tu correo</span>
           <p>Nunca pide acceso a tu buzón. Tú decides qué pegar o adjuntar, el análisis ocurre en este dispositivo y nada se envía a ningún servicio externo. Lo que se crea es un borrador: ninguna cita se registra sin que la revises y la confirmes.</p>
+          {/* Bloque J · los borradores no tienen pestaña en la hoja (SIN_PESTANA):
+              hay que decirlo donde se crean. */}
+          <p id="aviso-borradores-locales" className="mt-1.5">
+            <strong className="text-blue-950">Los borradores solo viven en este navegador.</strong> No se guardan en la
+            hoja de tu familia, no se ven en otros dispositivos y se borran al cerrar sesión. Al confirmar uno, la cita sí
+            se guarda en la hoja.
+          </p>
         </div>
       </div>
 

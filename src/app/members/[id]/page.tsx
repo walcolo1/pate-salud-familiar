@@ -488,7 +488,7 @@ export default function MemberDetailPage() {
                             try {
                               await revokeDocumentShare(doc.id);
                             } catch (err: any) {
-                              alert(`Error al revocar: ${err.message}`);
+                              avisar(`Error al revocar: ${err.message}`);
                             }
                           }}
                           className="bg-rose-50 border border-rose-100 text-rose-700 hover:bg-rose-100 p-2 rounded-xl text-[9px] font-black shrink-0 transition-colors"
@@ -549,7 +549,7 @@ export default function MemberDetailPage() {
               } else {
                 // Error recuperable: la ficha sigue ahí y la alternativa
                 // —inactivar— está a un botón de distancia.
-                alert(`No se puede eliminar a ${member.fullName} porque tiene historial médico asociado (citas, vacunas, documentos, exámenes, etc.). Por favor, inactívalo en su lugar.`);
+                avisar(`No se puede eliminar a ${member.fullName} porque tiene historial médico asociado (citas, vacunas, documentos, exámenes, etc.). Por favor, inactívalo en su lugar.`);
               }
             }}
             className="flex-1 min-w-[140px] py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold text-xs rounded-xl border border-rose-100 shadow-sm transition-colors text-center"

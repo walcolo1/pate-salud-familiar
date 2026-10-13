@@ -4,7 +4,7 @@
 paso está en [TABLERO.md](TABLERO.md); esto es dónde estamos, qué sostiene lo
 hecho y qué falta.*
 
-Última actualización: **21 de septiembre de 2026**, al cerrar **E10**.
+Última actualización: **12 de octubre de 2026**, al cerrar el **Bloque J** (v1.0.0).
 
 ---
 
@@ -17,6 +17,7 @@ hecho y qué falta.*
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
 | **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10/E10-bis** llevan el esquema a v3 |
+| **J** | Cierre para entrega · v1.0.0 | **hecho** · pestaña `TAREAS` (esquema v5), sin `alert()`, axe en `/login` y edición, manual reescrito, notas de versión y guía de despliegue · ver `J-ENTREGA.md` |
 | **I** | Deuda técnica y blindaje multicuenta | **cerrado y validado en vivo** · cola v2 con huella `SHA-256(sal‖sub)`, 15 estructuras, migración al leer · queda sin ver en vivo el aislamiento con dos cuentas reales · ver `I-DEUDA-MULTICUENTA.md` |
 | **H** | Endurecimiento: cola duradera, limpieza e identidad | **cerrado y validado en vivo** · cola en disco, sin `sincronizacionManual`, la sesión sin credencial avisa · ver `H-ENDURECIMIENTO.md` |
 | **G** | Corte seco de Firebase | **cerrado** · validado en vivo; G5 hecho: proyecto de Firebase borrado, variables retiradas, consentimiento sin `spreadsheets` ni `drive.appdata` |
@@ -118,22 +119,15 @@ cada módulo. Las que más condicionan lo que venga:
 | La carpeta `Temporal` existe y **nadie la vacía** hasta que E11 implemente la tarea diaria | `planInstalacion.ts` · `EVIDENCIA_E2.md` |
 | Actualizar una copia ya repartida cuando cambie el código: la maestra no actualiza a nadie hacia atrás | `PLANTILLA_PRODUCCION.md` |
 | Mirar el cuerpo del correo de invitación recibido: es lo único que queda de E9 | `EVIDENCIA_E9.md` |
-| Las **tareas genéricas** (`FollowUpTask`) dejarán de guardarse al girar la bandera de G: `SEGUIMIENTOS` es otra cosa y no tienen pestaña | `descriptores.ts` · `SIN_PESTANA` |
-| Las 4 escrituras de E11 siguen sin pestaña: **lanzan** un error explícito en vez de callar | `G0-REPOSITORIO.md` |
-| Qué hacer cuando la revisión cambia —recargar, avisar o recargar lo que no está en edición— sigue **sin decidir**: `alCambiar` es una llamada de vuelta | `G2-SINCRONIZACION.md` |
-| La CSP todavía abre `connect-src` e `img-src` a servicios de Firebase que ya no se usan | `next.config.ts` |
+| Las 3 colecciones de E11 (fuentes de Gmail, borradores de citas, ajustes de escaneo) siguen sin pestaña: **lanzan** en vez de callar, y los borradores avisan de que son locales | `G0-REPOSITORIO.md` · `descriptores.ts` |
 | Sin `databases()` en el navegador, la caché de Firestore **no se puede localizar** para borrarla | `purgaFirestore.ts` |
-| GIS **no renueva el `id_token` en silencio**: la ventana de 50 min es un intento, no una garantía | `G3-IDENTIDAD.md` |
-| `auto_select` tras un F5, la renovación a los 50 min y el rechazo de la cuenta equivocada **solo se pueden ver en vivo** | `G3-IDENTIDAD.md` |
-| Pegar el consolidado **v4** y repetir `instalar()`: la hoja de pruebas quedó en v3 | `E10-ESQUEMA-V2.md` |
-| El repositorio de G0 no tiene de dónde sacar el `id_token`: `sesionDelNavegador()` devuelve `null` hasta **G3** | `repositorioBackend.ts` |
+| GIS **no renueva el `id_token` en silencio**: la ventana de 50 min es un intento. Si falla, el vigía de sesión lo avisa (Bloque H) | `G3-IDENTIDAD.md` · `H-ENDURECIMIENTO.md` |
+| La renovación a los 50 min no se ha visto en vivo (el F5 y la cuenta equivocada sí) | `G3-IDENTIDAD.md` |
+| Pegar el consolidado **v5** en la hoja oficial, repetir `instalar()` (añade `TAREAS`) y publicar una versión nueva del despliegue | `J-ENTREGA.md` |
 | `version_esquema` dice en qué versión está una hoja, pero **nadie actúa** en consecuencia todavía | `E10-ESQUEMA-V2.md` |
 | Validación de consentimiento OAuth limpio | `TESTING.md` §6.11 |
 | Aislamiento multicuenta de la cola **con dos cuentas reales**: probado con dobles y en E2E, no visto en vivo | `I-DEUDA-MULTICUENTA.md` |
-| `/members/:id/edit` y `/login` fuera de la red de axe | `ACCESIBILIDAD.md`, puerta de C9 |
-| 23 `alert` de error siguen sin migrar al sistema de avisos | `src/` |
-| Deuda de lint en `AppContext.tsx` (27 errores en línea base, desde 72) | `scripts/lint-baseline.json` |
-| Adjuntos del historial veterinario: el campo `documentoId` existe y nadie lo rellena | `src/domain/mascotas.ts` |
+| Deuda de lint en `AppContext.tsx` (errores en línea base, bajando desde 72) | `scripts/lint-baseline.json` |
 | `E0b-4` sin volver a pasar contra el despliegue de E6: el criterio 1 está cerrado desde Node, no desde un navegador | `EVIDENCIA_E6.md` · paso 7 |
 | El cerrojo de `aplicar` y el lote de varias pestañas siguen sin comprobarse en vivo: hacen falta dos peticiones a la vez y datos que escribir | `ROUTER.md` · después del **Bloque G** |
 

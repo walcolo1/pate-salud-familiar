@@ -19,11 +19,11 @@ import { encabezadosDe, repararEncabezados } from './planInstalacion';
  */
 
 describe('la lista de pestañas', () => {
-  it('tiene 21 pestañas, no las 18 que decía el plan', () => {
+  it('tiene 22 pestañas, no las 18 que decía el plan', () => {
     // La especificación decía «18» en su §7 y enumeraba 19 en su §2.1. Faltaban
     // además PESOS e HISTORIAL, que la aplicación ya guarda hoy y no tenían
-    // dónde aterrizar en la migración.
-    expect(PESTANAS).toHaveLength(21);
+    // dónde aterrizar en la migración. La 22.ª, TAREAS, llegó con v5 (Bloque J).
+    expect(PESTANAS).toHaveLength(22);
   });
 
   it('no repite ningún nombre', () => {
@@ -309,5 +309,22 @@ describe('repararEncabezados', () => {
 
   it('una pestaña que no es del esquema se deja en paz', () => {
     expect(repararEncabezados('MIS_NOTAS', ['a', 'b'])).toEqual({ accion: 'NADA' });
+  });
+});
+
+describe('Bloque J · esquema v5: la pestaña TAREAS', () => {
+  it('existe, con su paciente y las columnas de cierre', () => {
+    const enc = encabezadosDe('TAREAS');
+    expect(enc).not.toBeNull();
+    for (const c of ['id', 'paciente_id', 'titulo', 'descripcion', 'fecha_limite', 'estado', 'prioridad', 'creado_en', 'actualizado_en', 'borrado_en']) {
+      expect(enc, c).toContain(c);
+    }
+  });
+
+  it('la versión es 5, y la 4 quedó congelada', () => {
+    expect(VERSION_ESQUEMA).toBe(5);
+    const v4 = JSON.parse(readFileSync(join(process.cwd(), 'scripts', 'esquema-v4.json'), 'utf8'));
+    expect(v4.version).toBe(4);
+    expect(v4.pestanas.TAREAS).toBeUndefined();
   });
 });

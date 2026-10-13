@@ -9,6 +9,7 @@ import EditarPauta from '@/components/miembros/EditarPauta';
 import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { useConfirmacion } from '@/context/Confirmacion';
+import { useAviso } from '@/context/Avisos';
 import { 
   Plus, 
   Save, 
@@ -70,6 +71,7 @@ export default function MedicationsPage() {
     calendarStatus
   } = useApp();
   const confirmar = useConfirmacion();
+  const avisar = useAviso();
 
   const [activeTab, setActiveTab] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
   // C3.4 · Tratamiento cuya pauta se está editando.
@@ -182,7 +184,7 @@ export default function MedicationsPage() {
 
     // Check custom rules warning before submit
     if (showDurationWarning && !durationConfirmed) {
-      alert('Por favor confirma la advertencia de duración de tratamiento mayor a 180 días.');
+      avisar('Por favor confirma la advertencia de duración de tratamiento mayor a 180 días.');
       return;
     }
 

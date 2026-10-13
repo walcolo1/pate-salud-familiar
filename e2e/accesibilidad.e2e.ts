@@ -150,6 +150,21 @@ async function medirYComparar(page: Page, nombre: string) {
   expect(c.veredicto, mensajeRegresion(nombre, c)).not.toBe('REGRESION');
 }
 
+/**
+ * Bloque J · `/login`, que estaba fuera de la red: es la primera pantalla que
+ * ve cualquiera, y se mide sin sesión, que es como se ve de verdad. Con el
+ * tráfico a Google bloqueado, el botón de GIS no se pinta: se mide lo nuestro.
+ */
+test.describe('C1 · accesibilidad sin sesión', () => {
+  test('A11Y · login', async ({ page }) => {
+    await bloquearGoogle(page);
+    await page.goto('/login');
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await expect(page.locator('body')).toBeVisible();
+    await medirYComparar(page, 'login');
+  });
+});
+
 test.describe('C1 · accesibilidad', () => {
   test.beforeEach(async ({ page }) => {
     await bloquearGoogle(page);
@@ -167,6 +182,15 @@ test.describe('C1 · accesibilidad', () => {
       await medirYComparar(page, ruta.nombre);
     });
   }
+
+  // Bloque J · la edición del familiar, que estaba fuera de la red.
+  test('A11Y · miembro-edit', async ({ page }) => {
+    const id = await primerFamiliar(page);
+    await page.goto(`/members/${id}/edit`);
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await expect(page.locator('main').first()).toBeVisible();
+    await medirYComparar(page, 'miembro-edit');
+  });
 
   for (const sub of SUBRUTAS) {
     test(`A11Y · ${sub.nombre}`, async ({ page }) => {
@@ -379,7 +403,6 @@ test.describe('C1 · accesibilidad', () => {
         memberId,
         tratamiento: 'Tratamiento sintetico',
         veterinario: 'Clinica sintetica',
-        documentoId: null,
         createdAt: ahora,
         updatedAt: ahora,
         deletedAt: null,

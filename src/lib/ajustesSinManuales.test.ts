@@ -46,3 +46,10 @@ describe('Bloque H · ningún cierre desde Ajustes se salta el aviso', () => {
     expect(AJUSTES).toMatch(/solicitarCierreDeSesion\(\)/);
   });
 });
+
+describe('Bloque J · los borradores de citas importadas dicen que son locales', () => {
+  it('la pantalla de importar lo avisa donde se crean', () => {
+    const IMPORTAR = readFileSync(join(process.cwd(), 'src', 'app', 'appointments', 'import', 'page.tsx'), 'utf8');
+    expect(IMPORTAR).toMatch(/Los borradores solo viven en este navegador/);
+  });
+});

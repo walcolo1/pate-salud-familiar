@@ -141,6 +141,8 @@ var VERBO_POR_TABLA = {
     DOSIS: 'MARCAR_DOSIS',
     ORDENES: 'ESCRIBIR_ORDEN',
     RECORDATORIOS: 'ESCRIBIR_CITA',
+    // Bloque J · lo mismo que un recordatorio: apuntar qué hay que hacer.
+    TAREAS: 'ESCRIBIR_CITA',
     HISTORIAL: 'ESCRIBIR_HISTORIAL',
 };
 /** Pestañas que `aplicar` nunca toca, por mucho permiso que se tenga. */

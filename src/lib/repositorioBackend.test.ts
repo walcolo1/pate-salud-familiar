@@ -145,11 +145,10 @@ describe('borrar es dar de baja', () => {
 });
 
 describe('lo que no tiene dónde escribirse, lo dice', () => {
-  it('las cuatro colecciones sin pestaña lanzan, y no gastan una petición', async () => {
+  it('las tres colecciones sin pestaña lanzan, y no gastan una petición', async () => {
+    // Eran cuatro: las tareas tienen pestaña desde el esquema v5 (Bloque J).
     const { repo, espia } = banco();
 
-    await expect(repo.saveTask(CTX, { id: 't1' } as Parameters<RepositorioBackend['saveTask']>[1]))
-      .rejects.toMatchObject({ codigo: NO_HAY_DONDE });
     await expect(
       repo.saveGmailSource(CTX, { id: 'g1' } as Parameters<RepositorioBackend['saveGmailSource']>[1]),
     ).rejects.toMatchObject({ codigo: NO_HAY_DONDE });
@@ -171,8 +170,8 @@ describe('lo que no tiene dónde escribirse, lo dice', () => {
     // abrir `descriptores.ts`.
     const { repo } = banco();
     await expect(
-      repo.saveTask(CTX, { id: 't1' } as Parameters<RepositorioBackend['saveTask']>[1]),
-    ).rejects.toThrow(/SEGUIMIENTOS/);
+      repo.saveGmailSource(CTX, { id: 'g1' } as Parameters<RepositorioBackend['saveGmailSource']>[1]),
+    ).rejects.toThrow(/Gmail/);
   });
 
   it('crear una familia no existe: la familia es la hoja', async () => {
@@ -667,5 +666,50 @@ describe('la dirección de la hoja (cierre de G4)', () => {
   it('sin despliegue registrado no inventa una', async () => {
     const repo = new RepositorioBackend({ url: () => null, idToken: async () => 't', fetch: vi.fn() as never });
     await expect(repo.urlDeLaHoja()).rejects.toMatchObject({ codigo: SIN_BACKEND });
+  });
+});
+
+describe('Bloque J · las tareas de seguimiento tienen pestaña', () => {
+  const TAREA = {
+    id: 't1',
+    memberId: 'p1',
+    title: 'Pedir cita de control',
+    description: 'Con los resultados del laboratorio',
+    createdAt: '2026-10-12T10:00:00.000Z',
+    dueDate: '2026-10-20',
+    status: 'PENDING',
+    priority: 'HIGH',
+  } as Parameters<RepositorioBackend['saveTask']>[1];
+
+  it('guardar una tarea escribe una fila en TAREAS, con su paciente', async () => {
+    const { repo, espia } = banco();
+    await repo.saveTask(CTX, TAREA);
+    const { accion, payload } = envio(espia);
+    expect(accion).toBe('aplicar');
+    const [m] = payload!.mutaciones!;
+    expect(m.tabla).toBe('TAREAS');
+    expect(m.pacienteId).toBe('p1');
+    expect(m.fila).toMatchObject({
+      id: 't1',
+      paciente_id: 'p1',
+      titulo: 'Pedir cita de control',
+      descripcion: 'Con los resultados del laboratorio',
+      fecha_limite: '2026-10-20',
+      estado: 'PENDING',
+      prioridad: 'HIGH',
+    });
+    // `creado_en` lo sella el router, no el reloj del cliente.
+    expect(m.fila).not.toHaveProperty('creado_en');
+  });
+
+  it('al leer la hoja, las tareas vuelven', async () => {
+    const enc = encabezadosDe('TAREAS')!;
+    const fila = enc.map((c) =>
+      ({ id: 't1', paciente_id: 'p1', titulo: 'Pedir cita', estado: 'DONE', prioridad: 'LOW', fecha_limite: '2026-10-20' } as Record<string, string>)[c] ?? '',
+    );
+    const { repo } = banco([{ ok: true, data: { esquema: 5, revision: 1, tablas: { TAREAS: [enc, fila] } } }]);
+    const datos = await repo.loadAll(CTX);
+    expect(datos.tasks).toHaveLength(1);
+    expect(datos.tasks[0]).toMatchObject({ id: 't1', memberId: 'p1', title: 'Pedir cita', status: 'DONE', priority: 'LOW', dueDate: '2026-10-20' });
   });
 });

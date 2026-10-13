@@ -32,9 +32,9 @@ import { NOMBRES_PESTANAS, pestanaPorNombre } from './esquemaHoja';
  */
 
 describe('pestañas que faltan', () => {
-  it('en una hoja recién copiada, faltan las 21', () => {
+  it('en una hoja recién copiada, faltan las 22', () => {
     // Una hoja nueva trae «Hoja 1» y nada más.
-    expect(pestanasQueFaltan(['Hoja 1'])).toHaveLength(21);
+    expect(pestanasQueFaltan(['Hoja 1'])).toHaveLength(22);
   });
 
   it('en una hoja ya instalada, no falta ninguna', () => {
@@ -44,9 +44,14 @@ describe('pestañas que faltan', () => {
   it('una instalación a medias se completa con lo que falte', () => {
     const aMedias = NOMBRES_PESTANAS.slice(0, 5);
     const faltan = pestanasQueFaltan(aMedias);
-    expect(faltan).toHaveLength(16);
+    expect(faltan).toHaveLength(NOMBRES_PESTANAS.length - 5);
     expect(faltan).not.toContain(NOMBRES_PESTANAS[0]);
     expect(faltan[0]).toBe(NOMBRES_PESTANAS[5]);
+  });
+
+  it('Bloque J · a una hoja en v4 —como la oficial— solo le falta TAREAS', () => {
+    const v4 = JSON.parse(readFileSync(join(process.cwd(), 'scripts', 'esquema-v4.json'), 'utf8'));
+    expect(pestanasQueFaltan(Object.keys(v4.pestanas))).toEqual(['TAREAS']);
   });
 
   it('respeta el orden del esquema, no el de la hoja', () => {
@@ -59,7 +64,7 @@ describe('pestañas que faltan', () => {
   });
 
   it('con una lista ausente no se rompe', () => {
-    expect(pestanasQueFaltan(undefined as never)).toHaveLength(21);
+    expect(pestanasQueFaltan(undefined as never)).toHaveLength(22);
   });
 });
 

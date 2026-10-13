@@ -130,7 +130,7 @@ describe('la configuración del Web App', () => {
 });
 
 describe('el Esquema.gs de la plantilla', () => {
-  it('contiene las 21 pestañas que define esquemaHoja.ts', () => {
+  it('contiene las 22 pestañas que define esquemaHoja.ts', () => {
     // La prueba de deriva de `esquemaHoja.test.ts` compara el fichero entero
     // con lo que el generador produciría. Esta comprueba lo contrario y más
     // barato: que cada nombre está donde el instalador va a buscarlo.
@@ -138,6 +138,6 @@ describe('el Esquema.gs de la plantilla', () => {
     for (const nombre of NOMBRES_PESTANAS) {
       expect(gs, nombre).toContain(`nombre: '${nombre}'`);
     }
-    expect(NOMBRES_PESTANAS).toHaveLength(21);
+    expect(NOMBRES_PESTANAS).toHaveLength(22);
   });
 });

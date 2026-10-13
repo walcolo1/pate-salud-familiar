@@ -62,7 +62,6 @@ async function sembrar(page: Page, entradas: EntradaSembrada[] = []) {
       diagnostico: h.diagnostico,
       tratamiento: null,
       veterinario: null,
-      documentoId: null,
       createdAt: ahora,
       updatedAt: ahora,
       deletedAt: null,

@@ -374,6 +374,22 @@ export const PESTANAS: readonly DefinicionPestana[] = [
     ),
   },
   {
+    // Bloque J · v5. No es SEGUIMIENTOS: aquella habla de los envíos que
+    // genera una orden —orden_id, plantilla, destinatario—; esta, de las
+    // tareas que alguien apunta para no olvidar algo.
+    nombre: 'TAREAS',
+    descripcion: 'Tareas de seguimiento de un paciente: qué hay que hacer y para cuándo.',
+    encabezados: conSincronizacion(
+      'id',
+      'paciente_id',
+      'titulo',
+      'descripcion',
+      'fecha_limite',
+      'estado',
+      'prioridad',
+    ),
+  },
+  {
     nombre: 'SEGUIMIENTOS',
     descripcion: 'Tareas programadas que consume un solo disparador diario, no uno por orden.',
     encabezados: conSincronizacion(
@@ -439,7 +455,7 @@ export const PESTANAS: readonly DefinicionPestana[] = [
 export const NOMBRES_PESTANAS: readonly string[] = PESTANAS.map((p) => p.nombre);
 
 /** Versión del esquema. Cambiarla obliga a una migración en `instalar()`. */
-export const VERSION_ESQUEMA = 4;
+export const VERSION_ESQUEMA = 5;
 
 export function pestanaPorNombre(nombre: string): DefinicionPestana | null {
   return PESTANAS.find((p) => p.nombre === nombre) ?? null;

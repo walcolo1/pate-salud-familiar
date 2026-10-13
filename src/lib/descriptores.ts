@@ -230,6 +230,25 @@ export const DESCRIPTORES: Record<string, readonly Descriptor[]> = {
     },
   ],
 
+  // Bloque J · esquema v5. Hasta aquí estaban en SIN_PESTANA: `SEGUIMIENTOS`
+  // es otra cosa (los envíos de una orden), y meterlas ahí dejaba una pestaña
+  // que no significaba lo que decía su nombre. Ahora tienen la suya.
+  tasks: [
+    {
+      pestana: 'TAREAS',
+      pacienteDesde: 'memberId',
+      campos: {
+        id: c('id'),
+        memberId: c('paciente_id'),
+        title: c('titulo'),
+        description: c('descripcion'),
+        dueDate: c('fecha_limite'),
+        status: c('estado'),
+        priority: c('prioridad'),
+      },
+    },
+  ],
+
   medicalOrders: [
     {
       pestana: 'ORDENES',
@@ -315,8 +334,6 @@ export const DESCRIPTORES: Record<string, readonly Descriptor[]> = {
  * alguien lo toque, en vez de tragarse el dato.
  */
 export const SIN_PESTANA: Record<string, string> = {
-  tasks:
-    '`SEGUIMIENTOS` habla de seguimientos DE UNA ORDEN —orden_id, plantilla, destinatario, enviado_en—, no de tareas genéricas. No les faltan columnas: son conceptos distintos, y meter uno en el otro dejaría una pestaña que no significa lo que dice su nombre',
   gmailSources: 'la importación desde Gmail es E11 y no está construida',
   appointmentCandidates:
     'las citas detectadas en un correo y pendientes de confirmar son de E11, que no está construido',

@@ -198,6 +198,8 @@ export const VERBO_POR_TABLA: Record<string, Verbo> = {
   DOSIS: 'MARCAR_DOSIS',
   ORDENES: 'ESCRIBIR_ORDEN',
   RECORDATORIOS: 'ESCRIBIR_CITA',
+  // Bloque J · lo mismo que un recordatorio: apuntar qué hay que hacer.
+  TAREAS: 'ESCRIBIR_CITA',
   HISTORIAL: 'ESCRIBIR_HISTORIAL',
 };
 
