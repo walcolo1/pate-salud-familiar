@@ -17,7 +17,7 @@ hecho y qué falta.*
 | **C** | Accesibilidad y UX | cerrado · queda la validación manual §6.12 |
 | **D** | Mascotas y veterinario | **cerrado** |
 | **E** | Backend de Apps Script por titular | **cerrado** · E0 a E9 validados · **E10/E10-bis** llevan el esquema a v3 |
-| **I** | Deuda técnica y blindaje multicuenta | **hecho, pendiente de validación en caliente** · esquema local sin campos retirados (migración al leer), cada lote de la cola con la huella de su cuenta · ver `I-DEUDA-MULTICUENTA.md` |
+| **I** | Deuda técnica y blindaje multicuenta | **cerrado y validado en vivo** · cola v2 con huella `SHA-256(sal‖sub)`, 15 estructuras, migración al leer · queda sin ver en vivo el aislamiento con dos cuentas reales · ver `I-DEUDA-MULTICUENTA.md` |
 | **H** | Endurecimiento: cola duradera, limpieza e identidad | **cerrado y validado en vivo** · cola en disco, sin `sincronizacionManual`, la sesión sin credencial avisa · ver `H-ENDURECIMIENTO.md` |
 | **G** | Corte seco de Firebase | **cerrado** · validado en vivo; G5 hecho: proyecto de Firebase borrado, variables retiradas, consentimiento sin `spreadsheets` ni `drive.appdata` |
 | H (antiguo) | Eliminar el autoguardado global de PHI | **absorbido por G** · hacer G bien lo obliga |
@@ -129,6 +129,7 @@ cada módulo. Las que más condicionan lo que venga:
 | El repositorio de G0 no tiene de dónde sacar el `id_token`: `sesionDelNavegador()` devuelve `null` hasta **G3** | `repositorioBackend.ts` |
 | `version_esquema` dice en qué versión está una hoja, pero **nadie actúa** en consecuencia todavía | `E10-ESQUEMA-V2.md` |
 | Validación de consentimiento OAuth limpio | `TESTING.md` §6.11 |
+| Aislamiento multicuenta de la cola **con dos cuentas reales**: probado con dobles y en E2E, no visto en vivo | `I-DEUDA-MULTICUENTA.md` |
 | `/members/:id/edit` y `/login` fuera de la red de axe | `ACCESIBILIDAD.md`, puerta de C9 |
 | 23 `alert` de error siguen sin migrar al sistema de avisos | `src/` |
 | Deuda de lint en `AppContext.tsx` (27 errores en línea base, desde 72) | `scripts/lint-baseline.json` |

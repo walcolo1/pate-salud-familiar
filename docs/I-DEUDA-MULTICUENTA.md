@@ -90,3 +90,13 @@ el diálogo de cierre deja descartarlos.
 
 **Lo que no cubre el arnés:** el cambio de cuenta con dos cuentas de Google
 reales. Eso es la validación en caliente.
+
+## Validación en vivo (evidencia real, cuenta personal del titular)
+
+Sobre `a852e6b`: `pate:cola:v1` en v2 con sal y huellas de 64 caracteres, sin
+correo ni identificador; envío FIFO; `sharedReports` y `lastExportMetadata`
+purgados del almacenamiento local sin tocar los perfiles; 15 estructuras.
+
+**No visto en vivo:** el aislamiento con una segunda cuenta de Google real
+(paso 2 del protocolo). Está cubierto por `cicloColaDuradera.test.ts` con las
+piezas de verdad, pero no con dos cuentas reales.
