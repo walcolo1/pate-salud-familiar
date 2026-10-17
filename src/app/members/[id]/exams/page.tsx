@@ -158,7 +158,7 @@ export default function ExamsPage() {
               >
                 <div className="flex justify-between items-start">
                   <div>
-                    <h4 className="text-sm font-extrabold text-slate-800 group-hover:text-teal-600 transition-colors leading-tight mb-0.5">{exam.examName}</h4>
+                    <h4 className="text-sm font-extrabold text-slate-800 group-hover:text-teal-700 transition-colors leading-tight mb-0.5">{exam.examName}</h4>
                     <span className="text-[10px] text-slate-500 font-bold">{exam.orderedBy} · {exam.laboratory || 'Lab'}</span>
                   </div>
                   {hasAlert ? (
