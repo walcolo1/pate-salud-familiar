@@ -64,7 +64,7 @@ web sigue funcionando, pero marcar una tarea como hecha lo rechaza la hoja
 
 | Ajuste | Valor |
 |---|---|
-| Root Directory | `web` |
+| Root Directory | *(vacío: la raíz del repo; `package.json` está en la raíz de GitHub)* |
 | Framework | Next.js |
 | Build Command | `npm run build` (el del proyecto: `next build --webpack`) |
 | Output | por defecto |
