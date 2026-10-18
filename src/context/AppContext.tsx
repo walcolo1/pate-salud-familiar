@@ -653,6 +653,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const deGoogle = user?.provider === 'google';
     vigiaRef.current?.usuarioActivo(deGoogle);
+    // Bloque M2 · la hoja depende de la cuenta: al cambiar de cuenta se
+    // vuelve a resolver (la suya, la que trajo su `?hoja=`, o el defecto) y
+    // el «sin acceso» de la anterior no se hereda.
+    setHojaRegistrada(sesionBackend().url() !== null);
+    setSinAcceso(false);
     if (deGoogle) void cargaAlEntrarRef.current?.intentar();
   }, [user?.email, user?.provider]);
   const cargarExpedienteRef = useRef<() => Promise<void>>(async () => {});

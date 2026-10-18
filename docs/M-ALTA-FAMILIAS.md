@@ -46,3 +46,19 @@ Los familiares de esa familia no hacen nada de esto: reciben la invitación.
 Actualizar las copias ya instaladas sigue siendo pegar el `Pate.gs` nuevo. Si
 el número de familias crece, convertir el núcleo en una **biblioteca de Apps
 Script** versionada y dejar en la plantilla solo una capa mínima.
+
+---
+
+## Bloque M2 · lo que enseñó la primera alta real (`wcoloradog@gmail.com`)
+
+| Síntoma | Causa | Arreglo |
+|---|---|---|
+| «Paté ▸ Conectar con la aplicación» falló con «permisos no suficientes para `Ui.showModalDialog`» | Con `oauthScopes` explícitos hace falta `script.container.ui` | Ámbito añadido (ocho en total) |
+| El diálogo ofrecía «Abrir Paté ya conectado» **sin haber publicado nada** | `ScriptApp.getService().getUrl()` da una dirección aunque no haya implementación | `verificarDespliegue_`: GET real a `doGet`; el botón solo aparece si responde como Paté (`esRespuestaDePate`). El diálogo **siempre** trae los pasos y el campo «Comprobar y conectar», que verifica en el servidor y guarda `URL_BACKEND` |
+| Tras el enlace, la app decía «Esta cuenta todavía no tiene un expediente aquí» | El enlace llevaba a una /exec muerta: el registro falló y quedó la hoja por defecto (la de otra familia) | Lo anterior, y además… |
+| La hoja de una cuenta se pisaba con la de otra en el mismo navegador | Una sola `pate:familia:v1` para todo el navegador | `hojaPorCuenta.ts`: la hoja de cada cuenta bajo una huella (nunca el correo); un `?hoja=` sin sesión lo adopta la cuenta que entra; el defecto solo vale para una cuenta sin hoja propia |
+| Ajustes decía «Registrada» y «Abrir la hoja» fallaba con «Inténtalo en un momento» | La tarjeta miraba solo si había dirección; los códigos de error no tenían mensaje | Con `ACCESO_DENEGADO`: «Sin acceso», campo abierto e indicador lateral «Sin acceso»; «Abrir la hoja» dice la causa (`ACCESO_DENEGADO`, `TOKEN_INVALIDO`, `ERROR_DESPACHO`, `FALLO_TRANSPORTE`) |
+
+Pruebas: `hojaPorCuenta.test.ts` (el caso real paso a paso), `altaFamilia.test.ts`
+(diálogo con y sin dirección verificada), `estadoHoja.test.ts`, `abrirHoja.test.ts`
+y `e2e/alta-familia.e2e.ts` M5 (`?hoja=` antes de entrar) y M6 (Ajustes sin acceso).

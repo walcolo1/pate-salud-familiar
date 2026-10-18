@@ -19,7 +19,9 @@
  * despliegue desactualizado produce fallos lejos de su causa.
  */
 
-import { CLAVE_SESION_FAMILIAR, esUrlBackendValida, type AlmacenSimple } from './invitacionEntrante';
+import { esUrlBackendValida, type AlmacenSimple } from './invitacionEntrante';
+import { guardarHojaVerificada } from './hojaPorCuenta';
+import { subActivo } from './hojaActual';
 import { VERSION_CONTRATO } from './router';
 import { VERSION_ESQUEMA } from './esquemaHoja';
 
@@ -43,6 +45,11 @@ export const MENSAJES_REGISTRO: Record<MotivoRechazo, string> = {
 interface Opciones {
   fetch?: typeof globalThis.fetch;
   almacen?: AlmacenSimple | null;
+  /**
+   * Bloque M2 · de qué cuenta es la hoja. `undefined`: la cuenta activa;
+   * `null`: nadie todavía (un `?hoja=` abierto antes de entrar).
+   */
+  sub?: string | null;
 }
 
 /**
@@ -97,7 +104,9 @@ export async function comprobarYRegistrar(
   const almacen =
     opciones.almacen ?? (typeof window === 'undefined' ? null : window.localStorage);
   try {
-    almacen?.setItem(CLAVE_SESION_FAMILIAR, limpia);
+    if (!almacen) throw new Error('sin almacenamiento');
+    const sub = opciones.sub === undefined ? subActivo() : opciones.sub;
+    if (!guardarHojaVerificada(almacen, limpia, sub)) throw new Error('no se guardó');
   } catch {
     // Modo privado o cuota llena: la comprobación fue bien, pero no se puede
     // recordar. Se dice como si no respondiera, que es lo que el usuario verá.

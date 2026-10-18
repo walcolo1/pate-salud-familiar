@@ -29,6 +29,7 @@ import {
   type AlmacenLike,
 } from './preferencias';
 import { CLAVE_SESION_FAMILIAR, leerBackend } from './invitacionEntrante';
+import { CLAVE_HOJAS_POR_CUENTA } from './hojaPorCuenta';
 import { CLAVE_COLA, leerCola } from './colaDuradera';
 
 /** Prefijo que identifica las claves de esta aplicación. */
@@ -48,6 +49,7 @@ export const CLAVES_PRESERVADAS: ReadonlySet<string> = new Set<string>([
   CLAVE_DEVICE_ID,       // pate_salud_device_id
   CLAVE_MIGRACION,       // pate:prefs:migrado
   CLAVE_SESION_FAMILIAR, // pate:familia:v1 — con condición, ver abajo
+  CLAVE_HOJAS_POR_CUENTA, // pate:hojas:v1 — Bloque M2: la hoja de cada cuenta, por huella
 ]);
 
 /*

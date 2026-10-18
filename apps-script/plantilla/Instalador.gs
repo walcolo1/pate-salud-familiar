@@ -252,12 +252,50 @@ function configurarAplicacion_(propiedades) {
 }
 
 /**
+ * ¿Esta /exec está publicada y es Paté? Un GET real a `doGet`.
+ *
+ * Bloque M2 · `ScriptApp.getService().getUrl()` da una dirección aunque no haya
+ * ninguna implementación publicada, y el diálogo ofrecía un botón que llevaba
+ * a un sitio muerto. Solo vale lo que contesta.
+ */
+function verificarDespliegue_(url) {
+  var limpia = String(url || '').trim();
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec$/.test(limpia)) return false;
+  try {
+    var respuesta = UrlFetchApp.fetch(limpia, { muteHttpExceptions: true, followRedirects: true });
+    return respuesta.getResponseCode() === 200 && esRespuestaDePate(respuesta.getContentText());
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * La /exec que hay que usar: la guardada (pegada o comprobada antes) o la que
+ * dice Google, pero solo si responde. `detectada` es la que no contestó.
+ */
+function despliegueVerificado_() {
+  var propiedades = PropertiesService.getScriptProperties();
+  var candidatas = [propiedades.getProperty(CLAVE_URL_BACKEND), urlDeEsteDespliegue_()];
+  var detectada = null;
+  for (var i = 0; i < candidatas.length; i++) {
+    var c = candidatas[i];
+    if (!c) continue;
+    if (verificarDespliegue_(c)) {
+      if (propiedades.getProperty(CLAVE_URL_BACKEND) !== c) propiedades.setProperty(CLAVE_URL_BACKEND, c);
+      return { url: c, detectada: null };
+    }
+    detectada = detectada || c;
+  }
+  return { url: null, detectada: detectada };
+}
+
+/**
  * Paté ▸ Conectar con la aplicación.
  *
  * Instala primero si hace falta (una copia recién hecha no tiene nada), deja la
- * audiencia escrita y enseña el diálogo de `htmlConexion`: los cuatro clics de
- * «Implementar» si todavía no hay implementación, o el botón que abre la PWA ya
- * conectada si la hay.
+ * audiencia escrita y enseña el diálogo de `htmlConexion`: siempre con los
+ * pasos para publicar y el campo para pegar la /exec; el botón «Abrir Paté ya
+ * conectado» solo si la dirección respondió.
  */
 function conectarConLaAplicacion() {
   var propiedades = PropertiesService.getScriptProperties();
@@ -273,16 +311,35 @@ function conectarConLaAplicacion() {
     );
     return;
   }
-  var salida = HtmlService.createHtmlOutput(htmlConexion(URL_APP_PATE, urlDeEsteDespliegue_()))
-    .setWidth(460)
-    .setHeight(330);
+  var estado = despliegueVerificado_();
+  var salida = HtmlService.createHtmlOutput(htmlConexion(URL_APP_PATE, estado.url, estado.detectada))
+    .setWidth(500)
+    .setHeight(560);
   ui.showModalDialog(salida, 'Conectar con la aplicación');
+}
+
+/**
+ * Desde el diálogo: comprobar una /exec pegada por el titular. Si responde, se
+ * guarda (también la usan las invitaciones) y se devuelve el enlace.
+ */
+function verificarDespliegueDesdeDialogo(url) {
+  var limpia = String(url || '').trim();
+  if (!verificarDespliegue_(limpia)) {
+    return {
+      ok: false,
+      mensaje:
+        'Esa dirección no responde como Paté. Comprueba que es la URL de la aplicación web de ESTE proyecto, ' +
+        'que la implementación es «Aplicación web» y que su acceso es «Cualquier usuario».',
+    };
+  }
+  PropertiesService.getScriptProperties().setProperty(CLAVE_URL_BACKEND, limpia);
+  return { ok: true, enlace: enlaceDeConexion(URL_APP_PATE, limpia) };
 }
 
 /** Desde el diálogo: el enlace de conexión, al correo del titular. */
 function enviarmeEnlaceDeConexion() {
-  var url = urlDeEsteDespliegue_();
-  if (!url) throw new Error('todavía no hay implementación');
+  var url = despliegueVerificado_().url;
+  if (!url) throw new Error('todavía no hay una implementación que responda');
   MailApp.sendEmail({
     to: Session.getEffectiveUser().getEmail(),
     subject: ASUNTO_CONEXION,

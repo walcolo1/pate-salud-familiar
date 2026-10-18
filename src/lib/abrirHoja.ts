@@ -14,6 +14,15 @@
 
 export const MENSAJES_ABRIR_HOJA = {
   PERMISO_INSUFICIENTE: 'Solo el titular puede abrir la hoja desde aquí.',
+  // Bloque M2 · antes caían todos en «Inténtalo en un momento», que no es lo
+  // que pasa y no dice qué hacer.
+  ACCESO_DENEGADO:
+    'Tu cuenta no figura en la hoja con la que habla este navegador. Conecta la tuya con «Cambiar dirección de la hoja» o desde tu hoja: Paté ▸ Conectar con la aplicación.',
+  TOKEN_INVALIDO: 'Tu sesión de Google caducó. Vuelve a entrar e inténtalo otra vez.',
+  ERROR_DESPACHO:
+    'La hoja respondió con un error: puede que su instalación no terminara. En tu hoja, ejecuta Paté ▸ Instalar o actualizar.',
+  FALLO_TRANSPORTE:
+    'La dirección de la hoja no responde. Comprueba que la implementación existe y que su acceso es «Cualquier usuario».',
   ACCION_DESCONOCIDA:
     'El Web App de tu familia es anterior a esta versión. Publica la versión nueva del despliegue en Apps Script.',
   SIN_BACKEND: 'Este navegador todavía no tiene registrada la hoja de la familia.',

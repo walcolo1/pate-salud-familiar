@@ -14,6 +14,8 @@ export interface EntradaEstadoHoja {
   hojaRegistrada: boolean;
   hayQueEntrar: boolean;
   pendientes: number;
+  /** Bloque M2 · la hoja contestó que esta cuenta no está en su ACCESO. */
+  sinAcceso?: boolean;
 }
 
 export interface EstadoHoja {
@@ -24,9 +26,16 @@ export interface EstadoHoja {
   tono: TonoEstadoHoja;
 }
 
-export function estadoHoja({ origen, hojaRegistrada, hayQueEntrar, pendientes }: EntradaEstadoHoja): EstadoHoja {
+export function estadoHoja({ origen, hojaRegistrada, hayQueEntrar, pendientes, sinAcceso }: EntradaEstadoHoja): EstadoHoja {
   if (origen === 'DEMO') {
     return { etiqueta: 'Demostración', detalle: 'Modo demostración: nada se guarda en una hoja.', tono: 'neutro' };
+  }
+  if (sinAcceso) {
+    return {
+      etiqueta: 'Sin acceso',
+      detalle: 'Tu cuenta no figura en la hoja con la que habla este navegador. Conecta la tuya en Ajustes.',
+      tono: 'atencion',
+    };
   }
   if (!hojaRegistrada) {
     return {

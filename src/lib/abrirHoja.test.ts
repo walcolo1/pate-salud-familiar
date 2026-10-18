@@ -84,3 +84,17 @@ describe('abrir la hoja en otra pestaña', () => {
     }
   });
 });
+
+describe('Bloque M2 · «Abrir la hoja» dice la causa real', () => {
+  it('una cuenta que no está en ACCESO no recibe «inténtalo en un momento»', async () => {
+    const pestana = { opener: {}, location: { replace: () => {} }, close: () => {} };
+    const r = await abrirHojaEnPestana(
+      async () => {
+        throw Object.assign(new Error('x'), { codigo: 'ACCESO_DENEGADO' });
+      },
+      () => pestana,
+    );
+    expect(r).toBe(MENSAJES_ABRIR_HOJA.ACCESO_DENEGADO);
+    expect(r).not.toBe(MENSAJES_ABRIR_HOJA.OTRO);
+  });
+});

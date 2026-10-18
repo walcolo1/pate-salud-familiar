@@ -1,3 +1,4 @@
+import { CLAVE_HOJAS_POR_CUENTA } from './hojaPorCuenta';
 import { describe, it, expect, vi } from 'vitest';
 import {
   purgarPersistenciaLocal,
@@ -56,12 +57,15 @@ function escenarioCompleto() {
 }
 
 describe('debeEliminarse', () => {
-  it('preserva exactamente las cuatro claves permitidas', () => {
+  it('preserva exactamente las cinco claves permitidas', () => {
     expect(debeEliminarse(CLAVE_PREFERENCIAS)).toBe(false);
     expect(debeEliminarse(CLAVE_DEVICE_ID)).toBe(false);
     expect(debeEliminarse(CLAVE_MIGRACION)).toBe(false);
     expect(debeEliminarse(CLAVE_SESION_FAMILIAR)).toBe(false);
-    expect(CLAVES_PRESERVADAS.size).toBe(4);
+    // Bloque M2 · la hoja de cada cuenta, por huella: sin ella, la segunda
+    // cuenta de un navegador perdería su hoja en cada cierre de sesión.
+    expect(debeEliminarse(CLAVE_HOJAS_POR_CUENTA)).toBe(false);
+    expect(CLAVES_PRESERVADAS.size).toBe(5);
   });
 
   it('elimina cualquier clave de la app no preservada', () => {

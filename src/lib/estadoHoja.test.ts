@@ -26,3 +26,11 @@ describe('estado de la hoja en la barra lateral', () => {
     }
   });
 });
+
+describe('Bloque M2 · sin acceso', () => {
+  it('dice «Sin acceso» aunque haya dirección, en vez de «Conectada»', () => {
+    const e = estadoHoja({ origen: 'REAL', hojaRegistrada: true, hayQueEntrar: false, pendientes: 0, sinAcceso: true });
+    expect(e.etiqueta).toBe('Sin acceso');
+    expect(e.tono).toBe('atencion');
+  });
+});

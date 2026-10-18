@@ -156,7 +156,7 @@ describe('la URL de la familia se lee de donde se escribe', () => {
     for (const f of ficheros(RAIZ)) {
       if (f.endsWith('.test.ts')) continue;
       const fuente = readFileSync(f, 'utf8');
-      for (const m of fuente.matchAll(/(guardarBackend|leerBackend|resolverBackend|olvidarBackend)\([^)]*?(window\.\w+Storage)/g)) {
+      for (const m of fuente.matchAll(/(guardarBackend|leerBackend|resolverBackend|olvidarBackend|resolverHoja|guardarHojaVerificada)\([^)]*?(window\.\w+Storage)/g)) {
         usos.push(`${relative(RAIZ, f)} → ${m[2]}`);
       }
     }

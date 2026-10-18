@@ -40,7 +40,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
     // G2 · la hoja cambió por otro lado
     hayCambiosRemotos, recargarExpediente,
     // G4b · ¿sabe este navegador dónde está la hoja?
-    hojaRegistrada, origenDatos,
+    hojaRegistrada, origenDatos, sinAcceso,
     // Cierre del Bloque H · sesión sin credencial
     hayQueEntrar, renderizarBotonGoogle,
   } = useApp();
@@ -242,6 +242,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
     hojaRegistrada,
     hayQueEntrar,
     pendientes: pendingSyncCount,
+    sinAcceso,
   });
 
   const navItems = [

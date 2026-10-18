@@ -7,6 +7,7 @@ import {
   esClienteOAuthValido,
   escaparHtml,
   htmlConexion,
+  esRespuestaDePate,
   PATRON_EXEC_DIALOGO,
 } from './planInstalacion';
 
@@ -93,6 +94,35 @@ describe('Bloque M · si el menú no conoce la /exec, se pega en el mismo diálo
     expect(patron.test('https://malo.example/macros/s/AKfy_familia_nueva_123456789/exec')).toBe(false);
     expect(patron.test(EXEC + '?x=1')).toBe(false);
     // El botón se arma hacia la PWA, con el ?hoja= del Bloque L.
-    expect(h).toContain(JSON.stringify(`${URL_APP_PATE}/?hoja=`));
+    // El botón ya no se arma en el navegador: lo da el servidor tras comprobar
+    // que la dirección responde (Bloque M2).
+    expect(h).toContain('verificarDespliegueDesdeDialogo');
+  });
+});
+
+describe('Bloque M2 · el diálogo solo ofrece el botón si la dirección respondió', () => {
+  it('reconoce la respuesta de doGet y nada más', () => {
+    expect(esRespuestaDePate('{"ok":true,"data":{"version":"e7"}}')).toBe(true);
+    expect(esRespuestaDePate({ ok: true, data: { version: 'e7' } })).toBe(true);
+    expect(esRespuestaDePate('<html>Inicia sesión</html>')).toBe(false);
+    expect(esRespuestaDePate({ ok: false, error: 'X' })).toBe(false);
+    expect(esRespuestaDePate({ ok: true, data: {} })).toBe(false);
+  });
+
+  it('sin dirección verificada: pasos y campo, ningún botón para abrir; y dice si Google dio una que no responde', () => {
+    const h = htmlConexion(URL_APP_PATE, null, EXEC);
+    expect(h).not.toContain('Abrir Paté ya conectado</a>');
+    expect(h).toContain('Nueva implementación');
+    expect(h).toContain('id="exec"');
+    expect(h).toContain('no responde como Paté');
+    expect(htmlConexion(URL_APP_PATE, null)).not.toContain('no responde como Paté');
+  });
+
+  it('con dirección verificada: el botón, y aun así los pasos y el campo para corregirla', () => {
+    const h = htmlConexion(URL_APP_PATE, EXEC);
+    expect(h).toContain('Abrir Paté ya conectado</a>');
+    expect(h).toContain('¿No conecta? Ver pasos para publicar o pegar la dirección /exec');
+    expect(h).toContain('id="exec"');
+    expect(h).toContain('Nueva implementación');
   });
 });

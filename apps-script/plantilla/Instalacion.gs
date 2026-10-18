@@ -314,49 +314,91 @@ var ESTILO_DIALOGO = 'body{font-family:Arial,sans-serif;color:#1e293b;font-size:
     '.boton{display:inline-block;background:#0f766e;color:#fff;font-weight:bold;padding:10px 16px;' +
     'border-radius:10px;text-decoration:none;margin:8px 0;border:0;cursor:pointer;font-size:14px}' +
     '.secundario{background:#fff;color:#0f766e;border:1px solid #0f766e}.nota{color:#475569;font-size:12px}';
+/** La /exec de una aplicación web de Apps Script, como literal de regex para el diálogo. */
+var PATRON_EXEC_DIALOGO = '/^https:\\/\\/script\\.google\\.com\\/macros\\/s\\/[A-Za-z0-9_-]{20,}\\/exec$/';
+/**
+ * ¿Lo que devolvió un GET a una /exec es Paté?
+ *
+ * Bloque M2 · el diálogo ya no se fía de `ScriptApp.getService().getUrl()`:
+ * en una copia recién hecha devuelve una dirección aunque no haya ninguna
+ * implementación publicada, y el botón «Abrir Paté ya conectado» llevaba a un
+ * sitio que no contestaba. Solo vale una dirección que responde como `doGet`.
+ */
+function esRespuestaDePate(cuerpo) {
+    let datos = cuerpo;
+    if (typeof cuerpo === 'string') {
+        try {
+            datos = JSON.parse(cuerpo);
+        }
+        catch (e) {
+            return false;
+        }
+    }
+    const d = (datos || {});
+    return d.ok === true && !!d.data && typeof d.data.version === 'string' && d.data.version.length > 0;
+}
+var PASOS_PUBLICAR = '<ol>' +
+    '<li>Menú <strong>Extensiones ▸ Apps Script</strong>.</li>' +
+    '<li>Arriba a la derecha: <strong>Implementar ▸ Nueva implementación</strong> (o, si ya existe, ' +
+    '<strong>Gestionar implementaciones ▸ ✏️ ▸ Versión: nueva versión</strong>).</li>' +
+    '<li>En el engranaje ⚙ elige <strong>Aplicación web</strong>. ' +
+    '<em>Ejecutar como:</em> <strong>Yo</strong>. <em>Quién tiene acceso:</em> <strong>Cualquier usuario</strong>.</li>' +
+    '<li>Pulsa <strong>Implementar</strong>, copia la <strong>URL de la aplicación web</strong> (termina en ' +
+    '<code>/exec</code>) y pégala abajo.</li>' +
+    '</ol>' +
+    '<p class="nota">«Cualquier usuario» no abre tu expediente a nadie: la aplicación solo responde a las ' +
+    'cuentas de Google que tú invites.</p>';
+/**
+ * El campo para pegar la /exec. La comprueba el servidor (`verificarDespliegueDesdeDialogo`)
+ * con una petición real; solo si contesta como Paté aparece el botón.
+ */
+function formularioDireccion() {
+    return ('<p><label for="exec"><strong>Dirección de la aplicación web</strong> (termina en <code>/exec</code>):</label></p>' +
+        '<input id="exec" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #94a3b8;border-radius:8px" ' +
+        'placeholder="Termina en /exec">' +
+        '<button class="boton secundario" id="comprobar" onclick="comprobar()">Comprobar y conectar</button>' +
+        '<p id="salida" class="nota" aria-live="polite"></p>' +
+        '<script>function comprobar(){var v=document.getElementById("exec").value.trim();var s=document.getElementById("salida");' +
+        'var b=document.getElementById("comprobar");' +
+        'if(!' + PATRON_EXEC_DIALOGO + '.test(v)){s.textContent="Esa dirección no es la de una aplicación web: tiene que terminar en /exec.";return;}' +
+        'b.disabled=true;s.textContent="Comprobando que responde…";' +
+        'google.script.run.withSuccessHandler(function(r){b.disabled=false;if(!r||!r.ok){s.textContent=(r&&r.mensaje)||"No responde.";return;}' +
+        'var a=document.createElement("a");a.className="boton";a.target="_blank";a.rel="noopener";a.href=r.enlace;' +
+        'a.textContent="Abrir Paté ya conectado";s.textContent="Responde y quedó guardada. ";s.appendChild(a);})' +
+        '.withFailureHandler(function(){b.disabled=false;s.textContent="No se pudo comprobar. Inténtalo otra vez.";})' +
+        '.verificarDespliegueDesdeDialogo(v);}</script>');
+}
 /**
  * El diálogo de «Paté ▸ Conectar con la aplicación».
  *
- * Sin implementación todavía: los cuatro clics para publicarla. Con ella: un
- * botón que abre la PWA ya conectada, y otro que le manda el mismo enlace al
- * titular por correo para abrirlo en el celular. Nada de copiar ni pegar URLs.
+ * `urlVerificada`: una /exec que **ya respondió** como Paté (o `null`).
+ * `detectadaSinResponder`: la que dio Google pero no contestó, para decirlo.
+ *
+ * Siempre lleva los pasos para publicar y el campo para pegar o corregir la
+ * dirección: si la implementación cambia, se arregla desde aquí.
  */
-/** La /exec de una aplicación web de Apps Script, como literal de regex para el diálogo. */
-var PATRON_EXEC_DIALOGO = '/^https:\\/\\/script\\.google\\.com\\/macros\\/s\\/[A-Za-z0-9_-]{20,}\\/exec$/';
-function htmlConexion(urlApp, urlBackend) {
-    if (!urlBackend) {
+function htmlConexion(urlApp, urlVerificada, detectadaSinResponder) {
+    const ayuda = PASOS_PUBLICAR + formularioDireccion();
+    if (!urlVerificada) {
         return ('<style>' + ESTILO_DIALOGO + '</style>' +
             '<p><strong>Falta un paso: publicar tu expediente para la aplicación.</strong></p>' +
-            '<ol>' +
-            '<li>Menú <strong>Extensiones ▸ Apps Script</strong>.</li>' +
-            '<li>Arriba a la derecha: <strong>Implementar ▸ Nueva implementación</strong>.</li>' +
-            '<li>En el engranaje ⚙ elige <strong>Aplicación web</strong>. ' +
-            '<em>Ejecutar como:</em> <strong>Yo</strong>. <em>Quién tiene acceso:</em> <strong>Cualquier usuario</strong>.</li>' +
-            '<li>Pulsa <strong>Implementar</strong> y vuelve aquí: <strong>Paté ▸ Conectar con la aplicación</strong>.</li>' +
-            '</ol>' +
-            '<p class="nota">«Cualquier usuario» no abre tu expediente a nadie: la aplicación solo responde a las ' +
-            'cuentas de Google que tú invites.</p>' +
-            // Si Google no le dice al menú la dirección de la implementación (pasa
-            // en algunas cuentas), se pega aquí mismo y el botón se arma en el
-            // diálogo: nada viaja a ningún sitio hasta que el titular lo pulsa.
-            '<p><label for="exec"><strong>¿Ya publicaste y sigue saliendo esto?</strong> Pega aquí la URL de la ' +
-            'aplicación web (termina en <code>/exec</code>):</label></p>' +
-            '<input id="exec" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #94a3b8;border-radius:8px" ' +
-            'placeholder="Termina en /exec" oninput="armar()">' +
-            '<p id="salida" class="nota" aria-live="polite"></p>' +
-            '<script>function armar(){var v=document.getElementById("exec").value.trim();var s=document.getElementById("salida");' +
-            'if(!' + PATRON_EXEC_DIALOGO + '.test(v)){s.textContent=v?"Esa dirección no termina en /exec.":"";return;}' +
-            'var a=document.createElement("a");a.className="boton";a.target="_blank";a.rel="noopener";' +
-            'a.href=' + JSON.stringify(urlApp.replace(/\/+$/, '') + '/?hoja=') + '+encodeURIComponent(v);' +
-            'a.textContent="Abrir Paté ya conectado";s.textContent="";s.appendChild(a);}</script>');
+            (detectadaSinResponder
+                ? '<p class="nota">Google indica una dirección para este proyecto, pero no responde como Paté: ' +
+                    'todavía no está publicada como aplicación web, o su acceso no es «Cualquier usuario».</p>'
+                : '') +
+            ayuda);
     }
-    const enlace = escaparHtml(enlaceDeConexion(urlApp, urlBackend));
+    const enlace = escaparHtml(enlaceDeConexion(urlApp, urlVerificada));
     return ('<style>' + ESTILO_DIALOGO + '</style>' +
-        '<p><strong>Tu expediente está listo.</strong> Ábrelo en la aplicación y entra con esta misma cuenta de Google.</p>' +
+        '<p><strong>Tu expediente está listo.</strong> Su dirección respondió. Ábrelo en la aplicación y entra con ' +
+        'esta misma cuenta de Google.</p>' +
         '<a class="boton" href="' + enlace + '" target="_blank" rel="noopener">Abrir Paté ya conectado</a> ' +
         '<button class="boton secundario" id="correo" onclick="enviar()">Enviarme el enlace por correo</button>' +
         '<p class="nota" id="estado">Para el celular: pídelo por correo y ábrelo allí. Después invita a tu familia ' +
         'desde Ajustes ▸ Invitaciones.</p>' +
+        '<details><summary><strong>¿No conecta? Ver pasos para publicar o pegar la dirección /exec</strong></summary>' +
+        ayuda +
+        '</details>' +
         '<script>function enviar(){var b=document.getElementById("correo");b.disabled=true;' +
         'google.script.run.withSuccessHandler(function(){document.getElementById("estado").textContent=' +
         '"Enviado a tu correo.";}).withFailureHandler(function(){b.disabled=false;' +

@@ -22,7 +22,7 @@ import { MENSAJES_REGISTRO } from '@/lib/registroBackend';
 import { abrirHojaEnPestana } from '@/lib/abrirHoja';
 
 export default function TarjetaHojaFamiliar() {
-  const { hojaRegistrada, registrarHojaFamiliar, urlDeLaHojaFamiliar, pendingSyncCount } = useApp();
+  const { hojaRegistrada, registrarHojaFamiliar, urlDeLaHojaFamiliar, pendingSyncCount, sinAcceso } = useApp();
   const idCampo = useId();
   const idAyuda = useId();
 
@@ -36,7 +36,10 @@ export default function TarjetaHojaFamiliar() {
   // formulario se pliega detrás de un botón secundario para que la tarjeta
   // diga lo único que importa a diario —está registrada— y deje abrirla.
   const [cambiando, setCambiando] = useState(false);
-  const formularioVisible = !hojaRegistrada || cambiando || error !== null;
+  // Bloque M2 · si la hoja con la que habla este navegador no tiene a esta
+  // cuenta, no se dice «Registrada»: se dice la verdad y se abre el campo.
+  const conectada = hojaRegistrada && !sinAcceso;
+  const formularioVisible = !conectada || cambiando || error !== null;
 
   // Cierre de G4 · la hoja del Web App, no la operacional de antes. La
   // dirección se pide al pulsar y no se guarda; la pestaña se abre antes de
@@ -105,12 +108,19 @@ export default function TarjetaHojaFamiliar() {
             Hoja de la familia
           </h3>
           <p className="text-xs text-slate-500 font-semibold mt-0.5">
-            {hojaRegistrada
-              ? 'Este navegador escribe en la hoja de tu familia.'
-              : 'Este navegador todavía no sabe dónde está la hoja de tu familia.'}
+            {sinAcceso
+              ? 'Tu cuenta no figura en la hoja con la que habla este navegador. Pega aquí la dirección de la tuya (Paté ▸ Conectar con la aplicación, en tu hoja).'
+              : hojaRegistrada
+                ? 'Este navegador escribe en la hoja de tu familia.'
+                : 'Este navegador todavía no sabe dónde está la hoja de tu familia.'}
           </p>
         </div>
-        {hojaRegistrada && (
+        {sinAcceso && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-extrabold text-amber-800 border border-amber-200">
+            Sin acceso
+          </span>
+        )}
+        {conectada && (
           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 border border-emerald-100">
             <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
             Registrada
@@ -118,7 +128,7 @@ export default function TarjetaHojaFamiliar() {
         )}
       </div>
 
-      {hojaRegistrada && (
+      {conectada && (
         <div className="flex flex-col gap-2">
           <div className="flex flex-col sm:flex-row gap-2">
             <button
@@ -175,7 +185,7 @@ export default function TarjetaHojaFamiliar() {
       {formularioVisible && (
         <form id={`${idCampo}-formulario`} onSubmit={comprobar} className="flex flex-col gap-2">
           <label htmlFor={idCampo} className="text-xs font-extrabold text-slate-700">
-            {hojaRegistrada ? 'Cambiar la dirección del despliegue' : 'Dirección del despliegue'}
+            {conectada ? 'Cambiar la dirección del despliegue' : 'Dirección del despliegue'}
           </label>
           <input
             id={idCampo}
@@ -218,7 +228,7 @@ export default function TarjetaHojaFamiliar() {
             {ocupado && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
             {ocupado ? 'Comprobando…' : 'Comprobar y guardar'}
           </button>
-          {hojaRegistrada && (
+          {conectada && (
             <button
               type="button"
               onClick={() => {
