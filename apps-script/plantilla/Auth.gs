@@ -41,6 +41,10 @@ var TIEMPO_ESPERA_TOKENINFO_MS = 10000;
  * @throws {Error} `TOKEN_INVALIDO` ante cualquier fallo, sin distinguir cuál.
  */
 function verificarIdentidad(idToken) {
+  // Sesión persistente: un ticket firmado por este backend sustituye al
+  // `id_token` de una hora. Ver `verificarTicketSesion_`.
+  if (esTicketSesion(idToken)) return verificarTicketSesion_(idToken);
+
   var ahora = Date.now();
   var clave = claveCache(idToken); // lanza TOKEN_INVALIDO si no es un JWT
   var cache = CacheService.getScriptCache();
@@ -132,4 +136,102 @@ function consultarTokenInfo_(idToken) {
  */
 function registrarFalloAuth_(motivo) {
   console.warn('auth rechazada: ' + motivo);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sesión persistente (ticket firmado)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * La clave con la que se firman los tickets. Vive solo aquí.
+ *
+ * Borrar esta propiedad cierra **todas** las sesiones de todos los
+ * dispositivos de una vez: la siguiente petición crea otra clave y ningún
+ * ticket anterior vuelve a cuadrar.
+ */
+var CLAVE_SECRETO_SESION = 'SESION_SECRETO';
+
+/** Prefijo de la caché huella → correo. */
+var PREFIJO_CACHE_HUELLA = 'hue_';
+
+function secretoSesion_() {
+  var propiedades = PropertiesService.getScriptProperties();
+  var secreto = propiedades.getProperty(CLAVE_SECRETO_SESION);
+  if (secreto) return secreto;
+
+  // Dos peticiones a la vez podrían crear dos claves distintas, y la que
+  // perdiera dejaría inservibles los tickets que ya hubiera firmado.
+  var cerrojo = LockService.getScriptLock();
+  if (!cerrojo.tryLock(10000)) throw new Error(ERROR_TOKEN);
+  try {
+    secreto = propiedades.getProperty(CLAVE_SECRETO_SESION);
+    if (!secreto) {
+      secreto = Utilities.getUuid() + Utilities.getUuid() + Utilities.getUuid();
+      propiedades.setProperty(CLAVE_SECRETO_SESION, secreto);
+    }
+    return secreto;
+  } finally {
+    cerrojo.releaseLock();
+  }
+}
+
+/** HMAC-SHA256 con la clave de sesión, en base64url sin relleno. */
+function firmadorSesion_() {
+  var secreto = secretoSesion_();
+  return function (texto) {
+    var bytes = Utilities.computeHmacSha256Signature(texto, secreto, Utilities.Charset.UTF_8);
+    return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/, '');
+  };
+}
+
+/**
+ * Verifica un ticket y devuelve la identidad, igual que con un `id_token`.
+ *
+ * El correo **no viaja en el ticket**: se recupera buscando su huella entre
+ * los correos que hoy tienen derecho a entrar. Quien ya no está en `ACCESO`
+ * no aparece, y el ticket deja de servir sin tener que revocar nada.
+ */
+function verificarTicketSesion_(ticket) {
+  var firmar = firmadorSesion_();
+  var carga = verificarTicket(ticket, firmar, Date.now()); // lanza TOKEN_INVALIDO
+
+  var email = correoDeHuellaConCache_(carga.h, firmar);
+  if (!email) {
+    registrarFalloAuth_('ticket de una cuenta sin acceso');
+    throw new Error(ERROR_TOKEN);
+  }
+  // `sub` no existe para un ticket, y nada lo usa para decidir: el acceso se
+  // resuelve por correo. Se marca para que se vea de dónde salió.
+  return { email: email, sub: 'ticket' };
+}
+
+function correoDeHuellaConCache_(huella, firmar) {
+  var cache = CacheService.getScriptCache();
+  var clave = PREFIJO_CACHE_HUELLA + huella.slice(0, 64);
+  var enCache = cache.get(clave);
+  if (enCache) return enCache;
+
+  var hoja = abrirHoja_();
+  var candidatos = [emailTitular_(hoja)];
+  var pestana = hoja.getSheetByName('ACCESO');
+  if (pestana && pestana.getLastRow() > 1) {
+    var columna = (encabezadosDe('ACCESO') || []).indexOf('email');
+    if (columna !== -1) {
+      var valores = pestana.getRange(2, columna + 1, pestana.getLastRow() - 1, 1).getValues();
+      for (var i = 0; i < valores.length; i++) candidatos.push(valores[i][0]);
+    }
+  }
+
+  var email = correoDeHuella(huella, candidatos, firmar);
+  // Solo se cachea el acierto. Que alguien salga de `ACCESO` lo sigue
+  // decidiendo `resolverAccesoLocal`, que relee la hoja por versión.
+  if (email) cache.put(clave, email, CACHE_HUELLA_SEGUNDOS);
+  return email;
+}
+
+/** Emite un ticket para quien ya pasó la cadena entera. */
+function abrirSesion(payload, acceso, identidad) {
+  if (!identidad || !identidad.email) throw new Error(ERROR_TOKEN);
+  var emitido = emitirTicket(identidad.email, firmadorSesion_(), Date.now());
+  return { ticket: emitido.ticket, expira: emitido.expira };
 }

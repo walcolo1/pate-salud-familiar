@@ -7,7 +7,7 @@ import EstadoCarga from '@/components/ui/EstadoCarga';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
-import { Search, Plus, User, ArrowRight } from 'lucide-react';
+import { Search, Plus, User, ArrowRight, PawPrint } from 'lucide-react';
 import { Relationship, BloodType } from '@/domain/models';
 
 const relationshipMap: Record<Relationship, string> = {
@@ -34,7 +34,8 @@ const bloodTypeMap: Record<BloodType, string> = {
 
 export default function MembersPage() {
   const router = useRouter();
-  const { user, members, documents, isLoading } = useApp();
+  const { user, members, documents, isLoading, pets } = useApp();
+  const mascotasActivas = (pets ?? []).filter((p) => p.activo && !p.deletedAt).length;
   const [search, setSearch] = useState('');
   const [memberFilter, setMemberFilter] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
 
@@ -100,6 +101,27 @@ export default function MembersPage() {
         </Link>
       </section>
 
+      {/* Las mascotas también son de la familia: acceso directo */}
+      <Link
+        href="/mascotas"
+        className="flex items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow"
+      >
+        <span className="flex items-center gap-3">
+          <span aria-hidden="true" className="p-2 bg-teal-50 text-teal-700 rounded-xl border border-teal-100">
+            <PawPrint className="h-4.5 w-4.5" />
+          </span>
+          <span>
+            <span className="block text-sm font-extrabold text-slate-800 leading-tight">Mascotas</span>
+            <span className="block text-[11px] text-slate-600 font-semibold mt-0.5">
+              {mascotasActivas === 0
+                ? 'Registra a la primera: peso, vacunas e historial'
+                : `${mascotasActivas} ${mascotasActivas === 1 ? 'mascota activa' : 'mascotas activas'}`}
+            </span>
+          </span>
+        </span>
+        <ArrowRight aria-hidden="true" className="h-4 w-4 text-teal-700" />
+      </Link>
+
       {/* Search Bar */}
       <section className="relative">
         <span className="absolute left-4.5 top-1/2 -translate-y-1/2 text-slate-500">
@@ -157,7 +179,7 @@ export default function MembersPage() {
                 className="flex items-center gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm shadow-slate-100/40 hover:shadow-md transition-all duration-200 group"
               >
                 {/* Avatar */}
-                <div className="relative h-14 w-14 rounded-full bg-teal-600/10 text-teal-700 border border-teal-600/20 flex items-center justify-center font-black text-base shrink-0 overflow-hidden group-hover:bg-teal-600 group-hover:text-white transition-all duration-300">
+                <div className="relative h-14 w-14 rounded-full bg-teal-600/10 text-teal-700 border border-teal-600/20 flex items-center justify-center font-black text-base shrink-0 overflow-hidden group-hover:bg-teal-700 group-hover:text-white transition-all duration-300">
                   {member.avatarUrl ? (
                     <>
                       <span className="absolute inset-0 flex items-center justify-center">

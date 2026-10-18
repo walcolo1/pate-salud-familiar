@@ -14,7 +14,7 @@
 
 import React, { useEffect, useId, useState } from 'react';
 import { sesionDeLaAplicacion } from '@/lib/identidad';
-import { CheckCircle2, ExternalLink, Link2, Loader2 } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Link2, Loader2, Pencil } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { MENSAJES_REGISTRO } from '@/lib/registroBackend';
 import { abrirHojaEnPestana } from '@/lib/abrirHoja';
@@ -30,6 +30,11 @@ export default function TarjetaHojaFamiliar() {
   const [hecho, setHecho] = useState(false);
   const [abriendo, setAbriendo] = useState(false);
   const [errorAbrir, setErrorAbrir] = useState<string | null>(null);
+  // Con la hoja ya registrada, cambiar la dirección es algo excepcional: el
+  // formulario se pliega detrás de un botón secundario para que la tarjeta
+  // diga lo único que importa a diario —está registrada— y deje abrirla.
+  const [cambiando, setCambiando] = useState(false);
+  const formularioVisible = !hojaRegistrada || cambiando || error !== null;
 
   // Cierre de G4 · la hoja del Web App, no la operacional de antes. La
   // dirección se pide al pulsar y no se guarda; la pestaña se abre antes de
@@ -58,6 +63,7 @@ export default function TarjetaHojaFamiliar() {
       if (resultado.ok) {
         setHecho(true);
         setUrl('');
+        setCambiando(false);
       } else {
         setError(MENSAJES_REGISTRO[resultado.motivo]);
       }
@@ -96,20 +102,42 @@ export default function TarjetaHojaFamiliar() {
 
       {hojaRegistrada && (
         <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={abrirHoja}
-            disabled={abriendo}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-extrabold text-slate-800 hover:border-teal-600 hover:text-teal-800 disabled:opacity-60"
-          >
-            {abriendo ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <ExternalLink className="h-4 w-4" aria-hidden="true" />
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              type="button"
+              onClick={abrirHoja}
+              disabled={abriendo}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-extrabold text-slate-800 hover:border-teal-600 hover:text-teal-800 disabled:opacity-60"
+            >
+              {abriendo ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              )}
+              Abrir la hoja
+              <span className="sr-only"> (se abre en otra pestaña)</span>
+            </button>
+            {!formularioVisible && (
+              <button
+                type="button"
+                onClick={() => setCambiando(true)}
+                aria-expanded={false}
+                aria-controls={`${idCampo}-formulario`}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl px-4 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+              >
+                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                Cambiar dirección de la hoja
+              </button>
             )}
-            Abrir la hoja
-            <span className="sr-only"> (se abre en otra pestaña)</span>
-          </button>
+          </div>
+          {hecho && !formularioVisible && (
+            <p role="status" className="rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">
+              Hoja registrada.{' '}
+              {pendingSyncCount > 0
+                ? `Quedan ${pendingSyncCount} cambio(s) por reenviar: se intentarán de nuevo solos.`
+                : 'Los cambios que estaban esperando ya se enviaron.'}
+            </p>
+          )}
           {errorAbrir && (
             <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs font-semibold text-red-700">
               {errorAbrir}
@@ -118,52 +146,67 @@ export default function TarjetaHojaFamiliar() {
         </div>
       )}
 
-      <form onSubmit={comprobar} className="flex flex-col gap-2">
-        <label htmlFor={idCampo} className="text-xs font-extrabold text-slate-700">
-          {hojaRegistrada ? 'Cambiar la dirección del despliegue' : 'Dirección del despliegue'}
-        </label>
-        <input
-          id={idCampo}
-          type="url"
-          inputMode="url"
-          autoComplete="off"
-          spellCheck={false}
-          required
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://script.google.com/macros/s/…/exec"
-          aria-describedby={idAyuda}
-          aria-invalid={error ? true : undefined}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-        />
-        <p id={idAyuda} className="text-[11px] text-slate-500 font-semibold leading-relaxed">
-          En Apps Script: <strong>Implementar ▸ Administrar implementaciones</strong>, y copia la URL de la
-          aplicación web. Se comprueba antes de guardarla.
-        </p>
-
-        {error && (
-          <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs font-semibold text-red-700">
-            {error}
+      {formularioVisible && (
+        <form id={`${idCampo}-formulario`} onSubmit={comprobar} className="flex flex-col gap-2">
+          <label htmlFor={idCampo} className="text-xs font-extrabold text-slate-700">
+            {hojaRegistrada ? 'Cambiar la dirección del despliegue' : 'Dirección del despliegue'}
+          </label>
+          <input
+            id={idCampo}
+            type="url"
+            inputMode="url"
+            autoComplete="off"
+            spellCheck={false}
+            required
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://script.google.com/macros/s/…/exec"
+            aria-describedby={idAyuda}
+            aria-invalid={error ? true : undefined}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+          />
+          <p id={idAyuda} className="text-[11px] text-slate-500 font-semibold leading-relaxed">
+            En Apps Script: <strong>Implementar ▸ Administrar implementaciones</strong>, y copia la URL de la
+            aplicación web. Se comprueba antes de guardarla.
           </p>
-        )}
-        {hecho && (
-          <p role="status" className="rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">
-            Hoja registrada.{' '}
-            {pendingSyncCount > 0
-              ? `Quedan ${pendingSyncCount} cambio(s) por reenviar: se intentarán de nuevo solos.`
-              : 'Los cambios que estaban esperando ya se enviaron.'}
-          </p>
-        )}
 
-        <button
-          type="submit"
-          disabled={ocupado || url.trim().length === 0}
-          className="mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-teal-700 px-4 text-sm font-extrabold text-white hover:bg-teal-800 disabled:opacity-60"
-        >
-          {ocupado && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-          {ocupado ? 'Comprobando…' : 'Comprobar y guardar'}
-        </button>
-      </form>
+          {error && (
+            <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs font-semibold text-red-700">
+              {error}
+            </p>
+          )}
+          {hecho && (
+            <p role="status" className="rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">
+              Hoja registrada.{' '}
+              {pendingSyncCount > 0
+                ? `Quedan ${pendingSyncCount} cambio(s) por reenviar: se intentarán de nuevo solos.`
+                : 'Los cambios que estaban esperando ya se enviaron.'}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={ocupado || url.trim().length === 0}
+            className="mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-teal-700 px-4 text-sm font-extrabold text-white hover:bg-teal-800 disabled:opacity-60"
+          >
+            {ocupado && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+            {ocupado ? 'Comprobando…' : 'Comprobar y guardar'}
+          </button>
+          {hojaRegistrada && (
+            <button
+              type="button"
+              onClick={() => {
+                setCambiando(false);
+                setError(null);
+                setUrl('');
+              }}
+              className="inline-flex h-10 items-center justify-center rounded-2xl px-4 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+            >
+              Cancelar
+            </button>
+          )}
+        </form>
+      )}
     </section>
   );
 }

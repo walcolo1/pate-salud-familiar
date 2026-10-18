@@ -23,10 +23,15 @@ import { PESTANAS } from './esquemaHoja';
  * dejándose algo.
  */
 
-const MODELOS = readFileSync(join(process.cwd(), 'src', 'domain', 'models.ts'), 'utf8');
+// Las mascotas (Bloque D) viven en su propio fichero de dominio.
+const MODELOS =
+  readFileSync(join(process.cwd(), 'src', 'domain', 'models.ts'), 'utf8') +
+  '\n' +
+  readFileSync(join(process.cwd(), 'src', 'domain', 'mascotas.ts'), 'utf8');
 
 function camposDelModelo(nombre: string): string[] {
-  const i = MODELOS.indexOf(`export interface ${nombre} {`);
+  const m = new RegExp(`export interface ${nombre}(?: extends [A-Za-z]+)? \\{`).exec(MODELOS);
+  const i = m ? m.index : -1;
   if (i === -1) return [];
   const cuerpo = MODELOS.slice(i, MODELOS.indexOf('\n}', i));
   return [...cuerpo.matchAll(/^ {2}([a-zA-Z][A-Za-z0-9]*)\??:/gm)].map((m) => m[1]);

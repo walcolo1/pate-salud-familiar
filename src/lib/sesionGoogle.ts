@@ -36,6 +36,8 @@
  * lee cualquier extensión. Hay una prueba que lo fija.
  */
 
+import { cargaDeTicket, esTicketSesion, RENOVAR_TICKET_ANTES_MS } from './autenticacion';
+
 /** Diez minutos: se renueva a los 50 de una hora. */
 export const MARGEN_RENOVACION_MS = 10 * 60 * 1000;
 
@@ -97,6 +99,43 @@ export interface EntornoSesion {
   /** Ya no hay sesión y hay que volver a entrar. Se llama **una vez**. */
   pedirEntrarDeNuevo(): void;
   registrarFallo(error: unknown): void;
+  /**
+   * Sesión persistente (opcional). Sin él, todo funciona como antes: solo
+   * `id_token` en memoria.
+   */
+  ticket?: PuertoTicket;
+}
+
+/**
+ * Lo que la sesión necesita para no depender de un `id_token` de una hora.
+ *
+ * El almacén y la red entran por aquí para que este fichero siga sin tocar
+ * ninguno de los dos: el `id_token` **sigue sin guardarse en ningún sitio**.
+ * Lo que se guarda —fuera de aquí— es el ticket que firma el backend, que no
+ * lleva correo, ni nombre, ni `sub`.
+ */
+export interface PuertoTicket {
+  leer(): string | null;
+  guardar(ticket: string): void;
+  borrar(): void;
+  /**
+   * Cambia una credencial (un `id_token` recién llegado, o un ticket a punto
+   * de caducar) por un ticket nuevo.
+   *
+   * Devuelve `null` si el backend no lo ofrece o no lo concede: no se vuelve a
+   * intentar con esa credencial. **Lanza** si fue algo pasajero (sin red, sin
+   * hoja registrada todavía): se reintenta más tarde.
+   */
+  canjear(credencial: string): Promise<string | null>;
+}
+
+/** Tras un fallo pasajero del canje, cuánto se espera para reintentar. */
+export const ESPERA_REINTENTO_CANJE_MS = 60_000;
+
+/** Cuándo caduca un ticket, en milisegundos. `null` si no es un ticket. */
+export function expiracionDeTicket(ticket: unknown): number | null {
+  const carga = cargaDeTicket(ticket);
+  return carga ? carga.exp : null;
 }
 
 export class SesionGoogle {
@@ -107,8 +146,108 @@ export class SesionGoogle {
   private yaPedido = false;
   private readonly oyentes = new Set<() => void>();
 
+  // Sesión persistente.
+  private ticket: string | null = null;
+  private ticketExpira: number | null = null;
+  private canje: Promise<void> | null = null;
+  /** La credencial cuyo canje el backend no concedió: no se insiste. */
+  private canjeDescartadoPara: string | null = null;
+  private reintentarCanjeDesde = 0;
+  /**
+   * Sube con cada cierre de sesión y con cada credencial nueva. Un canje que
+   * termina después no puede dejar guardado el ticket de quien ya se fue.
+   */
+  private generacion = 0;
+
   constructor(entorno: EntornoSesion) {
     this.entorno = entorno;
+    this.cargarTicket();
+  }
+
+  /** Lo que dejó la visita anterior. Un ticket caducado se borra al leerlo. */
+  private cargarTicket(): void {
+    const puerto = this.entorno.ticket;
+    if (!puerto) return;
+    let guardado: string | null = null;
+    try {
+      guardado = puerto.leer();
+    } catch {
+      guardado = null;
+    }
+    if (guardado !== null) this.fijarTicket(guardado, false);
+  }
+
+  /** Acepta un ticket si es uno y sigue vivo. Si no, lo quita de en medio. */
+  private fijarTicket(ticket: string | null, guardar: boolean): boolean {
+    const expira = expiracionDeTicket(ticket);
+    if (!ticket || !esTicketSesion(ticket) || expira === null || expira <= this.entorno.ahora()) {
+      this.descartarTicket();
+      return false;
+    }
+    this.ticket = ticket;
+    this.ticketExpira = expira;
+    if (guardar) {
+      try {
+        this.entorno.ticket?.guardar(ticket);
+      } catch {
+        // Sin almacén la sesión dura lo que la pestaña: como antes.
+      }
+    }
+    return true;
+  }
+
+  private descartarTicket(): void {
+    this.ticket = null;
+    this.ticketExpira = null;
+    if (!this.entorno.ticket) return;
+    try {
+      this.entorno.ticket.borrar();
+    } catch {
+      /* nada que hacer */
+    }
+  }
+
+  /** ¿Hay un ticket de sesión utilizable? */
+  get conTicket(): boolean {
+    return this.ticket !== null && this.ticketExpira !== null && this.entorno.ahora() < this.ticketExpira;
+  }
+
+  /** Hasta cuándo dura la sesión guardada en este dispositivo, o `null`. */
+  get ticketCaduca(): number | null {
+    return this.conTicket ? this.ticketExpira : null;
+  }
+
+  /** ¿Hay un `id_token` utilizable? */
+  private get tokenVigente(): boolean {
+    return this.token !== null && this.expira !== null && this.entorno.ahora() < this.expira;
+  }
+
+  /**
+   * Cambia una credencial por un ticket. Uno a la vez, y sin insistir con lo
+   * que el backend ya rechazó.
+   */
+  private canjear(credencial: string): Promise<void> {
+    const puerto = this.entorno.ticket;
+    if (!puerto) return Promise.resolve();
+    if (this.canje) return this.canje;
+    if (credencial === this.canjeDescartadoPara) return Promise.resolve();
+    if (this.entorno.ahora() < this.reintentarCanjeDesde) return Promise.resolve();
+
+    const generacion = this.generacion;
+    this.canje = (async () => {
+      try {
+        const nuevo = await puerto.canjear(credencial);
+        if (generacion !== this.generacion) return;
+        if (!nuevo || !this.fijarTicket(nuevo, true)) this.canjeDescartadoPara = credencial;
+      } catch (error) {
+        if (generacion !== this.generacion) return;
+        this.reintentarCanjeDesde = this.entorno.ahora() + ESPERA_REINTENTO_CANJE_MS;
+        this.entorno.registrarFallo(error);
+      }
+    })().finally(() => {
+      this.canje = null;
+    });
+    return this.canje;
   }
 
   /** Llega una credencial: del inicio de sesión, o de una renovación. */
@@ -121,6 +260,17 @@ export class SesionGoogle {
     // Vuelve a armarse el aviso: si esta sesión caduca, habrá que decirlo otra
     // vez.
     this.yaPedido = false;
+
+    // Una credencial de Google nueva manda sobre cualquier ticket anterior: si
+    // entró otra cuenta, el ticket viejo no puede seguir firmando por ella.
+    if (this.entorno.ticket) {
+      this.generacion += 1;
+      this.descartarTicket();
+      this.canjeDescartadoPara = null;
+      this.reintentarCanjeDesde = 0;
+      void this.canjear(idToken);
+    }
+
     this.avisarLlegada();
   }
 
@@ -152,11 +302,15 @@ export class SesionGoogle {
     this.expira = null;
     this.renovando = null;
     this.yaPedido = false;
+    this.generacion += 1;
+    this.canjeDescartadoPara = null;
+    this.reintentarCanjeDesde = 0;
+    this.descartarTicket();
   }
 
   /** ¿Queda sesión utilizable, sin salir a pedir nada? */
   get vigente(): boolean {
-    return this.token !== null && this.expira !== null && this.entorno.ahora() < this.expira;
+    return this.conTicket || this.tokenVigente;
   }
 
   /**
@@ -168,6 +322,32 @@ export class SesionGoogle {
    * error donde debería ver una invitación a entrar.
    */
   async idToken(): Promise<string | null> {
+    // 1 · Sesión persistente. Se renueva sola, sin esperar a nadie, cuando le
+    //     quedan menos de quince días.
+    if (this.conTicket) {
+      if ((this.ticketExpira as number) - this.entorno.ahora() < RENOVAR_TICKET_ANTES_MS) {
+        void this.canjear(this.ticket as string);
+      }
+      return this.ticket;
+    }
+    if (this.canje) {
+      await this.canje;
+      if (this.conTicket) return this.ticket;
+    }
+
+    // 2 · El `id_token` de siempre.
+    const token = await this.idTokenDeGoogle();
+
+    // 3 · Con un `id_token` en la mano, se intenta conseguir el ticket para no
+    //     depender de él dentro de una hora.
+    if (token && this.entorno.ticket) {
+      await this.canjear(token);
+      if (this.conTicket) return this.ticket;
+    }
+    return token;
+  }
+
+  private async idTokenDeGoogle(): Promise<string | null> {
     if (this.token === null || this.expira === null) return null;
 
     const restante = this.expira - this.entorno.ahora();
@@ -175,7 +355,7 @@ export class SesionGoogle {
 
     await this.renovacion();
 
-    if (this.vigente) return this.token;
+    if (this.tokenVigente) return this.token;
 
     // Aquí ya no hay nada que hacer con lo que tenemos.
     if (!this.yaPedido) {
@@ -193,8 +373,15 @@ export class SesionGoogle {
    * reloj del dispositivo va adelantado— y el `exp` no se entera.
    */
   async renovarAhora(): Promise<string | null> {
+    // Si el que se rechazó fue el ticket —clave rotada, cuenta fuera de
+    // ACCESO—, se tira y se vuelve al `id_token` si queda uno bueno.
+    if (this.ticket !== null) {
+      this.generacion += 1;
+      this.descartarTicket();
+      if (this.tokenVigente) return this.token;
+    }
     await this.renovacion();
-    return this.vigente ? this.token : null;
+    return this.tokenVigente ? this.token : null;
   }
 
   /**

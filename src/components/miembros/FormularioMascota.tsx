@@ -35,6 +35,12 @@ export interface FormularioMascotaProps {
   /** Si viene, se edita; si no, se crea. */
   mascota?: Pet | null;
   memberId: string;
+  /**
+   * Si viene, al dar de alta se elige el familiar responsable (desde la
+   * pantalla de Mascotas, que no cuelga de ningún familiar). Al editar no se
+   * cambia: los pesos y las vacunas llevan el responsable denormalizado.
+   */
+  responsables?: ReadonlyArray<{ id: string; nombre: string }>;
   onCerrar: () => void;
   /** Devuelve la validación: si falla, el diálogo se queda abierto. */
   onGuardar: (borrador: BorradorMascota) => Validacion;
@@ -47,9 +53,11 @@ export default function FormularioMascota({
   abierto,
   mascota,
   memberId,
+  responsables,
   onCerrar,
   onGuardar,
 }: FormularioMascotaProps) {
+  const [responsable, setResponsable] = useState(memberId);
   const [nombre, setNombre] = useState('');
   const [especie, setEspecie] = useState<Especie>('PERRO');
   const [raza, setRaza] = useState('');
@@ -67,6 +75,7 @@ export default function FormularioMascota({
   if (clave !== cargado) {
     setCargado(clave);
     setProblemas([]);
+    setResponsable(mascota?.memberId ?? memberId);
     setNombre(mascota?.nombre ?? '');
     setEspecie(mascota?.especie ?? 'PERRO');
     setRaza(mascota?.raza ?? '');
@@ -81,8 +90,9 @@ export default function FormularioMascota({
 
   const enviar = (e: React.FormEvent) => {
     e.preventDefault();
+    const elegirResponsable = !mascota && (responsables?.length ?? 0) > 0;
     const resultado = onGuardar({
-      memberId,
+      memberId: elegirResponsable ? responsable : memberId,
       nombre,
       especie,
       raza: raza || null,
@@ -139,6 +149,26 @@ export default function FormularioMascota({
             className={clases}
           />
         </div>
+
+        {!mascota && responsables && responsables.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="mascota-responsable" className="text-[10px] font-extrabold text-slate-700 uppercase">
+              A cargo de
+            </label>
+            <select
+              id="mascota-responsable"
+              value={responsable}
+              onChange={(e) => setResponsable(e.target.value)}
+              className={clases}
+            >
+              {responsables.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">

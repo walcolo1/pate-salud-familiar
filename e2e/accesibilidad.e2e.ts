@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { bloquearGoogle, entrarEnModoDemo } from './apoyo';
+import { bloquearGoogle, entrarEnModoDemo, abrirHerramientasAvanzadas } from './apoyo';
 import {
   GRAVEDADES,
   comparar,
@@ -57,6 +57,8 @@ const RUTAS: ReadonlyArray<{ nombre: string; url: string; espera?: string }> = [
   { nombre: 'dashboard', url: '/dashboard' },
   { nombre: 'members', url: '/members' },
   { nombre: 'settings', url: '/settings' },
+  // Mascotas en primer nivel: sin línea base, así que se exige cero.
+  { nombre: 'mascotas', url: '/mascotas' },
   { nombre: 'appointments-import', url: '/appointments/import' },
   { nombre: 'reminders', url: '/reminders' },
   { nombre: 'agenda', url: '/agenda' },
@@ -182,6 +184,22 @@ test.describe('C1 · accesibilidad', () => {
       await medirYComparar(page, ruta.nombre);
     });
   }
+
+  // Ajustes depurado: lo plegado también se mide, abierto.
+  test('A11Y · settings-avanzadas', async ({ page }) => {
+    await page.goto('/settings');
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await abrirHerramientasAvanzadas(page);
+    await expect(page.getByRole('button', { name: /Exportar Copia/i })).toBeVisible();
+    await medirYComparar(page, 'settings-avanzadas');
+  });
+
+  // Mascotas: el alta directa, con el selector de responsable.
+  test('A11Y · mascotas-dialogo', async ({ page }) => {
+    await page.goto('/mascotas?nueva=1');
+    await expect(page.getByRole('dialog', { name: 'Registrar mascota' })).toBeVisible({ timeout: 15_000 });
+    await medirYComparar(page, 'mascotas-dialogo');
+  });
 
   // Bloque J · la edición del familiar, que estaba fuera de la red.
   test('A11Y · miembro-edit', async ({ page }) => {

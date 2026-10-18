@@ -426,7 +426,7 @@ export default function AppointmentsImportPage() {
               <AlertCircle className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
               <div>
                 <span className="font-bold block text-xs mb-0.5">Sin citas ignoradas aún</span>
-                <p>Cuando el filtro <strong>&quot;Solo citas futuras&quot;</strong> está activo, las citas detectadas cuya fecha ya pasó se ignoran automáticamente y aparecerán aquí. Puedes activar este filtro en <strong>Configuración → Escaneo automático</strong>.</p>
+                <p>Cuando el filtro <strong>&quot;Solo citas futuras&quot;</strong> está activo, las citas detectadas cuya fecha ya pasó se ignoran automáticamente y aparecerán aquí. Puedes cambiar este filtro en <strong>Ajustes → Importación de citas</strong>.</p>
               </div>
             </div>
           )}

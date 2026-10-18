@@ -32,3 +32,56 @@ test('en modo demostración no se pide entrar con Google', async ({ page }) => {
   await page.waitForTimeout(12_000);
   await expect(page.getByText('Tu sesión de Google no está activa')).toHaveCount(0);
 });
+
+/**
+ * Sesión persistente · con un ticket guardado, un F5 no pide volver a entrar.
+ *
+ * GIS sigue bloqueado: no hay `id_token` posible. Lo único que hay es el
+ * ticket de la visita anterior. El backend se simula (la firma la comprueba el
+ * de verdad; aquí se mira el cliente): que no salga el aviso, y que las
+ * peticiones vayan firmadas con el ticket.
+ */
+test('con sesión persistente, un F5 no pide volver a entrar', async ({ page }) => {
+  const firmas: string[] = [];
+  await bloquearGoogle(page);
+  await page.route(/script\.google\.com\/macros\//, async (ruta) => {
+    let cuerpo: { idToken?: string; accion?: string } = {};
+    try {
+      cuerpo = JSON.parse(ruta.request().postData() || '{}');
+    } catch {
+      /* sin cuerpo */
+    }
+    firmas.push(String(cuerpo.idToken || ''));
+    const datos: Record<string, unknown> = {
+      exportar: { esquema: 5, revision: 1, tablas: {} },
+      obtenerRevision: { revision: 1 },
+      listarPacientes: { filas: [], revision: 1 },
+    };
+    await ruta.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, data: datos[String(cuerpo.accion)] ?? {} }),
+    });
+  });
+
+  await entrarComoSesionRealSimulada(page);
+  await page.evaluate((url) => {
+    const b64 = (t: string) => btoa(t).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const ahora = Date.now();
+    const carga = { v: 1, h: 'huella-sintetica-de-pruebas-0123456789', iat: ahora, exp: ahora + 29 * 24 * 3600 * 1000 };
+    const ticket = 'pt1.' + b64(JSON.stringify(carga)) + '.firma-sintetica';
+    localStorage.setItem('pate:familia:v1', url);
+    localStorage.setItem('pate:sesion:v1', JSON.stringify({ v: 1, t: ticket }));
+  }, BACKEND);
+
+  await page.reload();
+  await page.waitForTimeout(12_000);
+  await expect(page.getByText('Tu sesión de Google no está activa')).toHaveCount(0);
+  expect(firmas.length, 'la aplicación no habló con la hoja').toBeGreaterThan(0);
+  for (const f of firmas) expect(f.startsWith('pt1.')).toBe(true);
+
+  // Y otra vez: cerrar y abrir la PWA es lo mismo que esto.
+  await page.reload();
+  await page.waitForTimeout(12_000);
+  await expect(page.getByText('Tu sesión de Google no está activa')).toHaveCount(0);
+});

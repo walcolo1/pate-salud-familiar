@@ -16,15 +16,21 @@ import {
   ShieldCheck,
   AlertTriangle,
   RefreshCw,
-  X
+  X,
+  PawPrint,
 } from 'lucide-react';
+import { estadoHoja } from '@/lib/estadoHoja';
 import ConfirmDialog, { type OpcionDialogo } from '@/components/ui/ConfirmDialog';
 import { dialogoVisible, estaOcupado } from '@/lib/cierreSesion';
+
+/** Colores del indicador de la hoja. Contraste AA sobre `slate-50`. */
+const COLOR_TEXTO_HOJA = { ok: 'text-teal-700', atencion: 'text-amber-800', neutro: 'text-slate-600' } as const;
+const COLOR_PUNTO_HOJA = { ok: 'bg-teal-500', atencion: 'bg-amber-500', neutro: 'bg-slate-400' } as const;
 
 export default function Navbar({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const {
-    user, driveSyncEnabled, 
+    user, pendingSyncCount,
     sessionLocked, unlockSession,
     // A6-F2
     estadoCierre, solicitarCierreDeSesion, despacharCierre, reintentarSincronizacion,
@@ -231,9 +237,17 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
     );
   }
 
+  const hoja = estadoHoja({
+    origen: origenDatos,
+    hojaRegistrada,
+    hayQueEntrar,
+    pendientes: pendingSyncCount,
+  });
+
   const navItems = [
     { label: 'Inicio', href: '/dashboard', icon: Home },
     { label: 'Familia', href: '/members', icon: Users },
+    { label: 'Mascotas', href: '/mascotas', icon: PawPrint },
     { label: 'Agenda', href: '/agenda', icon: CalendarDays },
     { label: 'Alertas', href: '/reminders', icon: Bell },
     { label: 'Ajustes', href: '/settings', icon: Settings },
@@ -261,14 +275,19 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          {/* Sync status */}
-          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-            <span className="text-xs text-slate-500 font-semibold">Copia en Drive</span>
-            <div className="flex items-center gap-1.5 text-xs text-teal-700 font-bold">
-              <span className={`h-2 w-2 rounded-full ${driveSyncEnabled ? 'bg-teal-500 animate-pulse' : 'bg-slate-400'}`} />
-              {driveSyncEnabled ? 'Activo' : 'Pausado'}
-            </div>
-          </div>
+          {/* Estado de la hoja de la familia */}
+          <Link
+            href="/settings#hoja-familiar"
+            title={hoja.detalle}
+            aria-label={hoja.detalle}
+            className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors"
+          >
+            <span className="text-xs text-slate-600 font-semibold">Hoja familiar</span>
+            <span className={`flex items-center gap-1.5 text-xs font-bold ${COLOR_TEXTO_HOJA[hoja.tono]}`}>
+              <span aria-hidden="true" className={`h-2 w-2 rounded-full ${COLOR_PUNTO_HOJA[hoja.tono]}`} />
+              {hoja.etiqueta}
+            </span>
+          </Link>
 
           {/* Navigation Links */}
           <nav className="flex flex-col gap-1.5">
@@ -324,10 +343,14 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
             </div>
             <span className="font-extrabold text-sm text-slate-900 leading-none">Paté Salud</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`h-2.5 w-2.5 rounded-full ${driveSyncEnabled ? 'bg-teal-500' : 'bg-slate-400'}`} />
-            <span className="text-[10px] text-slate-500 font-bold">{driveSyncEnabled ? 'Drive Synced' : 'Offline'}</span>
-          </div>
+          <Link
+            href="/settings#hoja-familiar"
+            aria-label={hoja.detalle}
+            className="flex items-center gap-2"
+          >
+            <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${COLOR_PUNTO_HOJA[hoja.tono]}`} />
+            <span className={`text-[10px] font-bold ${COLOR_TEXTO_HOJA[hoja.tono]}`}>Hoja: {hoja.etiqueta}</span>
+          </Link>
         </header>
 
         {/* Content inject */}
@@ -345,12 +368,12 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center justify-center w-16 h-full gap-1 transition-all duration-200 ${
+              className={`flex flex-col items-center justify-center flex-1 min-w-0 h-full gap-1 transition-all duration-200 ${
                 active ? 'text-teal-700 font-bold' : 'text-slate-500'
               }`}
             >
               <Icon className={`h-5 w-5 ${active ? 'text-teal-700 scale-105' : 'text-slate-500'}`} />
-              <span className="text-[10px] tracking-wide font-medium">{item.label}</span>
+              <span className="text-[10px] tracking-wide font-medium truncate max-w-full">{item.label}</span>
             </Link>
           );
         })}

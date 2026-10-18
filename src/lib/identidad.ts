@@ -24,6 +24,7 @@
 import { SesionGoogle } from './sesionGoogle';
 import { leerBackend } from './invitacionEntrante';
 import type { SesionBackend } from './repositorioBackend';
+import { puertoTicket } from './ticketSesion';
 
 /** Cómo se pide una credencial nueva. Lo conecta quien inicializa GIS. */
 type Renovador = () => Promise<string | null>;
@@ -43,6 +44,10 @@ export const sesionDeLaAplicacion = new SesionGoogle({
   renovar: async () => (renovador ? renovador() : null),
   ahora: () => Date.now(),
   pedirEntrarDeNuevo: () => aviso?.(),
+  // Sesión persistente: un ticket de 30 días que firma el backend de la
+  // familia. Sin él, cada F5 perdía la credencial y había que volver a entrar.
+  // Ver `ticketSesion.ts`.
+  ticket: puertoTicket(),
   registrarFallo: () => {
     // A propósito en silencio: que no se pueda renovar sin molestar al usuario
     // es lo esperado en más navegadores de los que gustaría, y llenar la

@@ -22,6 +22,7 @@
  */
 
 import type { Mutacion } from './transporteBackend';
+import type { MedicalHistoryEntry, Pet, VaccineEntry, WeightEntry } from '../domain/mascotas';
 import type {
   FamilyMember,
   HealthProfile,
@@ -88,6 +89,11 @@ export interface AllFamilyData {
   doseReminders:           MedicationDoseReminder[];
   gmailSources:            AppointmentEmailSource[];
   appointmentCandidates:   ImportedEmailAppointmentCandidate[];
+  // Bloque D · mascotas (esquema v6).
+  pets:                    Pet[];
+  petWeights:              WeightEntry[];
+  petVaccines:             VaccineEntry[];
+  petHistory:              MedicalHistoryEntry[];
   // Settings (not a domain model; stored as flat flags in AppContext)
   gmailAutoScanEnabled:        boolean;
   gmailScanTime:               string;
@@ -115,6 +121,10 @@ export const EMPTY_FAMILY_DATA: AllFamilyData = {
   doseReminders:           [],
   gmailSources:            [],
   appointmentCandidates:   [],
+  pets:                    [],
+  petWeights:              [],
+  petVaccines:             [],
+  petHistory:              [],
   gmailAutoScanEnabled:        false,
   gmailScanTime:               '00:00',
   gmailScanRangeDays:          90,
@@ -242,6 +252,13 @@ export interface DataRepository {
   darDeBajaDoseReminder(ctx: RepositoryContext, reminderId: string): Promise<void>;
 
   // ── Gmail Sources ─────────────────────────────────────────────────────────
+  // ── Mascotas (Bloque D, esquema v6) ──────────────────────────────────────
+  /** Alta, edición y baja lógica (`activo: false`): la mascota no se borra. */
+  savePet(ctx: RepositoryContext, pet: Pet): Promise<void>;
+  savePetWeight(ctx: RepositoryContext, entry: WeightEntry): Promise<void>;
+  savePetVaccine(ctx: RepositoryContext, entry: VaccineEntry): Promise<void>;
+  savePetHistory(ctx: RepositoryContext, entry: MedicalHistoryEntry): Promise<void>;
+
   saveGmailSource(ctx: RepositoryContext, source: AppointmentEmailSource): Promise<void>;
   darDeBajaGmailSource(ctx: RepositoryContext, sourceId: string): Promise<void>;
 

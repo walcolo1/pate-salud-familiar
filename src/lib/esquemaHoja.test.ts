@@ -321,10 +321,42 @@ describe('Bloque J · esquema v5: la pestaña TAREAS', () => {
     }
   });
 
-  it('la versión es 5, y la 4 quedó congelada', () => {
-    expect(VERSION_ESQUEMA).toBe(5);
+  it('la 4 quedó congelada sin TAREAS', () => {
     const v4 = JSON.parse(readFileSync(join(process.cwd(), 'scripts', 'esquema-v4.json'), 'utf8'));
     expect(v4.version).toBe(4);
     expect(v4.pestanas.TAREAS).toBeUndefined();
+  });
+});
+
+describe('esquema v6: las mascotas llegan a la hoja', () => {
+  it('la versión es 6, y la 5 quedó congelada', () => {
+    expect(VERSION_ESQUEMA).toBe(6);
+    const v5 = JSON.parse(readFileSync(join(process.cwd(), 'scripts', 'esquema-v5.json'), 'utf8'));
+    expect(v5.version).toBe(5);
+    expect(v5.pestanas.PERFIL_MASCOTA).not.toContain('responsable_id');
+    expect(v5.pestanas.TAREAS).toBeDefined();
+  });
+
+  it('PERFIL_MASCOTA guarda el familiar a cargo, al final', () => {
+    const enc = encabezadosDe('PERFIL_MASCOTA') ?? [];
+    expect(enc[enc.length - 1]).toBe('responsable_id');
+  });
+
+  it('HISTORIAL guarda quién atendió, al final', () => {
+    const enc = encabezadosDe('HISTORIAL') ?? [];
+    expect(enc[enc.length - 1]).toBe('profesional');
+  });
+
+  it('a una hoja en v5, instalar() solo le añade esas dos columnas', () => {
+    const v5 = JSON.parse(readFileSync(join(process.cwd(), 'scripts', 'esquema-v5.json'), 'utf8'));
+    expect(repararEncabezados('PERFIL_MASCOTA', v5.pestanas.PERFIL_MASCOTA)).toMatchObject({
+      accion: 'REESCRIBIR',
+      columnasNuevas: ['responsable_id'],
+    });
+    expect(repararEncabezados('HISTORIAL', v5.pestanas.HISTORIAL)).toMatchObject({
+      accion: 'REESCRIBIR',
+      columnasNuevas: ['profesional'],
+    });
+    expect(repararEncabezados('CITAS', v5.pestanas.CITAS)).toEqual({ accion: 'NADA' });
   });
 });

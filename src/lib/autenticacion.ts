@@ -318,3 +318,203 @@ export function leerCache(crudo: unknown, ahoraMs: number): Identidad | null {
 export function urlTokenInfo(idToken: string): string {
   return 'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ticket de sesión (sesión persistente)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/*
+ * POR QUÉ HACE FALTA
+ * ──────────────────
+ * El `id_token` de Google dura una hora y el navegador no puede renovarlo por
+ * su cuenta: GIS no da token de refresco. Al recargar, la credencial se pierde
+ * y la aplicación pedía volver a entrar. En la práctica eso era el aviso rojo
+ * en cada F5, en cada PWA reabierta y a la hora de uso.
+ *
+ * QUÉ ES
+ * ──────
+ * Un ticket que **firma este mismo backend** con HMAC-SHA256 y una clave que
+ * solo existe en sus `ScriptProperties`. Se emite **a cambio de un `id_token`
+ * ya verificado por Google** (o de otro ticket válido, para renovarlo), y a
+ * partir de ahí sustituye al `id_token` en cada petición.
+ *
+ * LO QUE NO LLEVA
+ * ───────────────
+ * Ni correo, ni nombre, ni `sub`. Solo la **huella** de la cuenta —un HMAC del
+ * correo normalizado con la misma clave secreta—, la fecha de emisión y la de
+ * caducidad. En el navegador es una cadena opaca: quien la lea no sabe de
+ * quién es, y sin la clave no puede fabricar otra.
+ *
+ * POR QUÉ SIGUE SIENDO EL MISMO MURO
+ * ──────────────────────────────────
+ * El ticket no da acceso por sí mismo: el router vuelve a resolver el correo
+ * buscando su huella en `ACCESO` (y el titular en `CONFIG`) **en cada
+ * petición**, igual que con un `id_token`. Quien sale de `ACCESO` deja de
+ * entrar en el acto, tenga el ticket que tenga. Rotar la clave
+ * (`SESION_SECRETO`) invalida todos los tickets de golpe.
+ */
+
+/** Marca de los tickets. Un `id_token` es un JWT y nunca empieza así. */
+export const PREFIJO_TICKET = 'pt1.';
+
+/** Treinta días. Se renuevan solos mientras se usen. */
+export const VIGENCIA_TICKET_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** El cliente pide uno nuevo cuando al suyo le quedan menos de quince días. */
+export const RENOVAR_TICKET_ANTES_MS = 15 * 24 * 60 * 60 * 1000;
+
+/** Prefijo de lo que se firma para obtener la huella de una cuenta. */
+export const CONTEXTO_HUELLA = 'pate:cuenta:';
+
+/** Cuánto se cachea en el servidor la resolución huella → correo. */
+export const CACHE_HUELLA_SEGUNDOS = 600;
+
+/** La carga de un ticket. Tres campos y la versión; ni uno más. */
+export interface CargaTicket {
+  v: 1;
+  /** Huella HMAC de la cuenta. No es reversible sin la clave del backend. */
+  h: string;
+  /** Emitido, en milisegundos. */
+  iat: number;
+  /** Caduca, en milisegundos. */
+  exp: number;
+}
+
+/** Firma un texto con la clave del backend y devuelve base64url sin relleno. */
+export type Firmador = (texto: string) => string;
+
+export function esTicketSesion(token: unknown): boolean {
+  return typeof token === 'string' && token.indexOf(PREFIJO_TICKET) === 0;
+}
+
+/**
+ * Texto ASCII → base64url, sin relleno.
+ *
+ * A mano por la misma razón que `base64UrlAUtf8`: tiene que correr igual en
+ * Apps Script y en Node. Solo se usa con JSON de esta misma función, que es
+ * ASCII por construcción (números y una huella base64url).
+ */
+export function asciiABase64Url(texto: string): string {
+  let salida = '';
+  let i = 0;
+  for (; i + 2 < texto.length; i += 3) {
+    const n = (texto.charCodeAt(i) << 16) | (texto.charCodeAt(i + 1) << 8) | texto.charCodeAt(i + 2);
+    salida +=
+      ALFABETO_BASE64.charAt((n >> 18) & 63) +
+      ALFABETO_BASE64.charAt((n >> 12) & 63) +
+      ALFABETO_BASE64.charAt((n >> 6) & 63) +
+      ALFABETO_BASE64.charAt(n & 63);
+  }
+  const resto = texto.length - i;
+  if (resto === 1) {
+    const n = texto.charCodeAt(i) << 16;
+    salida += ALFABETO_BASE64.charAt((n >> 18) & 63) + ALFABETO_BASE64.charAt((n >> 12) & 63);
+  } else if (resto === 2) {
+    const n = (texto.charCodeAt(i) << 16) | (texto.charCodeAt(i + 1) << 8);
+    salida +=
+      ALFABETO_BASE64.charAt((n >> 18) & 63) +
+      ALFABETO_BASE64.charAt((n >> 12) & 63) +
+      ALFABETO_BASE64.charAt((n >> 6) & 63);
+  }
+  return salida.replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+/**
+ * Comparación en tiempo constante.
+ *
+ * Comparar firmas con `===` corta en el primer carácter distinto, y el tiempo
+ * que tarda en contestar le dice a quien prueba cuántos acertó.
+ */
+export function firmasIguales(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  // La longitud de una firma HMAC-SHA256 en base64url es fija (43): que
+  // difiera no revela nada que no se sepa ya.
+  if (a.length !== b.length || a.length === 0) return false;
+  let diferencia = 0;
+  for (let i = 0; i < a.length; i++) diferencia |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diferencia === 0;
+}
+
+/** La huella de una cuenta: HMAC del correo normalizado. */
+export function huellaDeCorreo(email: string, firmar: Firmador): string {
+  const normalizado = normalizarEmail(email);
+  if (normalizado.length === 0) invalido();
+  return firmar(CONTEXTO_HUELLA + normalizado);
+}
+
+/** Emite un ticket para un correo **ya verificado**. */
+export function emitirTicket(email: string, firmar: Firmador, ahoraMs: number): { ticket: string; expira: number } {
+  if (!Number.isFinite(ahoraMs) || ahoraMs <= 0) invalido();
+  const carga: CargaTicket = {
+    v: 1,
+    h: huellaDeCorreo(email, firmar),
+    iat: Math.floor(ahoraMs),
+    exp: Math.floor(ahoraMs + VIGENCIA_TICKET_MS),
+  };
+  const cuerpo = PREFIJO_TICKET + asciiABase64Url(JSON.stringify(carga));
+  return { ticket: cuerpo + '.' + firmar(cuerpo), expira: carga.exp };
+}
+
+/**
+ * La carga de un ticket, **sin comprobar la firma**. Para el cliente, que solo
+ * necesita saber cuándo caduca, y para las pruebas. Nunca decide un acceso.
+ */
+export function cargaDeTicket(ticket: unknown): CargaTicket | null {
+  if (!esTicketSesion(ticket)) return null;
+  const partes = String(ticket).slice(PREFIJO_TICKET.length).split('.');
+  if (partes.length !== 2 || partes[0].length === 0 || partes[1].length === 0) return null;
+  try {
+    const carga = JSON.parse(base64UrlAUtf8(partes[0])) as Partial<CargaTicket> | null;
+    if (!carga || typeof carga !== 'object' || carga.v !== 1) return null;
+    if (typeof carga.h !== 'string' || carga.h.length < 16) return null;
+    if (typeof carga.iat !== 'number' || typeof carga.exp !== 'number') return null;
+    if (!Number.isFinite(carga.iat) || !Number.isFinite(carga.exp) || carga.exp <= carga.iat) return null;
+    return { v: 1, h: carga.h, iat: carga.iat, exp: carga.exp };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Verifica un ticket: firma, forma y caducidad. Devuelve su carga.
+ *
+ * @throws `TOKEN_INVALIDO` ante cualquier fallo, sin decir cuál — igual que
+ *     con un `id_token`.
+ */
+export function verificarTicket(ticket: unknown, firmar: Firmador, ahoraMs: number): CargaTicket {
+  if (!esTicketSesion(ticket)) invalido();
+  const texto = String(ticket);
+  const punto = texto.lastIndexOf('.');
+  if (punto <= PREFIJO_TICKET.length) invalido();
+
+  const cuerpo = texto.slice(0, punto);
+  const firma = texto.slice(punto + 1);
+  if (!firmasIguales(firmar(cuerpo), firma)) invalido();
+
+  const carga = cargaDeTicket(texto);
+  if (!carga) invalido();
+  // Sin margen, como con el `id_token`. Tampoco se aceptan tickets «del
+  // futuro»: o el reloj está mal o alguien está jugando con la carga.
+  if ((carga as CargaTicket).exp <= ahoraMs) invalido();
+  if ((carga as CargaTicket).iat > ahoraMs + 5 * 60 * 1000) invalido();
+  if ((carga as CargaTicket).exp - (carga as CargaTicket).iat > VIGENCIA_TICKET_MS) invalido();
+  return carga as CargaTicket;
+}
+
+/**
+ * Busca, entre los correos con derecho a entrar, el de una huella.
+ *
+ * Son los de `ACCESO` más el titular: una familia, no un padrón, así que
+ * recorrerlos firma unos pocos correos. El resultado se cachea en el servidor.
+ */
+export function correoDeHuella(huella: string, candidatos: readonly unknown[], firmar: Firmador): string | null {
+  if (typeof huella !== 'string' || huella.length === 0) return null;
+  const vistos: Record<string, true> = {};
+  for (let i = 0; i < (candidatos || []).length; i++) {
+    const email = normalizarEmail(candidatos[i]);
+    if (email.length === 0 || email.indexOf('@') === -1 || vistos[email]) continue;
+    vistos[email] = true;
+    if (firmasIguales(firmar(CONTEXTO_HUELLA + email), huella)) return email;
+  }
+  return null;
+}

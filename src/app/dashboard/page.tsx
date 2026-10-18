@@ -17,7 +17,21 @@ import {
   ClipboardList,
   Pill,
   Mail,
+  PawPrint,
 } from 'lucide-react';
+import type { Relationship } from '@/domain/models';
+import { NOMBRE_ESPECIE } from '@/domain/mascotas';
+
+/** Cómo se llama cada relación en la tarjeta. Antes todo lo que no era «Tú» ni «Hijo/a» salía como «Cónyuge». */
+const RELACION_CORTA: Record<Relationship, string> = {
+  SELF: 'Tú',
+  SPOUSE: 'Cónyuge',
+  CHILD: 'Hijo/a',
+  PARENT: 'Padre/Madre',
+  SIBLING: 'Hermano/a',
+  GRANDPARENT: 'Abuelo/a',
+  OTHER: 'Familiar',
+};
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -35,6 +49,7 @@ export default function DashboardPage() {
     cambiosRetenidos,
     cargandoExpediente,
     isLoading,
+    pets,
     
     
     checkPendingInvitations
@@ -314,6 +329,9 @@ export default function DashboardPage() {
 
   // Filter only active members for dashboard
   const activeMembers = members.filter(m => (m.status || 'ACTIVE') === 'ACTIVE');
+  const activePets = (pets ?? [])
+    .filter((p) => p.activo && !p.deletedAt)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
   return (
     <div className="flex flex-col gap-8 pb-10">
@@ -391,7 +409,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-center w-full min-w-0">
                     <p className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[90px] mx-auto">{member.fullName.split(' ')[0]}</p>
-                    <span className="text-[9px] text-slate-500 font-semibold">{member.relationship === 'SELF' ? 'Tú' : member.relationship === 'CHILD' ? 'Hijo/a' : 'Cónyuge'}</span>
+                    <span className="text-[9px] text-slate-500 font-semibold">{RELACION_CORTA[member.relationship] ?? 'Familiar'}</span>
                     {member.documentType && member.documentNumber && (
                       <p className="text-[9px] text-teal-700 font-extrabold mt-0.5 truncate max-w-[95px] mx-auto leading-none">
                         {formatDocument(member.documentType, member.documentNumber)}
@@ -417,6 +435,57 @@ export default function DashboardPage() {
             </>
           )}
         </div>
+      </section>
+
+      {/* ── Mis mascotas ─────────────────────────────────────────────────── */}
+      <section className="flex flex-col gap-3" aria-labelledby="titulo-mascotas">
+        <div className="flex justify-between items-center px-1">
+          <h3 id="titulo-mascotas" className="font-extrabold text-slate-800 text-sm tracking-wide uppercase flex items-center gap-2">
+            {`Mis mascotas (${activePets.length})`}
+          </h3>
+          <Link href="/mascotas" className="text-xs font-bold text-teal-700 hover:text-teal-800 flex items-center gap-1">
+            <span>Ver todas</span>
+            <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+
+        {activeMembers.length === 0 ? null : activePets.length === 0 ? (
+          <EstadoVacio
+            variante="compacto"
+            icono={PawPrint}
+            titulo="Aún no hay mascotas"
+            descripcion="Lleva su peso, sus vacunas y sus visitas al veterinario junto al resto de la familia."
+            accion={{ tipo: 'enlace', etiqueta: 'Añadir mascota', href: '/mascotas?nueva=1' }}
+          />
+        ) : (
+          <div className="flex items-center gap-3.5 overflow-x-auto pb-2 scrollbar-none w-full">
+            {activePets.map((p) => (
+              <Link
+                key={p.id}
+                href={`/members/${p.memberId}/pets`}
+                aria-label={`${p.nombre}, ${NOMBRE_ESPECIE[p.especie] ?? 'mascota'}: ver su peso, vacunas e historial`}
+                className="flex flex-col items-center gap-2 bg-white p-4 rounded-2xl min-w-[110px] border border-slate-100 shadow-sm shadow-slate-100/40 hover:shadow-md transition-all duration-200 active:scale-95 shrink-0"
+              >
+                <span aria-hidden="true" className="h-12 w-12 rounded-full bg-teal-50 text-teal-700 border border-teal-100 flex items-center justify-center">
+                  <PawPrint className="h-5 w-5" />
+                </span>
+                <span className="text-center w-full min-w-0">
+                  <span className="block text-xs font-bold text-slate-800 leading-tight truncate max-w-[90px] mx-auto">{p.nombre}</span>
+                  <span className="block text-[9px] text-slate-500 font-semibold">{NOMBRE_ESPECIE[p.especie] ?? 'Mascota'}</span>
+                </span>
+              </Link>
+            ))}
+            <Link
+              href="/mascotas?nueva=1"
+              className="flex flex-col items-center justify-center gap-2 bg-slate-100/50 hover:bg-slate-100 p-4 rounded-2xl min-w-[110px] min-h-[118px] border border-dashed border-slate-200 transition-all duration-200 active:scale-95 shrink-0"
+            >
+              <span aria-hidden="true" className="h-10 w-10 rounded-full bg-white text-teal-700 flex items-center justify-center border border-slate-200">
+                <Plus className="h-5 w-5" />
+              </span>
+              <span className="text-[10px] font-bold text-teal-700">Añadir mascota</span>
+            </Link>
+          </div>
+        )}
       </section>
 
       {/* ── Quick Actions Grid ───────────────────────────────────────────── */}

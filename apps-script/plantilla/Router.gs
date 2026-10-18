@@ -157,6 +157,14 @@ var MANEJADORES = {
   aceptarInvitacion: function (payload, acceso, identidad) {
     return aceptarInvitacion(payload, acceso, identidad);
   },
+
+  /**
+   * Sesión persistente: cambia un `id_token` (o un ticket a punto de
+   * caducar) por un ticket de 30 días. Ver `Auth.gs`.
+   */
+  abrirSesion: function (payload, acceso, identidad) {
+    return abrirSesion(payload, acceso, identidad);
+  },
   cambiarRol: function (payload, acceso) {
     return mutarAcceso('CAMBIAR_ROL', payload, acceso);
   },

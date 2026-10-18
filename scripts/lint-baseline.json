@@ -12,7 +12,7 @@
   "src/app/members/new/page.tsx": 3,
   "src/app/members/page.tsx": 1,
   "src/app/onboarding/setup/page.tsx": 1,
-  "src/app/settings/page.tsx": 12,
+  "src/app/settings/page.tsx": 11,
   "src/context/AppContext.tsx": 27,
   "src/lib/analizadorCitaTexto.ts": 3,
   "src/lib/googleSheets.ts": 14,

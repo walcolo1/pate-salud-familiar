@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { bloquearGoogle, entrarEnModoDemo, volcarAlmacenamiento } from './apoyo';
+import { bloquearGoogle, entrarEnModoDemo, volcarAlmacenamiento, abrirHerramientasAvanzadas } from './apoyo';
 
 /**
  * E2E · Salvaguardas del modo DEMO (A6-F3).
@@ -26,6 +26,7 @@ test.describe('A6-F3 · salvaguardas DEMO', () => {
 
   test('D1 · la exportación DEMO lleva prefijo en el nombre del archivo', async ({ page }) => {
     await page.goto('/settings');
+    await abrirHerramientasAvanzadas(page);
     const descarga = page.waitForEvent('download', { timeout: 20_000 });
     await page.getByRole('button', { name: /Exportar|Descargar respaldo|respaldo/i }).first().click();
     const d = await descarga;
@@ -34,6 +35,7 @@ test.describe('A6-F3 · salvaguardas DEMO', () => {
 
   test('D2 · la exportación DEMO lleva aviso y origen dentro del JSON', async ({ page }) => {
     await page.goto('/settings');
+    await abrirHerramientasAvanzadas(page);
     const descarga = page.waitForEvent('download', { timeout: 20_000 });
     await page.getByRole('button', { name: /Exportar|Descargar respaldo|respaldo/i }).first().click();
     const d = await descarga;
@@ -49,7 +51,7 @@ test.describe('A6-F3 · salvaguardas DEMO', () => {
 
   test('D3 · un respaldo REAL es rechazado dentro del modo DEMO', async ({ page }) => {
     await page.goto('/settings');
-    await expect(page.getByRole('heading', { name: /Configuraci/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Ajustes/i, level: 2 })).toBeVisible();
     await page.waitForTimeout(500);
 
     const respaldoReal = JSON.stringify({

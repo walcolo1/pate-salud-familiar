@@ -11,6 +11,8 @@ import { VigiaSesion } from '../lib/vigiaSesion';
 import { ColaDuradera } from '../lib/colaDuradera';
 import { huellaCuenta } from '../lib/huellaCuenta';
 import { sujetoDe } from '../lib/sesionGoogle';
+import { esTicketSesion } from '../lib/autenticacion';
+import { fusionarMascotas, hayAlgo } from '../lib/fusionMascotas';
 import {
   DespachadorCola,
   conectarDisparadores,
@@ -652,8 +654,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   if (cargaAlEntrarRef.current === null) {
     cargaAlEntrarRef.current = new CargaAlEntrar({
       hayHoja: () => sesionBackend().url() !== null,
+      // El origen también cuenta: mientras sigue en su valor inicial (DEMO),
+      // `pullFromGoogle` vuelve sin hacer nada, y si eso contara como carga ya
+      // no se intentaría otra vez. Con la sesión persistente la identidad está
+      // desde el primer instante —antes llegaba segundos después con GIS— y
+      // ese orden dejaba el expediente sin recargar tras un F5.
       hayIdentidad: () =>
-        sesionDeLaAplicacion.vigente && usuarioActivoRef.current?.provider === 'google',
+        sesionDeLaAplicacion.vigente &&
+        usuarioActivoRef.current?.provider === 'google' &&
+        origenDatosRef.current === 'REAL',
       cargar: () => cargarExpedienteRef.current(),
       alCambiarCargando: setCargandoExpediente,
     });
@@ -766,7 +775,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Bloque I · la cuenta de la credencial con la que se va a enviar. Solo
       // salen los lotes que hizo esa cuenta.
       cuentaActiva: async () => {
-        const sub = sujetoDe(await sesionDeLaAplicacion.idToken());
+        const credencial = await sesionDeLaAplicacion.idToken();
+        // Con la sesión persistente la credencial es un ticket, que no lleva
+        // `sub` a propósito. El ticket se emitió para la cuenta que entró y se
+        // descarta con cualquier credencial nueva o cierre de sesión, así que
+        // la cuenta es la del usuario activo.
+        const sub = esTicketSesion(credencial)
+          ? usuarioActivoRef.current?.provider === 'google'
+            ? usuarioActivoRef.current.googleId
+            : null
+          : sujetoDe(credencial);
         return sub && colaRef.current ? huellaCuenta(colaRef.current.sal, sub) : null;
       },
       alCambiar: (n) => {
@@ -1645,7 +1663,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setLastKnownRevision(savedState.lastKnownRevision || 0);
         // Marcar como cargado desde caché local; el pull automático se lanza en background
         setSyncInitStatus('local_only');
-        setSyncInitMessage('Datos cargados desde caché local. Puedes sincronizar desde Configuración.');
+        setSyncInitMessage('Datos cargados desde caché local. Se actualizarán al volver a conectar con la hoja.');
       } else {
         // Inicialización limpia por primera vez para usuario real nuevo
         setUser(realUser);
@@ -1891,6 +1909,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const o = origenDe(user);
     origenDatosRef.current = o;
     setOrigenDatos(o);
+    // Ahora que se sabe que el origen es REAL, la carga al entrar ya puede
+    // intentarse (ver `hayIdentidad` en la carga al entrar).
+    if (o === 'REAL') void cargaAlEntrarRef.current?.intentar();
   }, [user]);
   useEffect(() => { pendingSyncCountRef.current = pendingSyncCount; }, [pendingSyncCount]);
 
@@ -2169,6 +2190,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     medicalOrders,
     medicationPrescriptions,
     medicationDoseReminders,
+    pets,
+    petWeights,
+    petVaccines,
+    petHistory,
   });
 
   stateRef.current = {
@@ -2186,6 +2211,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     medicalOrders,
     medicationPrescriptions,
     medicationDoseReminders,
+    pets,
+    petWeights,
+    petVaccines,
+    petHistory,
   };
 
   /** Vuelve la pantalla a como estaba antes de un cambio que la hoja rechazó. */
@@ -2204,6 +2233,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMedicalOrders(snap.medicalOrders);
     setMedicationPrescriptions(snap.medicationPrescriptions);
     setMedicationDoseReminders(snap.medicationDoseReminders);
+    setPets(snap.pets);
+    setPetWeights(snap.petWeights);
+    setPetVaccines(snap.petVaccines);
+    setPetHistory(snap.petHistory);
   };
 
   const mensajeDeRechazo = (codigo: string) =>
@@ -3579,6 +3612,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     setPets((prev) => [...prev, nueva]);
+    // v6 · a la hoja, como todo lo demás.
+    persistirPorMutacion(async (repo, ctx) => {
+      await repo.savePet(ctx, nueva);
+    });
     return { valido: true };
   };
 
@@ -3605,21 +3642,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const validacion = validarMascota(resultante);
     if (!validacion.valido) return validacion;
 
-    setPets((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              ...resultante,
-              nombre: (resultante.nombre as string).trim(),
-              raza: resultante.raza?.trim() || null,
-              notas: resultante.notas?.trim() || null,
-              updatedAt: new Date().toISOString(),
-              syncStatus: 'PENDING_SYNC',
-            }
-          : p,
-      ),
-    );
+    const actualizada: Pet = {
+      ...actual,
+      ...resultante,
+      memberId: resultante.memberId as string,
+      nombre: (resultante.nombre as string).trim(),
+      especie: resultante.especie!,
+      sexo: resultante.sexo!,
+      raza: resultante.raza?.trim() || null,
+      notas: resultante.notas?.trim() || null,
+      updatedAt: new Date().toISOString(),
+      syncStatus: 'PENDING_SYNC',
+    };
+    setPets((prev) => prev.map((p) => (p.id === id ? actualizada : p)));
+    persistirPorMutacion(async (repo, ctx) => {
+      await repo.savePet(ctx, actualizada);
+    });
     return { valido: true };
   };
 
@@ -3631,18 +3669,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * la propia familia— y borrarlo no devuelve nada a cambio.
    */
   const setPetActiva = (id: string, activa: boolean) => {
-    setPets((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              activo: activa,
-              updatedAt: new Date().toISOString(),
-              syncStatus: 'PENDING_SYNC',
-            }
-          : p,
-      ),
-    );
+    const actual = pets.find((p) => p.id === id);
+    if (!actual) return;
+    const cambiada: Pet = {
+      ...actual,
+      activo: activa,
+      updatedAt: new Date().toISOString(),
+      syncStatus: 'PENDING_SYNC',
+    };
+    setPets((prev) => prev.map((p) => (p.id === id ? cambiada : p)));
+    // La baja es lógica: una fila nueva con `activo = NO`, nunca un borrado.
+    persistirPorMutacion(async (repo, ctx) => {
+      await repo.savePet(ctx, cambiada);
+    });
   };
 
   /**
@@ -3684,19 +3723,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
     const masReciente = serie[serie.length - 1];
 
+    const conPeso: Pet = {
+      ...mascota,
+      pesoActualKg: masReciente.pesoKg,
+      updatedAt: new Date().toISOString(),
+      syncStatus: 'PENDING_SYNC',
+    };
     setPetWeights((prev) => [...prev, nuevo]);
-    setPets((prev) =>
-      prev.map((p) =>
-        p.id === entrada.petId
-          ? {
-              ...p,
-              pesoActualKg: masReciente.pesoKg,
-              updatedAt: new Date().toISOString(),
-              syncStatus: 'PENDING_SYNC',
-            }
-          : p,
-      ),
-    );
+    setPets((prev) => prev.map((p) => (p.id === entrada.petId ? conPeso : p)));
+    // El pesaje y el peso actual que refleja, en el mismo lote.
+    persistirPorMutacion(async (repo, ctx) => {
+      await repo.savePetWeight(ctx, nuevo);
+      await repo.savePet(ctx, conPeso);
+    });
 
     return { valido: true };
   };
@@ -3741,6 +3780,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     setPetVaccines((prev) => [...prev, nueva]);
+    persistirPorMutacion(async (repo, ctx) => {
+      await repo.savePetVaccine(ctx, nueva);
+    });
     return { valido: true };
   };
 
@@ -3784,6 +3826,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     setPetHistory((prev) => [...prev, nueva]);
+    persistirPorMutacion(async (repo, ctx) => {
+      await repo.savePetHistory(ctx, nueva);
+    });
     return { valido: true };
   };
 
@@ -5335,6 +5380,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMedicationPrescriptions(d.medications);
     setMedicationDoseReminders(d.doseReminders);
     setAppointmentCandidates(d.appointmentCandidates);
+
+    // v6 · las mascotas también vienen de la hoja. Las que solo existían en
+    // este navegador (antes de v6 no se subían) se conservan y se suben.
+    const local = stateRef.current;
+    const fusion = fusionarMascotas(
+      { pets: d.pets, petWeights: d.petWeights, petVaccines: d.petVaccines, petHistory: d.petHistory },
+      { pets: local.pets, petWeights: local.petWeights, petVaccines: local.petVaccines, petHistory: local.petHistory },
+    );
+    setPets(fusion.resultado.pets);
+    setPetWeights(fusion.resultado.petWeights);
+    setPetVaccines(fusion.resultado.petVaccines);
+    setPetHistory(fusion.resultado.petHistory);
+    if (hayAlgo(fusion.porSubir)) {
+      const { porSubir } = fusion;
+      persistirPorMutacion(async (repo, ctx) => {
+        for (const p of porSubir.pets) await repo.savePet(ctx, p);
+        for (const w of porSubir.petWeights) await repo.savePetWeight(ctx, w);
+        for (const v of porSubir.petVaccines) await repo.savePetVaccine(ctx, v);
+        for (const h of porSubir.petHistory) await repo.savePetHistory(ctx, h);
+      });
+    }
   };
 
   const resetIdleTimer = () => {

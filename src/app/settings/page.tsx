@@ -30,6 +30,7 @@ import {
   Timer,
 } from 'lucide-react';
 import TarjetaHojaFamiliar from '@/components/ajustes/TarjetaHojaFamiliar';
+import { sesionDeLaAplicacion } from '@/lib/identidad';
 
 
 export default function SettingsPage() {
@@ -55,7 +56,6 @@ export default function SettingsPage() {
     members,
     importBackupJSON,
     documents,
-    revokeDocumentShare,
     validateDataIntegrity,
     medicalOrders,
     medicationPrescriptions,
@@ -81,6 +81,7 @@ export default function SettingsPage() {
     invitations,
     createInvitation,
     revokeInvitation,
+    hayQueEntrar,
   } = useApp();
   const confirmar = useConfirmacion();
   const avisar = useAviso();
@@ -246,265 +247,58 @@ export default function SettingsPage() {
   };
 
 
+  // Estado real de la sesión, no la hora a la que se entró por primera vez.
+  const sesionHasta = sesionDeLaAplicacion.ticketCaduca;
+  const estadoSesion =
+    user.provider !== 'google'
+      ? { texto: 'Sesión de demostración', clase: 'bg-amber-50 text-amber-800 border-amber-100' }
+      : hayQueEntrar
+        ? { texto: 'Sesión de Google pausada: vuelve a entrar', clase: 'bg-amber-50 text-amber-800 border-amber-100' }
+        : sesionHasta
+          ? {
+              texto: `Sesión guardada en este dispositivo hasta el ${new Date(sesionHasta).toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })}`,
+              clase: 'bg-emerald-50 text-emerald-800 border-emerald-100',
+            }
+          : { texto: 'Sesión activa', clase: 'bg-emerald-50 text-emerald-800 border-emerald-100' };
+
   return (
     <div className="flex flex-col gap-6 select-none pb-12">
-      
-      {/* Header Info */}
-      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-        <h2 className="text-2xl font-black text-slate-800 leading-tight">Configuración</h2>
-        <p className="text-xs font-semibold text-slate-500">Administra tus servicios conectados, respaldos y cuenta.</p>
+
+      <section className="px-1">
+        <h2 className="text-2xl font-black text-slate-800 leading-tight">Ajustes</h2>
+        <p className="text-xs font-semibold text-slate-600 mt-1">Tu cuenta, la hoja de la familia y quién puede entrar.</p>
       </section>
 
-      {/* User profile card */}
-      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+      {/* Cuenta */}
+      <section aria-label="Tu cuenta" className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
         {user.photoUrl ? (
-          <img 
-            src={user.photoUrl} 
-            alt="Foto de perfil" 
+          <img
+            src={user.photoUrl}
+            alt="Foto de perfil"
             className="h-14 w-14 rounded-full border border-slate-200 shrink-0 object-cover"
             referrerPolicy="no-referrer"
           />
         ) : (
-          <div className="h-14 w-14 rounded-full bg-teal-600/10 text-teal-700 border border-teal-600/20 flex items-center justify-center font-black text-base shrink-0">
+          <div aria-hidden="true" className="h-14 w-14 rounded-full bg-teal-600/10 text-teal-700 border border-teal-600/20 flex items-center justify-center font-black text-base shrink-0">
             {user.displayName.substring(0, 2).toUpperCase()}
           </div>
         )}
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-extrabold text-slate-800 leading-none mb-1.5">{user.displayName}</h3>
-          <p className="text-[11px] text-slate-500 font-bold truncate leading-none mb-2">{user.email}</p>
-          <div className="flex flex-wrap gap-1.5 items-center">
-            {user.provider === 'google' ? (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-blue-50 text-blue-600 border border-blue-100">
-                Google Conectado
-              </span>
-            ) : (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-50 text-amber-700 border border-amber-100">
-                Sesión Demo local
-              </span>
-            )}
-            {user.loggedAt && (
-              <span className="text-[8px] text-slate-500 font-bold leading-none">
-                Conectado: {new Date(user.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            )}
-          </div>
+          <p className="text-[11px] text-slate-600 font-bold truncate leading-none mb-2">{user.email}</p>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${estadoSesion.clase}`}>
+            {estadoSesion.texto}
+          </span>
         </div>
       </section>
 
-      {/* G4b · Dónde está la hoja de la familia. Va arriba del todo: sin ella,
-          nada de lo que se escribe en la aplicación llega a ninguna parte. */}
+      {/* G4b · Dónde está la hoja de la familia. Va arriba: sin ella, nada de
+          lo que se escribe en la aplicación llega a ninguna parte. */}
       {origenDatos === 'REAL' && <TarjetaHojaFamiliar />}
 
-      {/* Ficha: Importación de citas (Bloque B — manual, sin Gmail) */}
-        <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-violet-50 text-violet-600 rounded-xl">
-              <Inbox className="h-5 w-5" />
-            </div>
-            <div>
-              <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Importación de citas</h4>
-              <p className="text-[10px] text-slate-500 font-semibold">
-                Pega el texto del correo de tu EPS o adjunta el documento. La aplicación no lee tu correo.
-              </p>
-            </div>
-          </div>
-
-          <hr className="border-slate-50" />
-
-          <div className="flex items-center justify-between">
-            <div>
-              <span id="etiqueta-solo-futuras" className="font-extrabold text-slate-700 block text-xs mb-0.5">Solo importar citas futuras</span>
-              <p className="text-[10px] text-slate-500">Marca como ignoradas las citas cuya fecha ya pasó.</p>
-            </div>
-            <button
-              id="btn-toggle-future-only"
-              type="button"
-              role="switch"
-              aria-checked={gmailOnlyFutureAppointments}
-              aria-labelledby="etiqueta-solo-futuras"
-              onClick={() => setGmailOnlyFutureAppointments(!gmailOnlyFutureAppointments)}
-              className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
-                gmailOnlyFutureAppointments ? 'bg-teal-700 justify-end' : 'bg-slate-200 justify-start'
-              }`}
-            >
-              <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
-            </button>
-          </div>
-
-          <div className="border-t border-slate-100/70 pt-3.5 flex items-center justify-between">
-            <div className="flex flex-col">
-              <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Pendientes de revisión</span>
-              <span className={`font-extrabold text-xs ${
-                appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length > 0 ? 'text-amber-700' : 'text-emerald-700'
-              }`}>
-                {appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length} borradores
-              </span>
-            </div>
-            <Link
-              href="/appointments/import"
-              id="link-importar-cita"
-              className="py-2 px-3.5 bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-[10px] rounded-lg shadow-sm transition-all"
-            >
-              Importar una cita
-            </Link>
-          </div>
-        </section>
-
-      {/* ── PANEL DE DIAGNÓSTICO Y RESPALDO DE GOOGLE-NATIVE ── */}
+      {/* Quién puede entrar (solo el titular) */}
       {user.provider === 'google' && (
-        <div className="flex flex-col gap-6">
-          
-          {/* Ficha 1: Diagnóstico General y Estado de Sincronización */}
-
-          {/* Ficha Nueva: Diagnóstico de Datos e Integridad */}
-          <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-teal-50 text-teal-700 rounded-xl">
-                  <Database className="h-5 w-5" />
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Diagnóstico y Salud de Datos</h4>
-                  <p className="text-[10px] text-slate-500 font-semibold">Resumen de registros locales e integridad de la información.</p>
-                </div>
-              </div>
-              
-              {integrityReport ? (
-                <span className={`text-[10px] font-black px-3 py-1 rounded-full border uppercase leading-none ${
-                  integrityReport.status === 'ok' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                  integrityReport.status === 'warnings' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                  'bg-rose-50 text-rose-700 border-rose-100'
-                }`}>
-                  Integridad: {integrityReport.status === 'ok' ? 'Correcto' :
-                               integrityReport.status === 'warnings' ? 'Advertencias' : 'Errores'}
-                </span>
-              ) : (
-                <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-slate-50 text-slate-500 border border-slate-200 uppercase leading-none">
-                  Sin verificar
-                </span>
-              )}
-            </div>
-
-            <hr className="border-slate-50" />
-
-            {/* Grid de Cantidades */}
-            <div>
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide block mb-3">Registros en memoria local</span>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Miembros</span>
-                  <div className="mt-1 flex items-baseline gap-1.5">
-                    <span className="text-lg font-black text-slate-800 leading-none">{totalMembers}</span>
-                    <span className="text-[8px] font-semibold text-slate-500 leading-none">({activeMembers} act / {inactiveMembers} inact)</span>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Citas médicas</span>
-                  <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalAppointments}</span>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Documentos clínicos</span>
-                  <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalDocs}</span>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Órdenes Médicas</span>
-                  <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalOrders}</span>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Medicamentos</span>
-                  <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalMeds}</span>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Tomas pendientes hoy</span>
-                  <span className={`text-lg font-black leading-none mt-1 ${pendingDoses > 0 ? 'text-teal-700' : 'text-slate-850'}`}>{pendingDoses}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Ejecución de Validación de Integridad */}
-            <div className="flex flex-col gap-3 pt-1">
-              <button
-                id="btn-validate-integrity"
-                onClick={() => {
-                  setIsCheckingIntegrity(true);
-                  setTimeout(() => {
-                    const result = validateDataIntegrity();
-                    setIntegrityReport(result);
-                    setIsCheckingIntegrity(false);
-                  }, 600);
-                }}
-                disabled={isCheckingIntegrity}
-                className="w-full h-10 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-75"
-              >
-                {isCheckingIntegrity ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>Validando consistencia de datos...</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    <span>Validar Integridad de Datos</span>
-                  </>
-                )}
-              </button>
-
-              {/* Resultados de la validación */}
-              {integrityReport && (
-                <div className={`p-4 rounded-2xl border flex flex-col gap-2 font-semibold text-[10px] ${
-                  integrityReport.status === 'ok' ? 'bg-emerald-50/50 border-emerald-100/60 text-emerald-800' :
-                  integrityReport.status === 'warnings' ? 'bg-amber-50/50 border-amber-100/60 text-amber-800' :
-                  'bg-rose-50/50 border-rose-100/60 text-rose-800'
-                }`}>
-                  <div className="flex items-center gap-2">
-                    {integrityReport.status === 'ok' ? (
-                      <CheckCircle2 className="h-4.5 w-4.5 text-emerald-700 flex-shrink-0" />
-                    ) : (
-                      <AlertCircle className="h-4.5 w-4.5 text-amber-700 flex-shrink-0" />
-                    )}
-                    <span className="font-bold text-[11px] block">
-                      {integrityReport.status === 'ok' && '¡Excelente! No se encontraron problemas de consistencia en tus datos.'}
-                      {integrityReport.status === 'warnings' && 'Sugerencias de integridad encontradas (Advertencias)'}
-                      {integrityReport.status === 'errors' && 'Conflictos críticos detectados (Errores)'}
-                    </span>
-                  </div>
-                  
-                  {integrityReport.errors.length > 0 && (
-                    <div className="mt-1 flex flex-col gap-1">
-                      <span className="font-bold text-[9px] uppercase text-rose-700">Errores:</span>
-                      <ul className="list-disc pl-4 space-y-1 text-rose-700 text-[9.5px]">
-                        {integrityReport.errors.map((err: string, idx: number) => (
-                          <li key={idx}>{err}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {integrityReport.warnings.length > 0 && (
-                    <div className="mt-1 flex flex-col gap-1">
-                      <span className="font-bold text-[9px] uppercase text-amber-700">Advertencias:</span>
-                      <ul className="list-disc pl-4 space-y-1 text-amber-700 text-[9.5px]">
-                        {integrityReport.warnings.map((warn: string, idx: number) => (
-                          <li key={idx}>{warn}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  <div className="text-[8px] text-slate-500 font-bold border-t border-slate-200/30 pt-2 mt-1">
-                    Verificado el: {new Date(integrityReport.checkedAt).toLocaleString('es-CO')}
-                  </div>
-                </div>
-              )}
-            </div>
-          </section>
-
-
+        <>
           {/* Ficha: Invitaciones Familiares (solo el titular) */}
           {currentUserRole === 'FAMILY_ADMIN' && (
             <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
@@ -666,416 +460,63 @@ export default function SettingsPage() {
             </section>
           )}
 
-        </div>
+        </>
       )}
 
-
-      {/* Compartición Google-native */}
-      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-        <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">
-          Compartición de Archivos (Drive)
-        </h4>
-        <hr className="border-slate-50" />
-        
-        <div className="bg-amber-50 p-3 rounded-2xl border border-amber-100 text-amber-700 text-[10px] leading-relaxed font-semibold">
-          <p className="font-extrabold mb-1">ℹ Resguardo de Privacidad:</p>
-          <p>La base de datos de tu familia se comparte de forma segura y automática con los miembros autorizados en tu grupo familiar. Los archivos físicos (PDFs/imágenes) almacenados en Google Drive solo se comparten con destinatarios explícitos.</p>
-        </div>
-
-        {/* Shared Reports list */}
-
-        {/* Shared Documents list */}
-        <div className="flex flex-col gap-3 mt-2">
-          <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wide px-1">Documentos Clínicos Compartidos (Drive)</span>
-          {documents.filter(d => d.shareStatus === 'SHARED').length === 0 ? (
-            <p className="text-[10px] text-slate-500 font-semibold italic px-1">No hay PDFs o imágenes compartidos actualmente.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {documents
-                .filter(d => d.shareStatus === 'SHARED')
-                .map((doc) => (
-                  <div key={doc.id} className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-semibold text-[10px]">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-extrabold text-slate-800 truncate">{doc.fileName}</p>
-                      <p className="text-[9px] text-slate-500">Destinatario: {doc.sharedWithEmail}</p>
-                      <p className="text-[8px] text-slate-500 font-bold">Fecha carga: {new Date(doc.uploadedAt).toLocaleDateString('es-CO')}</p>
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      {doc.driveUrl && (
-                        <a 
-                          href={doc.driveUrl} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="bg-white border border-slate-200 text-slate-700 hover:text-teal-700 px-3 py-1.5 rounded-xl font-bold transition-all text-center flex items-center justify-center animate-none"
-                        >
-                          Abrir
-                        </a>
-                      )}
-                      <button
-                        onClick={async () => {
-                          try {
-                            await revokeDocumentShare(doc.id);
-                          } catch (err: any) {
-                            avisar(`Error al revocar: ${err.message}`);
-                          }
-                        }}
-                        className="bg-rose-50 border border-rose-100 text-rose-700 hover:bg-rose-100 px-3 py-1.5 rounded-xl font-bold transition-all text-center"
-                      >
-                        Revocar
-                      </button>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Simulador de Permisos y Roles (Testing) */}
-      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-        <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">Simulador de Roles y Permisos (QA)</h4>
-        <hr className="border-slate-50" />
-        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3.5 font-semibold text-[10px] text-slate-500">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="simulador-rol" className="text-[9px] font-extrabold text-slate-600 uppercase">Rol del portal actual</label>
-            <select
-              id="simulador-rol"
-              value={simulatedRole || 'FAMILY_ADMIN'}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSimulatedRole(val === 'FAMILY_ADMIN' ? null : val as any);
-                avisar(`Rol simulado cambiado a: ${val}.`);
-              }}
-              className="h-10 px-3 bg-white border border-slate-200 focus:border-teal-500 rounded-xl text-xs font-semibold text-slate-900 outline-none text-slate-900"
-            >
-              <option value="FAMILY_ADMIN">Administrador Familiar (Completo)</option>
-              <option value="MEMBER_SELF">Miembro Familiar Propio (MEMBER_SELF)</option>
-              <option value="VIEWER">Visualizador (Viewer)</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="ajustes-correo-de-simulacion" className="text-[9px] font-extrabold text-slate-600 uppercase">Correo de simulación</label>
-            <div className="flex gap-2">
-              <input
-                id="ajustes-correo-de-simulacion"
-                type="email"
-                defaultValue={simulatedEmail || ''}
-                placeholder="Escribe el email del miembro habilitado..."
-                onBlur={(e) => {
-                  const val = e.target.value;
-                  setSimulatedEmail(val.trim() || null);
-                }}
-                className="flex-1 h-10 px-3 bg-white border border-slate-200 focus:border-teal-500 rounded-xl text-xs font-semibold text-slate-900 outline-none text-slate-900"
-              />
-              <button
-                type="button"
-                onClick={() => avisar('Correo de simulación establecido.')}
-                className="h-10 px-4 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl transition-colors shrink-0"
-              >
-                Aplicar
-              </button>
-            </div>
-            <p className="text-[8px] text-slate-500 mt-0.5">
-              Si el correo coincide con un miembro activo que tiene habilitado el acceso, la app limitará su vista y permisos automáticamente al guardar los cambios o recargar la pestaña.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Retención de Historial Clínico */}
-      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-        <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">Retención y Depuración de Historial</h4>
-        <hr className="border-slate-50" />
-        
-        <div className="flex flex-col gap-3">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-rose-50 text-rose-700 rounded-xl shrink-0 mt-0.5">
-              <Clock className="h-4.5 w-4.5" />
+      {/* Ficha: Importación de citas (Bloque B — manual, sin Gmail) */}
+        <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-violet-50 text-violet-600 rounded-xl">
+              <Inbox className="h-5 w-5" />
             </div>
             <div>
-              <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Políticas de Depuración de Citas</h5>
-              <div className="text-[10px] text-slate-500 font-semibold leading-normal mt-1 space-y-1">
-                <p>• Citas completadas: Depuradas 2 años después de finalizar.</p>
-                <p>• Citas no completadas: Depuradas 1 año después del agendamiento.</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Metrics list */}
-          <div className="grid grid-cols-3 gap-2.5 mt-1 select-none">
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
-              <span className="text-[8px] font-extrabold text-slate-500 uppercase leading-none">Citas Activas</span>
-              <strong className="text-sm font-black text-slate-700 leading-none mt-1">{activeApptsCount}</strong>
-            </div>
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
-              <span className="text-[8px] font-extrabold text-slate-500 uppercase leading-none">Depuradas</span>
-              <strong className="text-sm font-black text-slate-700 leading-none mt-1">{purgedApptsCount}</strong>
-            </div>
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
-              <span className="text-[8px] font-extrabold text-slate-500 uppercase leading-none">Elegibles</span>
-              <strong className={`text-sm font-black leading-none mt-1 ${eligibleCount > 0 ? 'text-amber-700' : 'text-slate-700'}`}>{eligibleCount}</strong>
-            </div>
-          </div>
-
-          <p className="text-[9px] font-semibold leading-relaxed text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-100/60">
-            <span>⚠ Advertencia: La depuración de citas realiza un borrado lógico ocultando los registros del expediente. Los eventos en tu Google Calendar y archivos asociados en Drive <strong>no</strong> se borrarán. Te recomendamos exportar a JSON antes de depurar.</span>
-          </p>
-
-          <button
-            onClick={() => {
-              runAppointmentRetentionCleanup();
-              avisar('Limpieza de citas ejecutada.');
-            }}
-            className="w-full h-10 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
-          >
-            <span>Ejecutar limpieza de historial</span>
-          </button>
-        </div>
-      </section>
-
-      {/* Estado PWA / Instalación Offline */}
-      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-        <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">Aplicación Instalable (PWA)</h4>
-        <hr className="border-slate-50" />
-
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-3.5">
-            <div className="p-2.5 bg-teal-50 text-teal-700 rounded-xl shrink-0">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <div>
-              <h5 className="text-xs font-extrabold text-slate-800 leading-tight mb-0.5">Soporte Offline y PWA Activo</h5>
-              <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
-                Esta aplicación está lista para instalarse en tu celular o computador y abrirse sin conexión a Internet.
+              <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Importación de citas</h4>
+              <p className="text-[10px] text-slate-500 font-semibold">
+                Pega el texto del correo de tu EPS o adjunta el documento. La aplicación no lee tu correo.
               </p>
             </div>
           </div>
 
-          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2 font-semibold text-[10px] text-slate-500 leading-relaxed">
-            <div className="flex items-center gap-1.5 font-bold text-slate-700 text-xs mb-1">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span>Estado: Lista para Instalar</span>
-            </div>
-            <p>
-              • <strong>Cómo instalar:</strong> Abre el menú de opciones de tu navegador (Chrome, Safari, Edge) y presiona <strong>&quot;Instalar aplicación&quot;</strong> o <strong>&quot;Agregar a la pantalla de inicio&quot;</strong>.
-            </p>
-            <p className="text-amber-700 font-bold bg-amber-50 p-2 rounded-lg border border-amber-100/55">
-              ⚠ Importante: Los datos clínicos ingresados se guardan localmente en este navegador. Si cambias de dispositivo o borras la caché, la información se perderá.
-            </p>
-            <p>
-              • <strong>Recomendación:</strong> Utiliza la herramienta de <strong>Copia de Seguridad (.json)</strong> a continuación para respaldar y transferir tus datos de forma manual cuando lo requieras.
-            </p>
-          </div>
-        </div>
-      </section>
+          <hr className="border-slate-50" />
 
-      {/* Administración de Datos Local */}
-      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-        <h4 className="font-extrabold text-xs text-slate-800 tracking-wide uppercase px-1">Administración de Datos</h4>
-        <hr className="border-slate-50" />
-        
-        {/* Backup JSON */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-              <Download className="h-4.5 w-4.5" />
-            </div>
+          <div className="flex items-center justify-between">
             <div>
-              <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Copia de Seguridad</h5>
-              <p className="text-[10px] text-slate-500 font-semibold leading-none mt-1">Exporta o importa el expediente clínico familiar en JSON</p>
+              <span id="etiqueta-solo-futuras" className="font-extrabold text-slate-700 block text-xs mb-0.5">Solo importar citas futuras</span>
+              <p className="text-[10px] text-slate-500">Marca como ignoradas las citas cuya fecha ya pasó.</p>
             </div>
-          </div>
-          
-          <input
-            type="file"
-            id="import-backup-file-input"
-            aria-label="Archivo de copia de seguridad"
-            accept=".json"
-            onChange={handleImportFileChange}
-            className="hidden"
-          />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
             <button
-              onClick={exportState}
-              className="h-10 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors border border-indigo-100 shadow-sm"
+              id="btn-toggle-future-only"
+              type="button"
+              role="switch"
+              aria-checked={gmailOnlyFutureAppointments}
+              aria-labelledby="etiqueta-solo-futuras"
+              onClick={() => setGmailOnlyFutureAppointments(!gmailOnlyFutureAppointments)}
+              className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none flex ${
+                gmailOnlyFutureAppointments ? 'bg-teal-700 justify-end' : 'bg-slate-200 justify-start'
+              }`}
             >
-              <Download className="h-4 w-4" />
-              <span>Exportar Copia (.json)</span>
-            </button>
-
-            <button
-              onClick={() => {
-                document.getElementById('import-backup-file-input')?.click();
-              }}
-              className="h-10 bg-white hover:bg-slate-50 text-indigo-750 font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors border border-indigo-100 shadow-sm"
-            >
-              <Download className="h-4 w-4 rotate-180" />
-              <span>Importar Copia (.json)</span>
+              <span className="w-4 h-4 rounded-full bg-white shadow self-center" />
             </button>
           </div>
-        </div>
 
-        <hr className="border-slate-50 my-1" />
-
-        {/* Database state tools */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-slate-100 text-slate-600 rounded-xl">
-              <Database className="h-4.5 w-4.5" />
+          <div className="border-t border-slate-100/70 pt-3.5 flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-slate-500 font-bold uppercase text-[9px] leading-none mb-1">Pendientes de revisión</span>
+              <span className={`font-extrabold text-xs ${
+                appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length > 0 ? 'text-amber-700' : 'text-emerald-700'
+              }`}>
+                {appointmentCandidates.filter(c => c.status === 'PENDING_REVIEW').length} borradores
+              </span>
             </div>
-            <div>
-              <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Almacenamiento Local</h5>
-              <p className="text-[10px] text-slate-500 font-semibold leading-none mt-1">Restaura la demostración o limpia los datos locales</p>
-            </div>
+            <Link
+              href="/appointments/import"
+              id="link-importar-cita"
+              className="py-2 px-3.5 bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-[10px] rounded-lg shadow-sm transition-all"
+            >
+              Importar una cita
+            </Link>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-1">
-            {user?.provider === 'mock' ? (
-              <>
-                <button
-                  onClick={async () => {
-                    const aceptado = await confirmar({
-                      titulo: 'Restaurar la demostración',
-                      descripcion: 'Los cambios que hayas hecho en el modo demostración se perderán y volverá la base original de ejemplo.',
-                      etiquetaConfirmar: 'Restaurar demostración',
-                      tono: 'peligro',
-                    });
-                    if (!aceptado) return;
-                    restoreDemoData();
-                    avisar('Base de demostración restaurada.');
-                  }}
-                  className="h-10 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-amber-100"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  <span>Restaurar Demo</span>
-                </button>
-                
-                <button
-                  onClick={async () => {
-                    const aceptado = await confirmar({
-                      titulo: 'Eliminar los datos de demostración',
-                      descripcion: 'Se borrarán de este navegador todos los datos de la demostración y se cerrará la sesión.',
-                      etiquetaConfirmar: 'Eliminar datos demo',
-                      tono: 'peligro',
-                    });
-                    if (!aceptado) return;
-                    clearDemoData();
-                    clearAllData();
-                    avisar('Datos de demostración eliminados de este navegador.');
-                    router.push('/login');
-                  }}
-                  className="h-10 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-rose-100"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Limpiar Datos Demo</span>
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={async () => {
-                    const aceptado = await confirmar({
-                      titulo: 'Reiniciar la cuenta en este navegador',
-                      descripcion: 'Se borrarán los datos locales de esta cuenta en este navegador. Tus archivos en Google Drive quedan intactos.',
-                      etiquetaConfirmar: 'Reiniciar cuenta',
-                      tono: 'peligro',
-                    });
-                    if (!aceptado) return;
-                    clearAllData();
-                    avisar('Datos locales de la cuenta reiniciados.');
-                    router.push('/login');
-                  }}
-                  className="h-10 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-rose-100"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Reiniciar Cuenta Actual</span>
-                </button>
-
-                {/* A6-F2 · Cierre de sesión con purga completa del dispositivo.
-                    Bloque H · pasa por el diálogo de cierre: con cambios sin
-                    enviar, avisa antes de borrar nada. */}
-                <button
-                  onClick={() => solicitarCierreDeSesion()}
-                  className="h-10 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-extrabold text-xs rounded-xl flex flex-col items-center justify-center transition-colors border border-slate-200 px-3 py-6"
-                >
-                  <span>Cerrar sesión y borrar datos de este dispositivo</span>
-                  <span className="font-semibold text-[10px] text-slate-500 mt-0.5">
-                    Elimina de este navegador el expediente, la caché y la sesión. Tus datos en Google no se tocan.
-                  </span>
-                </button>
-
-                <button
-                  onClick={async () => {
-                    const aceptado = await confirmar({
-                      titulo: 'Eliminar los datos de demostración',
-                      descripcion: 'Se borrarán de este navegador los datos de la demostración. Tus datos reales no se tocan.',
-                      etiquetaConfirmar: 'Eliminar datos demo',
-                      tono: 'peligro',
-                    });
-                    if (!aceptado) return;
-                    clearDemoData();
-                    avisar('Datos de demostración eliminados de este navegador.');
-                  }}
-                  className="h-10 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-100"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  <span>Limpiar Datos Demo</span>
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Security & privacy details */}
-      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-3">
-        <button
-          onClick={() => setShowLegal(!showLegal)}
-          className="flex items-center justify-between w-full focus:outline-none"
-        >
-          <div className="flex items-center gap-3 text-slate-800">
-            <ShieldCheck className="h-5 w-5 text-slate-500" />
-            <span className="text-xs font-extrabold">Políticas de Privacidad y Disclaimer</span>
-          </div>
-          {showLegal ? <ChevronUp className="h-4.5 w-4.5 text-slate-500" /> : <ChevronDown className="h-4.5 w-4.5 text-slate-500" />}
-        </button>
-
-        {showLegal && (
-          <div className="flex flex-col gap-3 mt-2 text-[11px] text-slate-500 leading-relaxed font-semibold animate-in fade-in duration-200">
-            <p>
-              Esta aplicación está diseñada bajo una **arquitectura 100% Google-native**. Esto significa que todos tus datos e historial clínico se almacenan directamente en tu cuenta personal de Google, garantizando soberanía absoluta sobre tu información de salud.
-            </p>
-            
-            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 flex flex-col gap-2 text-[10px] text-slate-600">
-              <p>
-                <strong>• Google Drive:</strong> Se utiliza exclusivamente para almacenar los archivos físicos (fotos o PDFs) de tus documentos clínicos y órdenes médicas. La aplicación crea una carpeta privada en tu Drive para que mantengas el control absoluto de tus archivos digitalizados.
-              </p>
-              <p>
-                <strong>• Google Sheets:</strong> Funciona como base de datos operacional. Todas tus tablas de datos (miembros, citas, medicamentos, tomas, órdenes) se registran en una hoja de cálculo (`SaludFamiliar_OperationalDB`) dentro de tu Google Drive. Los datos nunca se transmiten a servidores de terceros.
-              </p>
-              <p>
-                <strong>• Google Calendar:</strong> Sincroniza tus citas médicas y recordatorios de medicamentos. Para los tratamientos farmacológicos, la app incluye una alerta preventiva si programas más de 20 tomas/eventos individuales, evitando saturar tu calendario personal.
-              </p>
-              <p>
-                <strong>• Gmail:</strong> La aplicación <strong>no pide acceso a tu correo</strong>. El permiso de solo lectura se retiró por completo: para registrar una cita, pegas el texto del mensaje o adjuntas el documento, y el análisis ocurre en tu dispositivo.
-              </p>
-              <p>
-                <strong>• Seguridad de Tokens:</strong> Para proteger tu seguridad, los tokens de acceso y credenciales de Google OAuth **nunca se guardan en el LocalStorage ni SessionStorage** del navegador. Se administran mediante una sesión efímera en memoria y expiran automáticamente tras 60 minutos de inactividad.
-              </p>
-            </div>
-
-            <p>
-              <span><strong>Copia de seguridad adicional:</strong> Aunque tus datos están respaldados en tu cuenta de Google, te aconsejamos descargar copias manuales en formato JSON con la herramienta a continuación para mayor seguridad.</span>
-            </p>
-
-            <p className="italic text-rose-500/90 border-t border-slate-50 pt-2 mt-1">
-              Advertencia Médica: La información de salud y recordatorios de medicamentos provistos por esta aplicación son de carácter netamente informativo y organizativo. No reemplazan el diagnóstico médico profesional, tratamiento ni prescripciones de un médico calificado.
-            </p>
-          </div>
-        )}
-      </section>
+        </section>
 
 
       {/* ─── Seguridad de Sesión ─────────────────────────────────────────── */}
@@ -1194,17 +635,494 @@ export default function SettingsPage() {
         </div>
       </section>
 
+
+      {/* Instalar la aplicación */}
+      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-start gap-3.5">
+        <div aria-hidden="true" className="p-2.5 bg-teal-50 text-teal-700 rounded-xl shrink-0">
+          <ShieldCheck className="h-5 w-5" />
+        </div>
+        <div>
+          <h4 className="text-xs font-extrabold text-slate-800 leading-tight mb-1">Instálala en tu celular o computador</h4>
+          <p className="text-[11px] text-slate-600 font-semibold leading-relaxed">
+            En el menú del navegador, elige <strong>«Instalar aplicación»</strong> o <strong>«Agregar a la pantalla de inicio»</strong>.
+            El expediente vive en la hoja de tu familia, así que entras desde cualquier dispositivo y ves lo mismo.
+          </p>
+        </div>
+      </section>
+
+      {/* Herramientas avanzadas: plegadas, para que Ajustes sea sencillo para
+          cualquier familiar. Nada de aquí hace falta en el uso diario. */}
+      <details id="herramientas-avanzadas" className="group bg-white rounded-3xl border border-slate-100 shadow-sm">
+        <summary className="cursor-pointer list-none p-5 flex items-center justify-between gap-3 rounded-3xl focus-visible:outline-2 focus-visible:outline-teal-600">
+          <span className="flex items-center gap-3">
+            <Database aria-hidden="true" className="h-5 w-5 text-slate-500" />
+            <span>
+              <span className="block text-xs font-extrabold text-slate-800">Herramientas avanzadas</span>
+              <span className="block text-[11px] text-slate-600 font-semibold mt-0.5">Diagnóstico, copias de seguridad y datos de este dispositivo</span>
+            </span>
+          </span>
+          <ChevronDown aria-hidden="true" className="h-4.5 w-4.5 text-slate-500 transition-transform group-open:rotate-180" />
+        </summary>
+
+        <div className="flex flex-col gap-5 px-5 pb-5">
+          {user.provider === 'google' && (
+            <>
+          {/* Ficha Nueva: Diagnóstico de Datos e Integridad */}
+          <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-teal-50 text-teal-700 rounded-xl">
+                  <Database className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-800 tracking-tight">Diagnóstico y Salud de Datos</h4>
+                  <p className="text-[10px] text-slate-500 font-semibold">Cuántos registros tiene este dispositivo y si son coherentes entre sí.</p>
+                </div>
+              </div>
+              
+              {integrityReport ? (
+                <span className={`text-[10px] font-black px-3 py-1 rounded-full border uppercase leading-none ${
+                  integrityReport.status === 'ok' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                  integrityReport.status === 'warnings' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                  'bg-rose-50 text-rose-700 border-rose-100'
+                }`}>
+                  Integridad: {integrityReport.status === 'ok' ? 'Correcto' :
+                               integrityReport.status === 'warnings' ? 'Advertencias' : 'Errores'}
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-slate-50 text-slate-500 border border-slate-200 uppercase leading-none">
+                  Sin verificar
+                </span>
+              )}
+            </div>
+
+            <hr className="border-slate-50" />
+
+            {/* Grid de Cantidades */}
+            <div>
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide block mb-3">Registros en memoria local</span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Miembros</span>
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="text-lg font-black text-slate-800 leading-none">{totalMembers}</span>
+                    <span className="text-[8px] font-semibold text-slate-500 leading-none">({activeMembers} act / {inactiveMembers} inact)</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Citas médicas</span>
+                  <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalAppointments}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Documentos clínicos</span>
+                  <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalDocs}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Órdenes Médicas</span>
+                  <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalOrders}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Medicamentos</span>
+                  <span className="text-lg font-black text-slate-800 leading-none mt-1">{totalMeds}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100/50 flex flex-col justify-between">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mb-1">Tomas pendientes hoy</span>
+                  <span className={`text-lg font-black leading-none mt-1 ${pendingDoses > 0 ? 'text-teal-700' : 'text-slate-850'}`}>{pendingDoses}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Ejecución de Validación de Integridad */}
+            <div className="flex flex-col gap-3 pt-1">
+              <button
+                id="btn-validate-integrity"
+                onClick={() => {
+                  setIsCheckingIntegrity(true);
+                  setTimeout(() => {
+                    const result = validateDataIntegrity();
+                    setIntegrityReport(result);
+                    setIsCheckingIntegrity(false);
+                  }, 600);
+                }}
+                disabled={isCheckingIntegrity}
+                className="w-full h-10 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-75"
+              >
+                {isCheckingIntegrity ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Validando consistencia de datos...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    <span>Validar Integridad de Datos</span>
+                  </>
+                )}
+              </button>
+
+              {/* Resultados de la validación */}
+              {integrityReport && (
+                <div className={`p-4 rounded-2xl border flex flex-col gap-2 font-semibold text-[10px] ${
+                  integrityReport.status === 'ok' ? 'bg-emerald-50/50 border-emerald-100/60 text-emerald-800' :
+                  integrityReport.status === 'warnings' ? 'bg-amber-50/50 border-amber-100/60 text-amber-800' :
+                  'bg-rose-50/50 border-rose-100/60 text-rose-800'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    {integrityReport.status === 'ok' ? (
+                      <CheckCircle2 className="h-4.5 w-4.5 text-emerald-700 flex-shrink-0" />
+                    ) : (
+                      <AlertCircle className="h-4.5 w-4.5 text-amber-700 flex-shrink-0" />
+                    )}
+                    <span className="font-bold text-[11px] block">
+                      {integrityReport.status === 'ok' && '¡Excelente! No se encontraron problemas de consistencia en tus datos.'}
+                      {integrityReport.status === 'warnings' && 'Sugerencias de integridad encontradas (Advertencias)'}
+                      {integrityReport.status === 'errors' && 'Conflictos críticos detectados (Errores)'}
+                    </span>
+                  </div>
+                  
+                  {integrityReport.errors.length > 0 && (
+                    <div className="mt-1 flex flex-col gap-1">
+                      <span className="font-bold text-[9px] uppercase text-rose-700">Errores:</span>
+                      <ul className="list-disc pl-4 space-y-1 text-rose-700 text-[9.5px]">
+                        {integrityReport.errors.map((err: string, idx: number) => (
+                          <li key={idx}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {integrityReport.warnings.length > 0 && (
+                    <div className="mt-1 flex flex-col gap-1">
+                      <span className="font-bold text-[9px] uppercase text-amber-700">Advertencias:</span>
+                      <ul className="list-disc pl-4 space-y-1 text-amber-700 text-[9.5px]">
+                        {integrityReport.warnings.map((warn: string, idx: number) => (
+                          <li key={idx}>{warn}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  <div className="text-[8px] text-slate-500 font-bold border-t border-slate-200/30 pt-2 mt-1">
+                    Verificado el: {new Date(integrityReport.checkedAt).toLocaleString('es-CO')}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+
+
+            </>
+          )}
+
+          <section className="flex flex-col gap-3 border-t border-slate-100 pt-5">
+        {/* Backup JSON */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+              <Download className="h-4.5 w-4.5" />
+            </div>
+            <div>
+              <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Copia de Seguridad</h5>
+              <p className="text-[10px] text-slate-500 font-semibold leading-none mt-1">Exporta o importa el expediente clínico familiar en JSON</p>
+            </div>
+          </div>
+          
+          <input
+            type="file"
+            id="import-backup-file-input"
+            aria-label="Archivo de copia de seguridad"
+            accept=".json"
+            onChange={handleImportFileChange}
+            className="hidden"
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+            <button
+              onClick={exportState}
+              className="h-10 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors border border-indigo-100 shadow-sm"
+            >
+              <Download className="h-4 w-4" />
+              <span>Exportar Copia (.json)</span>
+            </button>
+
+            <button
+              onClick={() => {
+                document.getElementById('import-backup-file-input')?.click();
+              }}
+              className="h-10 bg-white hover:bg-slate-50 text-indigo-750 font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors border border-indigo-100 shadow-sm"
+            >
+              <Download className="h-4 w-4 rotate-180" />
+              <span>Importar Copia (.json)</span>
+            </button>
+          </div>
+        </div>
+
+          </section>
+
+          <section className="flex flex-col gap-3 border-t border-slate-100 pt-5">
+            <h4 className="text-xs font-extrabold text-slate-800">Retención de citas antiguas</h4>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-rose-50 text-rose-700 rounded-xl shrink-0 mt-0.5">
+              <Clock className="h-4.5 w-4.5" />
+            </div>
+            <div>
+              <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Políticas de Depuración de Citas</h5>
+              <div className="text-[10px] text-slate-500 font-semibold leading-normal mt-1 space-y-1">
+                <p>• Citas completadas: Depuradas 2 años después de finalizar.</p>
+                <p>• Citas no completadas: Depuradas 1 año después del agendamiento.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Metrics list */}
+          <div className="grid grid-cols-3 gap-2.5 mt-1 select-none">
+            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
+              <span className="text-[8px] font-extrabold text-slate-500 uppercase leading-none">Citas Activas</span>
+              <strong className="text-sm font-black text-slate-700 leading-none mt-1">{activeApptsCount}</strong>
+            </div>
+            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
+              <span className="text-[8px] font-extrabold text-slate-500 uppercase leading-none">Depuradas</span>
+              <strong className="text-sm font-black text-slate-700 leading-none mt-1">{purgedApptsCount}</strong>
+            </div>
+            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60 text-center flex flex-col gap-0.5">
+              <span className="text-[8px] font-extrabold text-slate-500 uppercase leading-none">Elegibles</span>
+              <strong className={`text-sm font-black leading-none mt-1 ${eligibleCount > 0 ? 'text-amber-700' : 'text-slate-700'}`}>{eligibleCount}</strong>
+            </div>
+          </div>
+
+          <p className="text-[9px] font-semibold leading-relaxed text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-100/60">
+            <span>⚠ Advertencia: La depuración de citas realiza un borrado lógico ocultando los registros del expediente. Los eventos en tu Google Calendar y archivos asociados en Drive <strong>no</strong> se borrarán. Te recomendamos exportar a JSON antes de depurar.</span>
+          </p>
+
+          <button
+            onClick={() => {
+              runAppointmentRetentionCleanup();
+              avisar('Limpieza de citas ejecutada.');
+            }}
+            className="w-full h-10 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
+          >
+            <span>Ejecutar limpieza de historial</span>
+          </button>
+        </div>
+          </section>
+
+          <section className="flex flex-col gap-3 border-t border-slate-100 pt-5">
+        {/* Database state tools */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-slate-100 text-slate-600 rounded-xl">
+              <Database className="h-4.5 w-4.5" />
+            </div>
+            <div>
+              <h5 className="text-xs font-extrabold text-slate-800 leading-tight">Almacenamiento Local</h5>
+              <p className="text-[10px] text-slate-500 font-semibold leading-none mt-1">Lo que guarda este navegador. La hoja de la familia no se toca.</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-1">
+            {user?.provider === 'mock' ? (
+              <>
+                <button
+                  onClick={async () => {
+                    const aceptado = await confirmar({
+                      titulo: 'Restaurar la demostración',
+                      descripcion: 'Los cambios que hayas hecho en el modo demostración se perderán y volverá la base original de ejemplo.',
+                      etiquetaConfirmar: 'Restaurar demostración',
+                      tono: 'peligro',
+                    });
+                    if (!aceptado) return;
+                    restoreDemoData();
+                    avisar('Base de demostración restaurada.');
+                  }}
+                  className="h-10 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-amber-100"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span>Restaurar Demo</span>
+                </button>
+                
+                <button
+                  onClick={async () => {
+                    const aceptado = await confirmar({
+                      titulo: 'Eliminar los datos de demostración',
+                      descripcion: 'Se borrarán de este navegador todos los datos de la demostración y se cerrará la sesión.',
+                      etiquetaConfirmar: 'Eliminar datos demo',
+                      tono: 'peligro',
+                    });
+                    if (!aceptado) return;
+                    clearDemoData();
+                    clearAllData();
+                    avisar('Datos de demostración eliminados de este navegador.');
+                    router.push('/login');
+                  }}
+                  className="h-10 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-rose-100"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Limpiar Datos Demo</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={async () => {
+                    const aceptado = await confirmar({
+                      titulo: 'Reiniciar la cuenta en este navegador',
+                      descripcion: 'Se borrarán los datos locales de esta cuenta en este navegador. Lo que está en la hoja de la familia no se toca.',
+                      etiquetaConfirmar: 'Reiniciar cuenta',
+                      tono: 'peligro',
+                    });
+                    if (!aceptado) return;
+                    clearAllData();
+                    avisar('Datos locales de la cuenta reiniciados.');
+                    router.push('/login');
+                  }}
+                  className="h-10 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-rose-100"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Reiniciar Cuenta Actual</span>
+                </button>
+
+                <button
+                  onClick={async () => {
+                    const aceptado = await confirmar({
+                      titulo: 'Eliminar los datos de demostración',
+                      descripcion: 'Se borrarán de este navegador los datos de la demostración. Tus datos reales no se tocan.',
+                      etiquetaConfirmar: 'Eliminar datos demo',
+                      tono: 'peligro',
+                    });
+                    if (!aceptado) return;
+                    clearDemoData();
+                    avisar('Datos de demostración eliminados de este navegador.');
+                  }}
+                  className="h-10 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-100"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span>Limpiar Datos Demo</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+          </section>
+
+          {/* El simulador de roles es una herramienta de pruebas: con una hoja
+              real, quién puede qué lo decide ACCESO, no este selector. */}
+          {origenDatos === 'DEMO' && (
+            <section className="flex flex-col gap-3 border-t border-slate-100 pt-5">
+              <h4 className="text-xs font-extrabold text-slate-800">Simulador de roles (demostración)</h4>
+        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-3.5 font-semibold text-[10px] text-slate-500">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="simulador-rol" className="text-[9px] font-extrabold text-slate-600 uppercase">Rol del portal actual</label>
+            <select
+              id="simulador-rol"
+              value={simulatedRole || 'FAMILY_ADMIN'}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSimulatedRole(val === 'FAMILY_ADMIN' ? null : val as any);
+                avisar(`Rol simulado cambiado a: ${val}.`);
+              }}
+              className="h-10 px-3 bg-white border border-slate-200 focus:border-teal-500 rounded-xl text-xs font-semibold text-slate-900 outline-none text-slate-900"
+            >
+              <option value="FAMILY_ADMIN">Administrador Familiar (Completo)</option>
+              <option value="MEMBER_SELF">Miembro Familiar Propio (MEMBER_SELF)</option>
+              <option value="VIEWER">Visualizador (Viewer)</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="ajustes-correo-de-simulacion" className="text-[9px] font-extrabold text-slate-600 uppercase">Correo de simulación</label>
+            <div className="flex gap-2">
+              <input
+                id="ajustes-correo-de-simulacion"
+                type="email"
+                defaultValue={simulatedEmail || ''}
+                placeholder="Escribe el email del miembro habilitado..."
+                onBlur={(e) => {
+                  const val = e.target.value;
+                  setSimulatedEmail(val.trim() || null);
+                }}
+                className="flex-1 h-10 px-3 bg-white border border-slate-200 focus:border-teal-500 rounded-xl text-xs font-semibold text-slate-900 outline-none text-slate-900"
+              />
+              <button
+                type="button"
+                onClick={() => avisar('Correo de simulación establecido.')}
+                className="h-10 px-4 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl transition-colors shrink-0"
+              >
+                Aplicar
+              </button>
+            </div>
+            <p className="text-[8px] text-slate-500 mt-0.5">
+              Si el correo coincide con un miembro activo que tiene habilitado el acceso, la app limitará su vista y permisos automáticamente al guardar los cambios o recargar la pestaña.
+            </p>
+          </div>
+        </div>
+            </section>
+          )}
+        </div>
+      </details>
+
+      {/* Privacidad */}
+      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => setShowLegal(!showLegal)}
+          aria-expanded={showLegal}
+          className="flex items-center justify-between w-full focus:outline-none"
+        >
+          <div className="flex items-center gap-3 text-slate-800">
+            <ShieldCheck aria-hidden="true" className="h-5 w-5 text-slate-500" />
+            <span className="text-xs font-extrabold">Privacidad y aviso médico</span>
+          </div>
+          {showLegal ? <ChevronUp aria-hidden="true" className="h-4.5 w-4.5 text-slate-500" /> : <ChevronDown aria-hidden="true" className="h-4.5 w-4.5 text-slate-500" />}
+        </button>
+
+        {showLegal && (
+          <div className="flex flex-col gap-3 mt-2 text-[11px] text-slate-600 leading-relaxed font-semibold">
+            <p>
+              Todo el expediente vive en <strong>la hoja de Google de tu familia</strong>, en la cuenta del titular. No hay
+              servidores de terceros: la aplicación habla directamente con el Apps Script de esa hoja.
+            </p>
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 flex flex-col gap-2 text-[11px] text-slate-600">
+              <p>
+                <strong>• Google Sheets:</strong> es la base de datos. Cada cambio se añade como una fila nueva; nada se borra, las bajas son lógicas.
+              </p>
+              <p>
+                <strong>• Google Drive:</strong> guarda los archivos (fotos o PDF) de los documentos clínicos.
+              </p>
+              <p>
+                <strong>• Gmail:</strong> la aplicación <strong>no pide acceso a tu correo</strong>. Para registrar una cita pegas el texto o adjuntas el documento, y se analiza en tu dispositivo.
+              </p>
+              <p>
+                <strong>• Sesión:</strong> se mantiene con un ticket que firma tu propia hoja y que <strong>no contiene tu correo ni tu nombre</strong>. Dura 30 días y se renueva solo; cerrar sesión lo borra de este dispositivo, y quitar a alguien de los accesos lo deja fuera al instante.
+              </p>
+            </div>
+            <p className="italic text-rose-700 border-t border-slate-100 pt-2 mt-1">
+              Aviso médico: la información y los recordatorios de esta aplicación son organizativos. No reemplazan el diagnóstico, el tratamiento ni las prescripciones de un profesional de la salud.
+            </p>
+          </div>
+        )}
+      </section>
+
       {/* Bloque H · el cierre pasa por el diálogo: con cambios sin enviar,
           avisa antes de nada. Llamar a signOut() directamente lo saltaba. */}
       <button
+        type="button"
         onClick={() => solicitarCierreDeSesion()}
-        className="w-full h-13.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-rose-600/10 active:translate-y-0.5 transition-all duration-200"
+        className="w-full py-3.5 bg-rose-700 hover:bg-rose-800 active:bg-rose-900 text-white font-extrabold rounded-2xl flex flex-col items-center justify-center shadow-md shadow-rose-700/10 transition-colors duration-200"
       >
-        <LogOut className="h-5 w-5" />
-        <span>Cerrar Sesión</span>
+        <span className="flex items-center gap-2">
+          <LogOut aria-hidden="true" className="h-5 w-5" />
+          <span>Cerrar sesión</span>
+        </span>
+        <span className="text-[11px] font-semibold text-white mt-0.5">
+          {' '}y borrar datos de este dispositivo. Lo que está en la hoja no se toca.
+        </span>
       </button>
-
-
 
       {/* A6-F3 · Rechazo de importación cruzada, accesible y sin exponer contenido */}
       <ConfirmDialog

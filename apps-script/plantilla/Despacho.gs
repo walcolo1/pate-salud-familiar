@@ -107,6 +107,11 @@ var ACCIONES = {
      * un solo uso.
      */
     aceptarInvitacion: { verbo: null, exigeAcceso: false, muta: true },
+    /**
+     * Sesión persistente. Exige token **y** acceso: solo quien hoy puede entrar
+     * recibe un ticket. El verbo es el mínimo que tiene cualquier rol.
+     */
+    abrirSesion: { verbo: 'LISTAR_PACIENTES' },
     verAuditoria: { verbo: 'VER_AUDITORIA' },
     exportar: { verbo: 'EXPORTAR_EXPEDIENTE' },
     /**

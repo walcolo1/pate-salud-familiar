@@ -85,7 +85,7 @@ test.describe('C2 · estados de carga, vacío y error', () => {
 
     // Hay salida: reintentar y una alternativa.
     await expect(error.getByRole('button', { name: 'Volver a intentarlo' })).toBeVisible();
-    await expect(error.getByRole('link', { name: 'Ir a Configuración' })).toBeVisible();
+    await expect(error.getByRole('link', { name: 'Ir a Ajustes' })).toBeVisible();
   });
 
   test('S3 · el expediente ilegible se conserva y se pone en cuarentena', async ({ page }) => {

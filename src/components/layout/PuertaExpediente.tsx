@@ -29,12 +29,12 @@ export default function PuertaExpediente({ children }: { children: React.ReactNo
           <>
             {errorCarga}{' '}
             Si el problema no se resuelve, puedes restaurar una copia de seguridad desde
-            Configuración.
+            Ajustes ▸ Herramientas avanzadas.
           </>
         }
         onReintentar={reintentarCarga}
         etiquetaReintentar="Volver a intentarlo"
-        accionSecundaria={{ etiqueta: 'Ir a Configuración', href: '/settings' }}
+        accionSecundaria={{ etiqueta: 'Ir a Ajustes', href: '/settings' }}
       />
     );
   }

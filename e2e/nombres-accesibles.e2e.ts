@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { bloquearGoogle, entrarEnModoDemo } from './apoyo';
+import { bloquearGoogle, entrarEnModoDemo, abrirHerramientasAvanzadas } from './apoyo';
 
 /**
  * E2E · Nombres accesibles de los controles críticos (C1.2).
@@ -47,6 +47,9 @@ test.describe('C1.2 · nombres accesibles', () => {
 
   test('N3 · el selector de rol de Ajustes tiene etiqueta asociada', async ({ page }) => {
     await page.goto('/settings');
+    // Desde la depuración de Ajustes, el simulador vive en «Herramientas
+    // avanzadas» y solo en modo demostración, que es como corre esta prueba.
+    await abrirHerramientasAvanzadas(page);
 
     const selector = page.getByRole('combobox', { name: /Rol del portal actual/i });
     await expect(selector).toHaveCount(1);

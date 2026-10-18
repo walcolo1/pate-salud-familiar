@@ -220,7 +220,7 @@ test.describe('Bloque B · importación manual de citas', () => {
 
   test('G10 · Ajustes ya no ofrece escaneo de Gmail ni lista de remitentes', async ({ page }) => {
     await page.goto('/settings');
-    await expect(page.getByRole('heading', { name: /Configuraci/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Ajustes/i, level: 2 })).toBeVisible();
 
     const cuerpo = page.locator('body');
     await expect(cuerpo).not.toContainText('Escaneo automático diario de Gmail');

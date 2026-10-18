@@ -121,7 +121,10 @@ var PESTANAS = [
     {
         nombre: 'PERFIL_MASCOTA',
         descripcion: 'Lo propio de un animal. 1:1 con PACIENTES.',
-        encabezados: conSincronizacion('id', 'paciente_id', 'especie', 'raza', 'fecha_nacimiento', 'sexo', 'peso_actual_kg', 'peso_ideal_kg'),
+        encabezados: ampliado(conSincronizacion('id', 'paciente_id', 'especie', 'raza', 'fecha_nacimiento', 'sexo', 'peso_actual_kg', 'peso_ideal_kg'), 
+        // v6 · el familiar a cargo. Sin él, una mascota leída de la hoja no
+        // tendría ficha a la que colgar.
+        'responsable_id'),
     },
     {
         nombre: 'CITAS',
@@ -199,7 +202,9 @@ var PESTANAS = [
     {
         nombre: 'HISTORIAL',
         descripcion: 'Qué le pasó a un paciente. Distinto de AUDITORIA, que registra quién hizo qué.',
-        encabezados: conSincronizacion('id', 'paciente_id', 'tipo_evento', 'titulo', 'descripcion', 'fecha_evento', 'entidad_relacionada'),
+        encabezados: ampliado(conSincronizacion('id', 'paciente_id', 'tipo_evento', 'titulo', 'descripcion', 'fecha_evento', 'entidad_relacionada'), 
+        // v6 · quién atendió. Lo pide el historial veterinario (D4).
+        'profesional'),
     },
     {
         nombre: 'DOMINIOS_AUTORIZADOS',
@@ -237,7 +242,7 @@ var PESTANAS = [
 /** Los nombres, en el mismo orden en que se crean las pestañas. */
 var NOMBRES_PESTANAS = PESTANAS.map((p) => p.nombre);
 /** Versión del esquema. Cambiarla obliga a una migración en `instalar()`. */
-var VERSION_ESQUEMA = 5;
+var VERSION_ESQUEMA = 6;
 function pestanaPorNombre(nombre) {
     var _a;
     return (_a = PESTANAS.find((p) => p.nombre === nombre)) !== null && _a !== void 0 ? _a : null;

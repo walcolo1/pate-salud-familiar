@@ -57,6 +57,11 @@ export const METODOS_ESCRITURA: readonly string[] = [
   'saveHistoryEvent',
   'saveReminder',
   'saveTask',
+  // Bloque D · mascotas (esquema v6).
+  'savePet',
+  'savePetWeight',
+  'savePetVaccine',
+  'savePetHistory',
   'saveMedicalOrder',
   'darDeBajaMedicalOrder',
   'saveMedication',

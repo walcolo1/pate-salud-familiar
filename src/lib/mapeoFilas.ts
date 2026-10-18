@@ -65,6 +65,12 @@ export interface Descriptor {
    * puede saber si quien escribe tiene permiso sobre ese expediente.
    */
   pacienteDesde?: string;
+  /**
+   * De qué especie es el paciente de esta fila. Por omisión `HUMANO`. El
+   * router la usa para los verbos que distinguen especie, así que una fila de
+   * mascota no puede salir marcada como humana.
+   */
+  especie?: 'HUMANO' | 'MASCOTA';
 }
 
 /**
@@ -137,6 +143,18 @@ export const DESCARTADOS: Record<string, string> = {
  * descarte global lo habría tirado en todas.
  */
 export const DESCARTADOS_POR_COLECCION: Record<string, Record<string, string>> = {
+  pets: {
+    familyId: 'la familia es la hoja, y la decide la URL del despliegue',
+  },
+  petWeights: {
+    memberId: 'se deriva de la mascota al leer: denormalizarlo en la hoja abre la puerta a que no cuadre',
+  },
+  petVaccines: {
+    memberId: 'se deriva de la mascota al leer: denormalizarlo en la hoja abre la puerta a que no cuadre',
+  },
+  petHistory: {
+    memberId: 'se deriva de la mascota al leer: denormalizarlo en la hoja abre la puerta a que no cuadre',
+  },
   vaccines: {
     // Decisión de D3, y vale igual aquí: un estado guardado que nadie refresca
     // miente en cuanto pasa la medianoche. Se calcula desde `proxima_dosis`.

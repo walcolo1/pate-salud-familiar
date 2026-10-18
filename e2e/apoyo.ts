@@ -1,5 +1,17 @@
 import { Page, expect } from '@playwright/test';
 
+/**
+ * Despliega «Herramientas avanzadas» de Ajustes, donde viven el diagnóstico,
+ * las copias de seguridad y los datos del dispositivo desde la depuración de
+ * la pantalla.
+ */
+export async function abrirHerramientasAvanzadas(page: Page) {
+  const panel = page.locator('#herramientas-avanzadas');
+  if (!(await panel.evaluate((d) => (d as HTMLDetailsElement).open))) {
+    await panel.locator('summary').click();
+  }
+}
+
 /** Valores sintéticos. Ninguno corresponde a una persona ni a un recurso real. */
 export const SINTETICOS = {
   documento: 'DOCUMENTO-TEST-A6-99887766',

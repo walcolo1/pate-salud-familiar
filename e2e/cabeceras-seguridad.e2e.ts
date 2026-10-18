@@ -159,8 +159,8 @@ test.describe('A7 · cabeceras de seguridad', () => {
     // localStorage y el registro del service worker: si la CSP rompiera algo
     // esencial, este recorrido no llegaría al final.
     await entrarEnModoDemo(page);
-    await page.getByRole('link', { name: 'Ajustes' }).click();
-    await expect(page.getByRole('heading', { name: /Configuraci/i })).toBeVisible();
+    await page.getByRole('link', { name: 'Ajustes', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /Ajustes/i, level: 2 })).toBeVisible();
 
     expect(violaciones, violaciones.join('\n')).toEqual([]);
   });

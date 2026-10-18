@@ -204,8 +204,8 @@ test.describe('A6-F3 · bloqueo de sesión', () => {
     // El bloqueo se provoca SIN recargar: una recarga borraria el contador en
     // memoria antes del bloqueo y la prueba no demostraria nada. Se navega por
     // el enrutado del cliente y se usan los controles reales de Ajustes.
-    await page.getByRole('link', { name: 'Ajustes' }).click();
-    await expect(page.getByRole('heading', { name: /Configuraci/i })).toBeVisible();
+    await page.getByRole('link', { name: 'Ajustes', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /Ajustes/i, level: 2 })).toBeVisible();
 
     const hhmm = (d: Date) =>
       `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;

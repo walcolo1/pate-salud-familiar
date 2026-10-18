@@ -18,6 +18,98 @@ import type { Descriptor } from './mapeoFilas';
 const c = (columna: string, tipo?: Descriptor['campos'][string]['tipo']) => ({ columna, tipo });
 
 /**
+ * Mascotas (Bloque D) — esquema v6.
+ *
+ * Hasta v6 vivían solo en el navegador. Una mascota es un paciente más:
+ * `PACIENTES` con `tipo: 'MASCOTA'` y lo propio en `PERFIL_MASCOTA`, igual que
+ * un humano con `PERFIL_HUMANO`. Sus pesos, vacunas e historial van a las
+ * pestañas comunes con su `paciente_id`; al leer se separan por ese id.
+ */
+export const DESCRIPTORES_MASCOTAS: Record<string, readonly Descriptor[]> = {
+  pets: [
+    {
+      pestana: 'PACIENTES',
+      pacienteDesde: 'id',
+      especie: 'MASCOTA',
+      constantes: { tipo: 'MASCOTA' },
+      campos: {
+        id: c('id'),
+        nombre: c('nombre'),
+        activo: c('activo', 'booleano'),
+        notas: c('notas'),
+      },
+    },
+    {
+      pestana: 'PERFIL_MASCOTA',
+      pacienteDesde: 'id',
+      especie: 'MASCOTA',
+      clave: 'paciente_id',
+      campos: {
+        id: c('paciente_id'),
+        especie: c('especie'),
+        raza: c('raza'),
+        fechaNacimiento: c('fecha_nacimiento'),
+        sexo: c('sexo'),
+        pesoActualKg: c('peso_actual_kg', 'numero'),
+        pesoIdealKg: c('peso_ideal_kg', 'numero'),
+        memberId: c('responsable_id'),
+      },
+    },
+  ],
+
+  petWeights: [
+    {
+      pestana: 'PESOS',
+      pacienteDesde: 'petId',
+      especie: 'MASCOTA',
+      campos: {
+        id: c('id'),
+        petId: c('paciente_id'),
+        fecha: c('fecha'),
+        pesoKg: c('peso_kg', 'numero'),
+        nota: c('nota'),
+      },
+    },
+  ],
+
+  petVaccines: [
+    {
+      pestana: 'VACUNAS',
+      pacienteDesde: 'petId',
+      especie: 'MASCOTA',
+      campos: {
+        id: c('id'),
+        petId: c('paciente_id'),
+        vacuna: c('vacuna'),
+        fecha: c('fecha'),
+        proximaDosis: c('proxima_dosis'),
+        laboratorio: c('laboratorio'),
+        lote: c('lote'),
+        veterinario: c('profesional'),
+      },
+    },
+  ],
+
+  petHistory: [
+    {
+      pestana: 'HISTORIAL',
+      pacienteDesde: 'petId',
+      especie: 'MASCOTA',
+      campos: {
+        id: c('id'),
+        petId: c('paciente_id'),
+        fecha: c('fecha_evento'),
+        tipo: c('tipo_evento'),
+        diagnostico: c('titulo'),
+        tratamiento: c('descripcion'),
+        veterinario: c('profesional'),
+      },
+    },
+  ],
+};
+
+
+/**
  * Colección → dónde se escribe.
  *
  * Una colección puede necesitar más de una pestaña; por eso es una lista.
@@ -27,9 +119,9 @@ export const DESCRIPTORES: Record<string, readonly Descriptor[]> = {
     {
       pestana: 'PACIENTES',
       pacienteDesde: 'id',
-      // La aplicación solo conoce personas; las mascotas son del Bloque D y no
-      // pasan por `DataRepository`. Sin esto la fila nacería sin especie y
-      // `PERFIL_MASCOTA` dejaría de distinguirse de `PERFIL_HUMANO`.
+      // Las mascotas escriben en esta misma pestaña con `tipo: 'MASCOTA'` (ver
+      // `pets`, más abajo). Sin esto la fila nacería sin especie y al leer no
+      // se sabría si es una persona o un animal.
       constantes: { tipo: 'HUMANO' },
       campos: {
         id: c('id'),
@@ -324,6 +416,9 @@ export const DESCRIPTORES: Record<string, readonly Descriptor[]> = {
     },
   ],
 
+
+  // Bloque D · esquema v6.
+  ...DESCRIPTORES_MASCOTAS,
 };
 
 /**
@@ -333,6 +428,7 @@ export const DESCRIPTORES: Record<string, readonly Descriptor[]> = {
  * Lanzar no cuenta como mudo en G1, así que el hueco queda visible el día que
  * alguien lo toque, en vez de tragarse el dato.
  */
+
 export const SIN_PESTANA: Record<string, string> = {
   gmailSources: 'la importación desde Gmail es E11 y no está construida',
   appointmentCandidates:
@@ -355,4 +451,8 @@ export const MODELO_DE_COLECCION: Record<string, string> = {
   medicalOrders: 'MedicalOrder',
   medications: 'MedicationPrescription',
   doseReminders: 'MedicationDoseReminder',
+  pets: 'Pet',
+  petWeights: 'WeightEntry',
+  petVaccines: 'VaccineEntry',
+  petHistory: 'MedicalHistoryEntry',
 };
