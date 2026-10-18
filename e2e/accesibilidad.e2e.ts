@@ -165,6 +165,16 @@ test.describe('C1 · accesibilidad sin sesión', () => {
     await expect(page.locator('body')).toBeVisible();
     await medirYComparar(page, 'login');
   });
+
+  // Bloque M · la guía de alta de una familia nueva, con la autorización
+  // marcada para medir también el botón de la plantilla.
+  test('A11Y · crear-expediente', async ({ page }) => {
+    await bloquearGoogle(page);
+    await page.goto('/crear-expediente');
+    await page.getByRole('checkbox', { name: /Autorizo el tratamiento/ }).check();
+    await expect(page.getByRole('link', { name: /Hacer mi copia de la plantilla/ })).toBeVisible();
+    await medirYComparar(page, 'crear-expediente');
+  });
 });
 
 test.describe('C1 · accesibilidad', () => {

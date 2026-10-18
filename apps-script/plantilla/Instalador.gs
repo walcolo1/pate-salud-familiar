@@ -48,6 +48,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Paté')
     .addItem('Instalar o actualizar', 'instalar')
+    .addItem('Conectar con la aplicación', 'conectarConLaAplicacion')
     .addItem('Diagnóstico', 'mostrarDiagnostico')
     .addSeparator()
     .addItem('Quitar disparadores', 'desinstalar')
@@ -124,6 +125,10 @@ function instalarConCerrojo_() {
   var emailTitular = normalizarEmail(Session.getEffectiveUser().getEmail());
   escribirConfig_(hoja, emailTitular);
   asegurarTitular_(hoja, emailTitular);
+  // Bloque M · la audiencia de los `id_token` y la dirección de la PWA, sin
+  // pedírselas al titular. Antes había que crear la propiedad a mano y nada lo
+  // decía: el primer inicio de sesión fallaba con «sesión no válida».
+  resumen.clienteOAuth = configurarAplicacion_(propiedades);
 
   // 3 · Semillas. Solo si la pestaña está vacía: reejecutar no debe duplicar
   //     catálogos ni resucitar dominios que el titular quitó a propósito.
@@ -211,6 +216,80 @@ function desinstalar() {
   auditar_('DESINSTALAR', 'OK', 'disparadores borrados: ' + borrados);
   SpreadsheetApp.getActive().toast(borrados + ' disparadores retirados', 'Paté', 5);
   return borrados;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque M · conectar la hoja con la aplicación
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Deja escritas la audiencia (`OAUTH_CLIENT_ID`) y la dirección de la PWA.
+ *
+ * El Client ID no viaja en la plantilla (E8: va en las propiedades, no en el
+ * código): se le pregunta a la propia PWA, por HTTPS, en `/api/configuracion`.
+ * Si ya estaba, no se toca —una instalación configurada a mano manda—. Si no
+ * se puede leer, se dice y el backend sigue fallando cerrado.
+ *
+ * @return {string} 'ya estaba' | 'configurado' | 'no se pudo'
+ */
+function configurarAplicacion_(propiedades) {
+  if (!propiedades.getProperty(CLAVE_URL_PWA)) propiedades.setProperty(CLAVE_URL_PWA, URL_APP_PATE);
+  if (propiedades.getProperty(CLAVE_CLIENTE_OAUTH)) return 'ya estaba';
+  try {
+    var respuesta = UrlFetchApp.fetch(URL_APP_PATE + RUTA_CONFIGURACION_PUBLICA, {
+      muteHttpExceptions: true,
+      followRedirects: false,
+    });
+    if (respuesta.getResponseCode() !== 200) return 'no se pudo';
+    var cliente = clienteDeConfiguracion(respuesta.getContentText());
+    if (!cliente) return 'no se pudo';
+    propiedades.setProperty(CLAVE_CLIENTE_OAUTH, cliente);
+    return 'configurado';
+  } catch (e) {
+    console.warn('instalar: no se pudo leer la configuración pública de la PWA');
+    return 'no se pudo';
+  }
+}
+
+/**
+ * Paté ▸ Conectar con la aplicación.
+ *
+ * Instala primero si hace falta (una copia recién hecha no tiene nada), deja la
+ * audiencia escrita y enseña el diálogo de `htmlConexion`: los cuatro clics de
+ * «Implementar» si todavía no hay implementación, o el botón que abre la PWA ya
+ * conectada si la hay.
+ */
+function conectarConLaAplicacion() {
+  var propiedades = PropertiesService.getScriptProperties();
+  if (!propiedades.getProperty(CLAVE_ID_HOJA)) instalar();
+  var cliente = configurarAplicacion_(propiedades);
+  var ui = SpreadsheetApp.getUi();
+  if (cliente === 'no se pudo') {
+    ui.alert(
+      'Paté',
+      'No se pudo leer la configuración de la aplicación (' + URL_APP_PATE + '). ' +
+        'Comprueba la conexión y vuelve a intentarlo.',
+      ui.ButtonSet.OK,
+    );
+    return;
+  }
+  var salida = HtmlService.createHtmlOutput(htmlConexion(URL_APP_PATE, urlDeEsteDespliegue_()))
+    .setWidth(460)
+    .setHeight(330);
+  ui.showModalDialog(salida, 'Conectar con la aplicación');
+}
+
+/** Desde el diálogo: el enlace de conexión, al correo del titular. */
+function enviarmeEnlaceDeConexion() {
+  var url = urlDeEsteDespliegue_();
+  if (!url) throw new Error('todavía no hay implementación');
+  MailApp.sendEmail({
+    to: Session.getEffectiveUser().getEmail(),
+    subject: ASUNTO_CONEXION,
+    body: cuerpoConexion(URL_APP_PATE, url),
+    noReply: true,
+  });
+  return true;
 }
 
 /** Qué hay instalado y qué falta. No cambia nada. */

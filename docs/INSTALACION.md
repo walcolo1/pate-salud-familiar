@@ -12,10 +12,17 @@ No hay un servidor nuestro en medio. Tus datos no salen de tu Drive.
 
 ---
 
+> **El camino corto (Bloque M):** en la aplicación, **«¿Tu familia todavía no
+> usa Paté? Crea su expediente»** (o la pantalla que ve una cuenta sin
+> acceso). Allí se autoriza el tratamiento de datos de salud y se abre la
+> plantilla. Son tres pasos: copiar → **Paté ▸ Instalar** → **Paté ▸ Conectar
+> con la aplicación ▸ Abrir Paté ya conectado**. Esta guía cuenta lo mismo con
+> más detalle.
+
 ## 1 · Copia la plantilla
 
-Abre el enlace de la plantilla que te pasamos y elige **Archivo ▸ Hacer una
-copia**.
+Abre el enlace de la plantilla (en la aplicación, «Hacer mi copia de la
+plantilla») y pulsa **Hacer una copia**.
 
 Ponle el nombre que quieras: `Paté · Familia Pérez`, por ejemplo. La copia es
 tuya y vive en tu Drive.
@@ -72,9 +79,21 @@ Se han creado:
   y laboratorios más comunes, que podrás ajustar desde la aplicación;
 - **tres tareas programadas**, que son las que después mandan los avisos.
 
-## 5 · Publica tu expediente para la aplicación
+La instalación además deja configurado, sin pedirte nada, con qué aplicación
+se identifica tu expediente (`OAUTH_CLIENT_ID`): lo lee de la propia
+aplicación. Antes había que crearlo a mano y nada lo decía.
 
-Este es el único paso incómodo, y también es el último.
+## 5 · Paté ▸ Conectar con la aplicación
+
+Abre **Paté ▸ Conectar con la aplicación**. La primera vez te explica cómo
+publicar tu expediente (los pasos de abajo). En cuanto está publicado, el mismo
+menú te da un botón **«Abrir Paté ya conectado»** y otro para **mandarte el
+enlace por correo** (para abrirlo en el celular). No hay que copiar ni pegar
+ninguna URL.
+
+### Publicar (una sola vez)
+
+Este es el único paso incómodo.
 
 1. **Extensiones ▸ Apps Script**. Se abre el editor en otra pestaña.
 2. Arriba a la derecha: **Implementar ▸ Nueva implementación**.
@@ -86,16 +105,20 @@ Este es el único paso incómodo, y también es el último.
      dirección es imposible de adivinar, y el programa comprueba la identidad de
      quien llama antes de responder nada. Si pusieras otra opción, la aplicación
      no podría hablar con tu expediente.
-5. **Implementar** y copia la **URL** que aparece.
+5. **Implementar**, y vuelve a la hoja: **Paté ▸ Conectar con la aplicación**.
 
-> **Esa URL es la llave de tu expediente.** No la publiques ni la pegues en un
-> grupo de WhatsApp. Compártela solo a través de la aplicación.
+> **La URL de la implementación es la llave de tu expediente.** No la publiques
+> ni la pegues en un grupo de WhatsApp. El menú la mete en el enlace de
+> conexión por ti.
 
-## 6 · Pégala en la aplicación
+## 6 · Abre Paté ya conectado
 
-Entra en Paté con tu cuenta de Google, ve a **Ajustes ▸ Hoja de la familia**,
-pega la URL y pulsa **Comprobar y guardar**. La aplicación comprueba que
-responde y que es una versión compatible antes de guardarla.
+En el diálogo, **Abrir Paté ya conectado** y entra con **la misma cuenta de
+Google** con la que instalaste. La aplicación comprueba que tu hoja responde y
+es compatible, la recuerda en ese navegador y carga tu expediente.
+
+¿Prefieres hacerlo a mano? También puedes pegar la URL en **Ajustes ▸ Hoja de
+la familia ▸ Cambiar dirección de la hoja**.
 
 Ya está. A partir de aquí, invitas a tu familia desde la aplicación y ellos solo
 tienen que abrir un enlace.

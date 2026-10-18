@@ -259,3 +259,118 @@ function veredictoDuracion(ms) {
         return 'ACEPTABLE';
     return 'PARTIR';
 }
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque M · alta de una familia nueva sin pasos técnicos
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * La aplicación de la que esta plantilla es el backend.
+ *
+ * No es una credencial ni es distinta por familia: es la misma PWA para todos,
+ * y es a donde llevan los enlaces de invitación y de conexión. De ella se lee
+ * el Client ID (ver `esClienteOAuthValido`), que así no viaja en la plantilla.
+ */
+var URL_APP_PATE = 'https://pate-salud-familiar.vercel.app';
+/** La ruta pública de la PWA que dice con qué Client ID se identifica. */
+var RUTA_CONFIGURACION_PUBLICA = '/api/configuracion';
+/** El formato de un Client ID de OAuth de Google, sin ningún valor concreto. */
+function esClienteOAuthValido(valor) {
+    return typeof valor === 'string' && /^\d{6,}-[a-z0-9]+\.apps\.googleusercontent\.com$/.test(valor.trim());
+}
+/**
+ * Lee la respuesta de `/api/configuracion` y devuelve el Client ID solo si es
+ * de Paté y tiene la forma de uno. Cualquier otra cosa es `null`: un backend
+ * sin audiencia falla cerrado, que es lo que tiene que pasar.
+ */
+function clienteDeConfiguracion(cuerpo) {
+    let datos = cuerpo;
+    if (typeof cuerpo === 'string') {
+        try {
+            datos = JSON.parse(cuerpo);
+        }
+        catch (e) {
+            return null;
+        }
+    }
+    const d = (datos || {});
+    if (d.app !== 'pate' || !esClienteOAuthValido(d.clientId))
+        return null;
+    return String(d.clientId).trim();
+}
+/** El enlace que abre la PWA ya conectada a esta hoja (`?hoja=`, Bloque L). */
+function enlaceDeConexion(urlApp, urlBackend) {
+    return urlApp.replace(/\/+$/, '') + '/?hoja=' + encodeURIComponent(urlBackend);
+}
+/** Texto seguro para meterlo en HTML. */
+function escaparHtml(texto) {
+    return String(texto == null ? '' : texto)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+var ESTILO_DIALOGO = 'body{font-family:Arial,sans-serif;color:#1e293b;font-size:14px;line-height:1.5;margin:0}' +
+    'ol{padding-left:20px}li{margin:6px 0}code{background:#f1f5f9;padding:1px 4px;border-radius:4px}' +
+    '.boton{display:inline-block;background:#0f766e;color:#fff;font-weight:bold;padding:10px 16px;' +
+    'border-radius:10px;text-decoration:none;margin:8px 0;border:0;cursor:pointer;font-size:14px}' +
+    '.secundario{background:#fff;color:#0f766e;border:1px solid #0f766e}.nota{color:#475569;font-size:12px}';
+/**
+ * El diálogo de «Paté ▸ Conectar con la aplicación».
+ *
+ * Sin implementación todavía: los cuatro clics para publicarla. Con ella: un
+ * botón que abre la PWA ya conectada, y otro que le manda el mismo enlace al
+ * titular por correo para abrirlo en el celular. Nada de copiar ni pegar URLs.
+ */
+/** La /exec de una aplicación web de Apps Script, como literal de regex para el diálogo. */
+var PATRON_EXEC_DIALOGO = '/^https:\\/\\/script\\.google\\.com\\/macros\\/s\\/[A-Za-z0-9_-]{20,}\\/exec$/';
+function htmlConexion(urlApp, urlBackend) {
+    if (!urlBackend) {
+        return ('<style>' + ESTILO_DIALOGO + '</style>' +
+            '<p><strong>Falta un paso: publicar tu expediente para la aplicación.</strong></p>' +
+            '<ol>' +
+            '<li>Menú <strong>Extensiones ▸ Apps Script</strong>.</li>' +
+            '<li>Arriba a la derecha: <strong>Implementar ▸ Nueva implementación</strong>.</li>' +
+            '<li>En el engranaje ⚙ elige <strong>Aplicación web</strong>. ' +
+            '<em>Ejecutar como:</em> <strong>Yo</strong>. <em>Quién tiene acceso:</em> <strong>Cualquier usuario</strong>.</li>' +
+            '<li>Pulsa <strong>Implementar</strong> y vuelve aquí: <strong>Paté ▸ Conectar con la aplicación</strong>.</li>' +
+            '</ol>' +
+            '<p class="nota">«Cualquier usuario» no abre tu expediente a nadie: la aplicación solo responde a las ' +
+            'cuentas de Google que tú invites.</p>' +
+            // Si Google no le dice al menú la dirección de la implementación (pasa
+            // en algunas cuentas), se pega aquí mismo y el botón se arma en el
+            // diálogo: nada viaja a ningún sitio hasta que el titular lo pulsa.
+            '<p><label for="exec"><strong>¿Ya publicaste y sigue saliendo esto?</strong> Pega aquí la URL de la ' +
+            'aplicación web (termina en <code>/exec</code>):</label></p>' +
+            '<input id="exec" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #94a3b8;border-radius:8px" ' +
+            'placeholder="Termina en /exec" oninput="armar()">' +
+            '<p id="salida" class="nota" aria-live="polite"></p>' +
+            '<script>function armar(){var v=document.getElementById("exec").value.trim();var s=document.getElementById("salida");' +
+            'if(!' + PATRON_EXEC_DIALOGO + '.test(v)){s.textContent=v?"Esa dirección no termina en /exec.":"";return;}' +
+            'var a=document.createElement("a");a.className="boton";a.target="_blank";a.rel="noopener";' +
+            'a.href=' + JSON.stringify(urlApp.replace(/\/+$/, '') + '/?hoja=') + '+encodeURIComponent(v);' +
+            'a.textContent="Abrir Paté ya conectado";s.textContent="";s.appendChild(a);}</script>');
+    }
+    const enlace = escaparHtml(enlaceDeConexion(urlApp, urlBackend));
+    return ('<style>' + ESTILO_DIALOGO + '</style>' +
+        '<p><strong>Tu expediente está listo.</strong> Ábrelo en la aplicación y entra con esta misma cuenta de Google.</p>' +
+        '<a class="boton" href="' + enlace + '" target="_blank" rel="noopener">Abrir Paté ya conectado</a> ' +
+        '<button class="boton secundario" id="correo" onclick="enviar()">Enviarme el enlace por correo</button>' +
+        '<p class="nota" id="estado">Para el celular: pídelo por correo y ábrelo allí. Después invita a tu familia ' +
+        'desde Ajustes ▸ Invitaciones.</p>' +
+        '<script>function enviar(){var b=document.getElementById("correo");b.disabled=true;' +
+        'google.script.run.withSuccessHandler(function(){document.getElementById("estado").textContent=' +
+        '"Enviado a tu correo.";}).withFailureHandler(function(){b.disabled=false;' +
+        'document.getElementById("estado").textContent="No se pudo enviar. Usa el botón de arriba.";})' +
+        '.enviarmeEnlaceDeConexion();}</script>');
+}
+var ASUNTO_CONEXION = 'Tu enlace a Paté · Salud Familiar';
+/** El correo con el enlace de conexión. Solo el enlace: nada clínico. */
+function cuerpoConexion(urlApp, urlBackend) {
+    return [
+        'Abre este enlace en el dispositivo donde quieras usar Paté y entra con tu cuenta de Google:',
+        '',
+        enlaceDeConexion(urlApp, urlBackend),
+        '',
+        'Quien tenga este enlace solo ve la pantalla de entrada: el expediente solo se abre a las cuentas que tú invites.',
+    ].join('\n');
+}

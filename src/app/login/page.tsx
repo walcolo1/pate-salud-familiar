@@ -164,6 +164,14 @@ export default function LoginPage() {
           Ver cómo funciona la aplicación
         </button>
 
+        {/* Bloque M · la puerta de entrada de una familia nueva */}
+        <button
+          onClick={() => router.push('/crear-expediente')}
+          className="py-2 text-sm font-extrabold text-white underline underline-offset-4 hover:text-teal-50 transition-colors duration-200"
+        >
+          ¿Tu familia todavía no usa Paté? Crea su expediente
+        </button>
+
         <hr className="border-white/10 my-1 mx-8" />
 
         {/* Security disclaimer footer */}

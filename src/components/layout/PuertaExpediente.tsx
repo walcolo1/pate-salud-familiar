@@ -15,11 +15,21 @@
  */
 
 import React from 'react';
+import { usePathname } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import EstadoError from '@/components/ui/EstadoError';
+import BienvenidaSinAcceso from '@/components/layout/BienvenidaSinAcceso';
+import { rutaPermitidaSinAcceso } from '@/lib/altaFamilia';
 
 export default function PuertaExpediente({ children }: { children: React.ReactNode }) {
-  const { errorCarga, reintentarCarga } = useApp();
+  const { errorCarga, reintentarCarga, sinAcceso, user } = useApp();
+  const ruta = usePathname();
+
+  // Bloque M · una cuenta sin acceso a la hoja no ve un expediente vacío ni un
+  // error técnico: ve qué puede hacer.
+  if (sinAcceso && !rutaPermitidaSinAcceso(ruta)) {
+    return <BienvenidaSinAcceso email={user?.email} />;
+  }
 
   if (errorCarga) {
     return (

@@ -460,6 +460,8 @@ interface AppContextProps {
    * de G4b, y por eso se enseña en voz alta y no se deduce de un contador.
    */
   hojaRegistrada: boolean;
+  /** Bloque M · la cuenta no figura en ACCESO de la hoja con la que habla. */
+  sinAcceso: boolean;
   /** El expediente se está descargando de la hoja al entrar. Para el indicador. */
   cargandoExpediente: boolean;
   /**
@@ -515,6 +517,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Se lee al montar, no al renderizar: `localStorage` no existe en el
   // servidor y leerlo durante el render descuadraría la hidratación.
   const [hojaRegistrada, setHojaRegistrada] = useState<boolean>(false);
+  // Bloque M · la hoja contestó que esta cuenta no está en su ACCESO.
+  const [sinAcceso, setSinAcceso] = useState<boolean>(false);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- se sincroniza con un almacén externo al montar
     setHojaRegistrada(sesionBackend().url() !== null);
@@ -4908,12 +4912,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
 
       aplicarDatosRemotos(datos);
+      setSinAcceso(false);
       setLastPullAt(new Date().toISOString());
       setLastSyncAt(new Date().toISOString());
       setOpSyncStatus('synced');
     } catch (err: unknown) {
       const codigo = (err as { codigo?: string } | null)?.codigo ?? '';
       if (codigo === 'SIN_IDENTIDAD') vigiaRef.current?.faltoIdentidad();
+      // Bloque M · la cuenta no figura en ACCESO de esta hoja: no es un fallo
+      // técnico sino alguien que llega sin expediente. `PuertaExpediente` le
+      // enseña los dos caminos (me invitaron / crear el de mi familia).
+      if (codigo === 'ACCESO_DENEGADO') setSinAcceso(true);
       console.error('[AppContext] no se pudo releer el expediente:', err);
       setOpSyncStatus('error');
       setOpSyncError(
@@ -4962,6 +4971,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const resultado = await comprobarYRegistrar(url);
     if (resultado.ok) {
       setHojaRegistrada(true);
+      setSinAcceso(false);
       await flushPendingSync();
       // Recién registrada —o cambiada—, el expediente de esa hoja todavía no
       // se ha leído.
@@ -5787,6 +5797,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       hayCambiosRemotos,
       recargarExpediente,
       hojaRegistrada,
+      sinAcceso,
       cargandoExpediente,
       hayQueEntrar,
       cambiosRetenidos,
