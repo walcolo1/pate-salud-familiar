@@ -33,7 +33,7 @@ const manifiesto = (): Manifiesto =>
   JSON.parse(readFileSync(RUTA_MANIFIESTO, 'utf8')) as Manifiesto;
 
 describe('los ámbitos del manifiesto', () => {
-  it('son exactamente estos siete, en este orden', () => {
+  it('son exactamente estos ocho, en este orden', () => {
     expect(manifiesto().oauthScopes).toEqual([
       // La hoja del titular. Amplio a la fuerza: ver la prueba de más abajo.
       'https://www.googleapis.com/auth/spreadsheets',
@@ -45,6 +45,11 @@ describe('los ámbitos del manifiesto', () => {
       'https://www.googleapis.com/auth/script.send_mail',
       // Crear los disparadores desde `instalar()`.
       'https://www.googleapis.com/auth/script.scriptapp',
+      // Bloque M · los diálogos de la hoja (`showModalDialog`, «Paté ▸
+      // Conectar con la aplicación»). Con `oauthScopes` explícitos, sin él
+      // Apps Script rechaza el diálogo: «Los permisos especificados no son
+      // suficientes para llamar a Ui.showModalDialog».
+      'https://www.googleapis.com/auth/script.container.ui',
       // UrlFetch, para verificar el `id_token` contra Google.
       'https://www.googleapis.com/auth/script.external_request',
       // El correo del titular, capturado durante la instalación.

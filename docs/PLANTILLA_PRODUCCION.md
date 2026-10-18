@@ -20,8 +20,8 @@ limpia y **nunca se ejecuta**.
 
 ```
 Enlace /copy: https://docs.google.com/spreadsheets/d/1eMuQxdZdt525IXryR-8PalRmuw243LlPnkO7T-L68fs/copy
-Armada el:    2026-09-19
-Versión:      e7 · esquema 1 · 21 pestañas · 12 ficheros consolidados
+Armada el:    2026-09-19 · actualizada el 2026-10-18 (Bloque M)
+Versión:      e7 · esquema 6 · 22 pestañas · 12 ficheros consolidados · 8 ámbitos
 ```
 
 ---
@@ -152,11 +152,11 @@ lo que verá un titular de verdad.
    | `E8-01-elegir-cuenta.png` | El selector de cuenta de Google |
    | `E8-02-no-verificada.png` | «Google no ha verificado esta aplicación» |
    | `E8-03-avanzada.png` | *Configuración avanzada* desplegado, con «Ir a … (no seguro)» |
-   | `E8-04-ambitos.png` | **La lista de los siete permisos**. Es la captura que importa |
+   | `E8-04-ambitos.png` | **La lista de los ocho permisos**. Es la captura que importa |
    | `E8-05-concedido.png` | La ejecución terminada |
 
 4. Comprobar en `E8-04` que los permisos que Google enumera se corresponden con
-   los siete ámbitos del manifiesto, y **que no hay ninguno más**. Google los
+   los ocho ámbitos del manifiesto, y **que no hay ninguno más**. Google los
    describe en lenguaje llano, no por su URL, así que la correspondencia hay
    que leerla:
 
@@ -167,6 +167,7 @@ lo que verá un titular de verdad.
    | `calendar.events` | Ver y editar eventos de todos tus calendarios |
    | `script.send_mail` | Enviar correo en tu nombre |
    | `script.scriptapp` | Crear y actualizar sus propios activadores |
+   | `script.container.ui` | Mostrar contenido de terceros en avisos y barras laterales de Google |
    | `script.external_request` | Conectarse a un servicio externo |
    | `userinfo.email` | Ver tu dirección de correo principal |
 

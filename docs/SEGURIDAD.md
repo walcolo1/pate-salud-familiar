@@ -140,7 +140,7 @@ que la conversación ocurra; no dice quién habla.
 
 ## Ámbitos del backend de Apps Script (E1)
 
-Siete ámbitos, declarados a mano en `apps-script/plantilla/appsscript.json`.
+Ocho ámbitos, declarados a mano en `apps-script/plantilla/appsscript.json`.
 Cada uno es un permiso que un titular concede **sobre su propia cuenta**, así
 que la lista está bajo llave: `src/lib/manifiestoPlantilla.test.ts` la compara
 entera —igualdad, no «contiene»— y falla si alguien añade, quita o reordena uno.
@@ -152,6 +152,7 @@ entera —igualdad, no «contiene»— y falla si alguien añade, quita o reorde
 | `calendar.events` | Crear y mover los eventos de las citas | `calendar`, que además administra los calendarios |
 | `script.send_mail` | Enviar el correo de invitación con `MailApp` | `https://mail.google.com/`, **restringido**: acceso total al buzón |
 | `script.scriptapp` | Crear los disparadores desde el instalador | — |
+| `script.container.ui` | Abrir diálogos en la hoja («Paté ▸ Conectar con la aplicación», Bloque M) | — |
 | `script.external_request` | `UrlFetch`, para verificar el `id_token` contra Google | — |
 | `userinfo.email` | Capturar el correo del titular durante la instalación | — |
 
