@@ -113,6 +113,12 @@
     "moderate": 0,
     "minor": 0
   },
+  "miembro-emergencia": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
   "miembro-exams": {
     "critical": 0,
     "serious": 0,
@@ -120,6 +126,12 @@
     "minor": 0
   },
   "miembro-exams-dialogo": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
+  "miembro-exams-verificacion": {
     "critical": 0,
     "serious": 0,
     "moderate": 0,

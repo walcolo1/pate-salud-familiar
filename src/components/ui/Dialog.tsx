@@ -45,7 +45,7 @@ export interface DialogProps {
    */
   cerrarAlPulsarFuera?: boolean;
   /** Ancho máximo. `md` para formularios; `sm` para avisos cortos. */
-  ancho?: 'sm' | 'md';
+  ancho?: 'sm' | 'md' | 'lg';
   /** Oculta la X de la esquina cuando el contenido ya trae sus propios botones. */
   sinBotonCerrar?: boolean;
 }
@@ -53,6 +53,8 @@ export interface DialogProps {
 const ANCHOS: Record<NonNullable<DialogProps['ancho']>, string> = {
   sm: 'w-[min(24rem,calc(100vw-2rem))]',
   md: 'w-[min(28rem,calc(100vw-2rem))]',
+  /** Bloque N · formularios con tabla (bandeja de verificación de un examen). */
+  lg: 'w-[min(52rem,calc(100vw-2rem))]',
 };
 
 export default function Dialog({

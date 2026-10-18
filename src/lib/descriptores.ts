@@ -264,6 +264,10 @@ export const DESCRIPTORES: Record<string, readonly Descriptor[]> = {
         unit: c('unidad'),
         referenceRange: c('rango_referencia'),
         isAbnormal: c('fuera_de_rango', 'booleano'),
+        // Bloque N · La bandeja de verificación los rellena siempre; las
+        // filas antiguas los traen vacíos y se enseñan como «sin verificar».
+        extractionConfidence: c('confianza_extraccion'),
+        verifiedBy: c('verificado_por'),
       },
     },
   ],

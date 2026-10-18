@@ -49,3 +49,11 @@ body {
 .foco-claro *:focus-visible {
   outline-color: #ffffff;
 }
+
+/* Bloque N · Ficha de emergencia: al imprimir, solo la tarjeta. */
+@media print {
+  body * { visibility: hidden !important; }
+  .zona-impresion, .zona-impresion * { visibility: visible !important; }
+  .zona-impresion { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none !important; }
+  .no-imprimir { display: none !important; }
+}

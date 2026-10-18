@@ -205,6 +205,13 @@ export interface ExamResult {
   referenceRange?: string | null;
   isAbnormal: boolean;
   recordedAt: string;
+  /**
+   * Bloque N · De dónde salió el valor: `ALTA`/`MEDIA`/`BAJA` (lector de
+   * informes), `MANUAL` o `CORREGIDO` (la persona cambió lo leído).
+   */
+  extractionConfidence?: string | null;
+  /** Bloque N · Marca de revisión humana (`REVISION_HUMANA:<fecha>`). Sin correo ni nombre. */
+  verifiedBy?: string | null;
 }
 
 export interface ClinicalDocument {

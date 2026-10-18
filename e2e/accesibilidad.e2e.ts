@@ -242,6 +242,34 @@ test.describe('C1 · accesibilidad', () => {
   }
 
   /**
+   * Bloque N · la bandeja de verificación con filas leídas (y una con
+   * errores), y la ficha de emergencia. Sin línea base: se exige cero.
+   */
+  test('A11Y · miembro-exams · bandeja de verificación', async ({ page }) => {
+    const id = await primerFamiliar(page);
+    await page.goto(`/members/${id}/exams`);
+    await expect(page.locator('main').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Registrar examen' }).first().click();
+    const dialogo = page.locator('dialog[open]');
+    await dialogo.getByRole('button', { name: 'Pegar texto' }).click();
+    await dialogo
+      .getByLabel('Texto del informe')
+      .fill('Fecha de toma: 10/09/2026\nCOLESTEROL TOTAL 193 mg/dL 80 - 200\nHDL COLESTEROL 48 mg/dL * 55 - 85');
+    await dialogo.getByRole('button', { name: 'Leer valores del texto' }).click();
+    await dialogo.getByRole('button', { name: 'Agregar fila' }).click();
+    await expect(dialogo.getByLabel('Analito, fila 3')).toBeVisible();
+    await medirYComparar(page, 'miembro-exams-verificacion');
+  });
+
+  test('A11Y · miembro-emergencia', async ({ page }) => {
+    const id = await primerFamiliar(page);
+    await page.goto(`/members/${id}/emergencia`);
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await expect(page.getByRole('button', { name: 'Imprimir ficha' })).toBeVisible();
+    await medirYComparar(page, 'miembro-emergencia');
+  });
+
+  /**
    * Los tres diálogos de órdenes médicas (C1.3b).
    *
    * No salen en `SUBRUTAS` porque no basta con pulsar un botón: sus botones

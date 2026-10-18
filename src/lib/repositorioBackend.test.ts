@@ -209,6 +209,35 @@ describe('lo que no tiene dónde escribirse, lo dice', () => {
     // v4 · Y va también EN la fila: es lo que permite volver a encontrarla.
     expect(m?.fila.paciente_id).toBe('p1');
   });
+
+  it('Bloque N · la bandeja escribe su confianza y su verificación, y vuelven al leer', async () => {
+    const resultado = {
+      id: 'r1', examId: 'e1', parameterName: 'HDL COLESTEROL', value: '48', unit: 'mg/dL',
+      referenceRange: '55 - 85', isAbnormal: true, recordedAt: '',
+      extractionConfidence: 'ALTA', verifiedBy: 'REVISION_HUMANA:2026-10-18',
+    };
+    const { repo, espia } = banco();
+    await repo.saveExamResults(CTX, 'e1', [resultado], 'p1');
+    const fila = envio(espia).payload!.mutaciones![0].fila;
+    expect(fila).toMatchObject({
+      parametro: 'HDL COLESTEROL', valor: '48', unidad: 'mg/dL', rango_referencia: '55 - 85',
+      fuera_de_rango: 'SI', confianza_extraccion: 'ALTA', verificado_por: 'REVISION_HUMANA:2026-10-18',
+    });
+
+    // Ida y vuelta: la misma fila, releída de la hoja, da el mismo resultado.
+    const enc = encabezadosDe('EXAMENES_RESULTADOS') ?? [];
+    const { repo: lector } = banco([
+      { ok: true, data: { esquema: 6, revision: 1, tablas: {
+        PACIENTES: [['p1', 'HUMANO', 'Ana', '', 'ACTIVE', '', '', '', '']],
+        EXAMENES_RESULTADOS: [enc.map((c) => String(fila[c] ?? ''))],
+      } } },
+    ]);
+    const [leido] = (await lector.loadAll(CTX)).examResults.e1;
+    expect(leido).toMatchObject({
+      parameterName: 'HDL COLESTEROL', value: '48', unit: 'mg/dL', referenceRange: '55 - 85',
+      isAbnormal: true, extractionConfidence: 'ALTA', verifiedBy: 'REVISION_HUMANA:2026-10-18',
+    });
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

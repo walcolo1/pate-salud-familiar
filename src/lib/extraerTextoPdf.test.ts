@@ -15,6 +15,7 @@ import {
   extraerTextoPdf,
   type CargadorPdf,
   type DocumentoPdfLike,
+  unirFragmentos,
 } from './extraerTextoPdf';
 
 /**
@@ -235,5 +236,23 @@ describe('worker de pdf.js', () => {
     expect(sha('public/pdf.worker.min.mjs')).toBe(
       sha('node_modules/pdfjs-dist/build/pdf.worker.min.mjs'),
     );
+  });
+});
+
+describe('Bloque N · unirFragmentos', () => {
+  const it2 = (str: string, y: number, hasEOL = false) => ({ str, transform: [1, 0, 0, 1, 72, y], hasEOL });
+
+  it('sin opciones, une con espacios como siempre (importación de citas)', () => {
+    expect(unirFragmentos([it2('A', 700), it2('B', 680)])).toBe('A B');
+  });
+
+  it('con líneas: un cambio de altura o un fin de línea abre línea nueva', () => {
+    expect(
+      unirFragmentos([it2('GLUCOSA', 700), it2('95', 700), it2('mg/dL', 700, true), it2('HDL', 686), it2('48', 686)], true),
+    ).toBe('GLUCOSA 95 mg/dL\nHDL 48');
+  });
+
+  it('con líneas y sin coordenadas, se fía de hasEOL', () => {
+    expect(unirFragmentos([{ str: 'A', hasEOL: true }, { str: 'B' }], true)).toBe('A\nB');
   });
 });

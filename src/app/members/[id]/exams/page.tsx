@@ -11,13 +11,22 @@ import {
   Plus, 
   Calendar, 
   Beaker, 
-  ShieldAlert, 
-  Check, 
   Info, 
-  Save, 
-  Heart 
 } from 'lucide-react';
-import { MedicalExam, ExamResult } from '@/domain/models';
+import { MedicalExam } from '@/domain/models';
+import ComparativoHistorico, { ChipEstado } from '@/components/examenes/ComparativoHistorico';
+import RegistroExamen, { type DatosExamen } from '@/components/examenes/RegistroExamen';
+import {
+  construirComparativo,
+  esUnidadDeRecuento,
+  estadoFrenteARango,
+  estaFueraDeRango,
+  fechaDeExamen,
+  parsearNumero,
+  parsearRango,
+  type ResultadoParaGuardar,
+} from '@/lib/resultadosLaboratorio';
+import { fechaLocalHoy } from '@/lib/repositorioBackend';
 
 export default function ExamsPage() {
   const router = useRouter();
@@ -27,16 +36,6 @@ export default function ExamsPage() {
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedExam, setSelectedExam] = useState<MedicalExam | null>(null);
-
-  // New exam form state
-  const [examName, setExamName] = useState('');
-  const [orderedBy, setOrderedBy] = useState('');
-  const [orderedDate, setOrderedDate] = useState('2026-05-28');
-  const [laboratory, setLaboratory] = useState('');
-
-  // Mock results to inject automatically when completing
-  const [glucoseValue, setGlucoseValue] = useState('95');
-  const [cholesterolValue, setCholesterolValue] = useState('210');
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -63,61 +62,39 @@ export default function ExamsPage() {
     );
   }
 
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!examName) return;
-
-    // Automatically define mock result parameters
-    const mockParameters = [
-      {
-        parameterName: 'Glucosa en ayunas',
-        value: glucoseValue,
-        unit: 'mg/dL',
-        referenceRange: '70 - 100',
-        isAbnormal: Number(glucoseValue) > 100 || Number(glucoseValue) < 70
-      },
-      {
-        parameterName: 'Colesterol Total',
-        value: cholesterolValue,
-        unit: 'mg/dL',
-        referenceRange: 'Menos de 200',
-        isAbnormal: Number(cholesterolValue) >= 200
-      }
-    ];
-
+  const handleGuardar = (datos: DatosExamen, resultados: ResultadoParaGuardar[]) => {
+    const fuera = resultados.filter((r) => r.isAbnormal).length;
     addExam(
       {
         memberId: id,
-        examName,
-        orderedBy: orderedBy || null,
-        orderedDate,
-        laboratory: laboratory || null,
+        examName: datos.examName,
+        orderedBy: datos.orderedBy,
+        orderedDate: datos.orderedDate,
+        laboratory: datos.laboratory,
         status: 'COMPLETED',
-        performedDate: orderedDate,
-        resultSummary: mockParameters.some(p => p.isAbnormal) 
-          ? 'Colesterol elevado. Revisión médica requerida.' 
-          : 'Resultados estables dentro del rango de referencia.'
+        performedDate: datos.orderedDate,
+        // Solo cuenta, no interpreta: la lectura clínica es del médico.
+        resultSummary: resultados.length === 0
+          ? null
+          : `${resultados.length} ${resultados.length === 1 ? 'valor verificado' : 'valores verificados'}` +
+            (fuera > 0 ? `; ${fuera} fuera del rango impreso por el laboratorio.` : '; todos dentro del rango impreso por el laboratorio.'),
       },
-      mockParameters
+      resultados,
     );
-
-    // Reset
-    setExamName('');
-    setOrderedBy('');
-    setLaboratory('');
-    setGlucoseValue('95');
-    setCholesterolValue('210');
     setShowAddForm(false);
   };
 
   const memberExams = exams
     .filter(e => e.memberId === id)
-    .sort((a, b) => new Date(b.orderedDate).getTime() - new Date(a.orderedDate).getTime());
+    .sort((a, b) => fechaDeExamen(b).localeCompare(fechaDeExamen(a)));
+
+  // Las fichas de /members son personas: los rangos veterinarios nunca entran.
+  const comparativo = construirComparativo(memberExams, examResults, id, { especie: 'HUMANO' });
 
   const currentResults = selectedExam ? (examResults[selectedExam.id] || []) : [];
 
   return (
-    <div className="flex flex-col gap-6 select-none pb-12">
+    <div className="flex flex-col gap-6 pb-12">
       
       {/* Navigation Header */}
       <section className="flex justify-end items-center">
@@ -136,6 +113,8 @@ export default function ExamsPage() {
         <p className="text-xs font-semibold text-slate-500">Resultados de laboratorio clínico y análisis diagnósticos.</p>
       </section>
 
+      <ComparativoHistorico comparativo={comparativo} />
+
       {/* Exams List */}
       <section className="flex flex-col gap-3.5">
         {memberExams.length === 0 ? (
@@ -151,40 +130,39 @@ export default function ExamsPage() {
             const hasAlert = resultsForThis.some(r => r.isAbnormal);
 
             return (
-              <div 
+              <button
+                type="button"
                 key={exam.id}
                 onClick={() => setSelectedExam(exam)}
-                className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col gap-3 group"
+                className="w-full text-left bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col gap-3 group"
               >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="text-sm font-extrabold text-slate-800 group-hover:text-teal-700 transition-colors leading-tight mb-0.5">{exam.examName}</h4>
-                    <span className="text-[10px] text-slate-500 font-bold">{exam.orderedBy} · {exam.laboratory || 'Lab'}</span>
-                  </div>
+                <span className="flex justify-between items-start w-full">
+                  <span>
+                    <span className="text-sm font-extrabold text-slate-800 group-hover:text-teal-700 transition-colors leading-tight mb-0.5 block">{exam.examName}</span>
+                    <span className="text-[10px] text-slate-600 font-bold">{[exam.orderedBy, exam.laboratory].filter(Boolean).join(' · ') || 'Sin laboratorio'}</span>
+                  </span>
                   {hasAlert ? (
-                    <span className="text-[9px] font-extrabold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full border border-rose-100 uppercase">Alerta</span>
-                  ) : (
-                    <span className="text-[9px] font-extrabold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-600/10 uppercase">Estable</span>
-                  )}
-                </div>
-
-                <hr className="border-slate-50" />
+                    <span className="text-[10px] font-extrabold bg-rose-50 text-rose-800 px-2 py-0.5 rounded-full border border-rose-200 uppercase">Fuera de rango</span>
+                  ) : resultsForThis.length > 0 ? (
+                    <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200 uppercase">En rango</span>
+                  ) : null}
+                </span>
 
                 {/* Details summary */}
-                <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-teal-700" />
-                    <span>Realizado: {new Date(exam.orderedDate).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                  </div>
-                  <span className="text-[10px] font-extrabold text-teal-700 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                    Ver valores <Info className="h-3.5 w-3.5" />
+                <span className="flex justify-between items-center w-full text-xs font-semibold text-slate-600 border-t border-slate-100 pt-3">
+                  <span className="flex items-center gap-2">
+                    <Calendar aria-hidden className="h-4 w-4 text-teal-700" />
+                    <span>Realizado: {new Date(`${fechaDeExamen(exam)}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                   </span>
-                </div>
+                  <span className="text-[10px] font-extrabold text-teal-800 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                    {resultsForThis.length} {resultsForThis.length === 1 ? 'valor' : 'valores'} <Info aria-hidden className="h-3.5 w-3.5" />
+                  </span>
+                </span>
 
                 {exam.resultSummary && (
-                  <p className="text-[11px] text-slate-500 font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-100/50 leading-relaxed italic">{exam.resultSummary}</p>
+                  <span className="block text-[11px] text-slate-600 font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-100/50 leading-relaxed italic">{exam.resultSummary}</span>
                 )}
-              </div>
+              </button>
             );
           })
         )}
@@ -202,32 +180,37 @@ export default function ExamsPage() {
           {currentResults.length === 0 ? (
             <p className="text-xs text-slate-500 font-semibold text-center py-4">No se capturaron métricas individuales.</p>
           ) : (
-            currentResults.map((res) => (
-              <div 
-                key={res.id}
-                className={`flex items-center justify-between p-3.5 rounded-2xl border ${
-                  res.isAbnormal 
-                    ? 'bg-rose-50/50 border-rose-100 text-rose-800' 
-                    : 'bg-slate-50/50 border-slate-100 text-slate-700'
-                }`}
-              >
-                <div>
-                  <h5 className="text-xs font-bold leading-tight">{res.parameterName}</h5>
-                  <span className="text-[9px] text-slate-500 font-bold block">Ref: {res.referenceRange}</span>
+            currentResults.map((res) => {
+              const recuento = esUnidadDeRecuento(res.unit);
+              const num = parsearNumero(String(res.value ?? '').replace(/^[<>]=?\s*/, ''), recuento);
+              const rango = parsearRango(res.referenceRange, recuento);
+              const estado = num !== null
+                ? estadoFrenteARango(num, rango.min, rango.max)
+                : estadoFrenteARango(null, null, null, res.value, res.referenceRange);
+              const fuera = estaFueraDeRango(estado) || (estado === 'SIN_RANGO' && res.isAbnormal);
+              return (
+                <div
+                  key={res.id}
+                  className={`flex items-center justify-between gap-3 p-3.5 rounded-2xl border ${
+                    fuera ? 'bg-rose-50/50 border-rose-100 text-rose-800' : 'bg-slate-50/50 border-slate-100 text-slate-700'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <h5 className="text-xs font-bold leading-tight">{res.parameterName}</h5>
+                    <span className="text-[10px] text-slate-600 font-bold block">Ref.: {res.referenceRange || 'sin rango'}</span>
+                    {!res.verifiedBy && <span className="text-[10px] text-slate-600 font-semibold block">Sin verificar</span>}
+                  </div>
+                  <div className="text-right flex flex-col items-end gap-1">
+                    <span className="text-sm font-black text-slate-800">
+                      {res.value} <span className="text-[10px] font-normal">{res.unit}</span>
+                    </span>
+                    <ChipEstado estado={estado} />
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className={`text-sm font-black block ${res.isAbnormal ? 'text-rose-700 font-black' : 'text-slate-800'}`}>
-                    {res.value} <span className="text-[10px] font-normal">{res.unit}</span>
-                  </span>
-                  {res.isAbnormal && (
-                    <span className="text-[8px] font-extrabold bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded uppercase">Anormal</span>
-                  )}
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
-
         <button
           onClick={() => setSelectedExam(null)}
           className="w-full h-11 bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs rounded-xl"
@@ -235,116 +218,23 @@ export default function ExamsPage() {
           Cerrar Resultados
         </button>      </Dialog>
 
-      {/* Add Exam Modal */}
+      {/* Registro con bandeja de verificación (Bloque N) */}
       <Dialog
         abierto={showAddForm}
-        titulo="Registrar Examen Clínico"
+        titulo="Registrar examen clínico"
+        descripcion="Sube el PDF, pega el texto o escribe los valores. Nada se guarda sin tu revisión."
+        ancho="lg"
         onCerrar={() => setShowAddForm(false)}
       >
-        
-        <form onSubmit={handleCreate} className="flex flex-col gap-4">
-          {/* Exam Name */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="examen-nombre-del-examen" className="text-[10px] font-extrabold text-slate-700 uppercase">Nombre del Examen</label>
-            <input
-              id="examen-nombre-del-examen"
-              type="text"
-              required
-              value={examName}
-              onChange={(e) => setExamName(e.target.value)}
-              placeholder="Ej. Examen de Glucosa, Hemograma Completo"
-              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
-            />
-          </div>
-
-          {/* Ordered Date */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="examen-fecha-realizacion" className="text-[10px] font-extrabold text-slate-700 uppercase">Fecha Realización</label>
-            <input
-              id="examen-fecha-realizacion"
-              type="date"
-              required
-              value={orderedDate}
-              onChange={(e) => setOrderedDate(e.target.value)}
-              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-            />
-          </div>
-
-          {/* Ordered By */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="examen-medico-que-ordena-opcional" className="text-[10px] font-extrabold text-slate-700 uppercase">Médico que ordena (Opcional)</label>
-            <input
-              id="examen-medico-que-ordena-opcional"
-              type="text"
-              value={orderedBy}
-              onChange={(e) => setOrderedBy(e.target.value)}
-              placeholder="Ej. Dr. Ramírez"
-              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
-            />
-          </div>
-
-          {/* Laboratory */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="examen-laboratorio-opcional" className="text-[10px] font-extrabold text-slate-700 uppercase">Laboratorio (Opcional)</label>
-            <input
-              id="examen-laboratorio-opcional"
-              type="text"
-              value={laboratory}
-              onChange={(e) => setLaboratory(e.target.value)}
-              placeholder="Ej. Laboratorio Clínico Niza"
-              className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-colors"
-            />
-          </div>
-
-          <hr className="border-slate-50" />
-          <h5 className="text-[10px] font-black text-slate-800 uppercase px-0.5">Captura de Valores de Referencia</h5>
-
-          {/* Grid for parameters */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Glucose */}
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="examen-glucosa-en-ayunas-mg-dl" className="text-[9px] font-extrabold text-slate-700">Glucosa en ayunas (mg/dL)</label>
-              <input
-                id="examen-glucosa-en-ayunas-mg-dl"
-                type="number"
-                value={glucoseValue}
-                onChange={(e) => setGlucoseValue(e.target.value)}
-                className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-              />
-            </div>
-
-            {/* Cholesterol */}
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="examen-colesterol-total-mg-dl" className="text-[9px] font-extrabold text-slate-700">Colesterol Total (mg/dL)</label>
-              <input
-                id="examen-colesterol-total-mg-dl"
-                type="number"
-                value={cholesterolValue}
-                onChange={(e) => setCholesterolValue(e.target.value)}
-                className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-colors"
-              />
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2.5 mt-2.5">
-            <button
-              type="button"
-              onClick={() => setShowAddForm(false)}
-              className="flex-1 h-11 border border-slate-200 hover:bg-slate-50 font-extrabold text-xs text-slate-500 rounded-xl transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="flex-1 h-11 bg-teal-700 hover:bg-teal-800 active:bg-teal-900 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-teal-600/10 transition-colors"
-            >
-              <Save className="h-4 w-4" />
-              <span>Guardar</span>
-            </button>
-          </div>
-        </form>      </Dialog>
-
+        {showAddForm && (
+          <RegistroExamen
+            especie="HUMANO"
+            hoy={fechaLocalHoy()}
+            onGuardar={handleGuardar}
+            onCancelar={() => setShowAddForm(false)}
+          />
+        )}
+      </Dialog>
     </div>
   );
 }

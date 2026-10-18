@@ -159,9 +159,47 @@ async function cargadorPorDefecto(datos: Uint8Array): Promise<DocumentoPdfLike> 
  * es un caso normal de uso, no un fallo del programa, y la persona necesita
  * un mensaje, no una excepción.
  */
+export interface OpcionesExtraccion {
+  /**
+   * Bloque N · Conservar los saltos de línea del documento. Un informe de
+   * laboratorio es una tabla: unir todo con espacios pega cada analito con el
+   * siguiente. Por defecto no, para no cambiar lo que ya leía la importación
+   * de citas.
+   */
+  conLineas?: boolean;
+}
+
+/**
+ * Une los fragmentos de texto de una página.
+ *
+ * Con `conLineas`, un fragmento abre línea nueva cuando pdf.js marca fin de
+ * línea (`hasEOL`) o cuando su coordenada vertical cambia respecto al
+ * anterior (`transform[5]`), que es como se ven las filas de una tabla.
+ */
+export function unirFragmentos(items: unknown[], conLineas = false): string {
+  if (!conLineas) {
+    return items.map((i) => (i as { str?: string }).str ?? '').join(' ');
+  }
+  let salida = '';
+  let yAnterior: number | null = null;
+  for (const bruto of items) {
+    const item = bruto as { str?: string; hasEOL?: boolean; transform?: number[] };
+    const y = Array.isArray(item.transform) ? Number(item.transform[5]) : null;
+    if (salida && y !== null && yAnterior !== null && Math.abs(y - yAnterior) > 1 && !salida.endsWith('\n')) {
+      salida += '\n';
+    }
+    const texto = item.str ?? '';
+    if (texto) salida += salida && !salida.endsWith('\n') && !salida.endsWith(' ') ? ` ${texto}` : texto;
+    if (item.hasEOL && !salida.endsWith('\n')) salida += '\n';
+    if (y !== null) yAnterior = y;
+  }
+  return salida;
+}
+
 export async function extraerTextoPdf(
   datos: Uint8Array,
   cargador: CargadorPdf = cargadorPorDefecto,
+  opciones: OpcionesExtraccion = {},
 ): Promise<ResultadoPdf> {
   if (excedeTamanoPdf(datos.byteLength)) return { estado: 'demasiado_grande' };
 
@@ -172,10 +210,7 @@ export async function extraerTextoPdf(
     for (let n = 1; n <= documento.numPages; n++) {
       const pagina = await documento.getPage(n);
       const contenido = await pagina.getTextContent();
-      const linea = contenido.items
-        .map((i) => (i as { str?: string }).str ?? '')
-        .join(' ');
-      partes.push(linea);
+      partes.push(unirFragmentos(contenido.items, opciones.conLineas));
     }
 
     return clasificarTextoPdf(partes.join('\n'));
