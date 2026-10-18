@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
+  estadoDeVacuna,
+  fechaLocalHoy,
   NO_HAY_DONDE,
   RepositorioBackend,
   SIN_BACKEND,
@@ -307,6 +309,23 @@ describe('loadAll', () => {
       }),
     ]);
     expect((await repo.loadAll(CTX)).members).toEqual([]);
+  });
+
+  it('una vacuna releída de la hoja sale aplicada si su fecha ya pasó, y programada si es futura', async () => {
+    // `VACUNAS` no guarda el estado: se calcula. Antes se leía `undefined` y
+    // la cartilla pintaba «Pendiente» en una dosis puesta hace meses.
+    const enc = encabezadosDe('VACUNAS') ?? [];
+    const fila = (id: string, fecha: string) =>
+      enc.map((c) => ({ id, paciente_id: 'p1', vacuna: 'Influenza', fecha } as Record<string, string>)[c] ?? '');
+    const { repo } = banco([
+      exportar({
+        PACIENTES: [['p1', 'HUMANO', 'Ana', '', 'ACTIVE', '', '', '', '']],
+        VACUNAS: [fila('v1', '2020-05-29'), fila('v2', '2999-01-01'), fila('v3', '')],
+      }),
+    ]);
+    const datos = await repo.loadAll(CTX);
+    const estados = Object.fromEntries(datos.vaccines.map((v) => [v.id, v.status]));
+    expect(estados).toEqual({ v1: 'COMPLETED', v2: 'SCHEDULED', v3: 'SCHEDULED' });
   });
 
   it('si el rol no llega a exportar, se pregunta paciente a paciente', async () => {
@@ -711,5 +730,19 @@ describe('Bloque J · las tareas de seguimiento tienen pestaña', () => {
     const datos = await repo.loadAll(CTX);
     expect(datos.tasks).toHaveLength(1);
     expect(datos.tasks[0]).toMatchObject({ id: 't1', memberId: 'p1', title: 'Pedir cita', status: 'DONE', priority: 'LOW', dueDate: '2026-10-20' });
+  });
+});
+
+describe('estadoDeVacuna', () => {
+  it('compara solo el día, en la hora del dispositivo', () => {
+    expect(estadoDeVacuna('2026-10-18', '2026-10-18')).toBe('COMPLETED');
+    expect(estadoDeVacuna('2026-10-18T23:00:00Z', '2026-10-18')).toBe('COMPLETED');
+    expect(estadoDeVacuna('2026-10-19', '2026-10-18')).toBe('SCHEDULED');
+    expect(estadoDeVacuna('', '2026-10-18')).toBe('SCHEDULED');
+    expect(estadoDeVacuna('no es fecha', '2026-10-18')).toBe('SCHEDULED');
+  });
+
+  it('hoy es la fecha local, no la UTC', () => {
+    expect(fechaLocalHoy(new Date(2026, 9, 18, 23, 30))).toBe('2026-10-18');
   });
 });

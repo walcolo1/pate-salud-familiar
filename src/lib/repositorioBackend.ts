@@ -135,6 +135,22 @@ export function sesionDelNavegador(): SesionBackend {
  * rol que se reparta. `validarInvitacion` lo rechaza igualmente, pero fallar
  * aquí ahorra una petición y dice mejor por qué.
  */
+/** `AAAA-MM-DD` de hoy en la hora del dispositivo, no en UTC. */
+export function fechaLocalHoy(ahora: Date = new Date()): string {
+  const dos = (n: number) => String(n).padStart(2, '0');
+  return `${ahora.getFullYear()}-${dos(ahora.getMonth() + 1)}-${dos(ahora.getDate())}`;
+}
+
+/**
+ * El estado de una vacuna, calculado como manda el esquema: aplicada si su
+ * fecha ya llegó; programada si es futura o no tiene fecha.
+ */
+export function estadoDeVacuna(fecha: unknown, hoy: string): 'COMPLETED' | 'SCHEDULED' {
+  const dia = String(fecha ?? '').trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return 'SCHEDULED';
+  return dia <= hoy ? 'COMPLETED' : 'SCHEDULED';
+}
+
 export function rolDeContrato(rol: string): string | null {
   const mapa: Record<string, string> = {
     CAREGIVER: 'CUIDADOR',
@@ -494,6 +510,15 @@ export class RepositorioBackend implements DataRepository {
 
       (datos as unknown as Record<string, unknown>)[coleccion] = registros;
     }
+
+    // `VACUNAS` no guarda el estado —el esquema dice que se calcula— y la
+    // cartilla lo lee de `status`. Sin esta línea, toda vacuna releída de la
+    // hoja salía «Pendiente», aunque tuviera fecha de aplicación.
+    const hoy = fechaLocalHoy();
+    datos.vaccines = datos.vaccines.map((vacuna) => ({
+      ...vacuna,
+      status: estadoDeVacuna(vacuna.dateApplied, hoy),
+    }));
 
     datos.healthProfiles = {};
     const perfiles = DESCRIPTORES.healthProfiles?.[0];
