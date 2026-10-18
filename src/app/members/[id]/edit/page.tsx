@@ -21,8 +21,6 @@ export default function EditMemberPage() {
   const [bloodType, setBloodType] = useState<BloodType | ''>('');
   const [notes, setNotes] = useState('');
   const [email, setEmail] = useState('');
-  const [canAccessPortal, setCanAccessPortal] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState<'NONE' | 'INVITED' | 'ACTIVE' | 'REVOKED'>('NONE');
   const [documentType, setDocumentType] = useState<MemberDocumentType>('CC');
   const [documentNumber, setDocumentNumber] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
@@ -34,16 +32,6 @@ export default function EditMemberPage() {
   const [avatarPath, setAvatarPath] = useState<string | null>(null);
   const [isAvatarDeleted, setIsAvatarDeleted] = useState(false);
   
-  // Granular permissions states
-  const [canManageOwnProfile, setCanManageOwnProfile] = useState(true);
-  const [canManageOwnAppointments, setCanManageOwnAppointments] = useState(true);
-  const [canManageOwnDocuments, setCanManageOwnDocuments] = useState(true);
-  const [canViewOwnHistory, setCanViewOwnHistory] = useState(true);
-  const [canUploadDocuments, setCanUploadDocuments] = useState(true);
-  const [canExportOwnData, setCanExportOwnData] = useState(false);
-  const [canViewFamilyData, setCanViewFamilyData] = useState(false);
-  const [canManageFamilyData, setCanManageFamilyData] = useState(false);
-
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,8 +50,6 @@ export default function EditMemberPage() {
       setBloodType(member.bloodType || '');
       setNotes(member.notes || '');
       setEmail(member.email || '');
-      setCanAccessPortal(member.canAccessPortal || false);
-      setPermissionStatus(member.permissionStatus || 'NONE');
       if (member.documentType) {
         setDocumentType(member.documentType);
       }
@@ -71,25 +57,6 @@ export default function EditMemberPage() {
         setDocumentNumber(member.documentNumber);
       }
       
-      const perms = member.permissions || {
-        canManageOwnProfile: true,
-        canManageOwnAppointments: true,
-        canManageOwnDocuments: true,
-        canViewOwnHistory: true,
-        canUploadDocuments: true,
-        canExportOwnData: false,
-        canViewFamilyData: false,
-        canManageFamilyData: false
-      };
-      
-      setCanManageOwnProfile(perms.canManageOwnProfile);
-      setCanManageOwnAppointments(perms.canManageOwnAppointments);
-      setCanManageOwnDocuments(perms.canManageOwnDocuments);
-      setCanViewOwnHistory(perms.canViewOwnHistory);
-      setCanUploadDocuments(perms.canUploadDocuments);
-      setCanExportOwnData(perms.canExportOwnData);
-      setCanViewFamilyData(perms.canViewFamilyData);
-      setCanManageFamilyData(perms.canManageFamilyData);
       setAvatarUrl(member.avatarUrl || null);
       setAvatarPath(member.avatarPath || null);
       setAvatarPreview(member.avatarUrl || null);
@@ -186,17 +153,6 @@ export default function EditMemberPage() {
       return;
     }
 
-    const permissions = {
-      canManageOwnProfile,
-      canManageOwnAppointments,
-      canManageOwnDocuments,
-      canViewOwnHistory,
-      canUploadDocuments,
-      canExportOwnData,
-      canViewFamilyData,
-      canManageFamilyData
-    };
-
     let finalUrl = avatarUrl;
     let finalPath = avatarPath;
 
@@ -228,9 +184,6 @@ export default function EditMemberPage() {
       bloodType: bloodType === '' ? null : bloodType,
       notes: notes.trim() || null,
       email: email.trim() || null,
-      canAccessPortal,
-      permissionStatus: canAccessPortal ? permissionStatus : 'NONE',
-      permissions: canAccessPortal ? permissions : null,
       documentType,
       documentNumber: normalizedDocNumber,
       avatarUrl: finalUrl,
@@ -434,71 +387,17 @@ export default function EditMemberPage() {
           />
         </div>
 
-        {/* Toggle Portal Access */}
+        {/* Bloque L · Quién puede entrar lo decide ACCESO en la hoja, no este
+            formulario: aquí solo se guarda el correo. La invitación real sale
+            de Ajustes ▸ Invitaciones (o del botón de la ficha). */}
         {email.trim() !== '' && (
-          <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
-            <div>
-              <h5 className="text-xs font-extrabold text-slate-800 leading-tight mb-0.5">Habilitar acceso al portal</h5>
-              <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">Permite iniciar sesión con este correo y ver su expediente</p>
-            </div>
-            <button 
-              type="button"
-              onClick={() => setCanAccessPortal(!canAccessPortal)}
-              className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-200 focus:outline-none ${
-                canAccessPortal ? 'bg-teal-700 flex justify-end' : 'bg-slate-200 flex justify-start'
-              }`}
-            >
-              <span className="w-4.5 h-4.5 rounded-full bg-white shadow" />
-            </button>
-          </div>
-        )}
-
-        {/* Permission Status and Granular Permissions checkboxes */}
-        {email.trim() !== '' && canAccessPortal && (
-          <div className="p-4 bg-slate-50/50 border border-slate-100 rounded-2xl flex flex-col gap-4">
-            {/* Permission Status */}
-            <div className="flex flex-col gap-2">
-              <label htmlFor="editar-estado-de-invitacion" className="text-xs font-extrabold text-slate-700">Estado de Invitación</label>
-              <select
-                id="editar-estado-de-invitacion"
-                value={permissionStatus}
-                onChange={(e) => setPermissionStatus(e.target.value as any)}
-                className="h-11 px-4 bg-white border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all duration-200"
-              >
-                <option value="NONE">Sin invitar</option>
-                <option value="INVITED">Invitación enviada</option>
-                <option value="ACTIVE">Invitación aceptada / Activa</option>
-                <option value="REVOKED">Acceso revocado</option>
-              </select>
-            </div>
-
-            {/* Granular checkboxes */}
-            <div className="flex flex-col gap-3">
-              <label className="text-xs font-extrabold text-slate-700">Permisos Granulares</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-semibold text-slate-600">
-                {[
-                  { label: 'Gestionar su perfil propio', checked: canManageOwnProfile, setter: setCanManageOwnProfile },
-                  { label: 'Gestionar citas propias', checked: canManageOwnAppointments, setter: setCanManageOwnAppointments },
-                  { label: 'Gestionar documentos propios', checked: canManageOwnDocuments, setter: setCanManageOwnDocuments },
-                  { label: 'Ver su historial propio', checked: canViewOwnHistory, setter: setCanViewOwnHistory },
-                  { label: 'Cargar documentos propios', checked: canUploadDocuments, setter: setCanUploadDocuments },
-                  { label: 'Exportar datos propios', checked: canExportOwnData, setter: setCanExportOwnData },
-                  { label: 'Ver datos de toda la familia', checked: canViewFamilyData, setter: setCanViewFamilyData },
-                  { label: 'Gestionar datos de toda la familia', checked: canManageFamilyData, setter: setCanManageFamilyData }
-                ].map((perm, idx) => (
-                  <label key={idx} className="flex items-center gap-2.5 cursor-pointer hover:text-slate-800 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={perm.checked}
-                      onChange={(e) => perm.setter(e.target.checked)}
-                      className="rounded border-slate-300 text-teal-700 focus:ring-teal-500/20 h-4.5 w-4.5 cursor-pointer accent-teal-600"
-                    />
-                    <span>{perm.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
+          <p className="text-[11px] text-slate-600 font-semibold leading-relaxed bg-slate-50 border border-slate-100 rounded-2xl p-3.5">
+            Para que entre a la aplicación con este correo, envíale una invitación desde{' '}
+            <a href={`/settings?invitar=${encodeURIComponent(id)}#invitaciones`} className="text-teal-800 underline font-extrabold">
+              Ajustes ▸ Invitaciones
+            </a>
+            . Le llegará un enlace por correo; su acceso se ve en la ficha del familiar.
+          </p>
         )}
 
         {/* Notes */}

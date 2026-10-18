@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import TarjetaHojaFamiliar from '@/components/ajustes/TarjetaHojaFamiliar';
 import { sesionDeLaAplicacion } from '@/lib/identidad';
+import { mensajeDeInvitacion } from '@/lib/mensajesInvitacion';
 
 
 export default function SettingsPage() {
@@ -81,6 +82,7 @@ export default function SettingsPage() {
     invitations,
     createInvitation,
     revokeInvitation,
+    refrescarInvitaciones,
     hayQueEntrar,
   } = useApp();
   const confirmar = useConfirmacion();
@@ -112,12 +114,15 @@ export default function SettingsPage() {
     try {
       await createInvitation(inviteEmail.trim(), inviteMemberId, inviteRole);
       setInviteSuccess(true);
+      avisar(`Invitación enviada a ${inviteEmail.trim()}. Le llegará un correo con el enlace (válido 7 días).`);
       setInviteEmail('');
       setInviteMemberId('');
       setInviteRole('MEMBER');
     } catch (err: any) {
       console.error(err);
-      setInviteError(err.message || 'Error al enviar la invitación.');
+      const mensaje = mensajeDeInvitacion(err);
+      setInviteError(mensaje);
+      avisar(mensaje);
     } finally {
       setIsSendingInvite(false);
     }
@@ -134,13 +139,30 @@ export default function SettingsPage() {
     setRevokingInviteId(inviteId);
     try {
       await revokeInvitation(inviteId);
+      avisar('Acceso retirado.');
     } catch (err: any) {
       console.error(err);
-      avisar(err.message || 'Error al revocar la invitación.');
+      avisar(mensajeDeInvitacion(err));
     } finally {
       setRevokingInviteId(null);
     }
   };
+
+  // Bloque L · la lista de invitaciones sale de `ACCESO` en la hoja, y
+  // `?invitar=<id>` (desde la ficha de un familiar) deja el formulario listo.
+  useEffect(() => {
+    if (origenDatos !== 'REAL') return;
+    void refrescarInvitaciones();
+  }, [origenDatos, refrescarInvitaciones]);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('invitar');
+    const familiar = id ? members.find((m) => m.id === id) : undefined;
+    if (!familiar) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- se rellena una vez desde el enlace
+    setInviteMemberId(familiar.id);
+    if (familiar.email) setInviteEmail(familiar.email);
+    document.getElementById('invitaciones')?.scrollIntoView({ block: 'start' });
+  }, [members]);
 
   const activeApptsCount = appointments.filter(a => (a.retentionStatus || 'ACTIVE') !== 'PURGED').length;
   const purgedApptsCount = appointments.filter(a => (a.retentionStatus || 'ACTIVE') === 'PURGED').length;
@@ -301,7 +323,7 @@ export default function SettingsPage() {
         <>
           {/* Ficha: Invitaciones Familiares (solo el titular) */}
           {currentUserRole === 'FAMILY_ADMIN' && (
-            <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5">
+            <section id="invitaciones" className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-5 scroll-mt-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-teal-50 text-teal-700 rounded-xl">
                   <Mail className="h-5 w-5" />

@@ -170,7 +170,7 @@ export default function LoginPage() {
         <div className="flex gap-3 p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
           <ShieldAlert className="h-5 w-5 text-teal-300 shrink-0 mt-0.5" />
           <p className="text-[10px] text-teal-100/60 leading-relaxed font-semibold">
-            🔒 <strong>Almacenamiento Local:</strong> Los datos se almacenan localmente en el navegador del dispositivo. No se sincronizan en la nube todavía y pueden eliminarse si el usuario borra datos del sitio. Esta app es autogestionada y no reemplaza el diagnóstico médico.
+            🔒 <strong>Dónde viven tus datos:</strong> en la hoja de cálculo de tu familia, en tu propio Google Drive. Este dispositivo guarda una copia para seguir trabajando sin conexión. En el modo demostración los datos son ficticios y no salen del navegador. Esta app no reemplaza el diagnóstico médico.
           </p>
         </div>
       </div>

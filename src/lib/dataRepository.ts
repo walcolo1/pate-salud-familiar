@@ -308,6 +308,12 @@ export interface DataRepository {
     callback: (invitations: FamilyInvitation[]) => void
   ): () => void;
 
+  /**
+   * Bloque L · las invitaciones y accesos reales, leídos de la hoja. Opcional:
+   * solo el backend de la hoja lo tiene.
+   */
+  listInvitations?(ctx: RepositoryContext): Promise<FamilyInvitation[]>;
+
   watchUserFamilyAccess(
     uid: string,
     callback: (accessList: FamilyAccess[]) => void

@@ -13,8 +13,10 @@
  */
 
 import React, { useEffect, useId, useState } from 'react';
-import { sesionDeLaAplicacion } from '@/lib/identidad';
-import { CheckCircle2, ExternalLink, Link2, Loader2, Pencil } from 'lucide-react';
+import { sesionBackend, sesionDeLaAplicacion } from '@/lib/identidad';
+import { CheckCircle2, Copy, ExternalLink, Link2, Loader2, Pencil } from 'lucide-react';
+import { useAviso } from '@/context/Avisos';
+import { enlaceDeHoja } from '@/lib/invitacionEntrante';
 import { useApp } from '@/context/AppContext';
 import { MENSAJES_REGISTRO } from '@/lib/registroBackend';
 import { abrirHojaEnPestana } from '@/lib/abrirHoja';
@@ -42,6 +44,22 @@ export default function TarjetaHojaFamiliar() {
   // Un «la sesión caducó» de antes no sigue en pantalla cuando ya hay
   // credencial: se borra en cuanto llega una.
   useEffect(() => sesionDeLaAplicacion.alRecibir(() => setErrorAbrir(null)), []);
+
+  const avisar = useAviso();
+
+  // Enlace directo a esta hoja, para un navegador que deba hablar con ella y
+  // no con la de por defecto (otra familia, otra cuenta).
+  const copiarEnlace = async () => {
+    const url = sesionBackend().url();
+    if (!url) return;
+    const enlace = enlaceDeHoja(window.location.origin, url);
+    try {
+      await navigator.clipboard.writeText(enlace);
+      avisar('Enlace copiado. Ábrelo en el otro dispositivo y entra con tu cuenta de Google.');
+    } catch {
+      avisar(`No se pudo copiar. Este es el enlace: ${enlace}`);
+    }
+  };
 
   const abrirHoja = async () => {
     setAbriendo(true);
@@ -116,6 +134,14 @@ export default function TarjetaHojaFamiliar() {
               )}
               Abrir la hoja
               <span className="sr-only"> (se abre en otra pestaña)</span>
+            </button>
+            <button
+              type="button"
+              onClick={copiarEnlace}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-extrabold text-slate-800 hover:border-teal-600 hover:text-teal-800"
+            >
+              <Copy className="h-4 w-4" aria-hidden="true" />
+              Copiar enlace para otro dispositivo
             </button>
             {!formularioVisible && (
               <button

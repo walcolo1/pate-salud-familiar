@@ -22,7 +22,7 @@
  */
 
 import { SesionGoogle } from './sesionGoogle';
-import { leerBackend } from './invitacionEntrante';
+import { resolverBackend } from './invitacionEntrante';
 import type { SesionBackend } from './repositorioBackend';
 import { puertoTicket } from './ticketSesion';
 
@@ -81,7 +81,7 @@ export function sesionBackend(): SesionBackend {
     //
     // No existe en el servidor, y el árbol de Next importa este módulo
     // también allí.
-    url: () => (typeof window === 'undefined' ? null : leerBackend(window.localStorage)),
+    url: () => (typeof window === 'undefined' ? null : resolverBackend(window.localStorage)),
     idToken: () => sesionDeLaAplicacion.idToken(),
     renovar: () => sesionDeLaAplicacion.renovarAhora(),
   };

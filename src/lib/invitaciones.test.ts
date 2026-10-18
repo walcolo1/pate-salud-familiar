@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   ASUNTO_INVITACION,
+  resolverUrlPwa,
+  resumenAccesos,
   DIAS_VIGENCIA_INVITACION,
   ERRORES_INVITACION,
   LONGITUD_MINIMA_TOKEN,
@@ -515,5 +517,48 @@ describe('una invitación ya canjeada', () => {
         ahoraMs: AHORA,
       }),
     ).toEqual({ ok: false, error: 'INVITACION_YA_USADA' });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque L
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('resolverUrlPwa', () => {
+  it('la propiedad manda; si falta, vale el origen https del titular', () => {
+    expect(resolverUrlPwa('https://pate.example/', 'https://otra.example')).toBe('https://pate.example');
+    expect(resolverUrlPwa(null, 'https://pate-salud-familiar.vercel.app')).toBe(
+      'https://pate-salud-familiar.vercel.app',
+    );
+  });
+
+  it('un origen con ruta, sin https o con credenciales no vale: el correo no lleva a cualquier sitio', () => {
+    expect(resolverUrlPwa(null, 'http://pate.example')).toBeNull();
+    expect(resolverUrlPwa(null, 'https://pate.example/phishing')).toBeNull();
+    expect(resolverUrlPwa(null, 'https://usuario@malo.example')).toBeNull();
+    expect(resolverUrlPwa(null, undefined)).toBeNull();
+  });
+});
+
+describe('resumenAccesos', () => {
+  const ahora = Date.parse('2026-10-18T12:00:00Z');
+  const filas = [
+    { email: 'Titular@x.com', rol: 'TITULAR', estado: 'ACTIVO' },
+    { email: 'ana@x.com', rol: 'MIEMBRO', pacientes_asignados: 'm1', estado: 'INVITADO', token_hash: 'h', token_expira: '2026-10-25T00:00:00Z' },
+    { email: 'luis@x.com', rol: 'LECTOR', pacientes_asignados: '*', estado: 'INVITADO', token_hash: 'h', token_expira: '2026-10-01T00:00:00Z' },
+    { email: 'eva@x.com', rol: 'CUIDADOR', pacientes_asignados: '*', estado: 'ACTIVO' },
+    { email: 'rita@x.com', rol: 'LECTOR', estado: 'REVOCADO' },
+  ];
+
+  it('deja fuera al titular, calcula el estado y NUNCA devuelve el hash', () => {
+    const r = resumenAccesos(filas, ahora);
+    expect(r.map((a) => [a.email, a.estado])).toEqual([
+      ['ana@x.com', 'PENDIENTE'],
+      ['luis@x.com', 'EXPIRADA'],
+      ['eva@x.com', 'ACEPTADA'],
+      ['rita@x.com', 'REVOCADA'],
+    ]);
+    expect(JSON.stringify(r)).not.toContain('token_hash');
+    expect(r.every((a) => !('tokenHash' in a))).toBe(true);
   });
 });

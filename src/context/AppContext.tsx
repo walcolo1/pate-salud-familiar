@@ -4,7 +4,8 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 // ── DataRepository abstraction (Phase 8) ─────────────────────────────────────
 import { arrancarIdentidad } from '../lib/identidadGis';
 import { conectarSondeo, ventanaDelNavegador } from '../lib/sondeoRevision';
-import { comprobarYRegistrar, type ResultadoRegistro } from '../lib/registroBackend';
+import { comprobarYRegistrar, MENSAJES_REGISTRO, type ResultadoRegistro } from '../lib/registroBackend';
+import { hojaDelEnlace } from '../lib/invitacionEntrante';
 import { sesionBackend, sesionDeLaAplicacion } from '../lib/identidad';
 import { CargaAlEntrar } from '../lib/cargaAlEntrar';
 import { VigiaSesion } from '../lib/vigiaSesion';
@@ -482,6 +483,7 @@ interface AppContextProps {
   pendingInvitations: FamilyInvitation[];
   invitations: FamilyInvitation[];
   createInvitation: (email: string, memberId: string, role: 'OWNER' | 'MEMBER' | 'CAREGIVER' | 'VIEWER') => Promise<string>;
+  refrescarInvitaciones: () => Promise<void>;
   acceptInvitation: (targetFamilyId: string, invitationId: string) => Promise<void>;
   revokeInvitation: (invitationId: string) => Promise<void>;
   createNewFamily: (name: string) => Promise<void>;
@@ -2377,8 +2379,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   ): Promise<string> => {
     const repo = await getDataRepository();
     const ctx = { uid: user?.googleId ?? user?.id ?? '', email: user?.email ?? '', familyId };
-    return await repo.createInvitation(ctx, email, memberId, role);
+    const resultado = await repo.createInvitation(ctx, email, memberId, role);
+    // Bloque L · la lista sale de la hoja: se relee para que la invitación
+    // recién escrita aparezca, con su estado real.
+    void refrescarInvitacionesRef.current();
+    return resultado;
   }, [user, familyId]);
+
+  /** Bloque L · relee de `ACCESO` las invitaciones y accesos (solo el backend de la hoja). */
+  const refrescarInvitaciones = useCallback(async (): Promise<void> => {
+    const repo = await getDataRepository();
+    if (!repo.listInvitations) return;
+    const ctx = { uid: user?.googleId ?? user?.id ?? '', email: user?.email ?? '', familyId };
+    try {
+      setInvitations(await repo.listInvitations(ctx));
+    } catch (err) {
+      console.warn('[AppContext] no se pudieron leer las invitaciones:', (err as { codigo?: string })?.codigo ?? err);
+    }
+  }, [user, familyId]);
+  const refrescarInvitacionesRef = useRef(refrescarInvitaciones);
+  useEffect(() => {
+    refrescarInvitacionesRef.current = refrescarInvitaciones;
+  }, [refrescarInvitaciones]);
 
   const acceptInvitation = useCallback(async (
     targetFamilyId: string,
@@ -2433,6 +2455,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const repo = await getDataRepository();
     const ctx = { uid: user?.googleId ?? user?.id ?? '', email: user?.email ?? '', familyId };
     await repo.revokeInvitation(ctx, invitationId);
+    void refrescarInvitacionesRef.current();
   }, [user, familyId]);
 
   const createNewFamily = useCallback(async (name: string): Promise<void> => {
@@ -3395,15 +3418,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Fallback Mock
+    // Bloque L · Sin Drive no hay archivo: se guarda la ficha del documento
+    // (nombre, tipo, notas) y se dice en voz alta. Antes se inventaba un
+    // `mock-drive-…` que la hoja guardaba como si el archivo existiera.
+    if (file) {
+      avisar('El archivo no se pudo subir a Google Drive. Se guardó la ficha del documento sin el archivo: vuelve a adjuntarlo cuando Drive esté disponible.');
+    }
     const docId = `doc-${Date.now()}`;
     const newDoc: ClinicalDocument = {
       id: docId,
       memberId,
       documentType: doc.fileType as any || 'PDF',
       fileName: file ? file.name : (doc.fileName.endsWith('.pdf') || doc.fileName.endsWith('.png') || doc.fileName.endsWith('.jpg') ? doc.fileName : `${doc.fileName}.pdf`),
-      driveFileId: `mock-drive-${Date.now()}`,
-      driveUrl: 'https://drive.google.com/drive',
+      driveFileId: '',
+      driveUrl: '',
       uploadedAt: new Date().toISOString(),
       syncStatus: driveSyncEnabled ? 'SYNC_ERROR' : 'LOCAL_ONLY',
       description: doc.description || null,
@@ -4527,9 +4555,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     }, 1500);
 
+    // Bloque L · La cita y su evento van solos en su lote. El candidato no
+    // tiene pestaña (`SIN_PESTANA`): metido en el mismo lote, su
+    // `NO_HAY_DONDE_ESCRIBIRLO` tumbaba el lote entero en silencio y la cita
+    // importada se quedaba solo en este dispositivo.
     persistirPorMutacion(async (repo, ctx) => {
       await repo.saveAppointment(ctx, newAppointment);
       await repo.saveHistoryEvent(ctx, importHistoryEvent);
+    });
+    persistirPorMutacion(async (repo, ctx) => {
       if (updatedCandidate) {
         await repo.saveAppointmentCandidate(ctx, updatedCandidate);
       }
@@ -4936,6 +4970,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     return resultado;
   };
+
+  // Enlace directo `?hoja=<url /exec>` (Ajustes ▸ «Copiar enlace»): se
+  // comprueba como si se hubiera pegado, se quita de la barra de direcciones
+  // —no debe quedar en el historial ni en un marcador— y se dice qué pasó.
+  const registrarHojaRef = useRef(registrarHojaFamiliar);
+  useEffect(() => {
+    registrarHojaRef.current = registrarHojaFamiliar;
+  });
+  useEffect(() => {
+    const url = hojaDelEnlace(window.location.search);
+    if (!url) return;
+    const limpia = new URL(window.location.href);
+    limpia.searchParams.delete('hoja');
+    window.history.replaceState(window.history.state, '', limpia.pathname + limpia.search + limpia.hash);
+    void registrarHojaRef.current(url).then((r) =>
+      avisar(r.ok ? 'Hoja de la familia conectada desde el enlace.' : MENSAJES_REGISTRO[r.motivo]),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una vez, al abrir el enlace
+  }, []);
 
   /** Trae lo nuevo y baja el aviso de cambios remotos. */
   const recargarExpediente = async () => {
@@ -5743,6 +5796,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pendingInvitations,
       invitations,
       createInvitation,
+      refrescarInvitaciones,
       acceptInvitation,
       revokeInvitation,
       createNewFamily,

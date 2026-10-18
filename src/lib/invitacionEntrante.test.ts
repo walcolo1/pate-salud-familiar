@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   CLAVE_SESION_FAMILIAR,
+  URL_BACKEND_OFICIAL,
+  enlaceDeHoja,
+  hojaDelEnlace,
+  resolverBackend,
+  urlBackendPorDefecto,
   MENSAJES,
   MENSAJE_DESCONOCIDO,
   MOTIVOS_PARAMETRO,
@@ -314,5 +319,53 @@ describe('la sesión familiar', () => {
     // Cambiar la forma de lo guardado sin cambiar la clave deja a los
     // navegadores que ya tienen datos leyendo algo que ya no entienden.
     expect(CLAVE_SESION_FAMILIAR).toMatch(/:v\d+$/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque L · un dispositivo nuevo se conecta solo
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('la dirección por defecto', () => {
+  const almacenCon = (valor: string | null): AlmacenSimple => ({
+    getItem: () => valor,
+    setItem: () => {},
+    removeItem: () => {},
+  });
+
+  it('sin nada configurado es la del despliegue oficial, y es una /exec válida', () => {
+    expect(urlBackendPorDefecto(undefined)).toBe(URL_BACKEND_OFICIAL);
+    expect(esUrlBackendValida(URL_BACKEND_OFICIAL)).toBe(true);
+  });
+
+  it('NEXT_PUBLIC_WEBAPP_URL la cambia; "off" la quita; una basura no se acepta', () => {
+    const otra = 'https://script.google.com/macros/s/OTRA_familia_1234567890abcdef/exec';
+    expect(urlBackendPorDefecto(otra)).toBe(otra);
+    expect(urlBackendPorDefecto('off')).toBeNull();
+    expect(urlBackendPorDefecto('https://malo.example/exec')).toBeNull();
+  });
+
+  it('lo registrado en el navegador manda sobre el defecto', () => {
+    const propia = 'https://script.google.com/macros/s/PROPIA_abcdefghijklmnopqrstu/exec';
+    expect(resolverBackend(almacenCon(propia))).toBe(propia);
+    expect(resolverBackend(almacenCon(null))).toBe(urlBackendPorDefecto());
+    // Un valor manipulado en localStorage no gana: se cae al defecto.
+    expect(resolverBackend(almacenCon('https://malo.example/exec'))).toBe(urlBackendPorDefecto());
+  });
+});
+
+describe('el enlace directo ?hoja=', () => {
+  const exec = 'https://script.google.com/macros/s/AKfy_x-1234567890abcdefghij/exec';
+
+  it('ida y vuelta', () => {
+    const enlace = enlaceDeHoja('https://pate.example/', exec);
+    expect(enlace).toBe(`https://pate.example/?hoja=${encodeURIComponent(exec)}`);
+    expect(hojaDelEnlace(new URL(enlace).search)).toBe(exec);
+  });
+
+  it('solo acepta una /exec de Apps Script', () => {
+    expect(hojaDelEnlace('?hoja=https%3A%2F%2Fmalo.example%2Fexec')).toBeNull();
+    expect(hojaDelEnlace('?otra=1')).toBeNull();
+    expect(hojaDelEnlace('')).toBeNull();
   });
 });

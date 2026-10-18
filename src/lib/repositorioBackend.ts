@@ -151,6 +151,49 @@ export function estadoDeVacuna(fecha: unknown, hoy: string): 'COMPLETED' | 'SCHE
   return dia <= hoy ? 'COMPLETED' : 'SCHEDULED';
 }
 
+const ROL_DE_LA_PWA: Record<string, FamilyInvitation['role']> = {
+  CUIDADOR: 'CAREGIVER',
+  MIEMBRO: 'MEMBER',
+  LECTOR: 'VIEWER',
+};
+const ESTADO_DE_LA_PWA: Record<string, FamilyInvitation['status']> = {
+  PENDIENTE: 'PENDING',
+  ACEPTADA: 'ACCEPTED',
+  EXPIRADA: 'EXPIRED',
+  REVOCADA: 'REVOKED',
+};
+
+/**
+ * De `listarAccesos` a la lista de Ajustes. El identificador es el correo:
+ * `revocar` trabaja por correo, porque en `ACCESO` no hay otro.
+ */
+export function invitacionesDesdeAccesos(accesos: unknown): FamilyInvitation[] {
+  if (!Array.isArray(accesos)) return [];
+  const salida: FamilyInvitation[] = [];
+  for (const crudo of accesos) {
+    const a = (crudo ?? {}) as Record<string, unknown>;
+    const email = String(a.email ?? '').trim().toLowerCase();
+    const role = ROL_DE_LA_PWA[String(a.rol ?? '').toUpperCase()];
+    const status = ESTADO_DE_LA_PWA[String(a.estado ?? '').toUpperCase()];
+    if (!email || !role || !status) continue;
+    salida.push({
+      id: email,
+      familyId: '',
+      invitedEmail: email,
+      invitedMemberId: String(a.pacientes ?? '').split(',')[0]?.trim() ?? '',
+      role,
+      status,
+      token: '',
+      createdAt: String(a.fechaAlta ?? ''),
+      expiresAt: String(a.expira ?? ''),
+      acceptedAt: null,
+      acceptedByUid: null,
+      createdBy: String(a.invitadoPor ?? ''),
+    });
+  }
+  return salida;
+}
+
 export function rolDeContrato(rol: string): string | null {
   const mapa: Record<string, string> = {
     CAREGIVER: 'CUIDADOR',
@@ -805,7 +848,12 @@ export class RepositorioBackend implements DataRepository {
       pedir(contexto, 'invitar', {
         email,
         rol,
-        pacientes: String(invitedMemberId ?? '').trim(),
+        // Miembro: solo su ficha. Cuidador y lector: toda la familia, que es
+        // lo que promete la etiqueta del formulario.
+        pacientes: rol === 'MIEMBRO' ? String(invitedMemberId ?? '').trim() : '*',
+        // Bloque L · de aquí sale el enlace del correo si la hoja no tiene
+        // `URL_PWA`. El backend solo acepta un origen https sin ruta.
+        origen: typeof window === 'undefined' ? '' : window.location.origin,
       }),
     );
 
@@ -854,11 +902,29 @@ export class RepositorioBackend implements DataRepository {
     return [];
   }
 
+  /** Bloque L · `ACCESO`, tal como lo resume `listarAccesos`, en el modelo de la PWA. */
+  async listInvitations(_ctx: RepositoryContext): Promise<FamilyInvitation[]> {
+    const data = await this.conSesion((contexto) =>
+      pedir<{ accesos?: unknown }>(contexto, 'listarAccesos'),
+    );
+    return invitacionesDesdeAccesos(data?.accesos);
+  }
+
   watchInvitations(
-    _ctx: RepositoryContext,
-    _callback: (invitations: FamilyInvitation[]) => void,
+    ctx: RepositoryContext,
+    callback: (invitations: FamilyInvitation[]) => void,
   ): () => void {
-    return () => {};
+    let vivo = true;
+    this.listInvitations(ctx)
+      .then((lista) => {
+        if (vivo) callback(lista);
+      })
+      .catch(() => {
+        /* sin permiso o sin red: la lista se queda como estaba */
+      });
+    return () => {
+      vivo = false;
+    };
   }
 
   watchUserFamilyAccess(

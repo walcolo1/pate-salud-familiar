@@ -361,3 +361,59 @@ function validarInvitacion(datos, rolesValidos) {
     const pacientes = String((_b = (datos !== null && datos !== void 0 ? datos : {}).pacientes) !== null && _b !== void 0 ? _b : '').trim();
     return { ok: true, email, rol, pacientes };
 }
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque L · de dónde sale la dirección de la PWA
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * La dirección de la PWA que irá en el correo.
+ *
+ * Antes solo valía la propiedad `URL_PWA`, que **nada escribía**: `invitar`
+ * fallaba cerrado en cada instalación y la invitación no salía nunca. Ahora:
+ * la propiedad si está; si no, el origen desde el que invita el titular —solo
+ * él puede invitar—, y solo si es un origen `https` sin ruta.
+ */
+function resolverUrlPwa(propiedad, origenCliente) {
+    if (esUrlPwaValida(propiedad))
+        return String(propiedad).trim().replace(/\/+$/, '');
+    if (typeof origenCliente !== 'string')
+        return null;
+    const origen = origenCliente.trim().replace(/\/+$/, '');
+    if (!/^https:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(origen))
+        return null;
+    return esUrlPwaValida(origen) ? origen : null;
+}
+/**
+ * Lo que el titular ve de `ACCESO` en Ajustes.
+ *
+ * El hash del token **no sale**: no sirve para nada en pantalla y es la mitad
+ * de lo que hace falta para suplantar una invitación. El titular tampoco se
+ * lista: es quien está mirando.
+ */
+function resumenAccesos(filas, ahoraMs) {
+    const salida = [];
+    for (let i = 0; i < (filas || []).length; i++) {
+        const f = filas[i] || {};
+        const email = String(f.email == null ? '' : f.email).trim().toLowerCase();
+        const rol = String(f.rol == null ? '' : f.rol).trim().toUpperCase();
+        if (!email || rol === 'TITULAR')
+            continue;
+        let estado = estadoInvitacion(f, ahoraMs);
+        // Alguien dado de alta sin pasar por una invitación (o ya canjeada) está
+        // activo si su estado lo dice; si no, no hay nada pendiente.
+        if (estado === 'INEXISTENTE') {
+            const crudo = String(f.estado == null ? '' : f.estado).trim().toUpperCase();
+            estado = crudo === 'ACTIVO' || crudo === '' ? 'ACEPTADA' : 'INEXISTENTE';
+        }
+        salida.push({
+            email,
+            rol,
+            pacientes: String(f.pacientes_asignados == null ? '' : f.pacientes_asignados).trim(),
+            estado,
+            expira: String(f.token_expira == null ? '' : f.token_expira),
+            invitadoPor: String(f.invitado_por == null ? '' : f.invitado_por),
+            fechaAlta: String(f.fecha_alta == null ? '' : f.fecha_alta),
+            ultimoAcceso: String(f.ultimo_acceso == null ? '' : f.ultimo_acceso),
+        });
+    }
+    return salida;
+}

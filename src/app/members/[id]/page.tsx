@@ -9,6 +9,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { useConfirmacion } from '@/context/Confirmacion';
 import { useAviso } from '@/context/Avisos';
+import { mensajeDeInvitacion } from '@/lib/mensajesInvitacion';
 import { 
   ArrowLeft, 
   Edit3, 
@@ -61,14 +62,23 @@ export default function MemberDetailPage() {
     inactivateMember,
     reactivateMember,
     deleteMember,
-    updateMember,
     documents,
     revokeDocumentShare,
     medicalOrders,
-    medicationPrescriptions
+    medicationPrescriptions,
+    invitations,
+    revokeInvitation,
+    refrescarInvitaciones,
+    origenDatos,
   } = useApp();
   const confirmar = useConfirmacion();
   const avisar = useAviso();
+
+  // Bloque L · el estado del acceso es el de `ACCESO` en la hoja.
+  useEffect(() => {
+    if (origenDatos !== 'REAL') return;
+    void refrescarInvitaciones();
+  }, [origenDatos, refrescarInvitaciones]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -347,110 +357,75 @@ export default function MemberDetailPage() {
         })}
       </section>
 
-      {/* Portal de Acceso Familiar */}
+      {/* Portal de Acceso Familiar — Bloque L: estado real, leído de ACCESO */}
       {member.email && (
         <>
           <h3 className="font-extrabold text-slate-800 text-sm tracking-wide uppercase px-1 mt-4">Portal de Acceso Familiar</h3>
           <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-xs font-extrabold text-slate-800 mb-0.5">Estado del acceso</h4>
-                <p className="text-[10px] text-slate-500 font-semibold">{member.email}</p>
-              </div>
-              <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border uppercase leading-none ${
-                member.permissionStatus === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                member.permissionStatus === 'INVITED' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                member.permissionStatus === 'REVOKED' ? 'bg-rose-50 text-rose-700 border-rose-100' :
-                'bg-slate-50 text-slate-500 border-slate-200'
-              }`}>
-                {member.permissionStatus === 'ACTIVE' ? 'Activo' :
-                 member.permissionStatus === 'INVITED' ? 'Invitado' :
-                 member.permissionStatus === 'REVOKED' ? 'Revocado' : 'Sin invitar'}
-              </span>
-            </div>
-
-            <div className="flex gap-2">
-              {member.permissionStatus !== 'ACTIVE' && member.permissionStatus !== 'INVITED' ? (
-                <button
-                  onClick={() => {
-                    updateMember(member.id, { 
-                      permissionStatus: 'INVITED',
-                      canAccessPortal: true 
-                    });
-                    avisar('Invitación enviada. En esta fase simulada puedes aceptarla o rechazarla desde este panel.');
-                  }}
-                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors text-center"
-                >
-                  Invitar / Habilitar Acceso
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    updateMember(member.id, { 
-                      permissionStatus: 'REVOKED',
-                      canAccessPortal: false 
-                    });
-                    avisar(`Acceso revocado para ${member.fullName}.`);
-                  }}
-                  className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors text-center"
-                >
-                  Revocar Acceso
-                </button>
-              )}
-
-              {member.permissionStatus === 'INVITED' && (
-                <button
-                  onClick={() => {
-                    updateMember(member.id, { permissionStatus: 'ACTIVE' });
-                    avisar('Simulación: invitación aceptada. Estado actualizado a Activo.');
-                  }}
-                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-[10px] rounded-xl shadow-sm transition-colors text-center animate-pulse"
-                >
-                  Aceptar Invitación (Simulación)
-                </button>
-              )}
-            </div>
-
-            {/* Granular Permissions Summary */}
-            {member.canAccessPortal && member.permissions && (
-              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 flex flex-col gap-2 font-semibold text-[10px] text-slate-500">
-                <span className="font-bold text-slate-600">Permisos granulares asignados:</span>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[9px] mt-1 list-none leading-relaxed">
-                  <li className="flex items-center gap-1.5">
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${member.permissions.canManageOwnProfile ? 'bg-teal-500' : 'bg-slate-300'}`} />
-                    <span>Gestionar perfil propio: {member.permissions.canManageOwnProfile ? 'Sí' : 'No'}</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${member.permissions.canManageOwnAppointments ? 'bg-teal-500' : 'bg-slate-300'}`} />
-                    <span>Gestionar citas propias: {member.permissions.canManageOwnAppointments ? 'Sí' : 'No'}</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${member.permissions.canManageOwnDocuments ? 'bg-teal-500' : 'bg-slate-300'}`} />
-                    <span>Gestionar documentos propios: {member.permissions.canManageOwnDocuments ? 'Sí' : 'No'}</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${member.permissions.canViewOwnHistory ? 'bg-teal-500' : 'bg-slate-300'}`} />
-                    <span>Ver historial propio: {member.permissions.canViewOwnHistory ? 'Sí' : 'No'}</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${member.permissions.canUploadDocuments ? 'bg-teal-500' : 'bg-slate-300'}`} />
-                    <span>Cargar documentos propios: {member.permissions.canUploadDocuments ? 'Sí' : 'No'}</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${member.permissions.canExportOwnData ? 'bg-teal-500' : 'bg-slate-300'}`} />
-                    <span>Exportar datos propios: {member.permissions.canExportOwnData ? 'Sí' : 'No'}</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${member.permissions.canViewFamilyData ? 'bg-teal-500' : 'bg-slate-300'}`} />
-                    <span>Ver datos familiares: {member.permissions.canViewFamilyData ? 'Sí' : 'No'}</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${member.permissions.canManageFamilyData ? 'bg-teal-500' : 'bg-slate-300'}`} />
-                    <span>Gestionar datos familiares: {member.permissions.canManageFamilyData ? 'Sí' : 'No'}</span>
-                  </li>
-                </ul>
-              </div>
-            )}
+            {(() => {
+              const acceso = invitations.find((i) => i.invitedEmail === member.email?.trim().toLowerCase());
+              const estado = acceso?.status;
+              const etiqueta =
+                estado === 'ACCEPTED' ? 'Activo' :
+                estado === 'PENDING' ? 'Invitado' :
+                estado === 'REVOKED' ? 'Revocado' :
+                estado === 'EXPIRED' ? 'Invitación vencida' : 'Sin invitar';
+              const tono =
+                estado === 'ACCEPTED' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                estado === 'PENDING' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                estado === 'REVOKED' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                'bg-slate-50 text-slate-600 border-slate-200';
+              const puedeRetirar = estado === 'ACCEPTED' || estado === 'PENDING';
+              return (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-800 mb-0.5">Estado del acceso</h4>
+                      <p className="text-[10px] text-slate-500 font-semibold">{member.email}</p>
+                    </div>
+                    <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border uppercase leading-none ${tono}`}>
+                      {etiqueta}
+                    </span>
+                  </div>
+                  {origenDatos === 'REAL' ? (
+                    <div className="flex gap-2">
+                      <Link
+                        href={`/settings?invitar=${encodeURIComponent(member.id)}#invitaciones`}
+                        className="flex-1 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-extrabold text-[11px] rounded-xl shadow-sm transition-colors text-center"
+                      >
+                        {estado === 'PENDING' || estado === 'EXPIRED' ? 'Reenviar invitación' : 'Invitar por correo'}
+                      </Link>
+                      {puedeRetirar && (
+                        <button
+                          onClick={async () => {
+                            const ok = await confirmar({
+                              titulo: 'Retirar acceso',
+                              descripcion: `${member.fullName} dejará de poder entrar al expediente.`,
+                              etiquetaConfirmar: 'Retirar acceso',
+                              tono: 'peligro',
+                            });
+                            if (!ok || !member.email) return;
+                            try {
+                              await revokeInvitation(member.email.trim().toLowerCase());
+                              avisar(`Acceso retirado a ${member.fullName}.`);
+                            } catch (err) {
+                              avisar(mensajeDeInvitacion(err));
+                            }
+                          }}
+                          className="flex-1 py-2.5 bg-rose-700 hover:bg-rose-800 text-white font-extrabold text-[11px] rounded-xl shadow-sm transition-colors text-center"
+                        >
+                          Retirar acceso
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-600 font-semibold">
+                      En la demostración no se envían invitaciones. Con la hoja de tu familia, se invita desde Ajustes ▸ Invitaciones.
+                    </p>
+                  )}
+                </>
+              );
+            })()}
           </section>
         </>
       )}

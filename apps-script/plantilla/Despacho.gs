@@ -112,6 +112,11 @@ var ACCIONES = {
      * recibe un ticket. El verbo es el mínimo que tiene cualquier rol.
      */
     abrirSesion: { verbo: 'LISTAR_PACIENTES' },
+    /**
+     * Bloque L · quién tiene acceso y qué invitaciones siguen pendientes, para
+     * la lista de Ajustes. Solo quien administra los accesos; sin hashes.
+     */
+    listarAccesos: { verbo: 'ADMINISTRAR_ACCESOS' },
     verAuditoria: { verbo: 'VER_AUDITORIA' },
     exportar: { verbo: 'EXPORTAR_EXPEDIENTE' },
     /**

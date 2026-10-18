@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   estadoDeVacuna,
+  invitacionesDesdeAccesos,
   fechaLocalHoy,
   NO_HAY_DONDE,
   RepositorioBackend,
@@ -226,9 +227,19 @@ describe('invitar y revocar pasan por el router, no por la hoja', () => {
     expect(accion).toBe('invitar');
     expect(payload.rol).toBe('CUIDADOR');
     expect(payload.email).toBe('tia@example.com');
-    expect(payload.pacientes).toBe('p1');
+    // Un cuidador ve a toda la familia, como promete la etiqueta del
+    // formulario (Bloque L); solo un miembro queda limitado a su ficha.
+    expect(payload.pacientes).toBe('*');
     // No hay identificador de invitación: `ACCESO` se lleva por correo.
     expect(id).toBe('tia@example.com');
+  });
+
+  it('un miembro queda limitado a su ficha', async () => {
+    const { repo, espia } = banco([{ ok: true, data: { invitada: true, expiraEn: 7 } }]);
+    await repo.createInvitation(CTX, 'ana@example.com', 'p1', 'MEMBER');
+    const { payload } = envio(espia) as unknown as { payload: Record<string, unknown> };
+    expect(payload.rol).toBe('MIEMBRO');
+    expect(payload.pacientes).toBe('p1');
   });
 
   it('el rol de titular no se reparte', async () => {
@@ -744,5 +755,21 @@ describe('estadoDeVacuna', () => {
 
   it('hoy es la fecha local, no la UTC', () => {
     expect(fechaLocalHoy(new Date(2026, 9, 18, 23, 30))).toBe('2026-10-18');
+  });
+});
+
+describe('invitacionesDesdeAccesos (Bloque L)', () => {
+  it('pasa ACCESO al modelo de Ajustes; el id es el correo, que es lo que revocar necesita', () => {
+    const lista = invitacionesDesdeAccesos([
+      { email: 'ana@x.com', rol: 'MIEMBRO', pacientes: 'm1', estado: 'PENDIENTE', expira: '2026-10-25' },
+      { email: 'eva@x.com', rol: 'CUIDADOR', pacientes: '*', estado: 'ACEPTADA' },
+      { email: '', rol: 'LECTOR', estado: 'PENDIENTE' },
+      { email: 'raro@x.com', rol: 'TITULAR', estado: 'ACEPTADA' },
+    ]);
+    expect(lista.map((i) => [i.id, i.role, i.status, i.invitedMemberId])).toEqual([
+      ['ana@x.com', 'MEMBER', 'PENDING', 'm1'],
+      ['eva@x.com', 'CAREGIVER', 'ACCEPTED', '*'],
+    ]);
+    expect(invitacionesDesdeAccesos(null)).toEqual([]);
   });
 });

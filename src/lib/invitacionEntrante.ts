@@ -339,6 +339,60 @@ export function leerBackend(almacen: AlmacenSimple | null | undefined): string |
   }
 }
 
+/**
+ * El despliegue oficial de la familia, para cuando el navegador no tiene uno.
+ *
+ * CERO CONFIGURACIÓN EN UN DISPOSITIVO NUEVO
+ * ──────────────────────────────────────────
+ * La dirección vivía solo en `localStorage`, así que en el celular —o en otro
+ * navegador— la aplicación decía «Sesión activa» y a la vez «no sé dónde está
+ * la hoja», y pedía pegar la `/exec` a mano. Con esto, entrar con Google basta.
+ *
+ * No es una credencial: el endpoint es público —por eso `ping` es anónimo— y
+ * sin una cuenta que figure en `ACCESO` no devuelve nada del expediente.
+ *
+ * `NEXT_PUBLIC_WEBAPP_URL` lo cambia por despliegue (otra familia, otra hoja);
+ * con `off`, no hay dirección por defecto (lo usan las pruebas E2E).
+ */
+export const URL_BACKEND_OFICIAL =
+  'https://script.google.com/macros/s/AKfycbweZPnhBRbY5bc3o4bm6D6VwzD2dbD_DsL_eaz4QrL0p_npwX7pRnCLxNOMR0K-ukZ3uw/exec';
+
+export function urlBackendPorDefecto(
+  configurada: string | undefined = process.env.NEXT_PUBLIC_WEBAPP_URL,
+): string | null {
+  const valor = String(configurada ?? '').trim();
+  if (valor.toLowerCase() === 'off') return null;
+  if (valor.length > 0) return esUrlBackendValida(valor) ? valor : null;
+  return URL_BACKEND_OFICIAL;
+}
+
+/**
+ * La dirección con la que habla este navegador: la que se registró aquí, y si
+ * no hay ninguna, la del despliegue por defecto.
+ */
+export function resolverBackend(almacen: AlmacenSimple | null | undefined): string | null {
+  return leerBackend(almacen) ?? urlBackendPorDefecto();
+}
+
+/**
+ * Enlace directo a una hoja: `https://…/?hoja=<url /exec>`.
+ *
+ * Para otra familia con su propia hoja, o para un navegador que deba hablar
+ * con un despliegue distinto del de por defecto. Solo se acepta una /exec.
+ */
+export function hojaDelEnlace(busqueda: string | null | undefined): string | null {
+  try {
+    const valor = new URLSearchParams(String(busqueda ?? '')).get('hoja');
+    return esUrlBackendValida(valor) ? String(valor).trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+export function enlaceDeHoja(origen: string, urlBackend: string): string {
+  return `${origen.replace(/\/+$/, '')}/?hoja=${encodeURIComponent(urlBackend)}`;
+}
+
 export function olvidarBackend(almacen: AlmacenSimple | null | undefined): void {
   try {
     almacen?.removeItem(CLAVE_SESION_FAMILIAR);

@@ -21,7 +21,7 @@
  */
 
 import { esTicketSesion, cargaDeTicket } from './autenticacion';
-import { leerBackend } from './invitacionEntrante';
+import { resolverBackend } from './invitacionEntrante';
 import { ErrorBackend, pedir } from './transporteBackend';
 import type { PuertoTicket } from './sesionGoogle';
 
@@ -79,7 +79,7 @@ export function leerTicketGuardado(almacen: AlmacenTicketLike | null): string | 
 export function puertoTicket(opciones: OpcionesPuerto = {}): PuertoTicket {
   const almacen = opciones.almacen ?? almacenDelNavegador;
   const url =
-    opciones.url ?? (() => leerBackend(typeof window === 'undefined' ? null : window.localStorage));
+    opciones.url ?? (() => resolverBackend(typeof window === 'undefined' ? null : window.localStorage));
 
   return {
     leer: () => leerTicketGuardado(almacen()),

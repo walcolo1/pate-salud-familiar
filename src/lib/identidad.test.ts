@@ -93,7 +93,7 @@ describe('lo que se le entrega al repositorio', () => {
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { CLAVE_SESION_FAMILIAR } from './invitacionEntrante';
+import { CLAVE_SESION_FAMILIAR, urlBackendPorDefecto } from './invitacionEntrante';
 
 describe('la URL de la familia se lee de donde se escribe', () => {
   /**
@@ -136,7 +136,10 @@ describe('la URL de la familia se lee de donde se escribe', () => {
       localStorage: almacen(),
       sessionStorage: almacen({ [CLAVE_SESION_FAMILIAR]: URL_BUENA }),
     };
-    expect(sesionBackend().url()).toBe(null);
+    // Lo de `sessionStorage` se ignora: sale la dirección por defecto
+    // (Bloque L), nunca la que se dejó en el almacén equivocado.
+    expect(sesionBackend().url()).not.toBe(URL_BUENA);
+    expect(sesionBackend().url()).toBe(urlBackendPorDefecto());
   });
 
   it('todo el código que escribe o lee la URL usa el MISMO almacén', () => {
@@ -153,7 +156,7 @@ describe('la URL de la familia se lee de donde se escribe', () => {
     for (const f of ficheros(RAIZ)) {
       if (f.endsWith('.test.ts')) continue;
       const fuente = readFileSync(f, 'utf8');
-      for (const m of fuente.matchAll(/(guardarBackend|leerBackend|olvidarBackend)\([^)]*?(window\.\w+Storage)/g)) {
+      for (const m of fuente.matchAll(/(guardarBackend|leerBackend|resolverBackend|olvidarBackend)\([^)]*?(window\.\w+Storage)/g)) {
         usos.push(`${relative(RAIZ, f)} → ${m[2]}`);
       }
     }

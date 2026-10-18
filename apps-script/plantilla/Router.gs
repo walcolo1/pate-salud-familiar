@@ -172,6 +172,22 @@ var MANEJADORES = {
     return mutarAcceso('REVOCAR', payload, acceso);
   },
 
+  /**
+   * Bloque L · la lista de Ajustes: `ACCESO` sin los hashes de los tokens.
+   * `resumenAccesos` (de `invitaciones.ts`) decide qué sale y cómo.
+   */
+  listarAccesos: function () {
+    var encabezados = encabezadosDe('ACCESO') || [];
+    var filas = leerPestana_('ACCESO');
+    var objetos = [];
+    for (var i = 0; i < filas.length; i++) {
+      var o = {};
+      for (var c = 0; c < encabezados.length; c++) o[encabezados[c]] = filas[i][c];
+      objetos.push(o);
+    }
+    return { accesos: resumenAccesos(objetos, Date.now()) };
+  },
+
   verAuditoria: function () {
     return { filas: leerPestana_('AUDITORIA') };
   },

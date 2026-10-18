@@ -95,12 +95,16 @@ function invitar(datos, acceso) {
   var validacion = validarInvitacion(datos || {}, ROLES);
   if (!validacion.ok) throw new Error('PAYLOAD: ' + validacion.error);
 
-  var urlPwa = PropertiesService.getScriptProperties().getProperty(CLAVE_URL_PWA);
-  var urlBackend = PropertiesService.getScriptProperties().getProperty(CLAVE_URL_BACKEND);
+  // Bloque L · Las dos direcciones ya no dependen de propiedades que nadie
+  // escribía: la PWA sale de la propiedad o del origen del titular que invita
+  // (`resolverUrlPwa`), y el backend, de la propiedad o de este despliegue.
+  var propiedades = PropertiesService.getScriptProperties();
+  var urlPwa = resolverUrlPwa(propiedades.getProperty(CLAVE_URL_PWA), (datos || {}).origen);
+  var urlBackend = propiedades.getProperty(CLAVE_URL_BACKEND) || urlDeEsteDespliegue_();
   if (!urlPwa || !urlBackend) {
     // Fallar cerrado, igual que `Auth.gs` sin audiencia: una instalación a
     // medias no debe poder mandar enlaces que no llevan a ninguna parte.
-    throw new Error('PAYLOAD: falta URL_PWA o URL_BACKEND en las propiedades');
+    throw new Error('PAYLOAD: falta la dirección de la aplicación o del despliegue');
   }
 
   // 2 · El token. Se compone el enlace ANTES de escribir, para que una URL mal
@@ -142,6 +146,19 @@ function invitar(datos, acceso) {
   // correo y por ningún otro sitio. Devolverlo aquí lo dejaría en el registro
   // de red del navegador del titular.
   return { invitada: true, expiraEn: DIAS_VIGENCIA_INVITACION };
+}
+
+/**
+ * La `/exec` de este despliegue, o `null` si no se puede saber (ejecución
+ * desde el editor, o una URL de prueba `/dev`, que no sirve en un correo).
+ */
+function urlDeEsteDespliegue_() {
+  try {
+    var url = String(ScriptApp.getService().getUrl() || '');
+    return /^https:\/\/script\.google\.com\/.+\/exec$/.test(url) ? url : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

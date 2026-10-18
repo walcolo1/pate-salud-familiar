@@ -58,6 +58,10 @@ test.describe('A6-F2 · purga de localStorage', () => {
 
     await page.getByRole('button', { name: 'Cerrar Sesión' }).click();
     await page.waitForURL('**/login', { timeout: 30_000 });
+    // La purga navega a /login; leer el almacén mientras esa navegación aún
+    // termina destruía el contexto («Execution context was destroyed»).
+    await page.waitForLoadState('load');
+    await expect(page.getByRole('heading', { name: 'Paté', level: 1 })).toBeVisible();
 
     const almacen = await volcarAlmacenamiento(page);
     expect(almacen['pate_salud_device_id']).toBe('dispositivo-e2e');

@@ -56,6 +56,8 @@ export default defineConfig({
       reuseExistingServer: true,
       timeout: 300_000,
       env: {
+      // Bloque L · sin dirección por defecto: las E2E no hablan con la hoja real.
+      NEXT_PUBLIC_WEBAPP_URL: 'off',
       NEXT_PUBLIC_FIREBASE_API_KEY: 'e2e-falsa',
       NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'e2e.invalid',
       NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'demo-e2e-a6',
@@ -72,6 +74,8 @@ export default defineConfig({
       reuseExistingServer: true,
       timeout: 300_000,
       env: {
+      // Bloque L · sin dirección por defecto: las E2E no hablan con la hoja real.
+      NEXT_PUBLIC_WEBAPP_URL: 'off',
       NEXT_PUBLIC_FIREBASE_API_KEY: 'e2e-falsa',
       NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'e2e.invalid',
       NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'demo-e2e-a6',
