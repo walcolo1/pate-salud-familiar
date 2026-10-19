@@ -83,6 +83,7 @@ import {
   type VaccineEntry as VacunaMascota,
   type Validacion,
   type WeightEntry as PesoMascota,
+  hoyLocal,
 } from '../domain/mascotas';
 import {
   generarDosis,
@@ -140,6 +141,26 @@ import {
 import {
 } from '../lib/analizadorCitaTexto';
 import { useConfirmacion } from './Confirmacion';
+import {
+  MODULOS_VACIOS,
+  normalizarModulos,
+  type ModuloMascota,
+  type ModulosMascota,
+  type RegistroDeModulo,
+} from '../lib/codecMascota';
+import {
+  idDeRecordatorio,
+  idDeToma,
+  proximaAplicacion,
+  validarCuidado,
+  validarTratamiento,
+  type CuidadoMascota,
+  type EstadoToma,
+  type RecordatorioMascota,
+  type TomaMascota,
+  type TratamientoMascota,
+} from '../domain/cuidadoMascota';
+import { estadoEsActivo } from '../domain/fichaMascota';
 import { useAviso } from './Avisos';
 
 /**
@@ -289,7 +310,11 @@ interface AppContextProps {
   updateAppointmentStatus: (id: string, status: HealthEventStatus) => void;
   addCheckup: (chk: Omit<PeriodicCheckup, 'id'>) => void;
   addVaccine: (vac: Omit<VaccineRecord, 'id'>) => void;
-  addExam: (exam: Omit<MedicalExam, 'id' | 'documentIds'>, results: Omit<ExamResult, 'id' | 'examId' | 'recordedAt'>[]) => void;
+  addExam: (
+    exam: Omit<MedicalExam, 'id' | 'documentIds'>,
+    results: Omit<ExamResult, 'id' | 'examId' | 'recordedAt'>[],
+    opciones?: { sinHistorial?: boolean },
+  ) => void;
   uploadDocument: (memberId: string, doc: { fileName: string; fileType: string; description?: string }, file?: File) => Promise<string>;
   deleteDocument: (id: string) => void;
   completeTask: (id: string) => void;
@@ -396,6 +421,10 @@ interface AppContextProps {
     laboratorio?: string | null;
     lote?: string | null;
     veterinario?: string | null;
+    clinica?: string | null;
+    tipo?: 'CORE' | 'NO_CORE' | null;
+    certificadoDocId?: string | null;
+    costo?: number | null;
   }) => Validacion;
   /** D4 · Registra una atención veterinaria ya ocurrida. */
   addPetHistory: (entrada: {
@@ -406,6 +435,17 @@ interface AppContextProps {
     tratamiento?: string | null;
     veterinario?: string | null;
   }) => Validacion;
+  /** Bloque O · cuidados, tratamientos, tomas y recordatorios de las mascotas. */
+  petModules: ModulosMascota;
+  addPetCare: (entrada: Omit<CuidadoMascota, 'id' | 'memberId'>) => Validacion;
+  savePetTreatment: (entrada: Omit<TratamientoMascota, 'id' | 'memberId'> & { id?: string }) => Validacion;
+  markPetDose: (tratamientoId: string, programadaEn: string, estado: EstadoToma) => void;
+  setPetReminderState: (
+    petId: string,
+    r: Pick<RecordatorioMascota, 'clave' | 'tipo' | 'titulo'>,
+    estado: 'COMPLETADO' | 'POSPUESTO',
+    fecha: string,
+  ) => void;
   addMedicalOrder: (order: Omit<MedicalOrder, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => void;
   updateMedicalOrder: (id: string, fields: Partial<MedicalOrder>) => void;
   deleteMedicalOrder: (id: string) => void;
@@ -548,6 +588,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [petWeights, setPetWeights] = useState<PesoMascota[]>([]);
   const [petVaccines, setPetVaccines] = useState<VacunaMascota[]>([]);
   const [petHistory, setPetHistory] = useState<EntradaHistorialVet[]>([]);
+  // Bloque O · cuidados, tratamientos, tomas y recordatorios de las mascotas.
+  const [petModules, setPetModules] = useState<ModulosMascota>(MODULOS_VACIOS);
   const [pendingInvitations, setPendingInvitations] = useState<FamilyInvitation[]>([]);
   const [invitations, setInvitations] = useState<FamilyInvitation[]>([]);
 
@@ -1106,6 +1148,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setPetWeights(savedState.petWeights || []);
           setPetVaccines(savedState.petVaccines || []);
           setPetHistory(savedState.petHistory || []);
+          setPetModules(normalizarModulos(savedState.petModules));
           setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
           setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
           setSimulatedRole(savedState.simulatedRole !== undefined ? savedState.simulatedRole : null);
@@ -1398,7 +1441,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pets,
       petWeights,
       petVaccines,
-      petHistory
+      petHistory,
+      petModules
     }, userEmailOrId);
   }, [
     user,
@@ -1435,6 +1479,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     petWeights,
     petVaccines,
     petHistory,
+    petModules,
     isLoading
   ]);
 
@@ -1646,6 +1691,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setPetWeights(savedState.petWeights || []);
           setPetVaccines(savedState.petVaccines || []);
           setPetHistory(savedState.petHistory || []);
+          setPetModules(normalizarModulos(savedState.petModules));
         setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
         setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
         setSimulatedRole(savedState.simulatedRole || null);
@@ -1768,6 +1814,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setPetWeights(savedState.petWeights || []);
           setPetVaccines(savedState.petVaccines || []);
           setPetHistory(savedState.petHistory || []);
+          setPetModules(normalizarModulos(savedState.petModules));
         setDriveSyncEnabled(savedState.driveSyncEnabled !== undefined ? savedState.driveSyncEnabled : true);
         setCalendarSyncEnabled(savedState.calendarSyncEnabled !== undefined ? savedState.calendarSyncEnabled : true);
         setSimulatedRole(savedState.simulatedRole !== undefined ? savedState.simulatedRole : null);
@@ -2205,6 +2252,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     petWeights,
     petVaccines,
     petHistory,
+    petModules,
   });
 
   stateRef.current = {
@@ -2226,6 +2274,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     petWeights,
     petVaccines,
     petHistory,
+    petModules,
   };
 
   /** Vuelve la pantalla a como estaba antes de un cambio que la hoja rechazó. */
@@ -2248,6 +2297,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setPetWeights(snap.petWeights);
     setPetVaccines(snap.petVaccines);
     setPetHistory(snap.petHistory);
+    setPetModules(snap.petModules);
   };
 
   const mensajeDeRechazo = (codigo: string) =>
@@ -3124,7 +3174,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const addExam = (
     exam: Omit<MedicalExam, 'id' | 'documentIds'>, 
-    results: Omit<ExamResult, 'id' | 'examId' | 'recordedAt'>[]
+    results: Omit<ExamResult, 'id' | 'examId' | 'recordedAt'>[],
+    opciones: { sinHistorial?: boolean } = {},
   ) => {
     const examId = `exam-${Date.now()}`;
     const newExam: MedicalExam = {
@@ -3154,14 +3205,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       relatedEntityId: examId,
       createdAt: new Date().toISOString()
     };
-    setHistory((prev) => [newEvent, ...prev]);
+    // Bloque O · el examen de una mascota no va al historial humano: su
+    // fila de HISTORIAL se leería como una atención veterinaria sin tipo.
+    if (!opciones.sinHistorial) setHistory((prev) => [newEvent, ...prev]);
 
     persistirPorMutacion(async (repo, ctx) => {
       await repo.saveExam(ctx, newExam);
       // El paciente hace falta: `EXAMENES_RESULTADOS` lo lleva en su columna
       // desde el esquema v4, y sin él el router deniega la mutación.
-      await repo.saveExamResults(ctx, examId, newResults, exam.memberId);
-      await repo.saveHistoryEvent(ctx, newEvent);
+      if (newResults.length > 0) await repo.saveExamResults(ctx, examId, newResults, exam.memberId);
+      if (!opciones.sinHistorial) await repo.saveHistoryEvent(ctx, newEvent);
     });
   };
 
@@ -3344,7 +3397,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // A6-F3 · Guarda estructural del modo demostración.
     if (origenDatosRef.current === 'DEMO') return '';
     const member = members.find((m) => m.id === memberId);
-    const memberName = member ? member.fullName : 'Miembro';
+    // Bloque O · una mascota tiene su propia carpeta y no escribe en el
+    // historial humano (su HISTORIAL es veterinario).
+    const mascotaDoc = pets.find((p) => p.id === memberId);
+    const memberName = member ? member.fullName : mascotaDoc ? `Mascota ${mascotaDoc.nombre}` : 'Miembro';
     const categoryName = ({
       PRESCRIPTION: 'Fórmula Médica',
       LAB_RESULT: 'Resultado de Laboratorio',
@@ -3408,11 +3464,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             relatedEntityId: docId,
             createdAt: new Date().toISOString()
           };
-          setHistory((prev) => [newEvent, ...prev]);
+          if (!mascotaDoc) setHistory((prev) => [newEvent, ...prev]);
 
           persistirPorMutacion(async (repo, ctx) => {
             await repo.saveDocument(ctx, newDoc);
-            await repo.saveHistoryEvent(ctx, newEvent);
+            if (!mascotaDoc) await repo.saveHistoryEvent(ctx, newEvent);
           });
 
           return docId;
@@ -3460,11 +3516,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       relatedEntityId: docId,
       createdAt: new Date().toISOString()
     };
-    setHistory((prev) => [newEvent, ...prev]);
+    if (!mascotaDoc) setHistory((prev) => [newEvent, ...prev]);
 
     persistirPorMutacion(async (repo, ctx) => {
       await repo.saveDocument(ctx, newDoc);
-      await repo.saveHistoryEvent(ctx, newEvent);
+      if (!mascotaDoc) await repo.saveHistoryEvent(ctx, newEvent);
     });
 
     return docId;
@@ -3643,8 +3699,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       sexo: borrador.sexo!,
       pesoActualKg: borrador.pesoActualKg ?? null,
       pesoIdealKg: borrador.pesoIdealKg ?? null,
-      activo: true,
+      activo: borrador.ficha?.estado ? estadoEsActivo(borrador.ficha.estado) : true,
       notas: borrador.notas?.trim() || null,
+      ficha: borrador.ficha ?? null,
+      fotoUrl: borrador.fotoUrl || null,
       ...marcasDeCreacion(),
     };
 
@@ -3674,6 +3732,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pesoIdealKg: cambios.pesoIdealKg ?? actual.pesoIdealKg,
       memberId: cambios.memberId ?? actual.memberId,
       notas: cambios.notas ?? actual.notas,
+      ficha: cambios.ficha ?? actual.ficha,
+      fotoUrl: cambios.fotoUrl !== undefined ? cambios.fotoUrl : actual.fotoUrl,
     };
 
     const validacion = validarMascota(resultante);
@@ -3688,6 +3748,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       sexo: resultante.sexo!,
       raza: resultante.raza?.trim() || null,
       notas: resultante.notas?.trim() || null,
+      // Bloque O · el estado de la ficha decide si sigue activa.
+      activo: cambios.ficha?.estado ? estadoEsActivo(cambios.ficha.estado) : actual.activo,
       updatedAt: new Date().toISOString(),
       syncStatus: 'PENDING_SYNC',
     };
@@ -3792,6 +3854,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     laboratorio?: string | null;
     lote?: string | null;
     veterinario?: string | null;
+    clinica?: string | null;
+    tipo?: 'CORE' | 'NO_CORE' | null;
+    certificadoDocId?: string | null;
+    costo?: number | null;
   }): Validacion => {
     const validacion = validarVacunaMascota(entrada);
     if (!validacion.valido) return validacion;
@@ -3813,6 +3879,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       laboratorio: entrada.laboratorio?.trim() || null,
       lote: entrada.lote?.trim() || null,
       veterinario: entrada.veterinario?.trim() || null,
+      clinica: entrada.clinica?.trim() || null,
+      tipo: entrada.tipo ?? null,
+      certificadoDocId: entrada.certificadoDocId || null,
+      costo: entrada.costo ?? null,
       ...marcasDeCreacion(),
     };
 
@@ -3867,6 +3937,100 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await repo.savePetHistory(ctx, nueva);
     });
     return { valido: true };
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Bloque O · Módulos clínicos de la mascota
+  //
+  // Validan con el dominio y escriben en pestañas existentes con
+  // `paciente_id = mascota`. Cada uno guarda su registro y nada más: lo que se
+  // puede calcular (próxima toma, recordatorios, gastos) no se guarda.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const guardarModulo = <M extends ModuloMascota>(modulo: M, registro: RegistroDeModulo<M>) => {
+    setPetModules((prev) => {
+      const lista = prev[modulo] as Array<{ id: string }>;
+      const sin = lista.filter((x) => x.id !== registro.id);
+      return { ...prev, [modulo]: [...sin, registro] };
+    });
+    persistirPorMutacion(async (repo, ctx) => {
+      await repo.savePetRecord(ctx, modulo, registro as unknown as Record<string, unknown>);
+    });
+  };
+
+  const mascotaOError = (petId: string) => pets.find((p) => p.id === petId) ?? null;
+  const noExiste: Validacion = { valido: false, problemas: [{ campo: 'petId', mensaje: 'La mascota ya no existe.' }] };
+
+  const addPetCare = (entrada: Omit<CuidadoMascota, 'id' | 'memberId'>): Validacion => {
+    const mascota = mascotaOError(entrada.petId);
+    if (!mascota) return noExiste;
+    const problemas = validarCuidado(entrada, hoyLocal());
+    if (problemas.length) return { valido: false, problemas };
+    const periodicidad = entrada.periodicidadMeses ?? null;
+    const registro: CuidadoMascota = {
+      ...entrada,
+      id: `cuidpet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      memberId: mascota.memberId,
+      periodicidadMeses: periodicidad,
+      proxima: entrada.proxima || proximaAplicacion(entrada.fecha, periodicidad),
+      ...marcasDeCreacion(),
+    };
+    guardarModulo('cuidados', registro);
+    return { valido: true };
+  };
+
+  const savePetTreatment = (entrada: Omit<TratamientoMascota, 'id' | 'memberId'> & { id?: string }): Validacion => {
+    const mascota = mascotaOError(entrada.petId);
+    if (!mascota) return noExiste;
+    const problemas = validarTratamiento(entrada);
+    if (problemas.length) return { valido: false, problemas };
+    const previo = entrada.id ? petModules.tratamientos.find((t) => t.id === entrada.id) : undefined;
+    const registro: TratamientoMascota = {
+      ...(previo ?? marcasDeCreacion()),
+      ...entrada,
+      id: entrada.id ?? `tratpet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      memberId: mascota.memberId,
+      updatedAt: new Date().toISOString(),
+    } as TratamientoMascota;
+    guardarModulo('tratamientos', registro);
+    return { valido: true };
+  };
+
+  const markPetDose = (tratamientoId: string, programadaEn: string, estado: EstadoToma) => {
+    const t = petModules.tratamientos.find((x) => x.id === tratamientoId);
+    if (!t) return;
+    const registro: TomaMascota = {
+      id: idDeToma(tratamientoId, programadaEn),
+      tratamientoId,
+      petId: t.petId,
+      memberId: t.memberId,
+      programadaEn,
+      estado,
+      aplicadaEn: estado === 'APLICADA' ? new Date().toISOString() : null,
+      ...marcasDeCreacion(),
+    };
+    guardarModulo('tomas', registro);
+  };
+
+  const setPetReminderState = (
+    petId: string,
+    r: Pick<RecordatorioMascota, 'clave' | 'tipo' | 'titulo'>,
+    estado: 'COMPLETADO' | 'POSPUESTO',
+    fecha: string,
+  ) => {
+    const mascota = mascotaOError(petId);
+    if (!mascota) return;
+    guardarModulo('recordatorios', {
+      id: idDeRecordatorio(petId, r.clave),
+      petId,
+      memberId: mascota.memberId,
+      clave: r.clave,
+      tipo: r.tipo,
+      titulo: r.titulo,
+      estado,
+      fecha,
+      ...marcasDeCreacion(),
+    });
   };
 
   const addMedicalOrder = (order: Omit<MedicalOrder, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus'>) => {
@@ -4759,7 +4923,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pets,
       petWeights,
       petVaccines,
-      petHistory
+      petHistory,
+      petModules
     });
   };
 
@@ -4798,6 +4963,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (Array.isArray(data.petWeights)) setPetWeights(data.petWeights);
       if (Array.isArray(data.petVaccines)) setPetVaccines(data.petVaccines);
       if (Array.isArray(data.petHistory)) setPetHistory(data.petHistory);
+      if (data.petModules) setPetModules(normalizarModulos(data.petModules));
       if (Array.isArray(data.emailSources)) setEmailSources(data.emailSources);
       if (Array.isArray(data.appointmentCandidates)) setAppointmentCandidates(data.appointmentCandidates);
 
@@ -5457,6 +5623,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       { pets: local.pets, petWeights: local.petWeights, petVaccines: local.petVaccines, petHistory: local.petHistory },
     );
     setPets(fusion.resultado.pets);
+    // Bloque O · los módulos se escriben al momento: la hoja manda.
+    setPetModules(normalizarModulos(d.petModules));
     setPetWeights(fusion.resultado.petWeights);
     setPetVaccines(fusion.resultado.petVaccines);
     setPetHistory(fusion.resultado.petHistory);
@@ -5727,6 +5895,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       petWeights,
       petVaccines,
       petHistory,
+      petModules,
+      addPetCare,
+      savePetTreatment,
+      markPetDose,
+      setPetReminderState,
       addPet,
       updatePet,
       setPetActiva,

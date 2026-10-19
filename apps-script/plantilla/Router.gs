@@ -64,7 +64,10 @@ function responder(objeto) {
 function dependencias_() {
   return {
     verificarIdentidad: verificarIdentidad,
-    resolverAcceso: resolverAccesoLocal,
+    // Bloque O · el alcance incluye las mascotas a cargo de quien ya alcanza.
+    resolverAcceso: function (email) {
+      return ampliarConMascotasACargo(resolverAccesoLocal(email), mascotasACargo_());
+    },
     puede: puede,
     manejadores: MANEJADORES,
     registrar: function (evento, detalle) {
@@ -238,6 +241,8 @@ var MANEJADORES = {
  * es el fallo que importa.
  */
 function aplicar(acceso, mutaciones) {
+  // Bloque O · la especie la dice `PACIENTES`, no el cliente.
+  mutaciones = fijarEspecies(mutaciones || [], especiePorPaciente_());
   var validacion = validarLote(acceso, mutaciones, puede);
   if (!validacion.ok) {
     registrarDenegacion_('lote rechazado en la posición ' + validacion.indice);
@@ -339,4 +344,27 @@ function columnasDe_(tabla) {
   var posiciones = {};
   for (var i = 0; i < encabezados.length; i++) posiciones[encabezados[i]] = i;
   return posiciones;
+}
+
+/** Bloque O · Mascotas y su responsable, de `PERFIL_MASCOTA`. */
+function mascotasACargo_() {
+  return mascotasACargoDesdeFilas(leerPestana_('PERFIL_MASCOTA'), encabezadosDe('PERFIL_MASCOTA') || []);
+}
+
+/**
+ * Bloque O · `id → tipo` de `PACIENTES` (la última fila manda). Devuelve la
+ * función que consulta `fijarEspecies`.
+ */
+function especiePorPaciente_() {
+  var cols = columnasDe_('PACIENTES');
+  var filas = leerPestana_('PACIENTES');
+  var tipos = {};
+  for (var i = 0; i < filas.length; i++) {
+    var id = String(filas[i][cols.id] || '').trim();
+    var tipo = String(filas[i][cols.tipo] || '').trim().toUpperCase();
+    if (id && tipo) tipos[id] = tipo;
+  }
+  return function (pacienteId) {
+    return Object.prototype.hasOwnProperty.call(tipos, pacienteId) ? tipos[pacienteId] : null;
+  };
 }

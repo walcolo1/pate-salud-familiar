@@ -23,6 +23,8 @@
  * acabaría arrastrando campos que no significan nada aquí.
  */
 
+import { validarFicha, type FichaMascota } from './fichaMascota';
+
 /** Especies que la aplicación sabe manejar. */
 export const ESPECIES = ['PERRO', 'GATO', 'AVE', 'CONEJO', 'ROEDOR', 'REPTIL', 'PEZ', 'OTRO'] as const;
 export type Especie = (typeof ESPECIES)[number];
@@ -108,6 +110,12 @@ export interface Pet extends Sincronizable {
   /** Se marca en falso en lugar de borrar: el historial se conserva. */
   activo: boolean;
   notas?: string | null;
+  /** Bloque O · ficha ampliada; viaja en el sobre de `PACIENTES.notas`. */
+  ficha?: FichaMascota | null;
+  /** Bloque O · claves de un sobre más nuevo, que se conservan al reescribir. */
+  notasExtra?: Record<string, unknown> | null;
+  /** Bloque O · foto o avatar (`PACIENTES.foto_url`). */
+  fotoUrl?: string | null;
 }
 
 export interface WeightEntry extends Sincronizable {
@@ -130,6 +138,14 @@ export interface VaccineEntry extends Sincronizable {
   laboratorio?: string | null;
   lote?: string | null;
   veterinario?: string | null;
+  /** Bloque O · clínica donde se aplicó. */
+  clinica?: string | null;
+  /** Bloque O · esencial u opcional (sobre en `VACUNAS.notas`). */
+  tipo?: 'CORE' | 'NO_CORE' | null;
+  /** Bloque O · documento con la foto del carnet o el certificado. */
+  certificadoDocId?: string | null;
+  /** Bloque O · costo, para el resumen de gastos. */
+  costo?: number | null;
 }
 
 export interface MedicalHistoryEntry extends Sincronizable {
@@ -198,6 +214,8 @@ export type BorradorMascota = Partial<
     | 'pesoIdealKg'
     | 'memberId'
     | 'notas'
+    | 'ficha'
+    | 'fotoUrl'
   >
 >;
 
@@ -252,8 +270,22 @@ export function validarMascota(
     }
   }
 
+  // Bloque O · la ficha ampliada.
+  if (borrador.ficha) {
+    problemas.push(...validarFicha(borrador.ficha, hoyLocal(ahora), borrador.fechaNacimiento ?? null));
+  }
+  if (borrador.fotoUrl && borrador.fotoUrl.length > TAMANO_MAXIMO_FOTO) {
+    problemas.push({ campo: 'fotoUrl', mensaje: 'La foto es demasiado grande; elige otra o recórtala.' });
+  }
+
   return problemas.length === 0 ? { valido: true } : { valido: false, problemas };
 }
+
+/**
+ * Bloque O · Una foto reducida (≈ 256 px, JPEG) cabe holgada en una celda de
+ * Sheets (50 000 caracteres). Por encima, no se guarda.
+ */
+export const TAMANO_MAXIMO_FOTO = 45_000;
 
 export function validarPeso(
   entrada: Partial<Pick<WeightEntry, 'fecha' | 'pesoKg' | 'petId'>>,

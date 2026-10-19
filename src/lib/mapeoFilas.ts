@@ -145,14 +145,41 @@ export const DESCARTADOS: Record<string, string> = {
 export const DESCARTADOS_POR_COLECCION: Record<string, Record<string, string>> = {
   pets: {
     familyId: 'la familia es la hoja, y la decide la URL del despliegue',
+    ficha: 'va dentro del sobre JSON de `PACIENTES.notas` (domain/fichaMascota), sin columnas nuevas',
+    notasExtra: 'claves de un sobre de versión más nueva; se reescriben dentro del mismo sobre de `notas`',
   },
   petWeights: {
     memberId: 'se deriva de la mascota al leer: denormalizarlo en la hoja abre la puerta a que no cuadre',
   },
   petVaccines: {
     memberId: 'se deriva de la mascota al leer: denormalizarlo en la hoja abre la puerta a que no cuadre',
+    tipo: 'va dentro del sobre JSON de la columna `notas` (Bloque O), sin columna propia',
+    certificadoDocId: 'va dentro del sobre JSON de la columna `notas` (Bloque O), sin columna propia',
+    costo: 'va dentro del sobre JSON de la columna `notas` (Bloque O), sin columna propia',
   },
   petHistory: {
+    memberId: 'se deriva de la mascota al leer: denormalizarlo en la hoja abre la puerta a que no cuadre',
+  },
+  // ── Bloque O ─────────────────────────────────────────────────────────────
+  petCare: {
+    memberId: 'se deriva de la mascota al leer: denormalizarlo en la hoja abre la puerta a que no cuadre',
+    categoria: 'se guarda en `tipo` con el prefijo VET_, que la distingue de los controles humanos',
+    producto: 'va dentro del sobre JSON de la columna `notas` (Bloque O), sin columna propia',
+    dosis: 'va dentro del sobre JSON de la columna `notas` (Bloque O), sin columna propia',
+    via: 'va dentro del sobre JSON de la columna `notas` (Bloque O), sin columna propia',
+    costo: 'va dentro del sobre JSON de la columna `notas` (Bloque O), sin columna propia',
+    notas: 'va dentro del sobre JSON de la columna `notas` (Bloque O), sin columna propia',
+  },
+  petTreatments: {
+    memberId: 'se deriva de la mascota al leer: denormalizarlo en la hoja abre la puerta a que no cuadre',
+    tipo: 'va dentro del sobre JSON de la columna `notas` (Bloque O), sin columna propia',
+    via: 'va dentro del sobre JSON de la columna `notas` (Bloque O), sin columna propia',
+    efectosSecundarios: 'va dentro del sobre JSON de la columna `notas` (Bloque O), sin columna propia',
+  },
+  petDoses: {
+    memberId: 'se deriva de la mascota al leer: denormalizarlo en la hoja abre la puerta a que no cuadre',
+  },
+  petReminderStates: {
     memberId: 'se deriva de la mascota al leer: denormalizarlo en la hoja abre la puerta a que no cuadre',
   },
   vaccines: {

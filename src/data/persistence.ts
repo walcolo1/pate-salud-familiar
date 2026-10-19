@@ -1,3 +1,4 @@
+import type { ModulosMascota } from '@/lib/codecMascota';
 import { 
   UserAccount, 
   FamilyMember, 
@@ -86,6 +87,8 @@ export interface SavedAppState {
   petWeights?: WeightEntry[];
   petVaccines?: VaccineEntry[];
   petHistory?: MedicalHistoryEntry[];
+  /** Bloque O · módulos clínicos de las mascotas. */
+  petModules?: ModulosMascota;
 }
 
 const ACTIVE_USER_KEY = 'pate_salud_active_user';

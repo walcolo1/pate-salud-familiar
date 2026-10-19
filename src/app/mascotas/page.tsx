@@ -45,7 +45,7 @@ export default function MascotasPage() {
       members
         .filter((m) => (m.status ?? 'ACTIVE') === 'ACTIVE')
         .sort((a, b) => (a.relationship === 'SELF' ? -1 : b.relationship === 'SELF' ? 1 : a.fullName.localeCompare(b.fullName, 'es')))
-        .map((m) => ({ id: m.id, nombre: m.relationship === 'SELF' ? `${m.fullName} (titular)` : m.fullName })),
+        .map((m) => ({ id: m.id, nombre: m.relationship === 'SELF' ? `${m.fullName} (titular)` : m.fullName, correo: m.email ?? null })),
     [members],
   );
   const nombreDe = useMemo(() => new Map(members.map((m) => [m.id, m.fullName])), [members]);

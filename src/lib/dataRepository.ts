@@ -23,6 +23,7 @@
 
 import type { Mutacion } from './transporteBackend';
 import type { MedicalHistoryEntry, Pet, VaccineEntry, WeightEntry } from '../domain/mascotas';
+import type { ModuloMascota, ModulosMascota } from './codecMascota';
 import type {
   FamilyMember,
   HealthProfile,
@@ -94,6 +95,8 @@ export interface AllFamilyData {
   petWeights:              WeightEntry[];
   petVaccines:             VaccineEntry[];
   petHistory:              MedicalHistoryEntry[];
+  /** Bloque O · cuidados, tratamientos, tomas y recordatorios de mascotas. */
+  petModules:              ModulosMascota;
   // Settings (not a domain model; stored as flat flags in AppContext)
   gmailAutoScanEnabled:        boolean;
   gmailScanTime:               string;
@@ -125,6 +128,7 @@ export const EMPTY_FAMILY_DATA: AllFamilyData = {
   petWeights:              [],
   petVaccines:             [],
   petHistory:              [],
+  petModules:              { cuidados: [], tratamientos: [], tomas: [], recordatorios: [] },
   gmailAutoScanEnabled:        false,
   gmailScanTime:               '00:00',
   gmailScanRangeDays:          90,
@@ -258,6 +262,8 @@ export interface DataRepository {
   savePetWeight(ctx: RepositoryContext, entry: WeightEntry): Promise<void>;
   savePetVaccine(ctx: RepositoryContext, entry: VaccineEntry): Promise<void>;
   savePetHistory(ctx: RepositoryContext, entry: MedicalHistoryEntry): Promise<void>;
+  /** Bloque O · un registro de los módulos clínicos de la mascota. */
+  savePetRecord(ctx: RepositoryContext, modulo: ModuloMascota, registro: Record<string, unknown>): Promise<void>;
 
   saveGmailSource(ctx: RepositoryContext, source: AppointmentEmailSource): Promise<void>;
   darDeBajaGmailSource(ctx: RepositoryContext, sourceId: string): Promise<void>;

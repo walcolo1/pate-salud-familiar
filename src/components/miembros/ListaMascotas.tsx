@@ -18,7 +18,7 @@ import EstadoVacio from '@/components/ui/EstadoVacio';
 import { NOMBRE_ESPECIE, NOMBRE_SEXO, type Pet, type VaccineEntry } from '@/domain/mascotas';
 import { descripcionEdad } from '@/lib/edad';
 import { vacunasPendientes } from '@/lib/vacunasMascota';
-import { PawPrint, Pencil, Power, Scale, Stethoscope, Syringe } from 'lucide-react';
+import { LayoutGrid, PawPrint, Pencil, Power, Scale, Stethoscope, Syringe } from 'lucide-react';
 
 export interface ListaMascotasProps {
   mascotas: Pet[];
@@ -103,6 +103,10 @@ export default function ListaMascotas({
                     <p className="text-[10px] font-semibold text-slate-500 mt-1">A cargo de {responsable}</p>
                   )}
 
+                  {mascota.fotoUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={mascota.fotoUrl} alt={`Foto de ${mascota.nombre}`} className="mt-2 h-16 w-16 rounded-2xl object-cover border border-slate-200" />
+                  )}
                   {mascota.notas && (
                     <p className="text-[10px] text-slate-600 mt-1.5 leading-relaxed">{mascota.notas}</p>
                   )}
@@ -110,6 +114,15 @@ export default function ListaMascotas({
               </div>
 
               <div className="flex gap-2 justify-end flex-wrap">
+                {/* Bloque O · el centro de control con los cinco módulos. */}
+                <Link
+                  href={`/mascotas/${mascota.id}`}
+                  aria-label={`Abrir el centro de control de ${mascota.nombre}`}
+                  className="px-3.5 h-8.5 text-[10px] font-extrabold text-white bg-teal-700 hover:bg-teal-800 rounded-xl transition-colors flex items-center gap-1"
+                >
+                  <LayoutGrid aria-hidden="true" className="h-3.5 w-3.5" />
+                  Centro de control
+                </Link>
                 <Link href={`${base}/peso`} aria-label={`Ver el peso de ${mascota.nombre}`} className={CLASE_ACCION}>
                   <Scale aria-hidden="true" className="h-3.5 w-3.5" />
                   Peso

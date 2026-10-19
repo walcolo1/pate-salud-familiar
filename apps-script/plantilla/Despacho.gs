@@ -155,6 +155,33 @@ var VERBO_POR_TABLA = {
     TAREAS: 'ESCRIBIR_CITA',
     HISTORIAL: 'ESCRIBIR_HISTORIAL',
 };
+/**
+ * Bloque O · La especie de cada mutación la dice la hoja, no el cliente.
+ *
+ * `puede()` concede verbos según la especie (órdenes solo a personas; el
+ * cuidado diario de una mascota también a un MIEMBRO). Si se fiara de lo que
+ * manda el navegador, bastaría con decir «MASCOTA» sobre una persona para
+ * editar su identidad. Aquí se sustituye por el `tipo` de `PACIENTES`.
+ *
+ * Un paciente que todavía no existe en la hoja (se está dando de alta en este
+ * mismo lote) conserva la especie que trae: crear sigue siendo del titular, y
+ * un rol parcial no alcanza a un identificador que no conoce.
+ */
+function fijarEspecies(mutaciones, especieDe) {
+    const salida = [];
+    for (let i = 0; i < (mutaciones || []).length; i++) {
+        const m = mutaciones[i] || {};
+        const id = typeof m.pacienteId === 'string' ? m.pacienteId.trim() : '';
+        const real = id ? especieDe(id) : null;
+        salida.push({
+            tabla: m.tabla,
+            pacienteId: m.pacienteId,
+            especie: real === 'HUMANO' || real === 'MASCOTA' ? real : m.especie,
+            fila: m.fila,
+        });
+    }
+    return salida;
+}
 /** Pestañas que `aplicar` nunca toca, por mucho permiso que se tenga. */
 var TABLAS_PROHIBIDAS = ['ACCESO', 'AUDITORIA', 'CONFIG'];
 function verboDeTabla(tabla) {

@@ -36,7 +36,10 @@ export const DESCRIPTORES_MASCOTAS: Record<string, readonly Descriptor[]> = {
         id: c('id'),
         nombre: c('nombre'),
         activo: c('activo', 'booleano'),
+        // Bloque O · `notas` lleva el sobre de la ficha ampliada
+        // (`domain/fichaMascota`); la foto, su columna de siempre.
         notas: c('notas'),
+        fotoUrl: c('foto_url'),
       },
     },
     {
@@ -86,6 +89,86 @@ export const DESCRIPTORES_MASCOTAS: Record<string, readonly Descriptor[]> = {
         laboratorio: c('laboratorio'),
         lote: c('lote'),
         veterinario: c('profesional'),
+        // Bloque O · clínica, y el sobre con tipo (core/no-core), certificado y costo.
+        clinica: c('institucion'),
+        detalle: c('notas'),
+      },
+    },
+  ],
+
+  // ── Bloque O · los cinco módulos clínicos, en pestañas existentes ─────────
+
+  petCare: [
+    {
+      pestana: 'CONTROLES',
+      pacienteDesde: 'petId',
+      especie: 'MASCOTA',
+      constantes: { estado: 'REALIZADO' },
+      campos: {
+        id: c('id'),
+        petId: c('paciente_id'),
+        tipo: c('tipo'),
+        fecha: c('fecha_realizada'),
+        proxima: c('proxima_fecha'),
+        periodicidadMeses: c('periodicidad_meses', 'numero'),
+        profesional: c('profesional'),
+        detalle: c('notas'),
+      },
+    },
+  ],
+
+  petTreatments: [
+    {
+      pestana: 'MEDICAMENTOS',
+      pacienteDesde: 'petId',
+      especie: 'MASCOTA',
+      campos: {
+        id: c('id'),
+        petId: c('paciente_id'),
+        nombre: c('nombre'),
+        dosisValor: c('dosis_valor', 'numero'),
+        dosisUnidad: c('dosis_unidad'),
+        frecuencia: c('frecuencia_tipo'),
+        horaInicio: c('momentos'),
+        fechaInicio: c('fecha_inicio'),
+        fechaFin: c('fecha_fin'),
+        estado: c('estado'),
+        prescritoPor: c('prescrito_por'),
+        indicaciones: c('indicaciones'),
+        detalle: c('notas'),
+      },
+    },
+  ],
+
+  petDoses: [
+    {
+      pestana: 'DOSIS',
+      pacienteDesde: 'petId',
+      especie: 'MASCOTA',
+      campos: {
+        id: c('id'),
+        tratamientoId: c('medicamento_id'),
+        petId: c('paciente_id'),
+        programadaEn: c('programada_en'),
+        estado: c('estado'),
+        aplicadaEn: c('tomada_en'),
+      },
+    },
+  ],
+
+  petReminderStates: [
+    {
+      pestana: 'RECORDATORIOS',
+      pacienteDesde: 'petId',
+      especie: 'MASCOTA',
+      campos: {
+        id: c('id'),
+        petId: c('paciente_id'),
+        tipo: c('tipo'),
+        titulo: c('titulo'),
+        fecha: c('fecha'),
+        estado: c('estado'),
+        clave: c('entidad_relacionada'),
       },
     },
   ],
@@ -459,4 +542,8 @@ export const MODELO_DE_COLECCION: Record<string, string> = {
   petWeights: 'WeightEntry',
   petVaccines: 'VaccineEntry',
   petHistory: 'MedicalHistoryEntry',
+  petCare: 'CuidadoMascota',
+  petTreatments: 'TratamientoMascota',
+  petDoses: 'TomaMascota',
+  petReminderStates: 'EstadoRecordatorioMascota',
 };

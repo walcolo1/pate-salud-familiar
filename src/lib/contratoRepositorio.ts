@@ -62,6 +62,7 @@ export const METODOS_ESCRITURA: readonly string[] = [
   'savePetWeight',
   'savePetVaccine',
   'savePetHistory',
+  'savePetRecord',
   'saveMedicalOrder',
   'darDeBajaMedicalOrder',
   'saveMedication',

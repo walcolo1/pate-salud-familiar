@@ -355,3 +355,79 @@ export function validarMutacion(
 
   return null;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque O · Mascotas a cargo
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Una mascota y su familiar responsable, tal como vienen de `PERFIL_MASCOTA`. */
+export interface MascotaACargo {
+  id: string;
+  responsableId: string;
+}
+
+/**
+ * Amplía el alcance con las mascotas cuyo responsable ya está en él.
+ *
+ * Una mascota es un paciente propio (`paciente_id`), y hasta aquí solo la
+ * alcanzaba quien la tuviera en `pacientes_asignados` o el alcance `*`. Quien
+ * cuida a la persona responsable —o es esa persona— no podía ni ver a su
+ * perro. Ahora alcanza, además, a las mascotas a cargo de cualquier paciente
+ * que ya alcance.
+ *
+ * Un solo nivel: la mascota de una mascota no existe, y no se encadena. No
+ * cambia el rol: qué puede HACER lo sigue decidiendo `puede()`.
+ */
+export function ampliarConMascotasACargo(
+  acceso: Acceso,
+  mascotas: readonly MascotaACargo[],
+): Acceso {
+  if (!acceso || acceso.alcanceTotal) return acceso;
+  const ya = acceso.pacientesPermitidos.slice();
+  for (let i = 0; i < (mascotas || []).length; i++) {
+    const m = mascotas[i];
+    const id = texto(m && m.id);
+    const responsable = texto(m && m.responsableId);
+    if (!id || !responsable || ya.indexOf(id) !== -1) continue;
+    if (alcanza(acceso, responsable)) ya.push(id);
+  }
+  if (ya.length === acceso.pacientesPermitidos.length) return acceso;
+  return {
+    email: acceso.email,
+    rol: acceso.rol,
+    estado: acceso.estado,
+    alcanceTotal: acceso.alcanceTotal,
+    pacientesPermitidos: ya,
+    pacientePropio: acceso.pacientePropio,
+    version: acceso.version,
+  };
+}
+
+/**
+ * Lee las mascotas a cargo de las filas crudas de `PERFIL_MASCOTA`. La última
+ * fila de cada mascota manda (la hoja es de solo-anexar).
+ */
+export function mascotasACargoDesdeFilas(
+  filas: readonly unknown[][],
+  encabezados: readonly string[],
+): MascotaACargo[] {
+  const iId = encabezados.indexOf('paciente_id');
+  const iResp = encabezados.indexOf('responsable_id');
+  const iBaja = encabezados.indexOf('borrado_en');
+  if (iId === -1 || iResp === -1) return [];
+  const porId: Record<string, string> = {};
+  for (let i = 0; i < (filas || []).length; i++) {
+    const f = filas[i] || [];
+    const id = texto(f[iId]);
+    if (!id) continue;
+    if (iBaja !== -1 && texto(f[iBaja])) {
+      delete porId[id];
+      continue;
+    }
+    const r = texto(f[iResp]);
+    if (r) porId[id] = r;
+  }
+  return Object.keys(porId).map(function (id) {
+    return { id: id, responsableId: porId[id] };
+  });
+}

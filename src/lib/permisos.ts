@@ -253,6 +253,21 @@ export const MATRIZ_PERMISOS: Record<Exclude<Rol, 'TITULAR'>, readonly Verbo[]> 
   LECTOR: ['LISTAR_PACIENTES', 'VER_CATALOGOS', 'LEER_HISTORIA', 'LEER_DOCUMENTO'],
 };
 
+/**
+ * Bloque O · Lo que un MIEMBRO puede hacer además **sobre una mascota** que le
+ * alcance (la suya o una que se le asignó).
+ *
+ * En una persona, cambiar su identidad o su pauta de medicación conviene que
+ * pase por quien cuida. En un animal, quien lo saca a pasear y le da la
+ * pastilla **es** quien lo cuida: negarle editar su ficha o apuntar su
+ * antiparasitario dejaba la mascota en manos de una sola persona.
+ *
+ * Solo aplica con la especie que diga la hoja (el router la fija desde
+ * `PACIENTES`, no la toma del cliente). Dar de alta y de baja sigue siendo del
+ * titular.
+ */
+export const VERBOS_MIEMBRO_SOBRE_MASCOTA: readonly Verbo[] = ['EDITAR_PACIENTE', 'ESCRIBIR_MEDICACION'];
+
 /** Verbos que solo el titular ejerce. Ninguna fila de la matriz los incluye. */
 export const VERBOS_SOLO_TITULAR: readonly Verbo[] = [
   'ADMINISTRAR_ACCESOS',
@@ -326,7 +341,15 @@ export function puede(
 
   const permitidos = CONJUNTOS[acceso.rol];
   if (!permitidos) return false;
-  return permitidos.has(verbo as string);
+  if (permitidos.has(verbo as string)) return true;
+
+  // Bloque O · el cuidado diario de una mascota a su alcance.
+  return (
+    acceso.rol === 'MIEMBRO' &&
+    definicion.ambito === 'PACIENTE' &&
+    especiePaciente === 'MASCOTA' &&
+    VERBOS_MIEMBRO_SOBRE_MASCOTA.indexOf(verbo as Verbo) !== -1
+  );
 }
 
 /**

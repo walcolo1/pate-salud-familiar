@@ -29,6 +29,66 @@
     "moderate": 0,
     "minor": 0
   },
+  "mascota-centro-medicamentos": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
+  "mascota-centro-medicamentos-dialogo": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
+  "mascota-centro-perfil": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
+  "mascota-centro-perfil-dialogo": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
+  "mascota-centro-preventiva": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
+  "mascota-centro-preventiva-dialogo": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
+  "mascota-centro-seguimiento": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
+  "mascota-centro-seguimiento-dialogo": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
+  "mascota-centro-vacunas": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
+  "mascota-centro-vacunas-dialogo": {
+    "critical": 0,
+    "serious": 0,
+    "moderate": 0,
+    "minor": 0
+  },
   "mascota-historial": {
     "critical": 0,
     "serious": 0,

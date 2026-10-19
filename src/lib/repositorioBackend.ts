@@ -67,6 +67,18 @@ import type {
   AppointmentEmailSource,
 } from '../domain/models';
 import type { MedicalHistoryEntry, Pet, VaccineEntry, WeightEntry } from '../domain/mascotas';
+import {
+  COLECCION_DE_MODULO,
+  MODULOS_VACIOS,
+  moduloAFila,
+  moduloDesdeFila,
+  petAFila,
+  petDesdeFila,
+  vacunaAFila,
+  vacunaDesdeFila,
+  type ModuloMascota,
+  type ModulosMascota,
+} from './codecMascota';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Códigos propios
@@ -526,7 +538,13 @@ export class RepositorioBackend implements DataRepository {
     const deMascota = (fila: Record<string, unknown>, columna: string) =>
       idsMascota.has(String(fila[columna] ?? '').trim());
     const COLUMNA_PACIENTE: Record<string, string> = { PACIENTES: 'id' };
+    // Bloque O · exámenes y documentos de una mascota viven en las mismas
+    // colecciones que los de una persona, con su `memberId` = la mascota: las
+    // pantallas ya filtran por paciente y el motor del Bloque N los compara
+    // con especie MASCOTA.
+    const COMPARTIDAS = new Set(['EXAMENES', 'EXAMENES_RESULTADOS', 'DOCUMENTOS']);
     const filasDe = (pestana: string): Record<string, unknown>[] => {
+      if (COMPARTIDAS.has(pestana)) return todasDe(pestana);
       const columna = COLUMNA_PACIENTE[pestana] ?? 'paciente_id';
       return todasDe(pestana).filter((f) => !deMascota(f, columna));
     };
@@ -768,7 +786,8 @@ export class RepositorioBackend implements DataRepository {
   // ── Mascotas (Bloque D, esquema v6) ───────────────────────────────────────
 
   async savePet(_ctx: RepositoryContext, pet: Pet): Promise<void> {
-    await this.guardar('pets', pet as unknown as Record<string, unknown>);
+    // Bloque O · la ficha ampliada viaja en el sobre de `notas`.
+    await this.guardar('pets', petAFila(pet));
   }
 
   async savePetWeight(_ctx: RepositoryContext, entry: WeightEntry): Promise<void> {
@@ -776,11 +795,16 @@ export class RepositorioBackend implements DataRepository {
   }
 
   async savePetVaccine(_ctx: RepositoryContext, entry: VaccineEntry): Promise<void> {
-    await this.guardar('petVaccines', entry as unknown as Record<string, unknown>);
+    await this.guardar('petVaccines', vacunaAFila(entry));
   }
 
   async savePetHistory(_ctx: RepositoryContext, entry: MedicalHistoryEntry): Promise<void> {
     await this.guardar('petHistory', entry as unknown as Record<string, unknown>);
+  }
+
+  /** Bloque O · cuidados, tratamientos, tomas y estado de recordatorios. */
+  async savePetRecord(_ctx: RepositoryContext, modulo: ModuloMascota, registro: Record<string, unknown>): Promise<void> {
+    await this.guardar(COLECCION_DE_MODULO[modulo], moduloAFila(modulo, registro));
   }
 
   // ── Gmail y ajustes: E11, que no está construido ──────────────────────────
@@ -969,7 +993,7 @@ export function idsDeMascotas(filasPacientes: readonly Record<string, unknown>[]
 export function mascotasDesdeFilas(
   filasDe: (pestana: string) => Record<string, unknown>[],
   idsMascota: Set<string>,
-): Pick<AllFamilyData, 'pets' | 'petWeights' | 'petVaccines' | 'petHistory'> {
+): Pick<AllFamilyData, 'pets' | 'petWeights' | 'petVaccines' | 'petHistory' | 'petModules'> {
   const [identidad, perfil] = DESCRIPTORES.pets;
   const deMascota = (columna: string) => (f: Record<string, unknown>) =>
     idsMascota.has(String(f[columna] ?? '').trim());
@@ -986,7 +1010,7 @@ export function mascotasDesdeFilas(
     if (!memberId) continue;
     pets.push({
       ...(datos as Record<string, unknown>),
-      ...base,
+      ...petDesdeFila(base),
       id: String(base.id),
       familyId: '',
       memberId,
@@ -1003,9 +1027,22 @@ export function mascotasDesdeFilas(
   return {
     pets,
     petWeights: conResponsable<WeightEntry>(colapsar(DESCRIPTORES.petWeights[0], filasDe('PESOS').filter(deMascota('paciente_id')))),
-    petVaccines: conResponsable<VaccineEntry>(colapsar(DESCRIPTORES.petVaccines[0], filasDe('VACUNAS').filter(deMascota('paciente_id')))),
+    petVaccines: conResponsable<VaccineEntry>(
+      colapsar(DESCRIPTORES.petVaccines[0], filasDe('VACUNAS').filter(deMascota('paciente_id'))).map((v) => vacunaDesdeFila(v)),
+    ),
     petHistory: conResponsable<MedicalHistoryEntry>(
       colapsar(DESCRIPTORES.petHistory[0], filasDe('HISTORIAL').filter(deMascota('paciente_id'))),
     ),
+    petModules: (() => {
+      const m: ModulosMascota = MODULOS_VACIOS();
+      for (const modulo of Object.keys(COLECCION_DE_MODULO) as ModuloMascota[]) {
+        const descriptor = DESCRIPTORES[COLECCION_DE_MODULO[modulo]][0];
+        const filas = colapsar(descriptor, filasDe(descriptor.pestana).filter(deMascota('paciente_id')))
+          .map((r) => moduloDesdeFila(modulo, r))
+          .filter((r): r is Record<string, unknown> => r !== null);
+        (m[modulo] as unknown[]) = conResponsable(filas as Record<string, unknown>[]);
+      }
+      return m;
+    })(),
   };
 }

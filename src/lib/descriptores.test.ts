@@ -27,7 +27,10 @@ import { PESTANAS } from './esquemaHoja';
 const MODELOS =
   readFileSync(join(process.cwd(), 'src', 'domain', 'models.ts'), 'utf8') +
   '\n' +
-  readFileSync(join(process.cwd(), 'src', 'domain', 'mascotas.ts'), 'utf8');
+  readFileSync(join(process.cwd(), 'src', 'domain', 'mascotas.ts'), 'utf8') +
+  '\n' +
+  // Bloque O · los módulos clínicos de la mascota.
+  readFileSync(join(process.cwd(), 'src', 'domain', 'cuidadoMascota.ts'), 'utf8');
 
 function camposDelModelo(nombre: string): string[] {
   const m = new RegExp(`export interface ${nombre}(?: extends [A-Za-z]+)? \\{`).exec(MODELOS);

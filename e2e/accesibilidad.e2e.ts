@@ -425,6 +425,76 @@ test.describe('C1 · accesibilidad', () => {
     await medirYComparar(page, 'mascota-vacunas-dialogo');
   });
 
+  /**
+   * Bloque O · el centro de control de una mascota: los cinco módulos, cada
+   * uno con datos y con su diálogo abierto. Sin línea base previa: cero.
+   */
+  test('A11Y · mascota-centro', async ({ page }) => {
+    test.setTimeout(120_000);
+    const id = await primerFamiliar(page);
+    await page.evaluate((memberId) => {
+      const clave = 'pate-salud-state:demo';
+      const e = JSON.parse(localStorage.getItem(clave) ?? '{}');
+      const ahora = new Date().toISOString();
+      const dd = (n: number) => String(n).padStart(2, '0');
+      const fecha = (dias: number) => {
+        const d = new Date(Date.now() + dias * 86_400_000);
+        return `${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}`;
+      };
+      const base = { createdAt: ahora, updatedAt: ahora, deletedAt: null };
+      e.pets = [{
+        id: 'pet-a11y-centro', familyId: 'local', memberId, nombre: 'MASCOTA-A11Y-CENTRO', especie: 'PERRO', sexo: 'MACHO',
+        fechaNacimiento: '2019-04-02', pesoActualKg: 15, pesoIdealKg: 12, activo: true, notas: 'Nota sintetica',
+        ficha: { estado: 'EN_TRATAMIENTO', esterilizado: true, fechaEsterilizacion: '2020-01-10', microchip: '985000000000001', tamano: 'MEDIANO',
+          veterinario: { nombre: 'Vet sintetico', clinica: 'Clinica sintetica' }, alimentacion: { marca: 'Marca', presentacion: 'SECO', vecesAlDia: 2 },
+          rutina: { banoCadaDias: 30 }, cuidadosEspeciales: { miedos: 'Ruidos' } },
+        ...base,
+      }];
+      e.petWeights = [
+        { id: 'w-c1', petId: 'pet-a11y-centro', memberId, fecha: fecha(-60), pesoKg: 13, ...base },
+        { id: 'w-c2', petId: 'pet-a11y-centro', memberId, fecha: fecha(-20), pesoKg: 15, ...base },
+      ];
+      e.petVaccines = [
+        { id: 'vc1', petId: 'pet-a11y-centro', memberId, vacuna: 'Rabia', tipo: 'CORE', fecha: fecha(-380), proximaDosis: fecha(-15), costo: 50000, ...base },
+        { id: 'vc2', petId: 'pet-a11y-centro', memberId, vacuna: 'Tos de las perreras (Bordetella)', tipo: 'NO_CORE', fecha: fecha(-30), proximaDosis: fecha(335), ...base },
+      ];
+      e.petModules = {
+        cuidados: [
+          { id: 'cc1', petId: 'pet-a11y-centro', memberId, categoria: 'ANTIPULGAS', fecha: fecha(-35), proxima: fecha(-5), periodicidadMeses: 1, producto: 'Pipeta', via: 'TOPICA', costo: 40000, ...base },
+          { id: 'cc2', petId: 'pet-a11y-centro', memberId, categoria: 'CONSULTA', fecha: fecha(-10), profesional: 'Vet sintetico', costo: 80000, ...base },
+        ],
+        tratamientos: [
+          { id: 'tc1', petId: 'pet-a11y-centro', memberId, nombre: 'Tratamiento sintetico', tipo: 'ANTIBIOTICO', dosisValor: 1, dosisUnidad: 'comprimido', frecuencia: 'CADA_12H', via: 'ORAL', fechaInicio: fecha(-1), horaInicio: '00:00', fechaFin: fecha(4), estado: 'ACTIVO', ...base },
+        ],
+        tomas: [],
+        recordatorios: [],
+      };
+      localStorage.setItem(clave, JSON.stringify(e));
+    }, id);
+
+    await page.goto('/mascotas/pet-a11y-centro');
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await expect(page.getByRole('heading', { name: 'MASCOTA-A11Y-CENTRO' })).toBeVisible();
+
+    const modulos: Array<[RegExp, string, string]> = [
+      [/^Perfil, peso y rutina$/, 'perfil', 'Editar ficha'],
+      [/^Vacunas$/, 'vacunas', 'Registrar vacuna'],
+      [/^Salud preventiva$/, 'preventiva', 'Registrar aplicación'],
+      [/^Medicamentos$/, 'medicamentos', 'Nuevo tratamiento'],
+      [/^Exámenes, documentos y recordatorios/, 'seguimiento', 'Registrar examen'],
+    ];
+    for (const [tab, nombre, abridor] of modulos) {
+      await page.getByRole('tab', { name: tab }).click();
+      await medirYComparar(page, `mascota-centro-${nombre}`);
+      await page.getByRole('button', { name: abridor }).first().click();
+      const dialogo = page.locator('dialog[open]');
+      await expect(dialogo, `no se abrió el diálogo de ${nombre}`).toBeVisible({ timeout: 10_000 });
+      await medirYComparar(page, `mascota-centro-${nombre}-dialogo`);
+      await page.keyboard.press('Escape');
+      await expect(dialogo).toBeHidden();
+    }
+  });
+
   /** El historial veterinario de una mascota (D4), con y sin diálogo. */
   test('A11Y · mascota-historial', async ({ page }) => {
     const id = await primerFamiliar(page);

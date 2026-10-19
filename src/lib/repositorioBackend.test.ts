@@ -802,3 +802,68 @@ describe('invitacionesDesdeAccesos (Bloque L)', () => {
     expect(invitacionesDesdeAccesos(null)).toEqual([]);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque O · Mascotas: ficha ampliada y módulos, ida y vuelta por la hoja
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Bloque O · mascota de punta a punta en las pestañas existentes', () => {
+  /** Convierte la fila enviada en celdas de su pestaña, como las devolvería `exportar`. */
+  const celdas = (tabla: string, fila: Record<string, unknown>) => (encabezadosDe(tabla) ?? []).map((c) => (fila[c] ?? '') as unknown);
+
+  it('lo que se escribe se relee igual: ficha, vacuna, preventivo, tratamiento, toma, recordatorio, examen y documento', async () => {
+    const { repo, espia } = banco(Array.from({ length: 12 }, () => ({ ok: true, data: { aplicadas: 1, revision: 1 } })));
+    const pet = {
+      id: 'pet-1', familyId: '', memberId: 'p1', nombre: 'Nube', especie: 'PERRO', sexo: 'HEMBRA', activo: true,
+      notas: 'Le teme a la pólvora', fotoUrl: 'data:image/jpeg;base64,AAAA',
+      ficha: { estado: 'EN_TRATAMIENTO', esterilizado: true, microchip: '985112003456789', veterinario: { nombre: 'Dra. Ruiz' }, alimentacion: { presentacion: 'SECO', vecesAlDia: 2 } },
+      createdAt: '', updatedAt: '',
+    };
+    await repo.savePet(CTX, pet as never);
+    await repo.savePetVaccine(CTX, { id: 'v1', petId: 'pet-1', memberId: 'p1', vacuna: 'Rabia', fecha: '2026-01-10', proximaDosis: '2027-01-10', tipo: 'CORE', costo: 60000, clinica: 'Huellitas', createdAt: '', updatedAt: '' } as never);
+    await repo.savePetRecord(CTX, 'cuidados', { id: 'c1', petId: 'pet-1', memberId: 'p1', categoria: 'ANTIPULGAS', fecha: '2026-10-01', proxima: '2026-11-01', periodicidadMeses: 1, producto: 'Bravecto', via: 'ORAL', costo: 120000 });
+    await repo.savePetRecord(CTX, 'tratamientos', { id: 't1', petId: 'pet-1', memberId: 'p1', nombre: 'Amoxicilina', tipo: 'ANTIBIOTICO', dosisValor: 250, dosisUnidad: 'mg', frecuencia: 'CADA_12H', via: 'ORAL', fechaInicio: '2026-10-15', horaInicio: '08:00', fechaFin: '2026-10-19', estado: 'ACTIVO', efectosSecundarios: 'Vómito' });
+    await repo.savePetRecord(CTX, 'tomas', { id: 't1@2026-10-15T08:00', tratamientoId: 't1', petId: 'pet-1', memberId: 'p1', programadaEn: '2026-10-15T08:00', estado: 'APLICADA', aplicadaEn: '2026-10-15T13:05:00Z' });
+    await repo.savePetRecord(CTX, 'recordatorios', { id: 'recpet:pet-1:PESO:2026-11-01', petId: 'pet-1', memberId: 'p1', clave: 'PESO:2026-11-01', tipo: 'PESO', titulo: 'Control de peso mensual', estado: 'POSPUESTO', fecha: '2026-11-08' });
+
+    // Todas las mutaciones viajan como MASCOTA y con el paciente = la mascota.
+    const enviadas = espia.mock.calls.map((_c, i) => envio(espia, i).payload!.mutaciones!).flat();
+    for (const m of enviadas) {
+      expect(m.pacienteId).toBe('pet-1');
+      expect((m as { especie?: string }).especie).toBe('MASCOTA');
+    }
+    const tablas: Record<string, unknown[][]> = { PACIENTES: [['p1', 'HUMANO', 'Ana', '', 'ACTIVE', '', '', '', '']] };
+    for (const m of enviadas) (tablas[m.tabla] ??= []).push(celdas(m.tabla, m.fila));
+    // El control veterinario se distingue de uno humano por su prefijo.
+    expect(enviadas.find((m) => m.tabla === 'CONTROLES')!.fila.tipo).toBe('VET_ANTIPULGAS');
+    // Exámenes y documentos de la mascota van en sus pestañas de siempre.
+    tablas.EXAMENES = [celdas('EXAMENES', { id: 'e1', paciente_id: 'pet-1', nombre: 'Química', fecha: '2026-10-01' })];
+    tablas.DOCUMENTOS = [celdas('DOCUMENTOS', { id: 'd1', paciente_id: 'pet-1', titulo: 'carnet.pdf' })];
+
+    const { repo: lector } = banco([{ ok: true, data: { esquema: 6, revision: 9, tablas } }]);
+    const d = await lector.loadAll(CTX);
+
+    expect(d.pets).toHaveLength(1);
+    expect(d.pets[0]).toMatchObject({ nombre: 'Nube', notas: 'Le teme a la pólvora', fotoUrl: 'data:image/jpeg;base64,AAAA', ficha: pet.ficha });
+    expect(d.petVaccines[0]).toMatchObject({ vacuna: 'Rabia', tipo: 'CORE', costo: 60000, clinica: 'Huellitas', memberId: 'p1' });
+    expect(d.petModules.cuidados[0]).toMatchObject({ categoria: 'ANTIPULGAS', producto: 'Bravecto', via: 'ORAL', costo: 120000, proxima: '2026-11-01', periodicidadMeses: 1, memberId: 'p1' });
+    expect(d.petModules.tratamientos[0]).toMatchObject({ nombre: 'Amoxicilina', tipo: 'ANTIBIOTICO', dosisValor: 250, frecuencia: 'CADA_12H', horaInicio: '08:00', efectosSecundarios: 'Vómito' });
+    expect(d.petModules.tomas[0]).toMatchObject({ tratamientoId: 't1', programadaEn: '2026-10-15T08:00', estado: 'APLICADA' });
+    expect(d.petModules.recordatorios[0]).toMatchObject({ clave: 'PESO:2026-11-01', estado: 'POSPUESTO', fecha: '2026-11-08' });
+    expect(d.exams.map((e) => e.memberId)).toEqual(['pet-1']);
+    expect(d.documents.map((x) => x.memberId)).toEqual(['pet-1']);
+    // Y nada de la mascota se cuela en las colecciones humanas.
+    expect(d.members.map((m) => m.id)).toEqual(['p1']);
+    expect(d.medications).toEqual([]);
+    expect(d.checkups).toEqual([]);
+  });
+
+  it('una mascota con notas antiguas en texto plano se lee igual que siempre', async () => {
+    const { repo } = banco([{ ok: true, data: { esquema: 6, revision: 1, tablas: {
+      PACIENTES: [['p1', 'HUMANO', 'Ana', '', 'ACTIVE', '', '', '', ''], celdas('PACIENTES', { id: 'pet-2', tipo: 'MASCOTA', nombre: 'Toby', activo: 'SI', notas: 'Come dos veces' })],
+      PERFIL_MASCOTA: [celdas('PERFIL_MASCOTA', { paciente_id: 'pet-2', especie: 'GATO', responsable_id: 'p1' })],
+    } } }]);
+    const d = await repo.loadAll(CTX);
+    expect(d.pets[0]).toMatchObject({ nombre: 'Toby', notas: 'Come dos veces', ficha: {} });
+  });
+});
